@@ -9,7 +9,7 @@ cmake_minimum_required(VERSION 3.15 FATAL_ERROR)
 set(CMAKE_BUILD_TYPE Debug)
 
 # PROJECT DEFINITION
-set(project_name "template_project")
+set(project_name "SimulationModels_for_SpaceNav")
 
 option(ENABLE_OPTIX "Enable OptiX" OFF)
 set(languages CXX CUDA) # ACHTUNG: PTX code requires C language!
