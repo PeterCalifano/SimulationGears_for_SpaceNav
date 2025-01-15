@@ -1,0 +1,6 @@
+codegen/
+CORTO_INPUT/*
+CORTO_OUTPUT/*
+v2e-output*
+slprj/*
+sensorsModels/Gyros_Samples

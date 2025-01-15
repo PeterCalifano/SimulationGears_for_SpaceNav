@@ -1,0 +1,3 @@
+To use this data, cite:
+1) Lemoine, F. G., et al. (2014), GRGM900C: A degree 900 lunar gravity model from GRAIL primary and extended mission data, Geophys. Res. Lett., 41, 3382-3389, doi:10.1002/2014GL060027
+2) Goossens, S., et al. (2016), A Global Degree and Order 1200 Model of the Lunar Gravity Field using GRAIL Mission Data, Lunar and Planetary Science Conference, Houston, TX, Abstract #1484. [PDF]
