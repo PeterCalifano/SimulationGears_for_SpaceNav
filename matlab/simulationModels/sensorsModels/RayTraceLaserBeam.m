@@ -10,6 +10,39 @@ arguments
     dTargetPosition_TB      (3,1) double {isnumeric, isvector}  = [0;0;0] % Distance from the ray origin to the target centre
     bEnableHeuristicPruning (1,1) logical {islogical, isscalar} = false   % Flag to enable heuristic pruning for computation accel.
 end
+%% SIGNATURE
+% [bInsersectionFlag, dtParamDistance, dIntersectionPoint] = RayTraceLaserBeam(strTargetModelData, ...
+%     dBeamDirection_TB, ...
+%     dRayOrigin_TB, ...
+%     dTargetPosition_TB, ...
+%     bEnableHeuristicPruning) %#codegen
+% -------------------------------------------------------------------------------------------------------------
+%% DESCRIPTION
+% Function implementing ray tracing of a single ray against mesh in strTargetModelData. Computation validity
+% is checked considering the distance from ray origin to mesh centre.
+% -------------------------------------------------------------------------------------------------------------
+%% INPUT
+% strTargetModelData      (1,1) struct {isstruct, isscalar}   % Struct containing mesh representing target
+% dBeamDirection_TB       (3,1) double {isnumeric,isvector}   % Ray direction as unit vector
+% dRayOrigin_TB           (3,1) double {isnumeric, isvector}  = [0;0;0] % Target model centre position
+% dTargetPosition_TB      (3,1) double {isnumeric, isvector}  = [0;0;0] % Distance from the ray origin to the target centre
+% bEnableHeuristicPruning (1,1) logical {islogical, isscalar} = false   % Flag to enable heuristic pruning for computation accel.
+% -------------------------------------------------------------------------------------------------------------
+%% OUTPUT
+% dMeasDistance
+% bInsersectionFlag
+% bValidityFlag
+% dIntersectionPoint
+% -------------------------------------------------------------------------------------------------------------
+%% CHANGELOG
+% 16-01-2024    Pietro Califano     First implementation for RCS-1 simulator
+% -------------------------------------------------------------------------------------------------------------
+%% DEPENDENCIES
+% [-]
+% -------------------------------------------------------------------------------------------------------------
+%% Future upgrades
+% [-]
+% -------------------------------------------------------------------------------------------------------------
 
 
 % Check if the input structure contains the required fields
