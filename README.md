@@ -1,2 +1,2 @@
-# cpp_template_project
-C++/CUDA Template project with pre-configured cmake for small builds. It includes unit testing frameworks (catch2, CppUnitLite), project folder organization, doxygen pre-config and GTwrap for wrapping code to Python and MATLAB. 
+# Simulation Gears for SpaceNav
+This repository is in development and will take a long time, but in the mean time feel free to grab what you need in the matlab/ folder. It contains legacy code from previous works =)
