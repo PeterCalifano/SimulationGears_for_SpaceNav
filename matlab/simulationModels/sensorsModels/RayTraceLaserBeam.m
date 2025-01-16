@@ -7,12 +7,17 @@ arguments
     strTargetModelData      (1,1) struct {isstruct, isscalar}   % Struct containing mesh representing target
     dBeamDirection_TB       (3,1) double {isnumeric,isvector}   % Ray direction as unit vector
     dRayOrigin_TB           (3,1) double {isnumeric, isvector}  = [0;0;0] % Target model centre position
-    dTargetPosition_TB      (1,1) double {isnumeric, isscalar}  = [0;0;0] % Distance from the ray origin to the target centre
+    dTargetPosition_TB      (3,1) double {isnumeric, isvector}  = [0;0;0] % Distance from the ray origin to the target centre
     bEnableHeuristicPruning (1,1) logical {islogical, isscalar} = false   % Flag to enable heuristic pruning for computation accel.
 end
 
-% Input checks
-assert(dTargetPosition_TB > 0, 'Distance value must be positive!');
+
+% Check if the input structure contains the required fields
+assert(isfield(strTargetModelData, 'i32triangVertexPtrs') || ...
+    isfield(strTargetModelData, 'dVerticesPositions'), ...
+    'Error: strTargetModelData must contain fields i32triangVertexPtrs and dVerticesPositions');
+
+ui32NumOfTriangles = uint32(size(strTargetModelData.i32triangVertexPtrs, 2));
 
 % if bEnableHeuristicPruning == true 
     % TODO (PC)
@@ -34,16 +39,21 @@ dIntersectionPoint  = zeros(3,1);
 % DEVNOTE: may be modified to select only a subset of the triangles for further optimization
 
 % Get data from struct to avoid accessing struct mem. locations during loop
-dVerticesPos = strTargetModelData.dVerticesPositions;
-i32triangVertPtr1 = strTargetModelData.i32triangVertexPtrs(1, :); % Improved mem access speed
-i32triangVertPtr2 = strTargetModelData.i32triangVertexPtrs(2, :); 
-i32triangVertPtr3 = strTargetModelData.i32triangVertexPtrs(3, :); 
+dVerticesPos        = strTargetModelData.dVerticesPositions;
+i32triangVertPtr1   = strTargetModelData.i32triangVertexPtrs(1, :); % Improved mem access speed
+i32triangVertPtr2   = strTargetModelData.i32triangVertexPtrs(2, :); 
+i32triangVertPtr3   = strTargetModelData.i32triangVertexPtrs(3, :); 
 
 % Compute ray origin to target centre position vector
 dRayOriginToTargetCentre = dTargetPosition_TB - dRayOrigin_TB;
 
 % Compute threshold for intersection check (projection of dRayOriginToTargetCentre onto ray)
 dIntersectionValidityThr = dot(dRayOriginToTargetCentre, dBeamDirection_TB);
+
+if dIntersectionValidityThr < 0
+    % DEVNOTE: Safe exit, this should not even be reached in principle: intersection check can be skipped.
+    return;
+end
 
 for id = 1:ui32NumTrianglesInSubset
 
@@ -72,7 +82,7 @@ for id = 1:ui32NumTrianglesInSubset
     % If intersection AND distance less than distance to target centre --> found, can break and return
     if bTmpIntersectFlag
 
-        if dTmptParamDistance < dIntersectionValidityThr
+        if dTmptParamDistance < dIntersectionValidityThr && dTmptParamDistance > 0
             % Intersection occurred on the camera side of the target --> VALID
             bInsersectionFlag = true;
             dtParamDistance = dTmptParamDistance;
