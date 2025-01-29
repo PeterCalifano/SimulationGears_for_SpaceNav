@@ -120,6 +120,8 @@ dPointDirDotSunDir = sum([dPointDirX_TB; dPointDirY_TB; dPointDirZ_TB]' * (-dSun
 % Illumination check
 bIlluminationFeasibilityMask = dPointDirDotSunDir <= 0 | dPointDirDotSunDir <= dCosIllumAngleThr;
 
+% TODO (PC): this heuristic check does not grant the points are actually illuminated, because self-shadowing is not checked using RT (shadow rays). Need to do it as optionally enabled in this function. Essentially, for each visible point from the camera, cast a shadow ray to light source and check for intersections. No intersection --> point is visible.
+
 % Heuristic geometrical check
 if strFcnOptions.bENABLE_HEUR_GEOM_FEAS_CHECK == true
     % dPointDirDotCameraPosDir_test = dot(repmat(-dCameraDir_TB, 1,length(ui32PointsIdx)), [dPointDirX_TB; dPointDirY_TB; dPointDirZ_TB], 1);
@@ -186,6 +188,7 @@ parfor idL = 1:i32NumOfPointsToTrace
     for id = 1:ui32NumTrianglesInSubset
 
         idT = ui32TrianglesIDsubset(id);
+        % DEVNOTE the only way to avoid broadcast arrays is to compose first vectors cointaining the indices of the vertices for each triangle.
         % Get triangle vertices ptrs
         i32triangVertPtr1_tmp = i32triangVertPtr1(id);
         i32triangVertPtr2_tmp = i32triangVertPtr2(id);
@@ -210,9 +213,10 @@ parfor idL = 1:i32NumOfPointsToTrace
             if (dRayToPointsFromCamNorm(idL) - dIntersectDistance) > eps('single') && bTmpIntersectFlag == true
                 assert(idT <= ui32NumOfTriangles)
                 bIsIntersected(idT) = true;
+
+                % TODO (PC) shadow ray casting goes here, to check for intersection with mesh (except for the triangles of which the vertex is part of). Triangles may be excluded easily based on some conditions here.
+
                 break; % Intersection detected --> no need to check other triangles
-                %                         elseif tmpIntersectFlag == true && intersectDistance <= tmpLosCam2LMnorm
-                %                             bIsIntersected(idT) = false; % Not really needed if default == false
             end
         end
 
