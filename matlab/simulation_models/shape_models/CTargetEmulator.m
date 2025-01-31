@@ -180,17 +180,17 @@ classdef CTargetEmulator
         end
         
         % PUBLIC METHODS
-        function [self, dPointsPositionsGT_TB, i32LandmarksID] = GenerateSimulatedPoints_TB(self, pointGTsamplingMethod)
+        function [self, dPointsPositionsGT_TB, i32LandmarksID] = GenerateSimulatedPoints_TB(self, enumPointGTsamplingMethod)
             arguments
                 self
-                pointGTsamplingMethod (1,1) enumPointGTsamplingMethod = enumPointGTsamplingMethod.random_uniform
+                enumPointGTsamplingMethod (1,1) EnumPointGTsamplingMethod = EnumPointGTsamplingMethod.random_uniform
             end
 
             bREUSE_FLAG = false;
 
             if self.pointGTsamplingMethod == -1
                 % First call, assign method
-                self.pointGTsamplingMethod = pointGTsamplingMethod;
+                self.pointGTsamplingMethod = enumPointGTsamplingMethod;
             else
                 % Determine if the same method is used
                 if enumPointGTsamplingMethod == self.pointGTsamplingMethod
