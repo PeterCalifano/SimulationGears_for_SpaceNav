@@ -129,7 +129,6 @@ classdef CAttitudePointingGenerator < handle
             arguments
                 options.enumOutRot3Param (1,1) EnumRotParams {isa(options.enumOutRot3Param, ...
                     'EnumRotParams')} = EnumRotParams.DCM
-                options.dAuxiliaryAxis (3,1) double {isvector} = [0; 0; 1];
             end
             
             ui32NumOfEntries = uint32(size(dCameraPosition_Frame, 2));
@@ -160,7 +159,7 @@ classdef CAttitudePointingGenerator < handle
                 dDCM_FrameFromCAM(:,:, idx) = [dCamDirX_Frame(:, idx), dCamDirY_Frame(:, idx), dCamBoresightZ_Frame(:, idx)];
             end
 
-            dOutRot3 = dDCM_FramefromCAM; % TEMPORARY
+            dOutRot3 = dDCM_FrameFromCAM; % TEMPORARY
             if options.enumOutRot3Param ~= EnumRotParams.DCM
                 warning('Current version only supports EnumRotParams.DCM output parameterization.')
             end
