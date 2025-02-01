@@ -57,23 +57,26 @@ strFcnOptions.bENABLE_HEUR_GEOM_FEAS_CHECK = true;
 i_strTargetBody = objTargetEmulator.getTargetStruct();
 
 % Legacy function for equivalence test
-tic
-[o_dIsLMvisibleMask] = CheckLMvisibility_rayTrace([double(ui32pointsIDs); dPointsPositions_TB], ...
-    i_strTargetBody, strCamera, dSunPosition_TB./norm(dSunPosition_TB), strVisibilityCheckOptions);
-legacy_timing_matlab = toc;
+% tic
+% [o_dIsLMvisibleMask] = CheckLMvisibility_rayTrace([double(ui32pointsIDs); dPointsPositions_TB], ...
+%     i_strTargetBody, strCamera, dSunPosition_TB./norm(dSunPosition_TB), strVisibilityCheckOptions);
+% legacy_timing_matlab = toc;
 
 % Test MATLAB function
 bDEBUG_MODE = true;
+profile on
 tic
 [bAllPointsVisibilityMask] = FastRayTracePointVisibility(ui32pointsIDs, dPointsPositions_TB, ...
     strTargetBodyData, strCameraData, dSunPosition_TB, strFcnOptions, bDEBUG_MODE);
 new_timing_matlab = toc;
+prof1 = profile('info');
+profile off
 
 
-disp('Sum of output differences against LEGACY:')
-bOutputDiffLegacy = bAllPointsVisibilityMask ~= o_dIsLMvisibleMask;
-sum(abs(bOutputDiffLegacy))
-
+% disp('Sum of output differences against LEGACY:')
+% bOutputDiffLegacy = bAllPointsVisibilityMask ~= o_dIsLMvisibleMask;
+% sum(abs(bOutputDiffLegacy))
+return
 % MEx equivalence test and timing
 i_strTargetBody = orderfields(i_strTargetBody);
 strCamera = orderfields(strCamera);
