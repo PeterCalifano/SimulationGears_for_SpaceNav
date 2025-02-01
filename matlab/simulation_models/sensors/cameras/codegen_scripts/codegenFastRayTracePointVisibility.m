@@ -16,7 +16,7 @@ coder_config.EnableOpenMP = true;
 coder_config.OptimizeReductions = true;
 
 %% Target function details
-targetName = 'FastRayTracePointVisibility';
+targetName = 'RayTracePointVisibilityLocalPA';
 
 % numOfInputs; % ADD ASSERT to size of args_cell from specification functions
 
