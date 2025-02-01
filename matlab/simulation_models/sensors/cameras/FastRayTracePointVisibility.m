@@ -1,5 +1,10 @@
-function [bAllPointsVisibilityMask, dProjectedPoints_UV] = FastRayTracePointVisibility(ui32PointsIdx, dPointsPositions_TB, ...
-    strTargetBodyData, strCameraData, dSunDir_TB, strFcnOptions, bDEBUG_MODE) %#codegen
+function [bAllPointsVisibilityMask, dProjectedPoints_UV] = FastRayTracePointVisibility(ui32PointsIdx, ...
+                                                                                       dPointsPositions_TB, ...
+                                                                                       strTargetBodyData, ...
+                                                                                       strCameraData, ...
+                                                                                       dSunDir_TB, ...
+                                                                                       strFcnOptions, ...
+                                                                                       bDEBUG_MODE) %#codegen
 arguments
     ui32PointsIdx       (1,:) uint32
     dPointsPositions_TB (3,:) double
@@ -154,9 +159,9 @@ dPointPosZ_TB = dPointPosZ_TB(bPointsToRayTrace);
 i32NumOfPointsToTrace = int32( length(dPointPosX_TB) );
 
 % Compute norms of relative positions of points wrt camera
-dRayToPointsFromCam_TB = [dPointPosX_TB; dPointPosY_TB; dPointPosZ_TB] - dPosition_TB;
+dRayToPointsFromCam_TB  = [dPointPosX_TB; dPointPosY_TB; dPointPosZ_TB] - dPosition_TB;
 dRayToPointsFromCamNorm = vecnorm(dRayToPointsFromCam_TB, 2, 1);
-dRayToPointsFromCam_TB = dRayToPointsFromCam_TB./dRayToPointsFromCamNorm;
+dRayToPointsFromCam_TB  = dRayToPointsFromCam_TB./dRayToPointsFromCamNorm;
 
 dPointDirFromCamX_TB = dRayToPointsFromCam_TB(1, :);
 dPointDirFromCamY_TB = dRayToPointsFromCam_TB(2, :);
@@ -206,7 +211,7 @@ parfor idL = 1:i32NumOfPointsToTrace
 
             % Evaluate intersection through ray tracing
 
-            [bTmpIntersectFlag, ~, ~, dIntersectDistance] = fastRayTriangleIntersection(dPosition_TB, ...
+            [bTmpIntersectFlag, ~, ~, dIntersectDistance, dIntersectionPoint] = fastRayTriangleIntersection(dPosition_TB, ...
                 [dPointDirFromCamX_TB(idL); dPointDirFromCamY_TB(idL); dPointDirFromCamZ_TB(idL);],  ... 
                 tmpTriangleVertices(:, 1), tmpTriangleVertices(:, 2), tmpTriangleVertices(:, 3));
 
