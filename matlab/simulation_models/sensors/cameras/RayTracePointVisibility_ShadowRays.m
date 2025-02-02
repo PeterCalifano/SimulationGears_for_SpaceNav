@@ -1,4 +1,4 @@
-function [bAllPointsVisibilityMask, dProjectedPoints_UV] = RayTracePointVisibilityWithShadowRays(ui32PointsIdx, ...
+function [bAllPointsVisibilityMask, dProjectedPoints_UV] = RayTracePointVisibility_ShadowRays(ui32PointsIdx, ...
                                                                                                  dPointsPositions_TB, ...
                                                                                                  strTargetBodyData, ...
                                                                                                  strCameraData, ...
@@ -18,11 +18,13 @@ end
 % 
 % -------------------------------------------------------------------------------------------------------------
 %% DESCRIPTION
-% Preliminary checks performed:
-% 1) Sun illumination of each point considering illumination threshold on dot product
-% 2) Heuristic geometrical feasibility check considering dot product of camera position and points positions
-% 3) Points projections within field of view using pinhole projection model
-% Intersection check performed using ray tracing to points against each triangle of the mesh 
+% -Preliminary checks performed:
+%   1) Points projections within field of view using pinhole projection model
+% - Intersection check performed using ray tracing to points against each triangle of the mesh, one-sided to
+%   automatically exclude back-facing triangles (normals in the same direction as the ray, withopaque body)
+% - Illumination check performed using a shadow ray from point to light. Point is illuminated if shadow ray 
+%   to light does not intersect anything. Illumination check may be pre-computed if light is fixed (not done
+%   here). All points that pass both intersection checks are marked as visible.
 % -------------------------------------------------------------------------------------------------------------
 %% INPUT
 % ui32PointsIdx       (1,:) uint32
@@ -129,6 +131,7 @@ bIlluminationFeasibilityMask = dPointDirDotSunDir <= 0 | dPointDirDotSunDir <= d
 
 % Heuristic geometrical check
 if strFcnOptions.bENABLE_HEUR_GEOM_FEAS_CHECK == true
+    % Ellipsoid based check for heuristic pruning of points
     % dPointDirDotCameraPosDir_test = dot(repmat(-dCameraDir_TB, 1,length(ui32PointsIdx)), [dPointDirX_TB; dPointDirY_TB; dPointDirZ_TB], 1);
     dPointDirDotCameraPosDir = sum([dPointDirX_TB; dPointDirY_TB; dPointDirZ_TB]' * (-dCameraDir_TB), 2);
     bGeometricalFeasibilityMask = dPointDirDotCameraPosDir < 0 |  abs(dPointDirDotCameraPosDir) <= dCosLosAngleThr;

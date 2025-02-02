@@ -18,11 +18,14 @@ end
 % 
 % -------------------------------------------------------------------------------------------------------------
 %% DESCRIPTION
-% Preliminary checks performed:
-% 1) Sun illumination of each point considering illumination threshold on dot product
-% 2) Heuristic geometrical feasibility check considering dot product of camera position and points positions
-% 3) Points projections within field of view using pinhole projection model
-% Intersection check performed using ray tracing to points against each triangle of the mesh 
+% -Preliminary checks performed:
+%   1) Sun illumination of each point considering illumination threshold on dot product. This is equivalent 
+%   to considering the local Phase angle using an ellipsoidal shape.
+%   2) Heuristic geometrical feasibility check considering dot product of camera position and points
+%   positions. This check uses an ellipsoidal shape to prune back-facing points. Do not consider thresholds
+%   that are too strict when using irregularly shaped bodies.
+%   3) Points projections within field of view using pinhole projection model
+% - Intersection check performed using ray tracing to points against each triangle of the mesh.
 % -------------------------------------------------------------------------------------------------------------
 %% INPUT
 % ui32PointsIdx       (1,:) uint32
