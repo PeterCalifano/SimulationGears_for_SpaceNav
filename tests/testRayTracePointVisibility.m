@@ -96,7 +96,21 @@ fcnHandle_mex = @() RayTracePointVisibility_EllipsLocalPA_MEX(uint32(ui32pointsI
 % PLOTS
 
 % 3D plot
-objFigPointCloud = figure('Renderer','opengl'); %#ok<*FGREN>
+% Set flag for background color
+bUseBlackBackground = true; % Set to false for white background
+
+objFigPointCloud = figure('Renderer','opengl');
+
+% Set background color based on flag
+if bUseBlackBackground
+    set(gca, 'Color', 'k'); % Axes background
+    set(gcf, 'Color', 'k'); % Figure background
+    textColor = 'w'; % White text
+else
+    set(gca, 'Color', 'w'); % White background
+    set(gcf, 'Color', 'w');
+    textColor = 'k'; % Black text
+end
 
 % Plot the mesh using patch
 objPatchModel = patch('Vertices', strShapeModel.dVerticesPos', 'Faces', strShapeModel.ui32triangVertexPtr', ...
@@ -111,9 +125,11 @@ objPointCloud_GT = plot3(dPointsPositionsGT_TB(1, :), dPointsPositionsGT_TB(2, :
 
 DefaultPlotOpts()
 grid off
-xlabel('X [m]')
-ylabel('Y [m]')
-zlabel('Z [m]')
+xlabel('X [m]', 'Color', textColor);
+ylabel('Y [m]', 'Color', textColor);
+zlabel('Z [m]', 'Color', textColor);
+set(gca, 'XColor', textColor, 'YColor', textColor, 'ZColor', textColor);
+
 % camproj('perspective'); % Use perspective projection
 % campos(dCameraPosition_TB'); % Set camera to camera position
 % camtarget(-dCameraPosition_TB')
@@ -130,7 +146,7 @@ objDirToSun = plot3([0, lineScale * dSunPosition_TB(1)], ...
                     [0, lineScale * dSunPosition_TB(2)], ...
                     [0, lineScale * dSunPosition_TB(3)], 'r-', ...
                     'LineWidth', 2, 'DisplayName', 'To Sun');
-legend([objPatchModel, objPointCloud_GT, objDirToSun]);
+legend([objPatchModel, objPointCloud_GT, objDirToSun], 'TextColor', textColor);
 hold off;
 
 % Show visible points in 3D plot
