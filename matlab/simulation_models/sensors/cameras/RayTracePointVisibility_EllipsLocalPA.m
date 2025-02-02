@@ -1,4 +1,4 @@
-function [bAllPointsVisibilityMask, dProjectedPoints_UV] = RayTracePointVisibilityLocalPA(ui32PointsIdx, ...
+function [bAllPointsVisibilityMask, dProjectedPoints_UV] = RayTracePointVisibility_EllipsLocalPA(ui32PointsIdx, ...
                                                                                        dPointsPositions_TB, ...
                                                                                        strTargetBodyData, ...
                                                                                        strCameraData, ...
@@ -57,7 +57,7 @@ if not(isfield(strFcnOptions, 'dIllumAngleThr'))
     strFcnOptions.dIllumAngleThr = deg2rad(40); % Valid phase angles: 180-illumAngleThr
 end
 
-if not(isfield(strFcnOptions, 'dLosAngleThr'))
+if not(isfield(strFcnOptions, 'dLosAngleThr')) % Heuristic removal of back-facing points assuming ellipsoid
     strFcnOptions.dLosAngleThr = deg2rad(40); % Valid angles: 180-dLosAngleThr
 end
 
@@ -122,7 +122,7 @@ dCameraDir_TB = dPosition_TB/norm(dPosition_TB);
 dPointDirDotSunDir = sum([dPointDirX_TB; dPointDirY_TB; dPointDirZ_TB]' * (-dSunDir_TB), 2);
 
 % Perform preliminary vectorized checks (get all points that passed checks)
-% Illumination check
+% NOTE: illumi
 bIlluminationFeasibilityMask = dPointDirDotSunDir <= 0 | dPointDirDotSunDir <= dCosIllumAngleThr;
 
 % TODO (PC): this heuristic check does not grant the points are actually illuminated, because self-shadowing is not checked using RT (shadow rays). Need to do it as optionally enabled in this function. Essentially, for each visible point from the camera, cast a shadow ray to light source and check for intersections. No intersection --> point is visible.

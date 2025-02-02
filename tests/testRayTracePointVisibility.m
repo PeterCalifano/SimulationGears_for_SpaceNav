@@ -63,7 +63,10 @@ DefaultPlotOpts()
 xlabel('X [m]')
 ylabel('Y [m]')
 zlabel('Z [m]')
-view(dCameraPosition_TB); % Camera direction % TODO (PC) use this when showing plots of emulator!
+% camproj('perspective'); % Use perspective projection
+% campos(dCameraPosition_TB'); % Set camera to camera position
+% camtarget(-dCameraPosition_TB')
+% view(dCameraPosition_TB'); % Camera direction % TODO (PC) use this when showing plots of emulator!
 
 % TODO (img like visualization
 % objFigImgLike = figure('Renderer','opengl');
@@ -80,9 +83,9 @@ legend([objPatchModel, objPointCloud_GT, objDirToSun]);
 hold off;
 
 % Determines max angle between Sun direction and LM direction --> for LOCAL PHASE ANGLE CHECK
-strVisibilityCheckOptions.dIllumAngleThr = deg2rad(65); % [rad] % Lower value, more permissible
+strVisibilityCheckOptions.dIllumAngleThr = deg2rad(90); % [rad] % Lower value, more permissible
 % Determines max angle between -los and LM direction in TF. Angle to assign is between +Los and the
-strVisibilityCheckOptions.dLosAngleThr = deg2rad(65); % [rad] % Lower value, more permissible
+strVisibilityCheckOptions.dLosAngleThr = deg2rad(10); % [rad] % Lower value, more permissible
 strVisibilityCheckOptions = orderfields(strVisibilityCheckOptions);
 
 strFcnOptions.dIllumAngleThr                = strVisibilityCheckOptions.dIllumAngleThr;
@@ -94,14 +97,14 @@ i_strTargetBody = objTargetEmulator.getTargetStruct();
 %% legacyTest_CheckLMvisibility_rayTrace_MEX
 % Legacy function for equivalence test (MEX because MATLAB version is too slow)
 % MEx equivalence test and timing
-i_strTargetBody = orderfields(i_strTargetBody);
-strCamera = orderfields(strCamera);
-strVisibilityCheckOptions = orderfields(strVisibilityCheckOptions);
-
-fcnHandle_LEGACY = @() CheckLMvisibility_rayTrace_MEX([double(ui32pointsIDs); dPointsPositionsGT_TB], ...
-    i_strTargetBody, strCamera, dSunPosition_TB./norm(dSunPosition_TB), strVisibilityCheckOptions);
-
-[dAvgRunTime_LEGACY, dTimings_LEGACY] = AverageFunctionTiming(fcnHandle_LEGACY, 5);
+% i_strTargetBody = orderfields(i_strTargetBody);
+% strCamera = orderfields(strCamera);
+% strVisibilityCheckOptions = orderfields(strVisibilityCheckOptions);
+% 
+% fcnHandle_LEGACY = @() CheckLMvisibility_rayTrace_MEX([double(ui32pointsIDs); dPointsPositionsGT_TB], ...
+%     i_strTargetBody, strCamera, dSunPosition_TB./norm(dSunPosition_TB), strVisibilityCheckOptions);
+% 
+% [dAvgRunTime_LEGACY, dTimings_LEGACY] = AverageFunctionTiming(fcnHandle_LEGACY, 5);
 
 %% test_RayTracePointVisibilityLocalPA_MEX
 
@@ -113,10 +116,10 @@ strFcnOptions = orderfields(strFcnOptions);
 fcnHandle_mex = @() RayTracePointVisibilityLocalPA_MEX(uint32(ui32pointsIDs), dPointsPositionsGT_TB, ...
     strTargetBodyData, strCameraData, dSunPosition_TB, strFcnOptions, bDEBUG_MODE);
 
-[dAvgRunTime, dTimings] = AverageFunctionTiming(fcnHandle_mex, 5);
+[dAvgRunTime, dTimings] = AverageFunctionTiming(fcnHandle_mex, 1);
 
 % Get output for visualization
-[bAllPointsVisibilityMask_legacyLocalPA, dProjectedPoints_UV] = RayTracePointVisibilityLocalPA_MEX(uint32(ui32pointsIDs), ...
+[bAllPointsVisibilityMask_legacyLocalPA, dProjectedPoints_UV] = RayTracePointVisibility_EllipsLocalPA_MEX(uint32(ui32pointsIDs), ...
                                                                                                    dPointsPositionsGT_TB, ...
                                                                                                    strTargetBodyData, ...
                                                                                                    strCameraData, ...
