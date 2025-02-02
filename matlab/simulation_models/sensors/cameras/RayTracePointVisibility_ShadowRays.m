@@ -3,7 +3,8 @@ function [bAllPointsVisibilityMask, dProjectedPoints_UV] = RayTracePointVisibili
                                                                                                strTargetBodyData, ...
                                                                                                strCameraData, ...
                                                                                                dSunPosition_TB, ...
-                                                                                               bDEBUG_MODE) %#codegen
+                                                                                               bDEBUG_MODE, ...
+                                                                                               bTwoSidedTest) %#codegen
 arguments
     ui32PointsIdx       (1,:) uint32
     dPointsPositions_TB (3,:) double
@@ -11,6 +12,7 @@ arguments
     strCameraData       {isstruct} 
     dSunPosition_TB     (3,1) double
     bDEBUG_MODE         (1,1) logical {islogical} = false
+    bTwoSidedTest       (1,1) logical {islogical} = false;
 end
 %% PROTOTYPE
 % 
@@ -175,7 +177,7 @@ for idL = 1:i32NumOfPointsToTrace
                 dTmpTriangleVertices(:, 1), ...
                 dTmpTriangleVertices(:, 2), ...
                 dTmpTriangleVertices(:, 3), ...
-                false, ...
+                bTwoSidedTest, ...
                 false); % Normal ray, one-sided test
 
 
@@ -205,7 +207,11 @@ for idL = 1:i32NumOfPointsToTrace
 
                 bPointsVisibilityMask(idL) = not(bLightOcclusion); % Point is visible if light not occluded
 
-            else % bTmpIntersectFlag == false
+            elseif bTmpIntersectFlag == false && bTwoSidedTest == false
+                % One-sided test may return no intersection because computation has been culled.
+                continue;
+
+            elseif bTmpIntersectFlag == false && bTwoSidedTest == true
                 warning(bTmpIntersectFlag, ['No intersection with mesh found for point %s. ...' ...
                     '\nHowever this should have not occurred because points to check belong to mesh!'], num2str(idL));
                 bPointsVisibilityMask(idL) = false;
