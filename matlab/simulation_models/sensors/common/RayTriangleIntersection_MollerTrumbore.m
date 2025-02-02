@@ -156,6 +156,7 @@ else
         return
     end
 
+    error('Implementation for one-sided missing here! ')
 
     % Check occlusion only case (do not compute t param and intersection point)
     if bCheckOcclusionOnly
