@@ -1,4 +1,5 @@
-classdef CTargetEmulator
+classdef CTargetEmulator < CSceneObject
+    % TODO verify this works as subclass of CSceneObject
     %% DESCRIPTION
     % What the class represent
     % -------------------------------------------------------------------------------------------------------------
@@ -22,7 +23,7 @@ classdef CTargetEmulator
     properties (SetAccess = protected, GetAccess = public)
 
         % Storage attributes
-        targetUnitOutput = 'm';
+        targetUnitOutput = 'm'; % TODO make this an enum class for safe usage
         % Entity position and attitude wrt World frame
         dPosVector_W  = [0; 0; 0];
         dRot3_WfromTB = eye(3,3); % Internally stored as DCM
@@ -76,23 +77,23 @@ classdef CTargetEmulator
             end
         end
 
-        function [dPosVector_W, dRot3_WfromTB] = GetPose(self, paramType)
+        function [dPosVector_W, dRot3_WfromTB] = GetPose(self, enumParamType)
             arguments
                 self
-                paramType (1,1) = EnumRotParams.DCM
+                enumParamType (1,1) = EnumRotParams.DCM
             end
 
             dPosVector_W  = self.dPosVector_W;
-            dRot3_WfromTB = self.rotation(paramType);
+            dRot3_WfromTB = self.rotation(enumParamType);
         end
 
-        function dRot3_WfromTB = rotation(self, paramType)
+        function dRot3_WfromTB = rotation(self, enumParamType)
             arguments
                 self
-                paramType (1,1) = EnumRotParams.DCM
+                enumParamType (1,1) = EnumRotParams.DCM
             end
 
-            switch paramType
+            switch enumParamType
                 case EnumRotParams.DCM
                     dRot3_WfromTB = self.dRot3_WfromTB;
                     
