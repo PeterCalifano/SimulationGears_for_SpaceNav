@@ -6,6 +6,8 @@ arguments
     dSunPosition_TB = [0;0;0]
 end
 
+error('Upgrade function taking from testRayTracePointVisibility');
+
 objFigPointCloud = figure('Renderer', 'opengl');
 
 % Plot the mesh using patch
