@@ -85,24 +85,30 @@ end
 % Find closer intersection among valid ones
 bIsIntersected = any(bIntersectionMask);
 
-% Find closest intersection point (min distance in dtRangeToIntersectionArray)
-[dRangeToIntersection, dMinPos] = min(dtRangeToIntersectionArray(bIntersectionMask));
+if bIsIntersected
+    % Find closest intersection point (min distance in dtRangeToIntersectionArray)
+    [dRangeToIntersection, dMinPos] = min(dtRangeToIntersectionArray(bIntersectionMask));
 
-dUbarycenCoord = dUbarycenCoordArray(:, bIntersectionMask);
-dVbarycenCoord = dVbarycenCoordArray(:, bIntersectionMask);
+    dUbarycenCoord = dUbarycenCoordArray(:, bIntersectionMask);
+    dVbarycenCoord = dVbarycenCoordArray(:, bIntersectionMask);
 
-dUbarycenCoord = dUbarycenCoord(:, dMinPos);
-dVbarycenCoord = dVbarycenCoord(:, dMinPos);
+    dUbarycenCoord = dUbarycenCoord(:, dMinPos);
+    dVbarycenCoord = dVbarycenCoord(:, dMinPos);
 
+    % Compute corresponding intersection point
+    dAllTriangVert0 = dAllTriangVert0(:, bIntersectionMask);
+    dAllTriangVert1 = dAllTriangVert1(:, bIntersectionMask);
+    dAllTriangVert2 = dAllTriangVert2(:, bIntersectionMask);
 
-% Compute corresponding intersection point
-dAllTriangVert0 = dAllTriangVert0(:, bIntersectionMask);
-dAllTriangVert1 = dAllTriangVert1(:, bIntersectionMask);
-dAllTriangVert2 = dAllTriangVert2(:, bIntersectionMask);
-
-dIntersectionPoint = (1 - dUbarycenCoord - dVbarycenCoord) * dAllTriangVert0(:, dMinPos) + ...
-                                            dUbarycenCoord * dAllTriangVert1(:, dMinPos) + ...
-                                            dVbarycenCoord * dAllTriangVert2(:, dMinPos);
+    dIntersectionPoint = (1 - dUbarycenCoord - dVbarycenCoord) * dAllTriangVert0(:, dMinPos) + ...
+        dUbarycenCoord * dAllTriangVert1(:, dMinPos) + ...
+        dVbarycenCoord * dAllTriangVert2(:, dMinPos);
+else
+    dUbarycenCoord = 0.0;
+    dVbarycenCoord = 0.0;
+    dRangeToIntersection = 0.0;
+    dIntersectionPoint = zeros(3,1);
+end
 
 end
 
