@@ -13,8 +13,8 @@ arguments
     dTriangVert0        (3,1)  double   % {isvector, isnumeric} % 
     dTriangVert1        (3,1)  double   % {isvector, isnumeric} % 
     dTriangVert2        (3,1)  double   % {isvector, isnumeric} % 
-    bTwoSidedTest       (1,1) logical = true;
-    bCheckOcclusionOnly (1,1) logical = false; % Ray is of shadow type
+    bTwoSidedTest       (1,1)  logical = true;
+    bCheckOcclusionOnly (1,1)  logical = false; % Ray is of shadow type
 end
 %% SIGNATURE
 % [bIntersectionFlag, dUbarycenCoord, dVbarycenCoord, ...
@@ -78,17 +78,17 @@ EPS = eps('single');
 dEdge1 = dTriangVert1 - dTriangVert0;
 dEdge2 = dTriangVert2 - dTriangVert0;
 
-% Compute auxiliary Q = cross(T, E1) where T = Origin - V0;
-dQ = [dRayDirection(2)*dEdge2(3) - dRayDirection(3)*dEdge2(2), ...
-    dRayDirection(3)*dEdge2(1) - dRayDirection(1)*dEdge2(3), ...
-    dRayDirection(1)*dEdge2(2) - dRayDirection(2)*dEdge2(1)];  
+% Compute auxiliary P = cross(D, E2) where D is the ray direction;
+dP = [dRayDirection(2)*dEdge2(3) - dRayDirection(3)*dEdge2(2), ...
+     dRayDirection(3)*dEdge2(1) - dRayDirection(1)*dEdge2(3), ...
+     dRayDirection(1)*dEdge2(2) - dRayDirection(2)*dEdge2(1)];  
 
 % Compute determinant of linear system
-dDet = dEdge1(1)*dQ(1) + dEdge1(2)*dQ(2) + dEdge1(3)*dQ(3); 
+dDet = dEdge1(1)*dP(1) + dEdge1(2)*dP(2) + dEdge1(3)*dP(3); 
 
 % Determine condition to check based on test type
 if bTwoSidedTest
-    % Two-sided test
+    %% Two-sided test
     % Check if ray is parallel to the plane (the intersection is at infinity)
     if (dDet > -EPS && dDet < EPS)
 
@@ -105,7 +105,7 @@ if bTwoSidedTest
 
     % Compute u barycentric coordinate
     dRayOriginFromV0 = dRayOrigin - dTriangVert0;
-    dUbarycenCoord = dInvDet * (dRayOriginFromV0(1)*dQ(1) + dRayOriginFromV0(2)*dQ(2) + dRayOriginFromV0(3)*dQ(3));
+    dUbarycenCoord = dInvDet * (dRayOriginFromV0(1)*dP(1) + dRayOriginFromV0(2)*dP(2) + dRayOriginFromV0(3)*dP(3));
 
     if (dUbarycenCoord < 0.0)
         % Triangle u-missed
@@ -117,9 +117,14 @@ if bTwoSidedTest
         return;
     end
 
-    r = [dRayOriginFromV0(2)*dEdge1(3)-dRayOriginFromV0(3)*dEdge1(2), dRayOriginFromV0(3)*dEdge1(1)-dRayOriginFromV0(1)*dEdge1(3), dRayOriginFromV0(1)*dEdge1(2)-dRayOriginFromV0(2)*dEdge1(1)];
+    % Compute auxiliary Q = cross(T, E1) where T = O - V0, and O is the ray origin;
+    % T = dRayOriginFromV0 = dRayOrigin - dTriangVert0 here.
+    dQ = [dRayOriginFromV0(2)*dEdge1(3) - dRayOriginFromV0(3)*dEdge1(2), ...
+          dRayOriginFromV0(3)*dEdge1(1) - dRayOriginFromV0(1)*dEdge1(3), ...
+          dRayOriginFromV0(1)*dEdge1(2) - dRayOriginFromV0(2)*dEdge1(1)];
     
-    dVbarycenCoord = dInvDet*(dRayDirection(1)*r(1)+dRayDirection(2)*r(2)+dRayDirection(3)*r(3));
+    % Compute V barycentric coordinate
+    dVbarycenCoord = dInvDet*(dRayDirection(1)*dQ(1) + dRayDirection(2)*dQ(2) + dRayDirection(3)*dQ(3));
 
     if (dVbarycenCoord < 0.0 || dUbarycenCoord + dVbarycenCoord > 1.0)
         % Triangle v-missed
@@ -134,7 +139,7 @@ if bTwoSidedTest
     % Both (u,v) valid --> Intersection exists
     bIntersectionFlag = true;
 
-    % Check occlusion only case (do not compute t param and intersection point)
+    % Check occlusion only case (do not compute t param and intersection point) % For shadow rays
     if bCheckOcclusionOnly
         dtRangeToIntersection   = 0;
         dIntersectionPoint      = zeros(3,1);
@@ -142,10 +147,10 @@ if bTwoSidedTest
     end
     
     % Compute t parameter of intersection point in unscaled space
-    dtRangeToIntersection = dInvDet * (dEdge2(1)*r(1) + dEdge2(2)*r(2) + dEdge2(3)*r(3)); 
+    dtRangeToIntersection = dInvDet * (dEdge2(1)*dQ(1) + dEdge2(2)*dQ(2) + dEdge2(3)*dQ(3)); 
 
 else
-    % One-sided test
+    %% One-sided test
     % Check if ray is parallel to the plane and if can be discarded because back-facing (one-sided test)
     if dDet < EPS
         bIntersectionFlag       = false;
@@ -156,20 +161,67 @@ else
         return
     end
 
-    error('Implementation for one-sided missing here! ')
+    % Compute T vector
+    dRayOriginFromV0 = dRayOrigin - dTriangVert0;
 
-    % Check occlusion only case (do not compute t param and intersection point)
-    if bCheckOcclusionOnly
+    % Compute scaled U barycentric coordinate 
+    dUbarycenCoord = (dRayOriginFromV0(1)*dP(1) + dRayOriginFromV0(2)*dP(2) + dRayOriginFromV0(3)*dP(3));
+
+    if (dUbarycenCoord < 0.0)
+        % Triangle u-missed
+        bIntersectionFlag       = false;
+        dUbarycenCoord          = 0;
+        dVbarycenCoord          = 0;
         dtRangeToIntersection   = 0;
         dIntersectionPoint      = zeros(3,1);
         return;
     end
 
-end
+    % Compute auxiliary Q = cross(T, E1) where T = O - V0, and O is the ray origin;
+    % T = dRayOriginFromV0 = dRayOrigin - dTriangVert0 here.
+    dQ = [dRayOriginFromV0(2)*dEdge1(3) - dRayOriginFromV0(3)*dEdge1(2), ...
+          dRayOriginFromV0(3)*dEdge1(1) - dRayOriginFromV0(1)*dEdge1(3), ...
+          dRayOriginFromV0(1)*dEdge1(2) - dRayOriginFromV0(2)*dEdge1(1)];
 
+    % Compute scaled V barycentric coordinate
+    dVbarycenCoord = (dRayDirection(1)*dQ(1) + dRayDirection(2)*dQ(2) + dRayDirection(3)*dQ(3));
+
+    if (dVbarycenCoord < 0.0 || dUbarycenCoord + dVbarycenCoord > 1.0)
+        % Triangle v-missed
+        bIntersectionFlag       = false;
+        dUbarycenCoord          = 0;
+        dVbarycenCoord          = 0;
+        dtRangeToIntersection   = 0;
+        dIntersectionPoint      = zeros(3,1);
+        return;
+    end
+
+    % Both (u,v) valid --> Intersection exists
+    bIntersectionFlag = true;
+
+    % Check occlusion only case (do not compute t param and intersection point) % For shadow rays
+    if bCheckOcclusionOnly
+        dUbarycenCoord          = 0; % Reset to zero, because (U,V) here are not in the unscaled space
+        dVbarycenCoord          = 0;
+        dtRangeToIntersection   = 0;
+        dIntersectionPoint      = zeros(3,1);
+        return;
+    end
+
+    % Compute t parameter of intersection point in unscaled space
+    dInvDet = 1./dDet;
+    dtRangeToIntersection = dInvDet * (dEdge2(1)*dQ(1) + dEdge2(2)*dQ(2) + dEdge2(3)*dQ(3)); 
+    
+    % Scale (U,V) barycentric coordinates
+    dUbarycenCoord = dInvDet * dUbarycenCoord;
+    dVbarycenCoord = dInvDet * dVbarycenCoord;
+end % End of intersection algorithm
+
+% Recover intersection point if required
 % Compute intersection point if intersection is found
 dIntersectionPoint = zeros(3,1);
-if nargout > 4
+
+if nargout > 4 && bIntersectionFlag
     dIntersectionPoint(1:3) = (1 - dUbarycenCoord - dVbarycenCoord) * dTriangVert0 + ...
                                                      dUbarycenCoord * dTriangVert1 + ...
                                                      dVbarycenCoord * dTriangVert2;
