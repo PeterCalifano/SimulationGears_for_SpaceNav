@@ -19,9 +19,9 @@ coder_config.OptimizeReductions = true;
 ui32MaxNumTriangs = 6e4;
 
 
-bCodegen_RayTriangleIntersection_MollerTrumbore         = true;
-bCodegen_RayTriangleVectorizedIntersect_MollerTrumbore  = true;
-
+bCodegen_RayTriangleIntersection_MollerTrumbore               = true;
+bCodegen_RayTriangleVectorizedIntersect_MollerTrumbore        = true;
+bCodegen_RayTriangleVectIntersectWithReject_MollerTrumbore    = true;
 
 %% Target function: RayTracePointVisibility_EllipsLocalPA
 if bCodegen_RayTriangleIntersection_MollerTrumbore
@@ -150,6 +150,71 @@ if bCodegen_RayTriangleVectorizedIntersect_MollerTrumbore
     codegen(strcat(targetName,'.m'), "-config", coder_config,...
         "-args", args_cell, "-nargout", numOutputs, "-o", outputFileName)
 end
+
+
+
+%% Target function: RayTriangleVectorizedIntersectWithReject_MollerTrumbore
+
+if bCodegen_RayTriangleVectIntersectWithReject_MollerTrumbore
+
+    % [bAllPointsVisibilityMask_ParallelRTwithShadowRays, dProjectedPoints_UV] = ParallelRayTracePointVisibility_ShadowRays(uint32(ui32pointsIDs), ...
+    %                                                                                                                         dPointsPositionsGT_TB, ...
+    %                                                                                                                         strTargetBodyData, ...
+    %                                                                                                                         strCameraData, ...
+    %                                                                                                                         dSunPosition_TB, ...
+    %                                                                                                                         bDEBUG_MODE, ...
+    %                                                                                                                         bTwoSidedTest);
+    targetName = 'RayTriangleVectorizedIntersectWithReject_MollerTrumbore';
+
+    % numOfInputs; % ADD ASSERT to size of args_cell from specification functions
+
+    % ENTRY-POINT FUNCTION ARGUMENTS DEFINITION
+    % NOTE: third option argument variable_dimensions is an array of bools, one
+    % for each dimension of the array
+
+    %
+    % [bIsIntersected, dUbarycenCoord, dVbarycenCoord, ...
+    %     dRangeToIntersection, dIntersectionPoint] = RayTriangleVectorizedIntersectWithReject_MollerTrumbore(dRayOrigin, ...
+    %                                                                                              dRayDirection, ...
+    %                                                                                              dAllTriangVert0, ...
+    %                                                                                              dAllTriangVert1, ...
+    %                                                                                              dAllTriangVert2, ...
+    %                                                                                              ui32NumOfTriang, ...
+    %                                                                                              bTwoSidedTest)%#codegen
+
+
+    % Function args
+    dRayOrigin      = coder.typeof(0,  [3, 1], [0, 0]);
+    dRayDirection   = coder.typeof(0,  [3, 1], [0, 0]);
+    dAllTriangVert0 = coder.typeof(0,  [3, ui32MaxNumTriangs], [0, 1]);
+    dAllTriangVert1 = coder.typeof(0,  [3, ui32MaxNumTriangs], [0, 1]);
+    dAllTriangVert2 = coder.typeof(0,  [3, ui32MaxNumTriangs], [0, 1]);
+    ui32NumOfTriang = coder.typeof(uint32(0),  [1, 1], [0, 0]);
+    bTwoSidedTest   = coder.typeof(false, [1, 1], [0, 0]);
+
+    args_cell{1,1}  = dRayOrigin;
+    args_cell{1,2}  = dRayDirection;
+    args_cell{1,3}  = dAllTriangVert0;
+    args_cell{1,4}  = dAllTriangVert1;
+    args_cell{1,5}  = dAllTriangVert2;
+    args_cell{1,6}  = ui32NumOfTriang;
+    args_cell{1,7}  = bTwoSidedTest;
+
+    % coder.getArgTypes % Function call to automatically specify input
+    % arguments. Note that this takes the specific sizes used in the function
+    % call
+
+    numOutputs = 5;
+    outputFileName = strcat(targetName, '_MEX');
+
+    %  CODEGEN CALL
+    % Extract filename
+    [path2target, targetName, targetExt] = fileparts(fullfile(targetName));
+    % Execute code generation
+    codegen(strcat(targetName,'.m'), "-config", coder_config,...
+        "-args", args_cell, "-nargout", numOutputs, "-o", outputFileName)
+end
+
 
 %% Target function: ParallelRayTracePointVisibility_ShadowRays
 % ACHTUNG: parallel.pool.Constant does not support code generation?!

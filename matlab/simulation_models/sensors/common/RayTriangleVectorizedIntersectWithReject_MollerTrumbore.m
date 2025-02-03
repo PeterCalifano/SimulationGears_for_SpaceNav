@@ -1,5 +1,5 @@
 function [bIsIntersected, dUbarycenCoord, dVbarycenCoord, ...
-    dRangeToIntersection, dIntersectionPoint] = RayTriangleVectorizedIntersect_MollerTrumbore(dRayOrigin, ...
+    dRangeToIntersection, dIntersectionPoint] = RayTriangleVectorizedIntersectWithReject_MollerTrumbore(dRayOrigin, ...
                                                                                              dRayDirection, ...
                                                                                              dAllTriangVert0, ...
                                                                                              dAllTriangVert1, ...
@@ -7,13 +7,13 @@ function [bIsIntersected, dUbarycenCoord, dVbarycenCoord, ...
                                                                                              ui32NumOfTriang, ...
                                                                                              bTwoSidedTest)%#codegen
 arguments
-    dRayOrigin          double %(3,1)  double   {isvector, isnumeric} % Removed for speed up. Enable is debug.
-    dRayDirection       double %(3,1)  double   {isvector, isnumeric} % 
-    dAllTriangVert0     double %(3,:)  double   {isvector, isnumeric} % 
-    dAllTriangVert1     double %(3,:)  double   {isvector, isnumeric} % 
-    dAllTriangVert2     double %(3,:)  double   {isvector, isnumeric} % 
-    ui32NumOfTriang     uint32
-    bTwoSidedTest       (1,1) logical 
+    dRayOrigin          %double %(3,1)  double   {isvector, isnumeric} % Removed for speed up. Enable is debug.
+    dRayDirection       %double %(3,1)  double   {isvector, isnumeric} % 
+    dAllTriangVert0     %double %(3,:)  double   {isvector, isnumeric} % 
+    dAllTriangVert1     %double %(3,:)  double   {isvector, isnumeric} % 
+    dAllTriangVert2     %double %(3,:)  double   {isvector, isnumeric} % 
+    ui32NumOfTriang     %uint32
+    bTwoSidedTest       %(1,1) logical 
 end
 
 % Precompute edges once
@@ -38,7 +38,7 @@ dIntersectionPoint      = zeros(3,1);
 dRayDirectionArray = repmat(dRayDirection, 1, ui32NumOfTriang);  % [3 x Ntri]
 
 % Compute P vectors array
-dParray = cross(dRayDirectionArray, dTriangEdges2);
+dParray = cross(dRayDirectionArray, dTriangEdges2, 1);
 
 % Compute Determinant
 dDetArray = sum(dTriangEdges1 .* dParray, 1);
@@ -58,10 +58,10 @@ if bTwoSidedTest
     ui32RePointers(not(bIntersectionMask)) = [];
 
     % Compute T vectors array
-    dRayOriginFromV0array = repmat(dRayOrigin, 1, ui32NumOfTriangValidDet) - dAllTriangVert0(bIntersectionMask);  % [3 x Ntri]
+    dRayOriginFromV0array = repmat(dRayOrigin, 1, ui32NumOfTriangValidDet) - dAllTriangVert0(:, bIntersectionMask);  % [3 x Ntri]
     
     % Compute u barycentric coordinates
-    dUbarycenCoordArray = sum(dRayOriginFromV0array .* dParray(bIntersectionMask), 1) ./ dDetArray(bIntersectionMask);
+    dUbarycenCoordArray = sum(dRayOriginFromV0array .* dParray(:, bIntersectionMask), 1) ./ dDetArray(ui32RePointers);
     
     % Update intersection validity mask
     bIntersectionMask_ValidU = ( (dUbarycenCoordArray >= 0) & (dUbarycenCoordArray <= 1) );
@@ -72,7 +72,7 @@ if bTwoSidedTest
     ui32RePointers_Uvalid(not(bIntersectionMask_ValidU)) = [];
 
     % Compute Q vector arrays
-    dQarray = cross(dRayOriginFromV0array(:, bIntersectionMask_ValidU), dTriangEdges1(:, ui32RePointers));
+    dQarray = cross(dRayOriginFromV0array(:, bIntersectionMask_ValidU), dTriangEdges1(:, ui32RePointers), 1);
 
     % Determine v barycentric coordinates
     dVbarycenCoordArray = sum(dRayDirectionArray(:, ui32RePointers) .* dQarray, 1) ./ dDetArray(ui32RePointers);
@@ -87,10 +87,10 @@ if bTwoSidedTest
     ui32RePointers_Uvalid(not(bIntersectionMask_ValidV)) = [];
 
     % Compute intersection distance
-    dtRangeToIntersectionArray = sum(dTriangEdges2(ui32RePointers) .* dQarray(:, bIntersectionMask_ValidV), 1) ./ dDetArray(ui32RePointers);
+    dtRangeToIntersectionArray = sum(dTriangEdges2(:, ui32RePointers) .* dQarray(:, bIntersectionMask_ValidV), 1) ./ dDetArray(ui32RePointers);
 
     % Update intersection validity mask
-    % btParamValidityMask = dtRangeToIntersectionArray >= EPS;
+    btParamValidityMask = dtRangeToIntersectionArray >= EPS;
 
     % bIntersectionMask(not(btParamValidityMask)) = false;
     % ui32RePointers(not(btParamValidityMask)) = [];
@@ -101,9 +101,9 @@ return;
 end
 
 % Find closer intersection among valid ones
-bIsIntersected = any(bIntersectionMask);
+bIsIntersected = any(btParamValidityMask);
 
-if bIsIntersected
+if bIsIntersected 
     % Find closest intersection point (min distance in dtRangeToIntersectionArray)
     [dRangeToIntersection, dMinPos] = min(dtRangeToIntersectionArray);
 
