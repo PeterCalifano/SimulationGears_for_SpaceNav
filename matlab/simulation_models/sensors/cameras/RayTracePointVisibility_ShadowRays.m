@@ -68,7 +68,7 @@ dResX        = strCameraData.dResX;
 dResY        = strCameraData.dResY;
 
 % INPUT ASSERTS (retrocompatibility with MATLAB < 2022b)
-assert(size(dPointsPositions_TB, 2) == length(ui32PointsIdx), "ERROR: number of indices must match nunber of points.");
+% assert(size(dPointsPositions_TB, 2) == length(ui32PointsIdx), "ERROR: number of indices must match nunber of points.");
 
 % Compute attitude matrices
 % dDCM_TBfromCAM = transpose(dDCM_INfromTB) * dDCM_INfromCAM;
@@ -137,7 +137,7 @@ i32triangVertPtr3 = ui32triangVertexPtr(3, :);
 bPointsVisibilityMask = false(i32NumOfPointsToTrace, 1); % Initialize visibility mask as "no visibility"
 
 % Visibility check for each landmark (position in TB frame)
-for idL = 1:i32NumOfPointsToTrace
+parfor idL = 1:i32NumOfPointsToTrace
     if bDEBUG_MODE == true 
         if mod(i32NumOfPointsToTrace/idL, 5)
             fprintf("Processing point entry %05d\n", idL)
@@ -150,6 +150,8 @@ for idL = 1:i32NumOfPointsToTrace
     ui32TrianglesIDsubset = 1:ui32NumOfTriangles;
     
     % Loop over triangles (TODO attempt to vectorize code)
+    dTmpTriangleVertices = coder.nullcopy(zeros(3, 3));
+
     for id = 1:ui32NumTrianglesInSubset
 
         idT = ui32TrianglesIDsubset(id);
@@ -159,12 +161,10 @@ for idL = 1:i32NumOfPointsToTrace
         i32triangVertPtr2_tmp = i32triangVertPtr2(id);
         i32triangVertPtr3_tmp = i32triangVertPtr3(id);
 
-        % Get triangle vertices positions
-        dTmpTriangleVertices = coder.nullcopy(zeros(3, 3));
-
         if all(i32triangVertPtr1_tmp ~= ui32PointsIdx(idL) & i32triangVertPtr2_tmp ~= ui32PointsIdx(idL) & ...
                 i32triangVertPtr3_tmp ~= ui32PointsIdx(idL))
 
+            % Get triangle vertices positions
             dTmpTriangleVertices(1:3, 1) = dVerticesPos(:, i32triangVertPtr1_tmp ); %#ok<PFBNS>
             dTmpTriangleVertices(1:3, 2) = dVerticesPos(:, i32triangVertPtr2_tmp );
             dTmpTriangleVertices(1:3, 3) = dVerticesPos(:, i32triangVertPtr3_tmp );
@@ -172,20 +172,34 @@ for idL = 1:i32NumOfPointsToTrace
             % Perform intersection test against mesh (1 ray 1 triangle) using one-sided test 
             % (cull computations excluding back-facing triangles)
     
-            [bTmpIntersectFlag, ~, ~, dIntersectDistance] = RayTriangleIntersection_MollerTrumbore(dCamPosition_TB, ...
+            [bTmpIntersectFlag, ~, ~, dIntersectDistance, ~] = RayTriangleIntersection_MollerTrumbore(dCamPosition_TB, ...
                 [dPointDirFromCamX_TB(idL); dPointDirFromCamY_TB(idL); dPointDirFromCamZ_TB(idL);],  ... 
                 dTmpTriangleVertices(:, 1), ...
                 dTmpTriangleVertices(:, 2), ...
                 dTmpTriangleVertices(:, 3), ...
-                bTwoSidedTest, ...
+                true, ...
                 false); % Normal ray, one-sided test
 
+
+            %%%%%%%%%%%%%%%%%%%%%% DEBUG %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+            % [bTmpIntersectFlag_check, ~, ~, dIntersectDistance_check] = RayTwoSidedTriangleIntersection_MollerTrembore(dCamPosition_TB, ...
+            %     [dPointDirFromCamX_TB(idL); dPointDirFromCamY_TB(idL); dPointDirFromCamZ_TB(idL);],  ... 
+            %     dTmpTriangleVertices(:, 1), dTmpTriangleVertices(:, 2), dTmpTriangleVertices(:, 3));
+
+
+            % assert(bTmpIntersectFlag == bTmpIntersectFlag_check)
+            %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
             if (dRayToPointsFromCamNorm(idL) - dIntersectDistance) > eps('single') && bTmpIntersectFlag == true
                 % Intersection closer than point detected --> point occluded by mesh (camera does not see it)
                 assert(idT <= ui32NumOfTriangles)
                 bPointsVisibilityMask(idL) = false;
-                break; 
+
+                %%%%%%%%%%%%%%%%%%%%%% DEBUG %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+                % PlotRays(dCamPosition_TB, [dPointPosX_TB(idL); dPointPosY_TB(idL); dPointPosZ_TB(idL)], dIntersectPoint_TB);
+                %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+                break;
 
             elseif (dRayToPointsFromCamNorm(idL) - dIntersectDistance) <= eps('single') && bTmpIntersectFlag == true
                 % Intersection farther than point detected --> point visible by camera
@@ -193,28 +207,32 @@ for idL = 1:i32NumOfPointsToTrace
                 
                 % Compute ray direction (to Sun)
                 dSunDirFromPoint_TB = dSunPosition_TB - [dPointPosX_TB(idL); dPointPosY_TB(idL); dPointPosZ_TB(idL)];
-                dSunDirFromPoint_TB = ndSunDirFromPoint_TB./norm(dSunDirFromPoint_TB);
+                dSunDirFromPoint_TB = dSunDirFromPoint_TB./norm(dSunDirFromPoint_TB);
 
                 % NOTE: for loop over all triangles of mesh inside (one-sided test)
                 [bLightOcclusion] = TraceShadowRay([dPointPosX_TB(idL); dPointPosY_TB(idL); dPointPosZ_TB(idL)], ...
                                             dSunDirFromPoint_TB, ...
                                             dVerticesPos, ...
-                                            ui32TrianglesIDsubset, ...
-                                            ui32NumTrianglesInSubset, ...
+                                            int32(ui32NumTrianglesInSubset), ...
                                             i32triangVertPtr1, ...
                                             i32triangVertPtr2, ...
-                                            i32triangVertPtr3);
+                                            i32triangVertPtr3, ...
+                                            ui32PointsIdx(idL));
 
                 bPointsVisibilityMask(idL) = not(bLightOcclusion); % Point is visible if light not occluded
+        
+                %%%%%%%%%%%%%%%%%%%%%% DEBUG %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+                % PlotRays(dCamPosition_TB, [dPointPosX_TB(idL); dPointPosY_TB(idL); dPointPosZ_TB(idL)], dIntersectPoint_TB, dSunPosition_TB);
+                %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-            elseif bTmpIntersectFlag == false && bTwoSidedTest == false
+
+                % DEVNOTE: conditions below possibly wrong
+            % elseif bTmpIntersectFlag == false 
                 % One-sided test may return no intersection because computation has been culled.
-                continue;
+                % continue;
 
-            elseif bTmpIntersectFlag == false && bTwoSidedTest == true
-                warning(bTmpIntersectFlag, ['No intersection with mesh found for point %s. ...' ...
-                    '\nHowever this should have not occurred because points to check belong to mesh!'], num2str(idL));
-                bPointsVisibilityMask(idL) = false;
+            % elseif bTmpIntersectFlag == false && bTwoSidedTest == true
+            % This case is only possible when
 
             end
         end
@@ -239,52 +257,50 @@ end
 function [bLightOcclusion] = TraceShadowRay(dRayOrigin, ...
                                             dRayDirection, ...
                                             dVerticesPos, ...
-                                            ui32TrianglesIDsubset, ...
-                                            ui32NumTrianglesInSubset, ...
+                                            i32NumTrianglesInSubset, ...
                                             i32triangVertPtr1, ...
                                             i32triangVertPtr2, ...
-                                            i32triangVertPtr3)
+                                            i32triangVertPtr3, ...
+                                            ui32TestPointIdx)
 
-bLightOcclusion = false;
+% bLightOcclusion = false;
+
+bLightOcclusion = false(i32NumTrianglesInSubset, 1);
+
 % Loop over triangles (TODO attempt to vectorize code)
-for id = 1:ui32NumTrianglesInSubset
+for id = 1:i32NumTrianglesInSubset
 
-    idT = ui32TrianglesIDsubset(id);
     % DEVNOTE the only way to avoid broadcast arrays is to compose first vectors cointaining the indices of the vertices for each triangle.
     % Get triangle vertices ptrs
     i32triangVertPtr1_tmp = i32triangVertPtr1(id); % TODO check how to solve broadcasting problem
     i32triangVertPtr2_tmp = i32triangVertPtr2(id);
     i32triangVertPtr3_tmp = i32triangVertPtr3(id);
 
-    % Get triangle vertices positions
-    dTmpTriangleVertices = coder.nullcopy(zeros(3, 3));
-
-    if all(i32triangVertPtr1_tmp ~= ui32PointsIdx(idL) & i32triangVertPtr2_tmp ~= ui32PointsIdx(idL) & ...
-            i32triangVertPtr3_tmp ~= ui32PointsIdx(idL))
-
-        dTmpTriangleVertices(1:3, 1) = dVerticesPos(:, i32triangVertPtr1_tmp );
-        dTmpTriangleVertices(1:3, 2) = dVerticesPos(:, i32triangVertPtr2_tmp );
-        dTmpTriangleVertices(1:3, 3) = dVerticesPos(:, i32triangVertPtr3_tmp );
+    if all(i32triangVertPtr1_tmp ~= ui32TestPointIdx & i32triangVertPtr2_tmp ~= ui32TestPointIdx & ...
+            i32triangVertPtr3_tmp ~= ui32TestPointIdx)
 
         % Perform intersection test against mesh (1 ray 1 triangle) using one-sided test
         % (cull computations excluding back-facing triangles)
-        assert(idT <= ui32NumOfTriangles)
-
-        [bLightOcclusion] = RayTriangleIntersection_MollerTrumbore(dRayOrigin, ...
+        [bLightOcclusion_tmp, ~, ~, ...
+          dtRangeToIntersection]  = RayTriangleIntersection_MollerTrumbore(dRayOrigin, ...
                                                                    dRayDirection,  ...
-                                                                   dTmpTriangleVertices(:, 1), ...
-                                                                   dTmpTriangleVertices(:, 2), ...
-                                                                   dTmpTriangleVertices(:, 3), ...
-                                                                   false, ...
+                                                                   dVerticesPos(:, i32triangVertPtr1_tmp ), ...
+                                                                   dVerticesPos(:, i32triangVertPtr2_tmp ), ...
+                                                                   dVerticesPos(:, i32triangVertPtr3_tmp ), ...
+                                                                   true, ...
                                                                    true); % Shadow ray, one-sided test
 
-        if bLightOcclusion == true
+        if bLightOcclusion_tmp == true && dtRangeToIntersection > eps('single')
+            bLightOcclusion(id) = true;
             break; % Intersection detected by Shadow Ray --> light occluded by mesh, point not illuminated
         end
 
     end
 
 end
+
+% Determine occlusion flag
+bLightOcclusion = any(bLightOcclusion == true);
 
 end
 
