@@ -116,6 +116,24 @@ catch
 end
 toc
 
+
+profile('clear')
+profile('off')
+tic
+[bAllPointsVisibilityMask_VectorizedRTwithShadowRays, ~] = RayTracePointVisibility_VectorizedShadowRays_MEX(uint32(ui32pointsIDs), ...
+                                                                             dPointsPositionsGT_TB, ...
+                                                                             strTargetBodyData, ...
+                                                                             strCameraData, ...
+                                                                             dSunPosition_TB, ...
+                                                                             bDEBUG_MODE, ...
+                                                                             bTwoSidedTest);
+
+try
+    p4 = profile('info');
+catch
+end
+toc
+
 % 
 % tic
 % [bAllPointsVisibilityMask_RTwithShadowRays, ~] = RayTracePointVisibility_ShadowRays_full_MEX(uint32(ui32pointsIDs), ...
