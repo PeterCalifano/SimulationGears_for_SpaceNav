@@ -218,6 +218,30 @@ classdef CAttitudePointingGenerator < handle
     end
 
     methods (Static, Access = public)
+        % TODO implement by moving class methods here and leaving only the call there.
+        % Static methods implementations (called by instance methods)
+        function [dOutRot3, dDCM_FrameFromCAM] = pointToTargetStatic_SunDirConstraint(dCameraPosition_Frame, ...
+            dTargetPosition_Frame, ...
+            dSunPosition_Frame, ...
+            options)
+
+        end
+
+        function [] = pointToTargetStatic_LVLH()
+            arguments
+                
+            end
+            error('Not implemented yet')
+        end
+
+        function [dOutRot3, dDCM_FrameFromCAM] = pointToTargetStatic_positionOnly(dCameraPosition_Frame, ...
+                dTargetPosition_Frame, ...
+                dSunPosition_Frame, ...
+                options)
+
+        end
+
+        % Auxiliary functions
         function [self, dCameraPositionToPoint_Frame, dCamBoresight_Frame] = displaceBoresightAlongSunRays(self, ...
                 dCameraPosition_Frame, ...
                 dSunPosition_Frame, ...
