@@ -2,6 +2,9 @@
 	"folders": [
 		{
 			"path": "."
+		},
+		{
+			"path": "../EstimationGears_for_SpaceNav"
 		}
 	]
 }
