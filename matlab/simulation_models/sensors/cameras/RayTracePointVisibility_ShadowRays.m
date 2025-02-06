@@ -4,15 +4,17 @@ function [bAllPointsVisibilityMask, dProjectedPoints_UV] = RayTracePointVisibili
                                                                                                strCameraData, ...
                                                                                                dSunPosition_TB, ...
                                                                                                bDEBUG_MODE, ...
-                                                                                               bTwoSidedTest) %#codegen
+                                                                                               bTwoSidedTest, ...
+                                                                                               bPointsAreMeshVertices) %#codegen
 arguments
-    ui32PointsIdx       (1,:) uint32
-    dPointsPositions_TB (3,:) double
-    strTargetBodyData   {isstruct}
-    strCameraData       {isstruct} 
-    dSunPosition_TB     (3,1) double
-    bDEBUG_MODE         (1,1) logical {islogical} = false
-    bTwoSidedTest       (1,1) logical {islogical} = false;
+    ui32PointsIdx           (1,:) uint32
+    dPointsPositions_TB     (3,:) double
+    strTargetBodyData       {isstruct}
+    strCameraData           {isstruct} 
+    dSunPosition_TB         (3,1) double
+    bDEBUG_MODE             (1,1) logical {islogical} = false
+    bTwoSidedTest           (1,1) logical {islogical} = false;
+    bPointsAreMeshVertices  (1,1) logical {islogical} = true;
 end
 %% PROTOTYPE
 % 
@@ -151,6 +153,7 @@ parfor idL = 1:i32NumOfPointsToTrace
     
     % Loop over triangles (TODO attempt to vectorize code)
     dTmpTriangleVertices = coder.nullcopy(zeros(3, 3));
+    bDoRayTrace = true; % Default: perform intersection check for all triangles
 
     for id = 1:ui32NumTrianglesInSubset
 
@@ -161,8 +164,13 @@ parfor idL = 1:i32NumOfPointsToTrace
         i32triangVertPtr2_tmp = i32triangVertPtr2(id);
         i32triangVertPtr3_tmp = i32triangVertPtr3(id);
 
-        if all(i32triangVertPtr1_tmp ~= ui32PointsIdx(idL) & i32triangVertPtr2_tmp ~= ui32PointsIdx(idL) & ...
-                i32triangVertPtr3_tmp ~= ui32PointsIdx(idL))
+        if bPointsAreMeshVertices
+            % If vertices are used as points, exclude the triangle containing the point as vertices from the intersection check
+            bDoRayTrace = all(i32triangVertPtr1_tmp ~= ui32PointsIdx(idL) & i32triangVertPtr2_tmp ~= ui32PointsIdx(idL) & ...
+                            i32triangVertPtr3_tmp ~= ui32PointsIdx(idL));            
+        end
+
+        if bDoRayTrace == true
 
             % Get triangle vertices positions
             dTmpTriangleVertices(1:3, 1) = dVerticesPos(:, i32triangVertPtr1_tmp ); %#ok<PFBNS>
@@ -217,7 +225,8 @@ parfor idL = 1:i32NumOfPointsToTrace
                                             i32triangVertPtr1, ...
                                             i32triangVertPtr2, ...
                                             i32triangVertPtr3, ...
-                                            ui32PointsIdx(idL));
+                                            ui32PointsIdx(idL), ...
+                                            bPointsAreMeshVertices);
 
                 bPointsVisibilityMask(idL) = not(bLightOcclusion); % Point is visible if light not occluded
         
@@ -261,13 +270,16 @@ function [bLightOcclusion] = TraceShadowRay(dRayOrigin, ...
                                             i32triangVertPtr1, ...
                                             i32triangVertPtr2, ...
                                             i32triangVertPtr3, ...
-                                            ui32TestPointIdx)
+                                            ui32TestPointIdx, ...
+                                            bPointsAreMeshVertices) %#codegen
 
 % bLightOcclusion = false;
 
 bLightOcclusion = false(i32NumTrianglesInSubset, 1);
 
 % Loop over triangles (TODO attempt to vectorize code)
+bDoRayTrace = true; % Default: perform intersection check for all triangles
+
 for id = 1:i32NumTrianglesInSubset
 
     % DEVNOTE the only way to avoid broadcast arrays is to compose first vectors cointaining the indices of the vertices for each triangle.
@@ -276,8 +288,13 @@ for id = 1:i32NumTrianglesInSubset
     i32triangVertPtr2_tmp = i32triangVertPtr2(id);
     i32triangVertPtr3_tmp = i32triangVertPtr3(id);
 
-    if all(i32triangVertPtr1_tmp ~= ui32TestPointIdx & i32triangVertPtr2_tmp ~= ui32TestPointIdx & ...
-            i32triangVertPtr3_tmp ~= ui32TestPointIdx)
+    if bPointsAreMeshVertices
+        % If vertices are used as points, exclude the triangle containing the point as vertices from the intersection check
+        bDoRayTrace = all(i32triangVertPtr1_tmp ~= ui32TestPointIdx & i32triangVertPtr2_tmp ~= ui32TestPointIdx & ...
+                        i32triangVertPtr3_tmp ~= ui32TestPointIdx);        
+    end
+
+    if bDoRayTrace == true
 
         % Perform intersection test against mesh (1 ray 1 triangle) using one-sided test
         % (cull computations excluding back-facing triangles)
