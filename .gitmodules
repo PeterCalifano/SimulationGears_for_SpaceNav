@@ -1,0 +1,4 @@
+[submodule "lib/S2-Sampling-Toolbox_PeterCdev"]
+	path = lib/S2-Sampling-Toolbox_PeterCdev
+	url = git@github.com:PeterCalifano/S2-Sampling-Toolbox_PeterCdev.git
+	branch = dev_main
