@@ -185,7 +185,7 @@ objFigPointCloud = figure('Renderer','opengl');
 
 % Set background color based on flag
 
-if bUseBlackBackground
+if bUseBlackBackground == true
     set(gca, 'Color', 'k'); % Axes background
     set(gcf, 'Color', 'k'); % Figure background
     textColor = 'w'; % White text
