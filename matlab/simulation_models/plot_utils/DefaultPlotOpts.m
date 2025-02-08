@@ -95,6 +95,7 @@ xlim('tight')
 set(objCurrentAx, 'Color', charBackGroundColor); % White background
 set(gcf, 'Color', charBackGroundColor);
 
+% Set axis colours
 objLabelHandle = objCurrentAx.XLabel;
 objLabelHandle.Color = charTextColor;
 
@@ -104,7 +105,12 @@ objLabelHandle.Color = charTextColor;
 objLabelHandle = objCurrentAx.ZLabel;
 objLabelHandle.Color = charTextColor;
 
+% Set title color
+objTitleHandle = objCurrentAx.Title;
+objTitleHandle.Color = charTextColor;
+
 set(objCurrentAx, 'XColor', charTextColor, 'YColor', charTextColor, 'ZColor', charTextColor);
+
 
 end
 
