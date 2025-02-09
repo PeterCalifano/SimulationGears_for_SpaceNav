@@ -78,6 +78,8 @@ classdef CTargetEmulator < CSceneObject
         end
 
         function [dPosVector_W, dRot3_WfromTB] = GetPose(self, enumParamType)
+            % Method to get pose of target emulator
+            % [dPosVector_W, dRot3_WfromTB] = GetPose(self, enumParamType)
             arguments
                 self
                 enumParamType (1,1) = EnumRotParams.DCM
