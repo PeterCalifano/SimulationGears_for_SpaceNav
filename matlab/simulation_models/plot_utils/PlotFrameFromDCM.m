@@ -16,6 +16,35 @@ arguments (Output)
     dXaxisVec     (3,1) double {isvector, isnumeric}
     dYaxisVec     (3,1) double {isvector, isnumeric}
 end
+%% SIGNATURE
+% -------------------------------------------------------------------------------------------------------------
+%% DESCRIPTION
+% Function plotting axes of a orthonormal reference frame using quiver3 given its origin and attitude
+% matrix. A new figure gets created if none is passed as input.
+% -------------------------------------------------------------------------------------------------------------
+%% INPUT
+% dEntityOrigin_RenderFrame       (3,1) double {isvector, isnumeric}
+% dEntityDCM_RenderFrameFromTF    (3,3) double {ismatrix, isnumeric}
+% cellPlotColors                  (3,1) cell
+% cellPlotNames                   (3,1) cell
+% objFig                          (1,1) {isscalar, mustBeA(objFig, ["double", "matlab.ui.Figure"])} = 0;
+% -------------------------------------------------------------------------------------------------------------
+%% OUTPUT
+% cellFrameAxes (1,3) cell
+% dZaxisVec     (3,1) double {isvector, isnumeric}
+% dXaxisVec     (3,1) double {isvector, isnumeric}
+% dYaxisVec     (3,1) double {isvector, isnumeric}
+% -------------------------------------------------------------------------------------------------------------
+%% CHANGELOG
+% 08-02-2025    Pietro Califano     First implementation.
+% -------------------------------------------------------------------------------------------------------------
+%% DEPENDENCIES
+% [-]
+% -------------------------------------------------------------------------------------------------------------
+%% Future upgrades
+% [-]
+% -------------------------------------------------------------------------------------------------------------
+%% Function code
 
 % Get axis from attitude matrix
 dXaxisVec = dEntityDCM_RenderFrameFromTF(1, :);
