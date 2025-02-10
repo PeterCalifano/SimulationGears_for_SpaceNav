@@ -238,6 +238,7 @@ classdef CAttitudePointingGenerator < handle
                 dTargetPosition_Frame, ...
                 dSunPosition_Frame, ...
                 options)
+            error('Not implemented yet')
 
         end
 
