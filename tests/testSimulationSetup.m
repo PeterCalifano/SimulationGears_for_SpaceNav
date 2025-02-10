@@ -35,7 +35,7 @@ strShapeStruct = objTargetEmulator.getShapeStruct();
 rng(0);
 random_cols = randi(ui32MAX_NUM_GT, 1, ui32MAX_NUM_GT);
 
-objTargetEmulator = objTargetEmulator.GenerateSimulatedPoints_TB("random_uniform");
+objTargetEmulator = objTargetEmulator.GenerateSimulatedPoints_TB("PICK_UNIFORM_RANDOM_ID");
 [dPointsPositionsGT_TB, ui32pointsIDs] = objTargetEmulator.GetPointsInTargetFrame(random_cols, true);
 
 % Verify the other branch to get points (using GT indices)

@@ -116,7 +116,7 @@ catch
 end
 toc
 
-rayTriGPU()
+% rayTriGPU()
 
 
 profile('clear')
@@ -176,7 +176,7 @@ toc
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% PLOTS
-
+%%%%%%%%%%%%%%%%%
 % 3D plot
 % Set flag for background color
 bUseBlackBackground = true; % Set to false for white background
@@ -247,7 +247,7 @@ objPointCloud_RTwithShadowRays = plot3(dPointsPositionsGT_RTwithShadowRays(1, :)
 legend([objPatchModel, objPointCloud_GT, objDirToSun, objPointCloud_RTwithEllipsLocalPA, objPointCloud_RTwithShadowRays], 'TextColor', charTextColor);
 hold off;
 
-% TODO (PC): add 2D frame plot with rectangle 
+%%%%%%%%%%%%%%%%%
 % 2D Image projection plot
 [dProjectedPoints_UV]   = pinholeProjectArrayHP_DCM(objCameraIntrisics.K, dDCM_INfromCAM', dCameraPosition_TB, dPointsPositionsGT_TB);
 bPointWithinFoV = ((dProjectedPoints_UV(1, :) > 0 & dProjectedPoints_UV(1, :) < objCameraIntrisics.ImageSize(1)) &...
