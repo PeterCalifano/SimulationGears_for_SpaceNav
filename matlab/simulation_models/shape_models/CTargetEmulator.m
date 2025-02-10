@@ -89,6 +89,10 @@ classdef CTargetEmulator < CSceneObject
             dRot3_WfromTB = self.rotation(enumParamType);
         end
 
+        function dPosVector_W = translation(self)
+            dPosVector_W = self.dPosVector_W;
+        end
+
         function dRot3_WfromTB = rotation(self, enumParamType)
             arguments
                 self
@@ -186,6 +190,11 @@ classdef CTargetEmulator < CSceneObject
         end
         
         % PUBLIC METHODS
+        function [self, dPointsPositionsGT_TB, i32LandmarksID] = GenerateSimulatedPoints_TB(self, enumPointGTsamplingMethod)
+            % DEVNOTE: deprecated GenerateSimulatedPoints_TB method currently kept for legacy reasons
+            [self, dPointsPositionsGT_TB, i32LandmarksID] = SampleMeshPoints(self, enumPointGTsamplingMethod);
+        end
+
         function [self, dPointsPositionsGT_TB, i32LandmarksID] = SampleMeshPoints(self, enumPointGTsamplingMethod)
             arguments
                 self
