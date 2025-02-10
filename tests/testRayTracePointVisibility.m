@@ -184,15 +184,14 @@ bUseBlackBackground = true; % Set to false for white background
 objFigPointCloud = figure('Renderer','opengl');
 
 % Set background color based on flag
-
-if bUseBlackBackground
+if bUseBlackBackground == true
     set(gca, 'Color', 'k'); % Axes background
     set(gcf, 'Color', 'k'); % Figure background
-    textColor = 'w'; % White text
+    charTextColor = 'w'; % White text
 else
     set(gca, 'Color', 'w'); % White background
     set(gcf, 'Color', 'w');
-    textColor = 'k'; % Black text
+    charTextColor = 'k'; % Black text
 end
 
 % Plot the mesh using patch
@@ -208,10 +207,10 @@ objPointCloud_GT = plot3(dPointsPositionsGT_TB(1, :), dPointsPositionsGT_TB(2, :
 
 DefaultPlotOpts()
 grid off
-xlabel('X [m]', 'Color', textColor);
-ylabel('Y [m]', 'Color', textColor);
-zlabel('Z [m]', 'Color', textColor);
-set(gca, 'XColor', textColor, 'YColor', textColor, 'ZColor', textColor);
+xlabel('X [m]', 'Color', charTextColor);
+ylabel('Y [m]', 'Color', charTextColor);
+zlabel('Z [m]', 'Color', charTextColor);
+set(gca, 'XColor', charTextColor, 'YColor', charTextColor, 'ZColor', charTextColor);
 
 camproj('perspective'); % Use perspective projection
 campos(dCameraPosition_TB'); % Set camera to camera position
@@ -244,7 +243,7 @@ objPointCloud_RTwithShadowRays = plot3(dPointsPositionsGT_RTwithShadowRays(1, :)
                 dPointsPositionsGT_RTwithShadowRays(3,:), '.', 'Color', '#FFA500', 'MarkerSize', 5, 'DisplayName', 'RT + Shadow ray');
 
 % Add legend
-legend([objPatchModel, objPointCloud_GT, objDirToSun, objPointCloud_RTwithEllipsLocalPA, objPointCloud_RTwithShadowRays], 'TextColor', textColor);
+legend([objPatchModel, objPointCloud_GT, objDirToSun, objPointCloud_RTwithEllipsLocalPA, objPointCloud_RTwithShadowRays], 'TextColor', charTextColor);
 hold off;
 
 % TODO (PC): add 2D frame plot with rectangle 

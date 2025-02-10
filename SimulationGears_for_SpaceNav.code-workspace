@@ -9,5 +9,8 @@
 		{
 			"path": "../CommManagersIndex/CommManager4MATLAB"
 		}
-	]
+	],
+	"settings": {
+		"fortran.fortls.disabled": true
+	}
 }
