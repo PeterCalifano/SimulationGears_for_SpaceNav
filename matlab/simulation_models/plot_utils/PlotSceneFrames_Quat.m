@@ -72,6 +72,8 @@ end
 % [-]
 % -------------------------------------------------------------------------------------------------------------
 %% Function code
+% TODO: add optional plot of the camera using computer vision toolbox: 
+% https://www.mathworks.com/help/vision/ref/plotcamera.html
 
 % Heuristic coefficient to scale camera position
 dScaleCoeff = 2 * kwargs.dAxisScale;

@@ -5,11 +5,11 @@ function [objSceneFig, cellPlotObjs] = PlotSceneFramesWithShape(strShapeModel, .
                                                                 dBodyOrigin_NavFrame, ...
                                                                 dBodyAttDCM_NavFrameFromOF, ...
                                                                 kwargs)
-arguments (Input) % TODO: update inputs
-    strShapeModel                    {isstruct}
-    dSunPosition_NavFrame            (3,:)   double {isvector, isnumeric}
-    dCameraOrigin_NavFrame           (3,:)   double {isvector, isnumeric}
-    dCameraAttDCM_NavframeFromOF     (3,3,:) double {ismatrix, isnumeric}
+arguments (Input) 
+    strShapeModel                  {isstruct}
+    dSunPosition_NavFrame          (3,1)   double {isnumeric}
+    dCameraOrigin_NavFrame         (3,1)   double {isvector, isnumeric}
+    dCameraAttDCM_NavframeFromOF   (3,3)   double {ismatrix, isnumeric}
     dBodyOrigin_NavFrame           (3,:)   double {ismatrix, isnumeric} = zeroes(3,1)
     dBodyAttDCM_NavFrameFromOF     (3,3,:) double {ismatrix, isnumeric} = eye(3)
 end
@@ -40,8 +40,7 @@ end
 % Get scale from maximum radius of shape model
 dAxisScale = 1.25 * max(vecnorm(strShapeModel.dVerticesPos, 2, 1), [], 'all');
 
-%% Plot shape object
-
+%% Plot shape object with point cloud
 [objSceneFig, cellPlotObjs] = Visualize3dShapeModelWithPC(strShapeModel, ...
                                                           dCameraOrigin_NavFrame, ...
                                                           dSunPosition_NavFrame, ...
@@ -54,7 +53,6 @@ dAxisScale = 1.25 * max(vecnorm(strShapeModel.dVerticesPos, 2, 1), [], 'all');
 
 
 %% Plot objects and camera frames
-
 % Convert DCMs to quaternion
 dSceneEntityQuatArray_RenderFrameFromOF = transpose( dcm2quat(dBodyAttDCM_NavFrameFromOF) );
 dCameraQuat_RenderFrameFromCam          = transpose( dcm2quat(dCameraAttDCM_NavframeFromOF) );
@@ -71,6 +69,7 @@ dCameraQuat_RenderFrameFromCam          = transpose( dcm2quat(dCameraAttDCM_Navf
                                                     "bEnableLegend", false, ...
                                                     "bUsePhysicalPosition", kwargs.bUsePhysicalPosition);
 
+%% Handle legend
 % Define cell for global legend
 cellPlotObjs = [cellPlotObjs(:)', cellPlotObjs_SceneFrames(:)'];
 

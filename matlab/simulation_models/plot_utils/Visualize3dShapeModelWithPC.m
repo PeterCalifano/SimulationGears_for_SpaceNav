@@ -19,30 +19,47 @@ arguments (Input)
     kwargs.bEnableLegend             (1,1) logical {isscalar, islogical} = true;
 end
 %% SIGNATURE
+% [objFig, cellPlotObjs] = Visualize3dShapeModelWithPC(strShapeModel, ...
+%                                                               dCameraPosition_NavFrame, ...
+%                                                               dSunPosition_NavFrame, ...
+%                                                               dBodyDCM_NavFrameFromOF, ...
+%                                                               kwargs)
 % -------------------------------------------------------------------------------------------------------------
 %% DESCRIPTION
-% What the function does
+% Function creating 3D visualization of shape model and input point cloud with respect to a generic world
+% frame (NavFrame). The function takes care of defining figure, settings and legend objects depending on the
+% inputs (kwargs).
 % -------------------------------------------------------------------------------------------------------------
 %% INPUT
-% in1 [dim] description
-% Name1                     []
-% Name2                     []
-% Name3                     []
+% arguments (Input) % Positional
+%     strShapeModel
+%     dCameraPosition_NavFrame
+%     dSunPosition_NavFrame   = [0;0;0]
+%     dBodyDCM_NavFrameFromOF = eye(3);
+% end
+% arguments (Input)
+%     kwargs.objFig           = 0
+%     kwargs.bUseBlackBackground       (1,1) logical {islogical, isscalar} = false;
+%     kwargs.dPointsPositions_NavFrame (3, :) double = [];
+%     kwargs.charDistanceUnit          (1,:) string {mustBeA(kwargs.charDistanceUnit, ["string", "char"])} = "m"
+%     kwargs.bEnforcePlotOpts          (1,1) logical {isscalar, islogical} = false
+%     kwargs.bUsePerspectiveView       (1,1) logical {isscalar, islogical} = false;
+%     kwargs.bEnableLegend             (1,1) logical {isscalar, islogical} = true;
+% end
 % -------------------------------------------------------------------------------------------------------------
 %% OUTPUT
-% out1 [dim] description
-% Name1                     []
-% Name2                     []
-% Name3                     []
+% objFig
+% cellPlotObjs
 % -------------------------------------------------------------------------------------------------------------
 %% CHANGELOG
 % 10-02-2025        Pietro Califano         First implementation from script code.
+% 11-02-2025        Pietro Califano         Complete release version.
 % -------------------------------------------------------------------------------------------------------------
 %% DEPENDENCIES
 % [-]
 % -------------------------------------------------------------------------------------------------------------
 %% Future upgrades
-% [-]
+% DefaultPlotOpts()
 % -------------------------------------------------------------------------------------------------------------
 %% Function code
 
