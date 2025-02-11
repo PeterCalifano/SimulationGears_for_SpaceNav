@@ -1,8 +1,8 @@
-function [objFig] = PlotSceneFrames_Quat(dSceneEntityOriginArray_RenderFrame, ...
-                                         dSceneEntityQuatArray_RenderFrameFromTF, ...
-                                         dCameraOrigin_RenderFrame, ...
-                                         dCameraQuat_RenderFrameFromCam, ...
-                                         kwargs)
+function [objFig, cellFramesAxesGlobal] = PlotSceneFrames_Quat(dSceneEntityOriginArray_RenderFrame, ...
+                                                            dSceneEntityQuatArray_RenderFrameFromTF, ...
+                                                            dCameraOrigin_RenderFrame, ...
+                                                            dCameraQuat_RenderFrameFromCam, ...
+                                                            kwargs)
 arguments
     dSceneEntityOriginArray_RenderFrame     (3,:) double {ismatrix, isnumeric}
     dSceneEntityQuatArray_RenderFrameFromTF (4,:) double {ismatrix, isnumeric}
@@ -16,8 +16,21 @@ arguments
     kwargs.charFigTitle         (1,:) string {mustBeA(kwargs.charFigTitle, ["string", "char"])} = "Reference frames visualization"
     kwargs.objFig               (1,1) {isscalar, mustBeA(kwargs.objFig, ["double", "matlab.ui.Figure"])} = 0;
     kwargs.bUseBlackBackground  (1,1) logical {islogical, isscalar} = false;
+    kwargs.bEnableLegend        (1,1) logical {isscalar, islogical} = true;
+    kwargs.dAxisScale           (1,1) double {isscalar, isnumeric} = 1.0     
+    kwargs.bUsePhysicalPosition (1,1) logical {islogical, isscalar} = false;
 end
 %% SIGNATURE
+% [objFig] = PlotSceneFrames_Quat(dSceneEntityOriginArray_RenderFrame, ...
+%                                          dSceneEntityQuatArray_RenderFrameFromTF, ...
+%                                          dCameraOrigin_RenderFrame, ...
+%                                          dCameraQuat_RenderFrameFromCam, ...
+%                                          kwargs.cellPlotColors, ...      
+%                                          kwargs.cellPlotNames, ...       
+%                                          kwargs.InputFig, ...            
+%                                          kwargs.charFigTitle, ...        
+%                                          kwargs.objFig, ...              
+%                                          kwargs.bUseBlackBackground )
 % -------------------------------------------------------------------------------------------------------------
 %% DESCRIPTION
 % Function plotting frames attached to camera and objects in a scene (single time instant). The scene is
@@ -42,6 +55,8 @@ end
 %     kwargs.charFigTitle         (1,:) string {mustBeA(kwargs.charFigTitle, ["string", "char"])} = "Reference frames visualization"
 %     kwargs.objFig               (1,1) {isscalar, mustBeA(kwargs.objFig, ["double", "matlab.ui.Figure"])} = 0;
 %     kwargs.bUseBlackBackground  (1,1) logical {islogical, isscalar} = false;
+%     kwargs.bEnableLegend        (1,1) logical {isscalar, islogical} = true;
+%     kwargs.dAxisScale           (1,1) double {isscalar, isnumeric} = 1.0          
 % end
 % -------------------------------------------------------------------------------------------------------------
 %% OUTPUT
@@ -59,7 +74,7 @@ end
 %% Function code
 
 % Heuristic coefficient to scale camera position
-dScaleCoeff = 2;
+dScaleCoeff = 2 * kwargs.dAxisScale;
 
 % Ensure quaternions are normalized
 dSceneEntityQuatArray_RenderFrameFromTF = dSceneEntityQuatArray_RenderFrameFromTF./norm(dSceneEntityQuatArray_RenderFrameFromTF);
@@ -67,11 +82,11 @@ dCameraQuat_RenderFrameFromCam = dCameraQuat_RenderFrameFromCam./norm(dCameraQua
 
 % Normalize scale for visualization
 if not(all(dSceneEntityOriginArray_RenderFrame == 0)) % Normalize positions of bodies to unity
-    dSceneEntityOriginArray_RenderFrame = dSceneEntityOriginArray_RenderFrame./norm(dSceneEntityOriginArray_RenderFrame);
+    dSceneEntityOriginArray_RenderFrame = dAxisScale * dSceneEntityOriginArray_RenderFrame./norm(dSceneEntityOriginArray_RenderFrame);
 end
 
 % Normalize position of camera to unity
-if not(all(dCameraOrigin_RenderFrame == 0))
+if not(all(dCameraOrigin_RenderFrame == 0)) && not(kwargs.bUsePhysicalPosition)
     dCameraOrigin_RenderFrame = dScaleCoeff * dCameraOrigin_RenderFrame./norm(dCameraOrigin_RenderFrame);
 end
 
@@ -132,15 +147,15 @@ if isempty(kwargs.cellPlotColors)
 end
 
 
-% Setup figure
+% Get figure and properties
 if kwargs.objFig == 0
-    objFig = figure;
+    objFig = figure('Renderer', 'opengl');
+    kwargs.bEnforcePlotOpts = true; % No figure provided, enable plot opts
+    [~, charTextColor, ~] = DefaultPlotOpts(objFig, "charRenderer", "opengl", "bUseBlackBackground", kwargs.bUseBlackBackground);
 else
     objFig = kwargs.objFig;
-    figure(objFig);
+    charTextColor = objFig.Color;
 end
-
-[~, charTextColor, ~] = DefaultPlotOpts(objFig, "charRenderer", "opengl", "bUseBlackBackground", kwargs.bUseBlackBackground);
 
 % Plot camera frame
 dCamDCM_RenderFrameFromCam          = quat2rotm(dCameraQuat_RenderFrameFromCam');
@@ -149,10 +164,23 @@ dCamDCM_RenderFrameFromCam          = quat2rotm(dCameraQuat_RenderFrameFromCam')
                                                            dCamDCM_RenderFrameFromCam, ...
                                                            kwargs.cellPlotColors(1:3), ...
                                                            kwargs.cellPlotNames(1:3), ...
-                                                           objFig);
+                                                           objFig, ...
+                                                           "dAxisScale", kwargs.dAxisScale);
 
 % Set view along camera boresight
 view(-[dCamBoresightaxisVec(1), dCamBoresightaxisVec(2), dCamBoresightaxisVec(3)]);
+
+
+% Define cell of plot objects for legend
+if kwargs.bEnableLegend
+    % If legend is enabled, first get objects already inserted
+    % TODO: get previous legend entries if any
+    % cellPrevLegendObjEntries; % TODO
+    disp('TODO')
+    cellPrevLegendObjEntries = {};
+else
+    cellPrevLegendObjEntries = {};
+end
 
 % Plot scene entities frames
 cellFramesAxesGlobal = cell(1, 3*dNumOfEntities + 3);
@@ -169,10 +197,11 @@ for idE = 1:dNumOfEntities
 
     % Plot idE frame
     [cellFrameAxes] = PlotFrameFromDCM(dSceneEntityOriginArray_RenderFrame(:, idE), ...
-        dSceneEntityDCM_RenderFrameFromTF, ...
-        kwargs.cellPlotColors(ui32EntityPtr:ui32EntityPtr+2), ...
-        kwargs.cellPlotNames(ui32EntityPtr:ui32EntityPtr+2), ...
-        objFig);
+                                       dSceneEntityDCM_RenderFrameFromTF, ...
+                                       kwargs.cellPlotColors(ui32EntityPtr:ui32EntityPtr+2), ...
+                                       kwargs.cellPlotNames(ui32EntityPtr:ui32EntityPtr+2), ...
+                                       objFig, ...
+                                       "dAxisScale", kwargs.dAxisScale);
 
     % Group all scene entities axes frames into one single cell
     cellFramesAxesGlobal(ui32EntityPtr:ui32EntityPtr+2) = cellFrameAxes(:);
@@ -184,15 +213,23 @@ end
 % TODO (PC)
 
 
-% Apply additional formatting
-legend([cellFramesAxesGlobal{:}], 'TextColor', charTextColor);
-xlabel('X [-]');
-ylabel('Y [-]');
-zlabel('Z [-]');
+% Apply additional formatting 
+cellFramesAxesGlobal = [cellPrevLegendObjEntries(:)', cellFramesAxesGlobal(:)']; % Appned all objects into common cell
 
-title(kwargs.charFigTitle);
-hold off;
-pause(0.05);
+if not(isempty(cellFramesAxesGlobal)) && kwargs.bEnableLegend
+    % Add legend if not empty
+    legend([cellFramesAxesGlobal{:}], 'TextColor', charTextColor);
+end
+
+if kwargs.objFig == 0
+    xlabel('X [-]');
+    ylabel('Y [-]');
+    zlabel('Z [-]');
+
+    title(kwargs.charFigTitle);
+    hold off;
+    pause(0.05);
+end
 
 end
 

@@ -1,19 +1,22 @@
-function [outputArg1,outputArg2] = Visualize3dShapeModelWithPC(strShapeModel, ...
-                                                                dCameraPosition_NavFrame, ...
-                                                                dSunPosition_NavFrame, ...
-                                                                kwargs)
+function [objFig, cellPlotObjs] = Visualize3dShapeModelWithPC(strShapeModel, ...
+                                                              dCameraPosition_NavFrame, ...
+                                                              dSunPosition_NavFrame, ...
+                                                              dBodyDCM_NavFrameFromOF, ...
+                                                              kwargs)
 arguments (Input) % Positional
     strShapeModel
     dCameraPosition_NavFrame
-    dSunPosition_NavFrame        = [0;0;0]
+    dSunPosition_NavFrame   = [0;0;0]
+    dBodyDCM_NavFrameFromOF = eye(3);
 end
 arguments (Input)
     kwargs.objFig           = 0
-    kwargs.bUseBlackBackground
+    kwargs.bUseBlackBackground       (1,1) logical {islogical, isscalar} = false;
     kwargs.dPointsPositions_NavFrame (3, :) double = [];
     kwargs.charDistanceUnit          (1,:) string {mustBeA(kwargs.charDistanceUnit, ["string", "char"])} = "m"
     kwargs.bEnforcePlotOpts          (1,1) logical {isscalar, islogical} = false
     kwargs.bUsePerspectiveView       (1,1) logical {isscalar, islogical} = false;
+    kwargs.bEnableLegend             (1,1) logical {isscalar, islogical} = true;
 end
 %% SIGNATURE
 % -------------------------------------------------------------------------------------------------------------
@@ -43,44 +46,46 @@ end
 % -------------------------------------------------------------------------------------------------------------
 %% Function code
 
-% Get figure
+% Get figure and properties
 if kwargs.objFig == 0
-    objFig = figure('Renderer','opengl');
+    objFig = figure('Renderer', 'opengl');
     kwargs.bEnforcePlotOpts = true; % No figure provided, enable plot opts
+    [~, charTextColor, ~] = DefaultPlotOpts(objFig, "charRenderer", "opengl", "bUseBlackBackground", kwargs.bUseBlackBackground);
 else
     objFig = kwargs.objFig;
+    charTextColor = objFig.Color;
 end
 
 % Refocus figure and hold
 figure(objFig)
 hold on;
 
-% Set background color based on flag
-% Default option
-set(gca, 'Color', 'w'); % White background
-set(gcf, 'Color', 'w');
-charTextColor = 'k'; % Black text
-
-if kwargs.bUseBlackBackground == true
-    set(gca, 'Color', 'k'); % Axes background
-    set(gcf, 'Color', 'k'); % Figure background
-    charTextColor = 'w'; % White text
+% Define cell of plot objects for legend
+if kwargs.bEnableLegend
+    % If legend is enabled, first get objects already inserted
+    % TODO: get previous legend entries if any
+else
+    % Else, store objects for external use
+    cellPlotObjs = {};
 end
 
-% Define cell of plot objects for legend
-cellPlotObjs = {};
-% TODO: get previous legend entries if any
+
+% Rotate vertices if body attitude is not eye(3)
+if dBodyDCM_NavFrameFromOF == eye(3)
+    dVerticesPos = strShapeModel.dVerticesPos';
+else
+    dVerticesPos = (dBodyDCM_NavFrameFromOF * strShapeModel.dVerticesPos)';
+end
 
 % Plot the mesh using patch
-objShadedMeshPlot = patch('Vertices', strShapeModel.dVerticesPos', 'Faces', strShapeModel.ui32triangVertexPtr', ...
+objShadedMeshPlot = patch('Vertices', dVerticesPos, 'Faces', strShapeModel.ui32triangVertexPtr', ...
                     'FaceColor', [0.7 0.7 0.7], 'EdgeColor', 'none', 'FaceAlpha', 1, 'DisplayName', '3D mesh model');
 hold on
 lighting gouraud;
 camlight('headlight');
 
 % Append object to cell
-cellPlotObjs = {cellPlotObjs(:), objShadedMeshPlot};
-
+cellPlotObjs = [cellPlotObjs(:)', {objShadedMeshPlot}];
 
 if not(isempty(kwargs.dPointsPositions_NavFrame))
 
@@ -90,7 +95,8 @@ if not(isempty(kwargs.dPointsPositions_NavFrame))
                               'g.', 'MarkerSize', 6, 'DisplayName', '');
 
     % Append object to cell
-    cellPlotObjs = {cellPlotObjs(:), objPointCloudPlot};
+    objPointCloudPlot = {objPointCloudPlot};
+    cellPlotObjs = [cellPlotObjs(:), objPointCloudPlot(:)];
 end
 
 if kwargs.bEnforcePlotOpts
@@ -119,21 +125,26 @@ end
 
 % Plot sun direction if provided
 if any(dSunPosition_NavFrame > 0)
+    
+    % Normalize position to avoid unreadable plots
+    dScaleDistanceSun = norm(dCameraPosition_NavFrame);
+    dSunPosition_NavFrame = dScaleDistanceSun * dSunPosition_NavFrame./norm(dSunPosition_NavFrame);
 
     hold on;
-    dLineScale = 1.5;
+    dLineScale = 1.2;
     objSunDirPlot = plot3([0, dLineScale * dSunPosition_NavFrame(1)], ...
                     [0, dLineScale * dSunPosition_NavFrame(2)], ...
                     [0, dLineScale * dSunPosition_NavFrame(3)], ...
-                    'r-', 'LineWidth', 2, 'DisplayName', 'To Sun');
-
+                    '-', 'Color', '#f48037', 'LineWidth', 2, 'DisplayName', 'To Sun');
+    axis equal
     % Append object to cell
-    cellPlotObjs = {cellPlotObjs(:), objSunDirPlot};
+    objSunDirPlot = {objSunDirPlot};
+    cellPlotObjs = [cellPlotObjs(:)', objSunDirPlot(:)];
 
 end
 
 
-if not(isempty(cellPlotObjs))
+if not(isempty(cellPlotObjs)) && kwargs.bEnableLegend
     % Add legend if not empty
     legend([cellPlotObjs{:}], ...
             'TextColor', charTextColor);

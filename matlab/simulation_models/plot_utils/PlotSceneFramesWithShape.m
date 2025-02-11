@@ -1,54 +1,83 @@
-function [] = PlotSceneFramesWithShape(dSunVector_NavFrame, ...
-                                       dCameraOrigin_NavFrame, ...
-                                       dCameraAttDCM_NavframeFromOF, ...
-                                       dBodiesOrigin_NavFrame, ...
-                                       dBodiesAttDCM_NavFrameFromOF, ...
-                                       kwargs)
+function [objSceneFig, cellPlotObjs] = PlotSceneFramesWithShape(strShapeModel, ...
+                                                                dSunPosition_NavFrame, ...
+                                                                dCameraOrigin_NavFrame, ...
+                                                                dCameraAttDCM_NavframeFromOF, ...
+                                                                dBodyOrigin_NavFrame, ...
+                                                                dBodyAttDCM_NavFrameFromOF, ...
+                                                                kwargs)
 arguments (Input) % TODO: update inputs
-    dSunVector_NavFrame              (3,:)   double {isvector, isnumeric}
+    strShapeModel                    {isstruct}
+    dSunPosition_NavFrame            (3,:)   double {isvector, isnumeric}
     dCameraOrigin_NavFrame           (3,:)   double {isvector, isnumeric}
     dCameraAttDCM_NavframeFromOF     (3,3,:) double {ismatrix, isnumeric}
-    dBodiesOrigin_NavFrame           (3,:,:)   double {ismatrix, isnumeric} = zeroes(3,1)
-    dBodiesAttDCM_NavFrameFromOF     (3,3,:,:) double {ismatrix, isnumeric} = eye(3)
+    dBodyOrigin_NavFrame           (3,:)   double {ismatrix, isnumeric} = zeroes(3,1)
+    dBodyAttDCM_NavFrameFromOF     (3,3,:) double {ismatrix, isnumeric} = eye(3)
 end
 arguments (Input)
-    kwargs.ui32TargetPort                  (1,1) uint32 {isscalar, isnumeric} = 0
-    kwargs.charOutputDatatype              (1,:) string {isa(kwargs.charOutputDatatype, 'string')} = "uint8"
-    kwargs.ui32NumOfBodies                 (1,1) uint32 {isnumeric, isscalar} = 1
-    kwargs.objCameraIntrinsics             (1,1) {mustBeA(kwargs.objCameraIntrinsics, "CCameraIntrinsics")} = CCameraIntrinsics()
-    kwargs.enumRenderingFrame              (1,1) EnumRenderingFrame {isa(kwargs.enumRenderingFrame, 'EnumRenderingFrame')} = EnumRenderingFrame.CUSTOM_FRAME % TARGET_BODY, CAMERA, CUSTOM_FRAME
-    kwargs.bEnableFramesPlot               (1,1) logical {islogical} = false;
-    kwargs.bConvertCamQuatToBlenderQuat    (1,1) logical {isscalar, islogical} = true;
-    kwargs.bDisplayImage                   (1,1) logical {islogical} = false;
+    kwargs.bUseBlackBackground          (1,1) logical {islogical, isscalar} = false;
+    kwargs.charDistanceUnit             (1,:) string {mustBeMember(kwargs.charDistanceUnit, ["m", "km"])} = 'm'
+    kwargs.cellPlotColors               (1,:) cell = {};
+    kwargs.cellPlotNames                (1,:) cell = {};
+    kwargs.objSceneFig                  (1,1) {isscalar, mustBeA(kwargs.objSceneFig, ["double", "matlab.ui.Figure"])} = 0;
+    kwargs.charFigTitle                 (1,:) string {mustBeA(kwargs.charFigTitle, ["string", "char"])} = "Scene frames and shape visualization"
+    kwargs.bUsePhysicalPosition         (1,1) logical {islogical, isscalar} = false;
+    kwargs.dPointsPositions_NavFrame    (3,:) double = [];
 end
 
 
+% Get figure and properties
+if kwargs.objSceneFig == 0
+    objSceneFig = figure('Renderer', 'opengl');
+    kwargs.bEnforcePlotOpts = true; % No figure provided, enable plot opts
+    [~, charTextColor, ~] = DefaultPlotOpts(objSceneFig, "charRenderer", "opengl", "bUseBlackBackground", kwargs.bUseBlackBackground);
+else
+    objSceneFig = kwargs.objSceneFig;
+    charTextColor = objSceneFig.Color;
+end
+% TODO: add check on fields of strShapeModel
+% strShapeModel.dVerticesPos, strShapeModel.ui32triangVertexPtr
+
+% Get scale from maximum radius of shape model
+dAxisScale = 1.25 * max(vecnorm(strShapeModel.dVerticesPos, 2, 1), [], 'all');
+
 %% Plot shape object
-% TODO
+
+[objSceneFig, cellPlotObjs] = Visualize3dShapeModelWithPC(strShapeModel, ...
+                                                          dCameraOrigin_NavFrame, ...
+                                                          dSunPosition_NavFrame, ...
+                                                          dBodyAttDCM_NavFrameFromOF, ...
+                                                          "charDistanceUnit", kwargs.charDistanceUnit, ...
+                                                          "bUseBlackBackground", kwargs.bUseBlackBackground, ...
+                                                          "objFig", objSceneFig, ...
+                                                          "bEnableLegend", false, ...
+                                                          "dPointsPositions_NavFrame", kwargs.dPointsPositions_NavFrame);
 
 
 %% Plot objects and camera frames
-if kwargs.bEnableFramesPlot
-    fprintf("\nProducing requested visualization of scene frames to render...\n")
 
-    % Convert DCMs to quaternion
-    dSceneEntityQuatArray_RenderFrameFromOF = transpose( dcm2quat(dBodiesAttDCM_NavFrameFromOF) );
-    dCameraQuat_RenderFrameFromCam          = transpose( dcm2quat(dCameraAttDCM_NavframeFromOF) );
+% Convert DCMs to quaternion
+dSceneEntityQuatArray_RenderFrameFromOF = transpose( dcm2quat(dBodyAttDCM_NavFrameFromOF) );
+dCameraQuat_RenderFrameFromCam          = transpose( dcm2quat(dCameraAttDCM_NavframeFromOF) );
 
-    % if kwargs.bConvertCamQuatToBlenderQuat
-    % DEVNOTE: removed because plot function operates using the same convention as
-    % this function, contrarily to Blender. Assuming that the plot is correct, the
-    % downstream operations should be correct too.
-    %     dCameraQuat_RenderFrameFromCam = BlenderPyCommManager.convertCamQuatToBlenderQuatStatic(dCameraQuat_RenderFrameFromCam);
-    % end
+% Construct figure with plot
+[~, cellPlotObjs_SceneFrames] = PlotSceneFrames_Quat(dBodyOrigin_NavFrame, ...
+                                                    dSceneEntityQuatArray_RenderFrameFromOF, ...
+                                                    dCameraOrigin_NavFrame, ...
+                                                    dCameraQuat_RenderFrameFromCam, ...
+                                                    'bUseBlackBackground', true, ...
+                                                    "objFig", objSceneFig, ...
+                                                    "charFigTitle", kwargs.charFigTitle, ...
+                                                    "dAxisScale", dAxisScale, ...
+                                                    "bEnableLegend", false, ...
+                                                    "bUsePhysicalPosition", kwargs.bUsePhysicalPosition);
 
-    % Construct figure with plot
-    [objSceneFigs(idImg)] = PlotSceneFrames_Quat(dBodiesOrigin_NavFrame, ...
-        dSceneEntityQuatArray_RenderFrameFromOF, ...
-        dCameraOrigin_NavFrame, ...
-        dCameraQuat_RenderFrameFromCam, 'bUseBlackBackground', true, ...
-        "charFigTitle", "Visualization with Blender camera quaternion");
-end
+% Define cell for global legend
+cellPlotObjs = [cellPlotObjs(:)', cellPlotObjs_SceneFrames(:)'];
+
+% Add legend
+legend([cellPlotObjs{:}], 'TextColor', charTextColor)
+axis equal
+
 
 end
 
