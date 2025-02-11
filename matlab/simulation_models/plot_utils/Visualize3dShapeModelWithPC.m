@@ -4,8 +4,8 @@ function [objFig, cellPlotObjs] = Visualize3dShapeModelWithPC(strShapeModel, ...
                                                               dBodyDCM_NavFrameFromOF, ...
                                                               kwargs)
 arguments (Input) % Positional
-    strShapeModel
-    dCameraPosition_NavFrame
+    strShapeModel % dVerticesPos, ui32triangVertexPtr
+    dCameraPosition_NavFrame % TODO: allow function to work WITHOUT DEFINING CAMERA
     dSunPosition_NavFrame   = [0;0;0]
     dBodyDCM_NavFrameFromOF = eye(3);
 end
