@@ -73,8 +73,6 @@ assert( all(abs(dRayDirection) <= 1), 'Ray direction is not a unit vector!');
 EPS = eps('double');
 
 %% MAIN COMPUTATION BODY
-% DEVNOTE: Linear system to solve for intersection
-% TO DO
 
 % Compute triangle edges
 dEdge1 = dTriangVert1 - dTriangVert0;
