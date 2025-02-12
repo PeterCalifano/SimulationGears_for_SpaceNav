@@ -4,6 +4,7 @@ classdef CAttitudePointingGenerator < handle
     % -------------------------------------------------------------------------------------------------------------
     %% CHANGELOG
     % 08-12-2024    Pietro Califano     Class implemented from adapted codes for pointing generation
+    % 12-02-2025    Pietro Califano     Update of class to add Sun position as input and static methods
     % -------------------------------------------------------------------------------------------------------------
     %% METHODS
     % Method1: Description
@@ -22,6 +23,7 @@ classdef CAttitudePointingGenerator < handle
 
         dCameraPosition_Frame = -ones(3,1);
         dTargetPosition_Frame = -ones(3,1);
+        dSunPosition_Frame    = -ones(3,1);
 
         bInvertZaxisForBlender    = false;
         bShowAttitudePointingPlot = false;
@@ -31,10 +33,11 @@ classdef CAttitudePointingGenerator < handle
 
     methods (Access = public)
         %% CONSTRUCTOR
-        function self = CAttitudePointingGenerator(dCameraPosition_Frame, dTargetPosition_Frame, options)
+        function self = CAttitudePointingGenerator(dCameraPosition_Frame, dTargetPosition_Frame, dSunPosition_Frame, options)
             arguments
-                dCameraPosition_Frame {ismatrix, isnumeric} = -ones(3,1); % Defaults to placeholder value
-                dTargetPosition_Frame {ismatrix, isnumeric} = -ones(3,1); % Defaults to placeholder value
+                dCameraPosition_Frame {ismatrix, mustBeNumeric} = -ones(3,1); % Defaults to placeholder value
+                dTargetPosition_Frame {ismatrix, mustBeNumeric} = -ones(3,1); 
+                dSunPosition_Frame {ismatrix, mustBeNumeric}    = -ones(3,1); 
             end
 
             arguments
@@ -42,8 +45,9 @@ classdef CAttitudePointingGenerator < handle
             end
 
             % Assign properties
-            self.dCameraPosition_Frame = dCameraPosition_Frame;
-            self.dTargetPosition_Frame = dTargetPosition_Frame;
+            self.dCameraPosition_Frame  = dCameraPosition_Frame;
+            self.dTargetPosition_Frame  = dTargetPosition_Frame;
+            self.dSunPosition_Frame     = dSunPosition_Frame;
             self.bInvertZaxisForBlender = options.bInvertZaxisForBlender;
 
         end
@@ -57,8 +61,8 @@ classdef CAttitudePointingGenerator < handle
         function [self, dOutRot3, dDCM_FramefromCAM] = pointToTarget_PositionOnly(self, dCameraPosition_Frame, dTargetPosition_Frame, options)
             arguments
                 self
-                dCameraPosition_Frame (3, :) double {ismatrix, isnumeric} = self.dCameraPosition_Frame
-                dTargetPosition_Frame (3, :) double {ismatrix, isnumeric} = self.dTargetPosition_Frame
+                dCameraPosition_Frame (3, :) double {ismatrix, mustBeNumeric} = self.dCameraPosition_Frame
+                dTargetPosition_Frame (3, :) double {ismatrix, mustBeNumeric} = self.dTargetPosition_Frame
             end
             arguments
                 options.enumOutRot3Param (1,1) EnumRotParams {isa(options.enumOutRot3Param, ...
@@ -120,20 +124,27 @@ classdef CAttitudePointingGenerator < handle
                 dTargetPosition_Frame, ...
                 dSunPosition_Frame, ...
                 options)
-            arguments
+            arguments (Input)
                 self
                 dCameraPosition_Frame (3, :) double = self.dCameraPosition_Frame
                 dTargetPosition_Frame (3, :) double = self.dTargetPosition_Frame
-                dSunPosition_Frame    (3, :) double = self.dTargetPosition_Frame
+                dSunPosition_Frame    (3, :) double = self.dSunPosition_Frame
             end
-            arguments
+            arguments (Input)
                 options.enumOutRot3Param (1,1) EnumRotParams {isa(options.enumOutRot3Param, ...
                     'EnumRotParams')} = EnumRotParams.DCM
+            end
+            arguments (Output)
+                self    
+                dOutRot3                  {mustBeNumeric, mustBeNonNan, mustBeFinite}
+                dDCM_FrameFromCAM (3,3,:) {mustBeNumeric, mustBeNonNan, mustBeFinite}
             end
             
             ui32NumOfEntries = uint32(size(dCameraPosition_Frame, 2));
             assert(ui32NumOfEntries == size(dTargetPosition_Frame, 2) || size(dTargetPosition_Frame, 2) == 1)
             assert(ui32NumOfEntries == size(dSunPosition_Frame, 2) || size(dSunPosition_Frame, 2) == 1)
+        
+            assert( all(vecnorm(dSunPosition_Frame, 2, 1) ~= 0 ), "Invalid input data: Sun position cannot be zero.");
 
             % Construct camera boresight
             dCamBoresightZ_Frame = -(dCameraPosition_Frame./vecnorm(dCameraPosition_Frame, 2, 1));
