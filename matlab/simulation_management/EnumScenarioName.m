@@ -4,7 +4,8 @@ classdef EnumScenarioName
 % MATLAB simulation environment.
 % -------------------------------------------------------------------------------------------------------------
 %% CHANGELOG
-% 17-08-2024        Pietro Califano        Class definition.
+% 17-08-2024        Pietro Califano         Class definition.
+% 12-02-2025        Pietro Califano         Add Apophis for RCS1
 % -------------------------------------------------------------------------------------------------------------
 %% DEPENDENCIES
 % [-]
@@ -19,6 +20,7 @@ enumeration
     Itokawa
     % Eros_NEAR
     Bennu_OREx
+    Apophis_RCS1
 end
 
 end
