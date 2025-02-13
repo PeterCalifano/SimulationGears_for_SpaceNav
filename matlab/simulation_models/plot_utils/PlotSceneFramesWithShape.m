@@ -34,11 +34,15 @@ else
     objSceneFig = kwargs.objSceneFig;
     charTextColor = objSceneFig.Color;
 end
-% TODO: add check on fields of strShapeModel
-% strShapeModel.dVerticesPos, strShapeModel.ui32triangVertexPtr
+
+% Check that strShapeModel contains necessary fields
+if ~isfield(strShapeModel, 'dVerticesPos') || ~isfield(strShapeModel, 'ui32triangVertexPtr')
+    error('strShapeModel must contain fields: dVerticesPos and ui32triangVertexPtr');
+end
 
 % Get scale from maximum radius of shape model
 dAxisScale = 1.25 * max(vecnorm(strShapeModel.dVerticesPos, 2, 1), [], 'all');
+
 
 %% Plot shape object with point cloud
 [objSceneFig, cellPlotObjs] = Visualize3dShapeModelWithPC(strShapeModel, ...
