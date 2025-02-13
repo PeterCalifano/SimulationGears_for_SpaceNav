@@ -187,8 +187,8 @@ classdef CBasePlotter < handle
                         "bUseBlackBackground", kwargs.bUseBlackBackground);
 
             else
-                objSceneFig = kwargs.objSceneFig;
-                charTextColor = objSceneFig.Color;
+                charBackGroundColor = objSceneFig.Color;
+                charTextColor = gca().XColor;
             end
         end
 
