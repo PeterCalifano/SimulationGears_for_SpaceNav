@@ -123,12 +123,11 @@ classdef CPointProjectionPlotter < CBasePlotter
             % Detector rectangle (sensor boundaries)
             % Draw the detector rectangle using `rectangle()`
             objCamDetector = rectangle('Position', [0, 0, objCameraParams.ImageSize(1), objCameraParams.ImageSize(2)], ...
-                                        'EdgeColor', 'r', 'LineWidth', 2);
+                                        'EdgeColor', 'r', 'LineWidth', 2); %#ok<NASGU>
 
 
             % Plot points set
             for idS = 1:ui32NumOfSets
-                hold on;
 
                 dProjectedPointsArray_UV = cellProjectedPointsArray_UV{idS};
 
@@ -136,8 +135,9 @@ classdef CPointProjectionPlotter < CBasePlotter
                     assert(size(dProjectedPointsArray_UV, 2) == 2, "ERROR: Invalid shape. Either the num. of columns or of the rows must be = 2.")
                     dProjectedPointsArray_UV = dProjectedPointsArray_UV';
                 end
+                hold on;
 
-                objPlot = plot(dProjectedPointsArray_UV(1, :), dProjectedPointsArray_UV(2, :), ...
+                objPlot = plot(dProjectedPointsArray_UV(2, :), dProjectedPointsArray_UV(1, :), ...
                                 'Marker', '.', ...
                                 'Color', cellPlotColors{idS}, ...
                                 'DisplayName', cellPlotNames{idS}, ...
