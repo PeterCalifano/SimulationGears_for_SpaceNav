@@ -303,3 +303,12 @@ uistack(objMeshProj, 'bottom'); % Send the mesh to the back
 legend([objVisibleProj_EllipsLocalPA, objVisibleProj_ShadowRays, objMeshProj], 'TextColor', 'w');
 hold off;
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% Test analogous function implementation
+% 2D Image projection plot % DONE, OK
+% [objSceneFig, cellPlotObjs] = CPointProjectionPlotter.PlotProjectedPoints({dProjectedPoints_UV, dProjectedPoints_UV(:, bVisiblePoints_EllipsLocalPA), dProjectedPoints_UV(:, bVisiblePoints_RTwithShadowRays)}, ...
+%                                                             objCameraIntrisics, ...
+%                                                             "bUseBlackBackground", true, ...
+%                                                             "cellPlotNames", {'Mesh vertices projection', 'RT + Ellips. Local PA', 'RT + Shadow Rays'} );
+
