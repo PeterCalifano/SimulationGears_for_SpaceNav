@@ -24,9 +24,11 @@ classdef CTargetEmulator < CSceneObject
 
         % Storage attributes
         targetUnitOutput = 'm'; % TODO make this an enum class for safe usage
-        % Entity position and attitude wrt World frame
+        % Entity position and attitude wrt World frame (kept for legacy reasons
         dPosVector_W  = [0; 0; 0];
         dRot3_WfromTB = eye(3,3); % Internally stored as DCM
+
+        objPose3_WorldFromPoseFrame = SPose3([0; 0; 0], eye(3,3));
     end
 
     properties (SetAccess = protected, GetAccess = public)
@@ -42,10 +44,11 @@ classdef CTargetEmulator < CSceneObject
 
     methods (Access = public)
         % CONSTRUCTORS
-        function self = CTargetEmulator(objShapeModel, ui32NumOfPointsGT)
+        function self = CTargetEmulator(objShapeModel, ui32NumOfPointsGT, objPose3_WorldFromPoseFrame)
             arguments
-                objShapeModel     (1,1) CShapeModel
+                objShapeModel     (1,1) {mustBeA(objShapeModel, "CShapeModel")}
                 ui32NumOfPointsGT (1,1) uint32 = 0
+                objPose3_WorldFromPoseFrame (1,1) {mustBeA(objPose3_WorldFromPoseFrame, ["SPose3"])} = SPose3([0; 0; 0], eye(3,3)); %#ok<NBRAK2>
             end
 
             % Set ShapeModel object
@@ -65,6 +68,9 @@ classdef CTargetEmulator < CSceneObject
             % Allocate memory for landmarks if required
             self.dPointsPositionsGT_TB = zeros(3, ui32NumOfPointsGT, 'double');
             self.i32LandmarksID        = zeros(1, ui32NumOfPointsGT, 'int32');
+
+            % Store pose3 object
+            self.objPose3_WorldFromPoseFrame = objPose3_WorldFromPoseFrame;
             
         end
         
@@ -89,11 +95,16 @@ classdef CTargetEmulator < CSceneObject
             dRot3_WfromTB = self.rotation(enumParamType);
         end
 
+
+        function [objPose3_WorldFromPoseFrame] = GetPose3(self)
+            objPose3_WorldFromPoseFrame = self.objPose3_WorldFromPoseFrame;
+        end
+
         function dPosVector_W = translation(self)
             dPosVector_W = self.dPosVector_W;
         end
 
-        function dRot3_WfromTB = rotation(self, enumParamType)
+        function [dRot3_WfromTB] = rotation(self, enumParamType)
             arguments
                 self
                 enumParamType (1,1) = EnumRotParams.DCM
@@ -162,7 +173,7 @@ classdef CTargetEmulator < CSceneObject
         
         function [strTargetDataStruct] = getTargetStruct(self)
             
-            % TEMPORARY DEFINITION BEFORE UPDATE of CheckLMvisibility function
+            % Maintained as this for legacy reasons. TODO update codes dependent on this!
             strTargetDataStruct.strShapeModel = self.getShapeStruct();
             strTargetDataStruct.dTargetPos_IN = self.dPosVector_W; 
             strTargetDataStruct.dQuat_INfromTB = self.rotation(EnumRotParams.QUAT_VSRPplus);
@@ -187,6 +198,11 @@ classdef CTargetEmulator < CSceneObject
             end
             self.dPosVector_W  = dPosVector_W  ;
             self.dRot3_WfromTB = dRot3_WfromTB ;
+
+            % Update object
+            self.objPose3_WorldFromPoseFrame.dPosition_Frame         = dPosVector_W;
+            self.objPose3_WorldFromPoseFrame.dDCM_FrameFromPoseFrame = dRot3_WfromTB;
+
         end
         
         % PUBLIC METHODS
