@@ -25,21 +25,22 @@ dFocalLength = 1E3;
 ui32OpticalCentre_uv = [512, 512];
 ui32ImageSize = [1024, 1024];
 
-objCameraIntrisics = CCameraIntrinsics(dFocalLength, ui32OpticalCentre_uv, ui32ImageSize);  
-disp(objCameraIntrisics)
+objCameraIntrinsics = CCameraIntrinsics(dFocalLength, ui32OpticalCentre_uv, ui32ImageSize);  
+disp(objCameraIntrinsics)
 
 % Define camera object
-objCamera = CProjectiveCamera(objCameraIntrisics);
+objCamera = CProjectiveCamera(objCameraIntrinsics);
 
 strCameraData.dDCM_INfromCAM = dDCM_INfromCAM;
 strCameraData.dPosition_IN = dCameraPosition_TB; % TO MODIFY
 strCameraData.dResX = ui32ImageSize(1);
 strCameraData.dResY = ui32ImageSize(2);
-strCameraData.dKcam = objCameraIntrisics.K;
+strCameraData.dKcam = objCameraIntrinsics.K;
 strCameraData       = orderfields(strCameraData);
 
+
 % Assign data for CheckLMvisibility_rayTrace_MEX (LEGACY)
-dFovHW = objCameraIntrisics.GetFovHW;
+dFovHW = objCameraIntrinsics.GetFovHW;
 
 strCamera.dFovX             = dFovHW(2); % [rad]
 strCamera.dFovY             = dFovHW(1); % [rad]
@@ -104,31 +105,31 @@ profile('clear')
 profile('off')
 tic
 [bAllPointsVisibilityMask_RTwithShadowRays, ~] = RayTracePointVisibility_ShadowRays_MEX(uint32(ui32pointsIDs), ...
-                                                                                    dPointsPositionsGT_TB, ...
-                                                                                    strTargetBodyData, ...
-                                                                                    strCameraData, ...
-                                                                                    dSunPosition_TB, ...
-                                                                                    bDEBUG_MODE, ...
-                                                                                    bTwoSidedTest); 
+                                                                                         dPointsPositionsGT_TB, ...
+                                                                                         strTargetBodyData, ...
+                                                                                         strCameraData, ...
+                                                                                         dSunPosition_TB, ...
+                                                                                         bDEBUG_MODE, ...
+                                                                                         bTwoSidedTest); 
 try
     p2 = profile('info');
 catch
 end
 toc
 
-% rayTriGPU()
+% rayTriGPU
 
 
 profile('clear')
 profile('off')
 tic
 [bAllPointsVisibilityMask_VectorizedRTwithShadowRays, ~] = RayTracePointVisibility_VectorizedShadowRays_MEX(uint32(ui32pointsIDs), ...
-                                                                             dPointsPositionsGT_TB, ...
-                                                                             strTargetBodyData, ...
-                                                                             strCameraData, ...
-                                                                             dSunPosition_TB, ...
-                                                                             bDEBUG_MODE, ...
-                                                                             bTwoSidedTest);
+                                                                                                            dPointsPositionsGT_TB, ...
+                                                                                                            strTargetBodyData, ...
+                                                                                                            strCameraData, ...
+                                                                                                            dSunPosition_TB, ...
+                                                                                                            bDEBUG_MODE, ...
+                                                                                                            bTwoSidedTest);
 
 try
     p4 = profile('info');
@@ -160,6 +161,25 @@ toc
 % toc
 
 % profile viewer
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% DEBUG EMULATOR %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% % PASSED, result is identical.
+% objEmulatorSettings_MaxFidelity = SFrontEndTrackerEmulatorSettings("enumRandProcessType", "NONE", ...
+%     "enumTrackLossModel", "NONE", "bMaxFidelity", true);
+% 
+% % % Setup frontend emulator object 
+% objFrontEndEmulator_MaxFidelity = CFrontEndTracker_Emulator(objCameraIntrinsics, ...
+%                                                             objTargetEmulator, ...
+%                                                             objEmulatorSettings_MaxFidelity);
+% 
+% % Run frame acquisition to get visible points
+% objCameraPose_W = SPose3(strCameraData.dPosition_IN, strCameraData.dDCM_INfromCAM);
+% 
+% objFrontEndEmulator_MaxFidelity = objFrontEndEmulator_MaxFidelity.acquireFrame(objCameraPose_W, ...
+%                                                                                 dSunPosition_TB, ...
+%                                                                                 0);
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 
 %% test_ParallelRayTracePointVisibility_ShadowRays
 % NOTE: this is essentially useless...
@@ -249,9 +269,9 @@ hold off;
 
 %%%%%%%%%%%%%%%%%
 % 2D Image projection plot
-[dProjectedPoints_UV]   = pinholeProjectArrayHP_DCM(objCameraIntrisics.K, dDCM_INfromCAM', dCameraPosition_TB, dPointsPositionsGT_TB);
-bPointWithinFoV = ((dProjectedPoints_UV(1, :) > 0 & dProjectedPoints_UV(1, :) < objCameraIntrisics.ImageSize(1)) &...
-                   (dProjectedPoints_UV(2, :) > 0 & dProjectedPoints_UV(2, :) < objCameraIntrisics.ImageSize(2)))';
+[dProjectedPoints_UV]   = pinholeProjectArrayHP_DCM(objCameraIntrinsics.K, dDCM_INfromCAM', dCameraPosition_TB, dPointsPositionsGT_TB);
+bPointWithinFoV = ((dProjectedPoints_UV(1, :) > 0 & dProjectedPoints_UV(1, :) < objCameraIntrinsics.ImageSize(1)) &...
+                   (dProjectedPoints_UV(2, :) > 0 & dProjectedPoints_UV(2, :) < objCameraIntrinsics.ImageSize(2)))';
 
 % Determine visible and illuminated points
 bVisiblePoints_EllipsLocalPA    = bPointWithinFoV & bAllPointsVisibilityMask_legacyEllipsLocalPA;
@@ -283,7 +303,7 @@ set(gca, 'XColor', 'w', 'YColor', 'w'); % White axis lines
 
 % Detector rectangle (sensor boundaries)
 % Draw the detector rectangle using `rectangle()`
-objCamDetector = rectangle('Position', [0, 0, objCameraIntrisics.ImageSize(1), objCameraIntrisics.ImageSize(2)], 'EdgeColor', 'r', 'LineWidth', 2);
+objCamDetector = rectangle('Position', [0, 0, objCameraIntrinsics.ImageSize(1), objCameraIntrinsics.ImageSize(2)], 'EdgeColor', 'r', 'LineWidth', 2);
 
 % Get valid indices for 2D patch
 dVertices2D = dProjectedPoints_UV';
