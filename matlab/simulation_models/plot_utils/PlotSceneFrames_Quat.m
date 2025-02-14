@@ -160,6 +160,7 @@ else
 end
 
 % Plot camera frame
+% TODO check that the DCM is as intended!
 dCamDCM_RenderFrameFromCam          = quat2rotm(dCameraQuat_RenderFrameFromCam');
 
 [cellCameraAxes, dCamBoresightaxisVec] = PlotFrameFromDCM(dCameraOrigin_RenderFrame, ...

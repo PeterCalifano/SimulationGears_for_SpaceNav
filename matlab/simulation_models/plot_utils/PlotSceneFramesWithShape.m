@@ -22,6 +22,7 @@ arguments (Input)
     kwargs.charFigTitle                 (1,:) string {mustBeA(kwargs.charFigTitle, ["string", "char"])} = "Scene frames and shape visualization"
     kwargs.bUsePhysicalPosition         (1,1) logical {islogical, isscalar} = false;
     kwargs.dPointsPositions_NavFrame    (3,:) double = [];
+    kwargs.bConvertToBlenderFrame       (1,1) logical {islogical, isscalar} = false;
 end
 
 
@@ -59,7 +60,18 @@ dAxisScale = 1.25 * max(vecnorm(strShapeModel.dVerticesPos, 2, 1), [], 'all');
 %% Plot objects and camera frames
 % Convert DCMs to quaternion
 dSceneEntityQuatArray_RenderFrameFromOF = transpose( dcm2quat(dBodyAttDCM_NavFrameFromOF) );
-dCameraQuat_RenderFrameFromCam          = transpose( dcm2quat(dCameraAttDCM_NavframeFromOF) );
+
+if kwargs.bConvertToBlenderFrame
+    % Perform operations to convert to Blender quaternion
+    dCameraQuat_RenderFrameFromCam  = transpose( dcm2quat( transpose(dCameraAttDCM_NavframeFromOF )) );
+    dCameraQuat_RenderFrameFromCam  = transpose( quatinv( quatmultiply( dCameraQuat_RenderFrameFromCam' , [0,1,0,0]) ) );
+    % (Blender takes this quaternion inverted for it to be correctly pointing to target)
+
+else
+    % Use matrix with standard camera frame convention
+    dCameraQuat_RenderFrameFromCam          = transpose( dcm2quat(dCameraAttDCM_NavframeFromOF) );
+end
+
 
 % Construct figure with plot
 [~, cellPlotObjs_SceneFrames] = PlotSceneFrames_Quat(dBodyOrigin_NavFrame, ...
