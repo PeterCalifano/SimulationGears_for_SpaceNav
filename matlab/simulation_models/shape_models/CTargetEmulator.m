@@ -95,7 +95,6 @@ classdef CTargetEmulator < CSceneObject
             dRot3_WfromTB = self.rotation(enumParamType);
         end
 
-
         function [objPose3_WorldFromPoseFrame] = GetPose3(self)
             objPose3_WorldFromPoseFrame = self.objPose3_WorldFromPoseFrame;
         end
@@ -190,6 +189,15 @@ classdef CTargetEmulator < CSceneObject
         end
 
         % SETTERS
+        function [] = SetPose3(self, objPose3_WorldFromPoseFrame)
+            self.objPose3_WorldFromPoseFrame = objPose3_WorldFromPoseFrame;
+
+            % Update legacy attributes
+            self.dRot3_WfromTB  = objPose3_WorldFromPoseFrame.rotation;
+            self.dPosVector_W   = objPose3_WorldFromPoseFrame.translation;
+        end
+
+
         function [self] = SetPose(self, dPosVector_W, dRot3_WfromTB)
             arguments
                 self
