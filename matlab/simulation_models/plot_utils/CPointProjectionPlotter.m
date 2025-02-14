@@ -71,7 +71,8 @@ classdef CPointProjectionPlotter < CBasePlotter
             % Get figure and properties
             [objSceneFig, charTextColor, charBackGroundColor] = CBasePlotter.initializeFigureObj(kwargs.objSceneFig, ...
                 "bUseBlackBackground", kwargs.bUseBlackBackground, ...
-                "charRenderer", kwargs.charRenderer);
+                "charRenderer", kwargs.charRenderer, ...
+                "bEnforcePlotOpts", kwargs.bEnforcePlotOpts);
 
             [cellPlotObjs] = CBasePlotter.initializeLegendCell(kwargs.bEnableLegend);
 
@@ -130,6 +131,11 @@ classdef CPointProjectionPlotter < CBasePlotter
             for idS = 1:ui32NumOfSets
 
                 dProjectedPointsArray_UV = cellProjectedPointsArray_UV{idS};
+
+                if isempty(dProjectedPointsArray_UV)
+                    warning('Points set to plot is empty! No attempt to plot.')
+                    continue;
+                end
 
                 if size(dProjectedPointsArray_UV, 1) ~= 2
                     assert(size(dProjectedPointsArray_UV, 2) == 2, "ERROR: Invalid shape. Either the num. of columns or of the rows must be = 2.")

@@ -63,20 +63,17 @@ classdef CBasePlotter < handle
 
         function [objFig, charTextColor, charBackGroundColor] = DefaultPlotOpts(objFig, kwargs)
             arguments
-                objFig = ""
+                objFig = 0
             end
             arguments
                 kwargs.bUseBlackBackground  (1,1) logical {islogical, isscalar} = false;
                 kwargs.charRenderer         (1,:) string {mustBeA(kwargs.charRenderer, ["string", "char"])} = 'painters'; % 'opengl'
             end
             %% PROTOTYPE
-            % DefaultPlotOpts(fig_in)
+            % [objFig, charTextColor, charBackGroundColor] = DefaultPlotOpts(objFig, kwargs)
             % -------------------------------------------------------------------------
             %% DESCRIPTION
-            % "Void" function applying default plot options for axis width, ticks and
-            % grid to the currently active figure if no input is given. The options are
-            % applied to the figure given as input if nargin > 0. This is useful
-            % specifically when multiple figure objects are handles automatically.
+            % TODO
             % -------------------------------------------------------------------------
             % INPUT
             % fig_in: [fig object] Optional input. Figure object to which the options
@@ -86,7 +83,8 @@ classdef CBasePlotter < handle
             % [-]
             % -------------------------------------------------------------------------
             % CHANGELOG
-            %    18-04-2023    Pietro Califano    Coded and tested
+            % 18-04-2023    Pietro Califano     Coded and tested
+            % 14-02-2025    Pietro Califano     Implement version as static method for Base Plotter    
             % -------------------------------------------------------------------------
             % DEPENDENCIES
             % [-]
@@ -116,12 +114,9 @@ classdef CBasePlotter < handle
             if nargin == 0
                 % Get figure and axis handles
                 objFig = gcf;
-
             else
-
                 % Assert input type
                 mustBeA(objFig, "matlab.ui.Figure");
-
             end
 
             objCurrentAx = gca;
@@ -173,24 +168,30 @@ classdef CBasePlotter < handle
 
         function [objSceneFig, charTextColor, charBackGroundColor] = initializeFigureObj(objSceneFig, kwargs)
             arguments
-                objSceneFig           (1,1) {isscalar, mustBeA(objSceneFig, ["double", "matlab.ui.Figure"])} = 0;
+                objSceneFig                  (1,1) {isscalar, mustBeA(objSceneFig, ["double", "matlab.ui.Figure"])} = 0;
                 kwargs.charRenderer          (1,:) string {mustBeA(kwargs.charRenderer, ["string", "char"])} = 'opengl'
                 kwargs.bUseBlackBackground   (1,1) logical {islogical, isscalar} = false;
+                kwargs.bEnforcePlotOpts      (1,1) logical {islogical, isscalar} = false;
             end
 
             if objSceneFig == 0
-
                 objSceneFig = figure('Renderer', kwargs.charRenderer);
                 kwargs.bEnforcePlotOpts = true; % No figure provided, enable plot opts
-                [~, charTextColor, charBackGroundColor] = CBasePlotter.DefaultPlotOpts(objSceneFig, ...
-                        "charRenderer", kwargs.charRenderer, ...
-                        "bUseBlackBackground", kwargs.bUseBlackBackground);
+            end
 
+
+            if kwargs.bEnforcePlotOpts == true
+                [~, charTextColor, charBackGroundColor] = CBasePlotter.DefaultPlotOpts(objSceneFig, ...
+                    "charRenderer", kwargs.charRenderer, ...
+                    "bUseBlackBackground", kwargs.bUseBlackBackground);
             else
                 charBackGroundColor = objSceneFig.Color;
                 charTextColor = gca().XColor;
             end
+
+
         end
+
 
     end
 
