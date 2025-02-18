@@ -189,7 +189,7 @@ classdef CTargetEmulator < CSceneObject
         end
 
         % SETTERS
-        function [] = SetPose3(self, objPose3_WorldFromPoseFrame)
+        function [self] = SetPose3(self, objPose3_WorldFromPoseFrame)
             self.objPose3_WorldFromPoseFrame = objPose3_WorldFromPoseFrame;
 
             % Update legacy attributes

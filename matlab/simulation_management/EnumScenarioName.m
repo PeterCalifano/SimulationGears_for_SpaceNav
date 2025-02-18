@@ -20,7 +20,7 @@ enumeration
     Itokawa
     % Eros_NEAR
     Bennu_OREx
-    Apophis_RCS1
+    Apophis
 end
 
 end
