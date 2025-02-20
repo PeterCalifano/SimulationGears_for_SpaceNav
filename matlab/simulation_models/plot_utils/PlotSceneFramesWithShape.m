@@ -83,7 +83,10 @@ end
                                                     "charFigTitle", kwargs.charFigTitle, ...
                                                     "dAxisScale", dAxisScale, ...
                                                     "bEnableLegend", false, ...
-                                                    "bUsePhysicalPosition", kwargs.bUsePhysicalPosition);
+                                                    "bUsePhysicalPosition", kwargs.bUsePhysicalPosition, ...
+                                                    "cellPlotColors", kwargs.cellPlotColors);
+
+
 
 %% Handle legend
 % Define cell for global legend
@@ -92,6 +95,7 @@ cellPlotObjs = [cellPlotObjs(:)', cellPlotObjs_SceneFrames(:)'];
 % Add legend
 legend([cellPlotObjs{:}], 'TextColor', charTextColor)
 axis equal
+grid off
 
 
 end

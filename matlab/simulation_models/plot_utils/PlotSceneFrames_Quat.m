@@ -173,7 +173,6 @@ dCamDCM_RenderFrameFromCam          = quat2rotm(dCameraQuat_RenderFrameFromCam')
 % Set view along camera boresight
 view(-[dCamBoresightaxisVec(1), dCamBoresightaxisVec(2), dCamBoresightaxisVec(3)]);
 
-
 % Define cell of plot objects for legend
 if kwargs.bEnableLegend
     % If legend is enabled, first get objects already inserted
