@@ -183,7 +183,7 @@ for idL = 1:i32nLandMarks
 
                         % Evaluate intersection through ray tracing
                        
-                        [tmpIntersectFlag, ~, ~, intersectDistance] = fastRayTriangleIntersection(i_dCAMpos_TB, dTmpLosCam2LMdir_TB, ...
+                        [tmpIntersectFlag, ~, ~, intersectDistance] = RayTwoSidedTriangleIntersection_MollerTrembore(i_dCAMpos_TB, dTmpLosCam2LMdir_TB, ...
                             tmpTriangleVertices(:, 1), tmpTriangleVertices(:, 2), tmpTriangleVertices(:, 3));
 
                         if (tmpLosCam2LMnorm - intersectDistance) > eps('single') && tmpIntersectFlag == true

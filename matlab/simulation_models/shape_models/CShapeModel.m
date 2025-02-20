@@ -1,9 +1,10 @@
-classdef CShapeModel
+classdef CShapeModel < CBaseDatastruct
     %% DESCRIPTION
     % What the class represent
     % -------------------------------------------------------------------------------------------------------------
     %% CHANGELOG
     % 05-10-2024        Pietro Califano         First implementation completed.
+    % 13-02-2025        Pietro Califano         Update implementation to inherit from CBaseDatastruct (handle)
     % -------------------------------------------------------------------------------------------------------------
     %% DEPENDENCIES
     % [-]
@@ -31,12 +32,12 @@ classdef CShapeModel
 
     methods (Access=public)
         % CONSTRUCTOR 
-        function self = CShapeModel(loadingMethod, inputData, charInputUnit, charTargetUnitOutput)
+        function self = CShapeModel(charLoadingMethod, inputData, charInputUnit, charTargetUnitOutput)
             arguments
-                loadingMethod
-                inputData     (1,1) string
-                charInputUnit  
-                charTargetUnitOutput 
+                charLoadingMethod    (1,:) string {mustBeA(charLoadingMethod, ["string", "char"]), mustBeMember(charLoadingMethod, ["mat", "cspice", "struct"])}
+                inputData            (1,1) string
+                charInputUnit        (1,:) string {mustBeA(charInputUnit       , ["string", "char"]), mustBeMember(charInputUnit, ["m", "km"])} = 'km'
+                charTargetUnitOutput (1,:) string {mustBeA(charTargetUnitOutput, ["string", "char"]), mustBeMember(charTargetUnitOutput, ["m", "km"])} = 'm' % TODO add enumaration
             end
 
             self.charTargetUnitOutput = charTargetUnitOutput;
@@ -54,7 +55,7 @@ classdef CShapeModel
             end
             
             % Call input specific loading function
-            if strcmpi(loadingMethod, 'cspice')
+            if strcmpi(charLoadingMethod, 'cspice')
 
                 if strcmpi(charInputUnit, 'm') 
                     warning("CSpice usually gives models' vertices in km, but 'meters' has been specified. Make sure this is correct.")
@@ -62,10 +63,10 @@ classdef CShapeModel
 
                 [self] = LoadModelFromSPICE(self, inputData);
 
-            elseif strcmpi(loadingMethod, 'mat')
+            elseif strcmpi(charLoadingMethod, 'mat')
                 [self] = LoadModelFromMat(self, inputData);
 
-            elseif strcmpi(loadingMethod, 'struct')
+            elseif strcmpi(charLoadingMethod, 'struct')
                 [self] = LoadModelFromStruct(self, inputData);
             end
 

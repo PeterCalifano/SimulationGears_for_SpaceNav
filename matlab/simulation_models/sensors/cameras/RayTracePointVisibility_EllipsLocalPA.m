@@ -1,5 +1,10 @@
-function [bAllPointsVisibilityMask, dProjectedPoints_UV] = FastRayTracePointVisibility(ui32PointsIdx, dPointsPositions_TB, ...
-    strTargetBodyData, strCameraData, dSunDir_TB, strFcnOptions, bDEBUG_MODE) %#codegen
+function [bAllPointsVisibilityMask, dProjectedPoints_UV] = RayTracePointVisibility_EllipsLocalPA(ui32PointsIdx, ...
+                                                                                       dPointsPositions_TB, ...
+                                                                                       strTargetBodyData, ...
+                                                                                       strCameraData, ...
+                                                                                       dSunDir_TB, ...
+                                                                                       strFcnOptions, ...
+                                                                                       bDEBUG_MODE) %#codegen
 arguments
     ui32PointsIdx       (1,:) uint32
     dPointsPositions_TB (3,:) double
@@ -13,11 +18,14 @@ end
 % 
 % -------------------------------------------------------------------------------------------------------------
 %% DESCRIPTION
-% Preliminary checks performed:
-% 1) Sun illumination of each point considering illumination threshold on dot product
-% 2) Heuristic geometrical feasibility check considering dot product of camera position and points positions
-% 3) Points projections within field of view using pinhole projection model
-% Intersection check performed using ray tracing to points against each triangle of the mesh 
+% -Preliminary checks performed:
+%   1) Sun illumination of each point considering illumination threshold on dot product. This is equivalent 
+%   to considering the local Phase angle using an ellipsoidal shape.
+%   2) Heuristic geometrical feasibility check considering dot product of camera position and points
+%   positions. This check uses an ellipsoidal shape to prune back-facing points. Do not consider thresholds
+%   that are too strict when using irregularly shaped bodies.
+%   3) Points projections within field of view using pinhole projection model
+% - Intersection check performed using ray tracing to points against each triangle of the mesh.
 % -------------------------------------------------------------------------------------------------------------
 %% INPUT
 % ui32PointsIdx       (1,:) uint32
@@ -52,7 +60,7 @@ if not(isfield(strFcnOptions, 'dIllumAngleThr'))
     strFcnOptions.dIllumAngleThr = deg2rad(40); % Valid phase angles: 180-illumAngleThr
 end
 
-if not(isfield(strFcnOptions, 'dLosAngleThr'))
+if not(isfield(strFcnOptions, 'dLosAngleThr')) % Heuristic removal of back-facing points assuming ellipsoid
     strFcnOptions.dLosAngleThr = deg2rad(40); % Valid angles: 180-dLosAngleThr
 end
 
@@ -117,7 +125,7 @@ dCameraDir_TB = dPosition_TB/norm(dPosition_TB);
 dPointDirDotSunDir = sum([dPointDirX_TB; dPointDirY_TB; dPointDirZ_TB]' * (-dSunDir_TB), 2);
 
 % Perform preliminary vectorized checks (get all points that passed checks)
-% Illumination check
+% NOTE: illumi
 bIlluminationFeasibilityMask = dPointDirDotSunDir <= 0 | dPointDirDotSunDir <= dCosIllumAngleThr;
 
 % TODO (PC): this heuristic check does not grant the points are actually illuminated, because self-shadowing is not checked using RT (shadow rays). Need to do it as optionally enabled in this function. Essentially, for each visible point from the camera, cast a shadow ray to light source and check for intersections. No intersection --> point is visible.
@@ -154,9 +162,9 @@ dPointPosZ_TB = dPointPosZ_TB(bPointsToRayTrace);
 i32NumOfPointsToTrace = int32( length(dPointPosX_TB) );
 
 % Compute norms of relative positions of points wrt camera
-dRayToPointsFromCam_TB = [dPointPosX_TB; dPointPosY_TB; dPointPosZ_TB] - dPosition_TB;
+dRayToPointsFromCam_TB  = [dPointPosX_TB; dPointPosY_TB; dPointPosZ_TB] - dPosition_TB;
 dRayToPointsFromCamNorm = vecnorm(dRayToPointsFromCam_TB, 2, 1);
-dRayToPointsFromCam_TB = dRayToPointsFromCam_TB./dRayToPointsFromCamNorm;
+dRayToPointsFromCam_TB  = dRayToPointsFromCam_TB./dRayToPointsFromCamNorm;
 
 dPointDirFromCamX_TB = dRayToPointsFromCam_TB(1, :);
 dPointDirFromCamY_TB = dRayToPointsFromCam_TB(2, :);
@@ -206,7 +214,7 @@ parfor idL = 1:i32NumOfPointsToTrace
 
             % Evaluate intersection through ray tracing
 
-            [bTmpIntersectFlag, ~, ~, dIntersectDistance] = fastRayTriangleIntersection(dPosition_TB, ...
+            [bTmpIntersectFlag, ~, ~, dIntersectDistance] = RayTwoSidedTriangleIntersection_MollerTrembore(dPosition_TB, ...
                 [dPointDirFromCamX_TB(idL); dPointDirFromCamY_TB(idL); dPointDirFromCamZ_TB(idL);],  ... 
                 tmpTriangleVertices(:, 1), tmpTriangleVertices(:, 2), tmpTriangleVertices(:, 3));
 

@@ -1,4 +1,5 @@
-classdef CTargetEmulator
+classdef CTargetEmulator < CSceneObject
+    % TODO verify this works as subclass of CSceneObject
     %% DESCRIPTION
     % What the class represent
     % -------------------------------------------------------------------------------------------------------------
@@ -22,10 +23,12 @@ classdef CTargetEmulator
     properties (SetAccess = protected, GetAccess = public)
 
         % Storage attributes
-        targetUnitOutput = 'm';
-        % Entity position and attitude wrt World frame
+        targetUnitOutput = 'm'; % TODO make this an enum class for safe usage
+        % Entity position and attitude wrt World frame (kept for legacy reasons
         dPosVector_W  = [0; 0; 0];
         dRot3_WfromTB = eye(3,3); % Internally stored as DCM
+
+        objPose3_WorldFromPoseFrame = SPose3([0; 0; 0], eye(3,3));
     end
 
     properties (SetAccess = protected, GetAccess = public)
@@ -33,18 +36,19 @@ classdef CTargetEmulator
         objShapeModel;
 
         ui32NumOfPointsGT         = uint32(0);
-        i32LandmarksID           = zeros(1, 0, "uint32")
+        i32LandmarksID            = zeros(1, 0, "uint32")
         dPointsPositionsGT_TB     = zeros(3, 0, 'double');
-        pointGTsamplingMethod     = -1;
+        enumPointGTsamplingMethod     = -1;
     end
 
 
-    methods (Access=public)
+    methods (Access = public)
         % CONSTRUCTORS
-        function self = CTargetEmulator(objShapeModel, ui32NumOfPointsGT)
+        function self = CTargetEmulator(objShapeModel, ui32NumOfPointsGT, objPose3_WorldFromPoseFrame)
             arguments
-                objShapeModel     (1,1) CShapeModel
+                objShapeModel     (1,1) {mustBeA(objShapeModel, "CShapeModel")}
                 ui32NumOfPointsGT (1,1) uint32 = 0
+                objPose3_WorldFromPoseFrame (1,1) {mustBeA(objPose3_WorldFromPoseFrame, ["SPose3"])} = SPose3([0; 0; 0], eye(3,3)); %#ok<NBRAK2>
             end
 
             % Set ShapeModel object
@@ -64,35 +68,48 @@ classdef CTargetEmulator
             % Allocate memory for landmarks if required
             self.dPointsPositionsGT_TB = zeros(3, ui32NumOfPointsGT, 'double');
             self.i32LandmarksID        = zeros(1, ui32NumOfPointsGT, 'int32');
+
+            % Store pose3 object
+            self.objPose3_WorldFromPoseFrame = objPose3_WorldFromPoseFrame;
             
         end
         
         % GETTERS
         function bool = hasLandmarks(self)
-            if self.pointGTsamplingMethod ~= -1
+            if self.enumPointGTsamplingMethod ~= -1
                 bool = true;
             else
                 bool = false;
             end
         end
 
-        function [dPosVector_W, dRot3_WfromTB] = GetPose(self, paramType)
+        function [dPosVector_W, dRot3_WfromTB] = GetPose(self, enumParamType)
+            % Method to get pose of target emulator
+            % [dPosVector_W, dRot3_WfromTB] = GetPose(self, enumParamType)
             arguments
                 self
-                paramType (1,1) = EnumRotParams.DCM
+                enumParamType (1,1) = EnumRotParams.DCM
             end
 
             dPosVector_W  = self.dPosVector_W;
-            dRot3_WfromTB = self.rotation(paramType);
+            dRot3_WfromTB = self.rotation(enumParamType);
         end
 
-        function dRot3_WfromTB = rotation(self, paramType)
+        function [objPose3_WorldFromPoseFrame] = GetPose3(self)
+            objPose3_WorldFromPoseFrame = self.objPose3_WorldFromPoseFrame;
+        end
+
+        function dPosVector_W = translation(self)
+            dPosVector_W = self.dPosVector_W;
+        end
+
+        function [dRot3_WfromTB] = rotation(self, enumParamType)
             arguments
                 self
-                paramType (1,1) = EnumRotParams.DCM
+                enumParamType (1,1) = EnumRotParams.DCM
             end
 
-            switch paramType
+            switch enumParamType
                 case EnumRotParams.DCM
                     dRot3_WfromTB = self.dRot3_WfromTB;
                     
@@ -106,6 +123,7 @@ classdef CTargetEmulator
             end
         end
 
+        % GETTERS
         % TODO function to get landmarks in nav frame using target pose instead of target fixed frame
         function [] = GetPointsInWorldFrame(self)
             arguments
@@ -122,7 +140,7 @@ classdef CTargetEmulator
                 bUseIndicesAsPtrs (1,1) logical {isscalar} = false
             end
             
-            assert(self.pointGTsamplingMethod ~= -1, 'No simulated GT points found. Did you forget to call "GenerateSimulatedPoints_TB" method first?') % Assert if points have been generated
+            assert(self.enumPointGTsamplingMethod ~= -1, 'No simulated GT points found. Did you forget to call "SampleMeshPoints" method first?') % Assert if points have been generated
 
             if nargin < 2 || all(i32PointsIndices == 0)  % Return all points
                 dPointsPositionsGT_TB = self.dPointsPositionsGT_TB;
@@ -150,25 +168,36 @@ classdef CTargetEmulator
             end
 
         end
-
-        function [shapeDataStruct] = getShapeStruct(self)
-            shapeDataStruct = self.objShapeModel.getShapeStruct();
-            shapeDataStruct = orderfields(shapeDataStruct);
-        end
-
-        function [targetDataStruct] = getTargetStruct(self)
             
-            % TEMPORARY DEFINITION BEFORE UPDATE of CheckLMvisibility function
-            targetDataStruct.strShapeModel = self.getShapeStruct();
-            targetDataStruct.dTargetPos_IN = self.dPosVector_W; 
-            targetDataStruct.dQuat_INfromTB = self.rotation(EnumRotParams.QUAT_VSRPplus);
-            targetDataStruct.bIS_JPL_QUAT = true; % Incorrect fieldname, because QUAT_VSRPplus not yet defined at time of implementation
+        
+        function [strTargetDataStruct] = getTargetStruct(self)
+            
+            % Maintained as this for legacy reasons. TODO update codes dependent on this!
+            strTargetDataStruct.strShapeModel = self.getShapeStruct();
+            strTargetDataStruct.dTargetPos_IN = self.dPosVector_W; 
+            strTargetDataStruct.dQuat_INfromTB = self.rotation(EnumRotParams.QUAT_VSRPplus);
+            strTargetDataStruct.bIS_JPL_QUAT = true; % Incorrect fieldname, because QUAT_VSRPplus not yet defined at time of implementation
             
             % Order fields by name
-            targetDataStruct = orderfields(targetDataStruct);
+            strTargetDataStruct = orderfields(strTargetDataStruct);
+        end
+
+
+        function [strShapeDataStruct] = getShapeStruct(self)
+            strShapeDataStruct = self.objShapeModel.getShapeStruct();
+            strShapeDataStruct = orderfields(strShapeDataStruct);
         end
 
         % SETTERS
+        function [self] = SetPose3(self, objPose3_WorldFromPoseFrame)
+            self.objPose3_WorldFromPoseFrame = objPose3_WorldFromPoseFrame;
+
+            % Update legacy attributes
+            self.dRot3_WfromTB  = objPose3_WorldFromPoseFrame.rotation;
+            self.dPosVector_W   = objPose3_WorldFromPoseFrame.translation;
+        end
+
+
         function [self] = SetPose(self, dPosVector_W, dRot3_WfromTB)
             arguments
                 self
@@ -177,23 +206,33 @@ classdef CTargetEmulator
             end
             self.dPosVector_W  = dPosVector_W  ;
             self.dRot3_WfromTB = dRot3_WfromTB ;
+
+            % Update object
+            self.objPose3_WorldFromPoseFrame.dPosition_Frame         = dPosVector_W;
+            self.objPose3_WorldFromPoseFrame.dDCM_FrameFromPoseFrame = dRot3_WfromTB;
+
         end
         
         % PUBLIC METHODS
-        function [self, dPointsPositionsGT_TB, i32LandmarksID] = GenerateSimulatedPoints_TB(self, pointGTsamplingMethod)
+        function [self, dPointsPositionsGT_TB, i32LandmarksID] = GenerateSimulatedPoints_TB(self, enumPointGTsamplingMethod)
+            % DEVNOTE: deprecated GenerateSimulatedPoints_TB method currently kept for legacy reasons
+            [self, dPointsPositionsGT_TB, i32LandmarksID] = SampleMeshPoints(self, enumPointGTsamplingMethod);
+        end
+
+        function [self, dPointsPositionsGT_TB, i32LandmarksID] = SampleMeshPoints(self, enumPointGTsamplingMethod)
             arguments
                 self
-                pointGTsamplingMethod (1,1) enumPointGTsamplingMethod = enumPointGTsamplingMethod.random_uniform
+                enumPointGTsamplingMethod (1,1) EnumPointGTsamplingMethod = EnumPointGTsamplingMethod.PICK_UNIFORM_RANDOM_ID
             end
 
             bREUSE_FLAG = false;
 
-            if self.pointGTsamplingMethod == -1
+            if self.enumPointGTsamplingMethod == -1
                 % First call, assign method
-                self.pointGTsamplingMethod = pointGTsamplingMethod;
+                self.enumPointGTsamplingMethod = enumPointGTsamplingMethod;
             else
                 % Determine if the same method is used
-                if enumPointGTsamplingMethod == self.pointGTsamplingMethod
+                if enumPointGTsamplingMethod == self.enumPointGTsamplingMethod
                     bREUSE_FLAG = true;
                 end
             end
@@ -201,8 +240,10 @@ classdef CTargetEmulator
             assert(self.bHasModel_, 'No model loaded. You need to load one before generating simulated landmarks.');
 
             if self.ui32NumOfPointsGT > 0 && bREUSE_FLAG == false
+                
                 % Generate landmarks in target fixed frame
                 [dAllPointsPositionsGT_TB] = generateLandmarksMap(self.objShapeModel.getShapeStruct(), self.ui32NumOfPointsGT);
+
                 self.dPointsPositionsGT_TB = dAllPointsPositionsGT_TB(2:4, :);
                 self.i32LandmarksID = int32(dAllPointsPositionsGT_TB(1, :));
             
@@ -211,11 +252,32 @@ classdef CTargetEmulator
 
             elseif self.ui32NumOfPointsGT > 0 && bREUSE_FLAG == true
                 % Return previously computed landmarks
-                dPointsPositionsGT_TB = self.dPointsPositionsGT_TB;
-                i32LandmarksID = self.i32LandmarksID;
+                dPointsPositionsGT_TB   = self.dPointsPositionsGT_TB;
+                i32LandmarksID          = self.i32LandmarksID;
             end
 
         end
+
+    end
+
+    methods (Access = protected)
+        function [] = SampleMeshPoints_impl(self, enumPointGTsamplingMethod)
+            arguments
+                self
+                enumPointGTsamplingMethod (1,1) EnumPointGTsamplingMethod = EnumPointGTsamplingMethod.PICK_UNIFORM_RANDOM_ID
+            end
+
+
+            switch enumPointGTsamplingMethod
+
+                case EnumPointGTsamplingMethod.PICK_UNIFORM_RANDOM_ID
+                    error('Not implemented yet')
+
+                case EnumPointGTsamplingMethod.ICOSAHEDRON_SAMPLING
+                    error('Not implemented yet')
+            end
+        end
+
 
     end
 
