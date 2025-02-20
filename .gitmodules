@@ -2,3 +2,7 @@
 	path = lib/MathCore_for_SpaceNav
 	url = git@github.com:PeterCalifano/MathCore_for_SpaceNav.git
 	branch = dev_main
+[submodule "lib/S2-Sampling-Toolbox_PeterCdev"]
+	path = lib/S2-Sampling-Toolbox_PeterCdev
+	url = git@github.com:PeterCalifano/S2-Sampling-Toolbox_PeterCdev.git
+	branch = dev_main
