@@ -5,7 +5,7 @@ function [dPosVeldt, strAccelInfo] = evalRHS_InertialDynOrbit( ...
     dRefRmain, ...
     dCoeffSRP, ...
     d3rdBodiesGM, ...
-    dBodyEphemeris, ...
+    dBodyEphemerides, ...
     dMainCSlmCoeffCols, ...
     ui32MaxSHdegree, ...
     ui32StatesIdx, ...
@@ -17,23 +17,25 @@ arguments
     dRefRmain
     dCoeffSRP           double = []
     d3rdBodiesGM        double = []
-    dBodyEphemeris      double = []
+    dBodyEphemerides    double = []
     dMainCSlmCoeffCols  double = []
     ui32MaxSHdegree     uint32 = []
     ui32StatesIdx       uint32 = []
     dResidualAccel      double = zeros(3,1)
 end %#codegen
 %% PROTOTYPE
-% dPosVeldt = evalRHS_DynOrbit( ...
+% [dPosVeldt, strAccelInfo] = evalRHS_InertialDynOrbit( ...
 %     dxState_IN, ...
 %     dDCMmainAtt_INfromTF, ...
 %     dMainGM, ...
 %     dRefRmain, ...
 %     dCoeffSRP, ...
 %     d3rdBodiesGM, ...
-%     dBodyEphemeris, ...
+%     dBodyEphemerides, ...
 %     dMainCSlmCoeffCols, ...
-%     ui16StatesIdx)
+%     ui32MaxSHdegree, ...
+%     ui32StatesIdx, ...
+%     dResidualAccel) %#codegen
 % -------------------------------------------------------------------------------------------------------------
 %% DESCRIPTION
 % NOTE: Code generation not tested. It is likely that some modifications in how memory and variables are
@@ -47,9 +49,11 @@ end %#codegen
 % dRefRmain
 % dCoeffSRP           double = []
 % d3rdBodiesGM        double = []
-% dBodyEphemeris      double = []
+% dBodyEphemerides    double = []
 % dMainCSlmCoeffCols  double = []
-% ui16StatesIdx         uin16  = []
+% ui32MaxSHdegree     uint32 = []
+% ui32StatesIdx       uint32 = []
+% dResidualAccel      double = zeros(3,1)
 % -------------------------------------------------------------------------------------------------------------
 %% OUTPUT
 % dPosVeldt
@@ -81,21 +85,21 @@ end
 % Construct local indices
 dSunPos_IN = zeros(3,1);
 
-if ~isempty(dBodyEphemeris)
+if ~isempty(dBodyEphemerides)
 
     if any(dBodyEphemerides > 0)
 
-        dSunPos_IN(:)      = dBodyEphemeris(1:3, 1);
+        dSunPos_IN(:)      = dBodyEphemerides(1:3, 1);
 
         % Get number of 3rd bodies other than Sun
-        ui8N3rdBodies = uint8(size(dBodyEphemeris, 2)) - 1;
+        ui8N3rdBodies = uint8(size(dBodyEphemerides, 2)) - 1;
 
         if coder.target("MATLAB") || coder.target("MEX")
             assert(length(d3rdBodiesGM) == ui8N3rdBodies + 1)
         end
 
         if ui8N3rdBodies > 0
-            d3rdBodiesPos_IN = reshape(dBodyEphemeris(4:end), 3, ui8N3rdBodies); % TODO may require modification, if so, just add a extraction index that moved along column
+            d3rdBodiesPos_IN = reshape(dBodyEphemerides(4:end), 3, ui8N3rdBodies); % TODO may require modification, if so, just add a extraction index that moved along column
         else
             d3rdBodiesPos_IN = [];
         end
@@ -142,7 +146,7 @@ end
 dTotAcc3rdBody = zeros(3,1);
 dAcc3rdSun     = zeros(3,1);
 
-if ~isempty(dBodyEphemeris)
+if ~isempty(dBodyEphemerides)
     if any(dBodyEphemerides > 0)
 
         % Add up accelerations of all bodies other than the Sun
@@ -189,7 +193,7 @@ if ~isempty(dBodyEphemeris)
 end
 
 % Cannonball SRP acceleration
-if ~isempty(dBodyEphemeris) % TODO: need a way to disable this --> factory pattern for classes?
+if ~isempty(dBodyEphemerides) % TODO: need a way to disable this --> factory pattern for classes?
     dAccCannonBallSRP = dCoeffSRP * dPosSunToSC./SCdistToSun;
 else
     dAccCannonBallSRP = zeros(3,1);
