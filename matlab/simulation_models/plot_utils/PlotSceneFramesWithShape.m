@@ -23,12 +23,20 @@ arguments (Input)
     kwargs.bUsePhysicalPosition         (1,1) logical {islogical, isscalar} = false;
     kwargs.dPointsPositions_NavFrame    (3,:) double = [];
     kwargs.bConvertToBlenderFrame       (1,1) logical {islogical, isscalar} = false;
+    kwargs.charPointsDisplayName     (1,:) string  {mustBeA(kwargs.charPointsDisplayName, ["string", "char"])} = "Points"
+    kwargs.charPointsDisplayColor     (1,:) string  {mustBeA(kwargs.charPointsDisplayColor, ["string", "char"])} = "#FFDC00"
+    kwargs.bEnforcePlotOpts         (1,1) logical {islogical} = false;
 end
 
 
 % Get figure and properties
-if kwargs.objSceneFig == 0
-    objSceneFig = figure('Renderer', 'opengl');
+if kwargs.objSceneFig == 0 || kwargs.bEnforcePlotOpts
+    if kwargs.objSceneFig == 0
+        objSceneFig = figure('Renderer', 'opengl');
+    else
+        objSceneFig = figure(kwargs.objSceneFig.Number);
+    end
+
     kwargs.bEnforcePlotOpts = true; % No figure provided, enable plot opts
     [~, charTextColor, ~] = DefaultPlotOpts(objSceneFig, "charRenderer", "opengl", "bUseBlackBackground", kwargs.bUseBlackBackground);
 else
@@ -54,7 +62,9 @@ dAxisScale = 1.25 * max(vecnorm(strShapeModel.dVerticesPos, 2, 1), [], 'all');
                                                           "bUseBlackBackground", kwargs.bUseBlackBackground, ...
                                                           "objFig", objSceneFig, ...
                                                           "bEnableLegend", false, ...
-                                                          "dPointsPositions_NavFrame", kwargs.dPointsPositions_NavFrame);
+                                                          "dPointsPositions_NavFrame", kwargs.dPointsPositions_NavFrame, ...
+                                                          "charPointsDisplayName", kwargs.charPointsDisplayName, ...
+                                                          "charPointsDisplayColor", kwargs.charPointsDisplayColor);
 
 
 %% Plot objects and camera frames

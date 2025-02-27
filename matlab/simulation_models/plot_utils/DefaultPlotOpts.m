@@ -83,7 +83,11 @@ grid minor
 axis auto;
 
 objCurrentAx.XAxisLocation = 'bottom';
-objCurrentAx.YAxisLocation = 'left';
+try
+    objCurrentAx.YAxisLocation = 'left';
+catch
+end
+
 objCurrentAx.XMinorTick = 'on';
 objCurrentAx.YMinorTick = 'on';
 objCurrentAx.LineWidth = 1.05;

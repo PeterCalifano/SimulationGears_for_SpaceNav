@@ -13,6 +13,8 @@ arguments (Input)
     kwargs.objFig           = 0
     kwargs.bUseBlackBackground       (1,1) logical {islogical, mustBeScalarOrEmpty} = false;
     kwargs.dPointsPositions_NavFrame (3,:) double  {mustBeNumeric} = [];
+    kwargs.charPointsDisplayName     (1,:) string  {mustBeA(kwargs.charPointsDisplayName, ["string", "char"])} = "Points"
+    kwargs.charPointsDisplayColor     (1,:) string  {mustBeA(kwargs.charPointsDisplayColor, ["string", "char"])} = "#FFDC00"
     kwargs.charDistanceUnit          (1,:) string  {mustBeA(kwargs.charDistanceUnit, ["string", "char"])} = "m"
     kwargs.bEnforcePlotOpts          (1,1) logical {mustBeScalarOrEmpty, islogical} = false
     kwargs.bUsePerspectiveView       (1,1) logical {mustBeScalarOrEmpty, islogical} = false;
@@ -133,7 +135,10 @@ if not(isempty(kwargs.dPointsPositions_NavFrame))
     objPointCloudPlot = plot3(kwargs.dPointsPositions_NavFrame(1, :), ...
                               kwargs.dPointsPositions_NavFrame(2, :), ...
                               kwargs.dPointsPositions_NavFrame(3,:), ...
-                              'g.', 'MarkerSize', 6, 'DisplayName', '');
+                              '.', 'MarkerSize', 6, ...
+                              "Color", kwargs.charPointsDisplayColor, ...
+                              "DisplayName", kwargs.charPointsDisplayName, ...
+                              "LineStyle", "none");
 
     % Append object to cell
     objPointCloudPlot = {objPointCloudPlot};
