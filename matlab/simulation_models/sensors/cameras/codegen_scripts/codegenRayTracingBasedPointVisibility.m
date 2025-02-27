@@ -16,11 +16,11 @@ coder_config.EnableOpenMP = true;
 coder_config.OptimizeReductions = true;
 
 % Common settings
-ui32MaxNumPoints  = 5e4;
-ui32MaxNumTriangs = 6e4;
+ui32MaxNumPoints  = 1.2e5;
+ui32MaxNumTriangs = 2e5;
 
 
-bCodegen_RayTracePointVisibility_EllipsLocalPA              = false;
+bCodegen_RayTracePointVisibility_EllipsLocalPA              = true;
 bCodegen_RayTracePointVisibility_ShadowRays                 = true;
 bCodegen_RayTracePointVisibility_VectorizedShadowRays       = true;
 
