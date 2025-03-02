@@ -11,14 +11,19 @@ arguments (Input) % Positional
 end
 arguments (Input)
     kwargs.objFig           = 0
-    kwargs.bUseBlackBackground       (1,1) logical {islogical, mustBeScalarOrEmpty} = false;
-    kwargs.dPointsPositions_NavFrame (3,:) double  {mustBeNumeric} = [];
-    kwargs.charPointsDisplayName     (1,:) string  {mustBeA(kwargs.charPointsDisplayName, ["string", "char"])} = "Points"
-    kwargs.charPointsDisplayColor     (1,:) string  {mustBeA(kwargs.charPointsDisplayColor, ["string", "char"])} = "#FFDC00"
-    kwargs.charDistanceUnit          (1,:) string  {mustBeA(kwargs.charDistanceUnit, ["string", "char"])} = "m"
-    kwargs.bEnforcePlotOpts          (1,1) logical {mustBeScalarOrEmpty, islogical} = false
-    kwargs.bUsePerspectiveView       (1,1) logical {mustBeScalarOrEmpty, islogical} = false;
-    kwargs.bEnableLegend             (1,1) logical {mustBeScalarOrEmpty, islogical} = true;
+    kwargs.bUseBlackBackground          (1,1) logical {islogical, mustBeScalarOrEmpty} = false;
+    kwargs.dPointsPositions_NavFrame    (3,:) double  {mustBeNumeric} = [];
+    kwargs.charPointsDisplayName        (1,:) string  {mustBeA(kwargs.charPointsDisplayName, ["string", "char"])} = "Points"
+    kwargs.charPointsDisplayColor       (1,:) string  {mustBeA(kwargs.charPointsDisplayColor, ["string", "char"])} = "#FFDC00"
+    kwargs.charDistanceUnit             (1,:) string  {mustBeA(kwargs.charDistanceUnit, ["string", "char"])} = "m"
+    kwargs.bEnforcePlotOpts             (1,1) logical {mustBeScalarOrEmpty, islogical} = false
+    kwargs.bUsePerspectiveView          (1,1) logical {mustBeScalarOrEmpty, islogical} = false;
+    kwargs.bEnableLegend                (1,1) logical {mustBeScalarOrEmpty, islogical} = true;
+    kwargs.dFaceAlpha                   (1,1) double  {isscalar} = 1.0;
+    kwargs.charPathDisplayName          (1,:) string  {mustBeA(kwargs.charPathDisplayName, ["string", "char"])} = '3D mesh model';
+    kwargs.charPatchFaceColor           (1,:)  {isvector} = "#A9A9A9";
+    kwargs.bShowAsWireframe             (1,1) logical {islogical} = true;
+    kwargs.bShowMeshModel               (1,1) logical {islogical} = true;
 end
 %% SIGNATURE
 % [objFig, cellPlotObjs] = Visualize3dShapeModelWithPC(strShapeModel, ...
@@ -121,21 +126,46 @@ end
 figure(objFig)
 hold on;
 
-objShadedMeshPlot = patch('Vertices', dVerticesPos, 'Faces', strShapeModel.ui32triangVertexPtr', ...
-                    'FaceColor', [0.7 0.7 0.7], 'EdgeColor', 'none', 'FaceAlpha', 1, 'DisplayName', '3D mesh model');
-hold on
-lighting gouraud;
-camlight('headlight', "local");
+if kwargs.bShowMeshModel
+    if kwargs.bShowAsWireframe
+        % Apply color modifiers to show edges only
+        charEdgeColor = "#A9A9A9";
+        kwargs.charPatchFaceColor = "none";
+    else
+        charEdgeColor = "none";
+    end
+    
+    if size(strShapeModel.ui32triangVertexPtr, 2) > 1e4 && kwargs.bShowAsWireframe 
 
-% Append object to cell
-cellPlotObjs = [cellPlotObjs(:)', {objShadedMeshPlot}];
+        ui32SubSampleIndices = uint32(ceil( linspace(1, size(strShapeModel.ui32triangVertexPtr, 2), 1e4) ));
+        % Select a subset of faces
+        ui32SubSampledTriangleFaces = strShapeModel.ui32triangVertexPtr(:, ui32SubSampleIndices)';
+
+    else
+        ui32SubSampledTriangleFaces = strShapeModel.ui32triangVertexPtr';
+    end
+
+    objShadedMeshPlot = patch('Vertices', dVerticesPos, ...
+        'Faces', ui32SubSampledTriangleFaces, ...
+        'FaceColor', kwargs.charPatchFaceColor, ...
+        'EdgeColor', charEdgeColor, ...
+        'FaceAlpha', kwargs.dFaceAlpha, ...
+        'DisplayName', kwargs.charPathDisplayName, ...
+        "LineWidth", 0.1, "LineStyle", "-.");
+
+    hold on
+    lighting gouraud;
+    camlight('headlight', "local");
+    % Append object to cell
+    cellPlotObjs = [cellPlotObjs(:)', {objShadedMeshPlot}];
+end
 
 if not(isempty(kwargs.dPointsPositions_NavFrame))
 
     objPointCloudPlot = plot3(kwargs.dPointsPositions_NavFrame(1, :), ...
                               kwargs.dPointsPositions_NavFrame(2, :), ...
                               kwargs.dPointsPositions_NavFrame(3,:), ...
-                              '.', 'MarkerSize', 6, ...
+                              '.', 'MarkerSize', 7, ...
                               "Color", kwargs.charPointsDisplayColor, ...
                               "DisplayName", kwargs.charPointsDisplayName, ...
                               "LineStyle", "none");
@@ -203,6 +233,8 @@ if not(isempty(cellPlotObjs)) && kwargs.bEnableLegend
     % Add legend if not empty
     legend([cellPlotObjs{:}], ...
             'TextColor', charTextColor);
+elseif isempty(cellPlotObjs) && kwargs.bEnableLegend
+    warning('%s status: No object to show in figure.', char(mfilename) );
 end
 
 
