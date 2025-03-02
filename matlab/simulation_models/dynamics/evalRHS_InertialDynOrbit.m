@@ -111,8 +111,8 @@ end
 
 %% Function code: Acceleration models computation
 % Allocate variables
-dAccTot = coder.nullcopy(zeros(3, 1));
-dPosVeldt = coder.nullcopy(zeros(6, 1));
+dAccTot      = coder.nullcopy(zeros(3, 1));
+dPosVeldt    = coder.nullcopy(zeros(6, 1));
 
 % Compute auxiliary variables
 dPosNorm = sqrt( dxState_IN(ui8posVelIdx(1))^2 + ...
@@ -178,7 +178,7 @@ if ~isempty(dBodyEphemerides)
         if all(dAuxTerm1 < eps, 'all') && all(dAuxTerm2 < eps, 'all')
             dAuxTerm3 = zeros(3,1);
         else
-            dAuxTerm3 = dAuxTerm1 -  dAuxTerm2;
+            dAuxTerm3 = dAuxTerm1 - dAuxTerm2;
         end
 
         % Sun 3rd Body acceleration
