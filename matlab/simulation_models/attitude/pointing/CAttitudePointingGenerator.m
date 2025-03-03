@@ -152,10 +152,9 @@ classdef CAttitudePointingGenerator < handle
             % TODO: Add "displacement option here"
 
             % Construct Y axis to satisfy Sun orthogonality constraint
-            dCamPosFromSun_Frame = dCameraPosition_Frame - dSunPosition_Frame;
+            dCamPosFromSun_Frame = dSunPosition_Frame - dCameraPosition_Frame;
 
-            dCamDirY_Frame = -cross(dCamPosFromSun_Frame./vecnorm(dCamPosFromSun_Frame, 2, 1),...
-                dCamBoresightZ_Frame, 1);
+            dCamDirY_Frame = cross(dCamBoresightZ_Frame, dCamPosFromSun_Frame./vecnorm(dCamPosFromSun_Frame, 2, 1), 1);
 
             dCamDirY_Frame = dCamDirY_Frame./vecnorm(dCamDirY_Frame, 2, 1);
 
