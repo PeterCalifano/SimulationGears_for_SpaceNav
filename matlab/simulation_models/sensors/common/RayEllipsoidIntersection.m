@@ -145,8 +145,9 @@ if nargout > 4
         dJac_aCoeff_AttErr = transpose(dRayDirection_Frame) * ( dEllipsoidMatrix + transpose(dEllipsoidMatrix) ) * skewSymm(dRayDirection_RefTF); 
         
         % Derivative of b coefficient wrt target attitude error
-        dJac_bCoeff_AttErr = transpose(dRayDirection_RefTF) * (dEllipsoidMatrix * dCameraPosFromCentre_FramePreConv)...
-                              + dRayDirection_Frame * dEllipsoidMatrix * (- skewSymm(dCameraPosFromCentre_FramePreConv) );
+        % FIXME, first entry is likely wrong (become scalar!), while second cannot be multiplied
+        dJac_bCoeff_AttErr = transpose( transpose( skewSymm(dRayDirection_RefTF) ) * (dEllipsoidMatrix * dCameraPosFromCentre_FramePreConv) )...
+                              + transpose(dRayDirection_Frame) * dEllipsoidMatrix * (- skewSymm(dCameraPosFromCentre_FramePreConv) );
 
         % Derivative of c coefficient wrt target attitude error
         dJac_cCoeff_AttErr = dJac_cCoeff_RayOriginInTF * (- skewSymm(dCameraPosFromCentre_FramePreConv) );
