@@ -1,16 +1,26 @@
-function [bIntersectFlag, dIntersectDistance, bFailureFlag, dIntersectPoint] = RayEllipsoidIntersection(dRayOrigin, ...
-                                                                                                         dRayDirection, ...
-                                                                                                         dEllipsoidCentre, ...
-                                                                                                         dEllipsoidInvDiagShapeCoeffs, ...
-                                                                                                         dDCM_TFfromFrame) %#codegen
+function [bIntersectFlag, dIntersectDistance, bFailureFlag, dIntersectPoint, ...
+            dJacIntersectDistance_RayOrigin, dJacIntersectDistance_TargetAttErr] = RayEllipsoidIntersection(dRayOrigin_Frame, ...
+                                                                                                             dRayDirection_Frame, ...
+                                                                                                             dEllipsoidCentre_Frame, ...
+                                                                                                             dEllipsoidInvDiagShapeCoeffs, ...
+                                                                                                             dDCM_TFfromFrame, ...
+                                                                                                             dDCM_EstTFfromFrame) %#codegen
 arguments
-    dRayOrigin                      (3,1) double
-    dRayDirection                   (3,1) double
-    dEllipsoidCentre                (3,1) double
-    dEllipsoidInvDiagShapeCoeffs    (:,1) double % [1/a^2; 1/b^2; 1/c^2]
-    dDCM_TFfromFrame                (3,3) double = eye(3)
+    dRayOrigin_Frame                    (3,1) double
+    dRayDirection_Frame                 (3,1) double
+    dEllipsoidCentre_Frame              (3,1) double
+    dEllipsoidInvDiagShapeCoeffs        (:,1) double % [1/a^2; 1/b^2; 1/c^2]
+    dDCM_TFfromFrame                    (3,3) double = eye(3)           % Required for jacobians
+    dDCM_EstTFfromFrame                 (3,3) double = dDCM_TFfromFrame % Rotation including attitude error estimate
 end
 %% SIGNATURE
+% [bIntersectFlag, dIntersectDistance, bFailureFlag, dIntersectPoint, ...
+%             dJacIntersectDistance_RayOrigin, dJacIntersectDistance_TargetAttErr] = RayEllipsoidIntersection(dRayOrigin_Frame, ...
+%                                                                                                              dRayDirection_Frame, ...
+%                                                                                                              dEllipsoidCentre_Frame, ...
+%                                                                                                              dEllipsoidInvDiagShapeCoeffs, ...
+%                                                                                                              dDCM_TFfromFrame, ...
+%                                                                                                              dDCM_EstTFfromFrame) %#codegen
 % -------------------------------------------------------------------------------------------------------------
 %% DESCRIPTION
 % Function to compute intersection of a 3D ellipsoid with a ray (line in 3D).
@@ -29,7 +39,8 @@ end
 % Name3                     []
 % -------------------------------------------------------------------------------------------------------------
 %% CHANGELOG
-% 02-02-2025        Pietro Califano         First version implemented.
+% 02-03-2025        Pietro Califano         First version of intersection test implemented.
+% 04-03-2025        Pietro Califano         Implement jacobian evaluation wrt ray origin and target attitude
 % -------------------------------------------------------------------------------------------------------------
 %% DEPENDENCIES
 % [-]
@@ -39,12 +50,18 @@ end
 % -------------------------------------------------------------------------------------------------------------
 %% Function code
 % Data pre-processing
-if not(all(dDCM_TFfromFrame == eye(3)))
-    % Convert ray origin, direction and target position to target fixed frame
-    dRayOrigin          = dDCM_TFfromFrame * dRayOrigin;
-    dRayDirection       = dDCM_TFfromFrame * dRayDirection;
-    if any(abs(dEllipsoidCentre) > 0)
-        dEllipsoidCentre    = dDCM_TFfromFrame * dEllipsoidCentre;
+if nargout > 4
+    dRayDirection_RefTF = dDCM_TFfromFrame * dRayDirection_Frame;
+    dEllipsoidCentre_FramePreConv = dRayOrigin_Frame - dEllipsoidCentre_Frame;
+end
+
+if not(all(dDCM_EstTFfromFrame == eye(3)))
+    % Convert IN-PLACE ray origin, direction and target position to target fixed frame
+    dRayOrigin_Frame          = dDCM_EstTFfromFrame * dRayOrigin_Frame;
+    dRayDirection_Frame       = dDCM_EstTFfromFrame * dRayDirection_Frame;
+    
+    if any(abs(dEllipsoidCentre_Frame) > 0)
+        dEllipsoidCentre_Frame    = dDCM_EstTFfromFrame * dEllipsoidCentre_Frame;
     end
 end
 
@@ -56,17 +73,19 @@ bIntersectFlag      = false;
 bFailureFlag        = false;
 dIntersectPoint     = zeros(3, 1);
 dIntersectDistance  = zeros(1, 1);
+dJacIntersectDistance_RayOrigin   = zeros(1, 3);
+dJacIntersectDistance_TargetAttErr  = zeros(1, 3);
 
 % Compute 2nd order intersection equation
 % Equation: at^2 + 2bt + c = 0. Note that the b computed here is twice the B coefficient of a generic 
 % quadratic equation. This is why the Delta and the solution looks slightly strange.
 
-dRayOriginFromEllipsCentre = dRayOrigin - dEllipsoidCentre;
-dAuxMatrix0 = dRayDirection' * dEllipsoidMatrix;
+dRayOriginFromEllipsCentre = dRayOrigin_Frame - dEllipsoidCentre_Frame; % In Target fixed
+dAuxMatrix0 = dRayDirection_Frame' * dEllipsoidMatrix;
 
 % Compute a coefficient 
 % NOTE: this can be avoided in case of a sphere and set to 1, replacing the 1 with r^2 in C)
-daCoeff = dAuxMatrix0 * dRayDirection;
+daCoeff = dAuxMatrix0 * dRayDirection_Frame;
 % Compute b coefficient
 dbCoeff = dAuxMatrix0 * dRayOriginFromEllipsCentre;
 % Compute c coefficient
@@ -81,14 +100,14 @@ if dDelta < 0
 end
 
 bIntersectFlag = true;
-dAuxTerm0 = 1 / daCoeff; 
-dAuxTerm1 = sqrt(dDelta); 
+dInvAcoeff = 1 / daCoeff; 
+dSqrtDelta = sqrt(dDelta); 
 
-dtParam0 = dAuxTerm0 * ( - dbCoeff + dAuxTerm1 );
-dtParam1 = dAuxTerm0 * ( - dbCoeff - dAuxTerm1 ); 
+dtParam0 = dInvAcoeff * ( - dbCoeff + dSqrtDelta );
+dtParam1 = dInvAcoeff * ( - dbCoeff - dSqrtDelta ); 
 
 if dtParam0 >= eps && dtParam1 >= eps
-    dIntersectDistance(:) = min(dtParam0, dtParam1);
+    [dIntersectDistance(:), dSignSelector] = min([dtParam0, dtParam1]);
 else
     bIntersectFlag = false;
     bFailureFlag = true;
@@ -96,6 +115,49 @@ else
 end
 
 % Compute intersection point from ray equation if required
-dIntersectPoint(:) = dRayOrigin + dRayDirection * dIntersectDistance;
+dIntersectPoint(:) = dRayOrigin_Frame + dRayDirection_Frame * dIntersectDistance;
+
+
+%% Jacobian evaluation
+% DEVNOTE TODO: can be optimized both in terms of memory and computations
+if nargout > 4
+    % Pre-compute shared quantities
+    dInvSqrtDelta   = 1/dSqrtDelta;
+    dJac_cCoeff_RayOriginInTF = dRayOriginFromEllipsCentre' * ( dEllipsoidMatrix + transpose(dEllipsoidMatrix) ); % * eye(3);
+
+    if dSignSelector == 1
+        dSign = 1.0;
+    elseif dSignSelector == 2
+        dSign = -1.0;
+    end
+
+    % Compute jacobian of intersection distance wrt ray origin in input Frame 
+    dJacIntersectDist_RayOriginInTF = - dRayDirection_Frame' * dEllipsoidMatrix + ...
+             (-dSign * dInvSqrtDelta * (2 * dbCoeff * dRayDirection_Frame' * dEllipsoidMatrix - daCoeff * dJac_cCoeff_RayOriginInTF) );
+
+    dJacIntersectDistance_RayOrigin(:,:) = dInvAcoeff * dJacIntersectDist_RayOriginInTF * dDCM_EstTFfromFrame;
+
+    if nargout > 5
+        % Compute auxiliary quantities
+        dCameraPosFromCentre_FramePreConv = dDCM_TFfromFrame * (dEllipsoidCentre_FramePreConv);
+
+        % Derivative of a coefficient wrt target attitude error
+        dJac_aCoeff_AttErr = transpose(dRayDirection_Frame) * ( dEllipsoidMatrix + transpose(dEllipsoidMatrix) ) * skewSymm(dRayDirection_RefTF); 
+        
+        % Derivative of b coefficient wrt target attitude error
+        dJac_bCoeff_AttErr = transpose(dRayDirection_RefTF) * (dEllipsoidMatrix * dCameraPosFromCentre_FramePreConv)...
+                              + dRayDirection_Frame * dEllipsoidMatrix * (- skewSymm(dCameraPosFromCentre_FramePreConv) );
+
+        % Derivative of c coefficient wrt target attitude error
+        dJac_cCoeff_AttErr = dJac_cCoeff_RayOriginInTF * (- skewSymm(dCameraPosFromCentre_FramePreConv) );
+
+        % Compute jacobian of intersection distance wrt small target attitude error
+        dAuxJac0 = - dInvAcoeff^2 * dJac_aCoeff_AttErr * (dbCoeff + dSign * dSqrtDelta);
+        dAuxJac1 = dInvAcoeff * (- dJac_bCoeff_AttErr + (dSign * dInvSqrtDelta * ...
+                        (2*dbCoeff * dJac_bCoeff_AttErr  - (dJac_aCoeff_AttErr * dcCoeff + daCoeff * dJac_cCoeff_AttErr) )) );
+
+        dJacIntersectDistance_TargetAttErr(:,:) = dAuxJac0 + dAuxJac1;
+    end
+end
 
 end
