@@ -21,8 +21,8 @@ classdef CSPICEkerLoader
     end
 
     properties (Access = private)
-        defaultTargetNames = {'Didymos_Hera', 'Itokawa', 'Bennu_OREx'};
-        defaultTargetPaths = {"Milani_KERNELS", "Itokawa", "Bennu_OREx"};
+        defaultTargetNames = {'Didymos_Hera', 'Itokawa', 'Bennu_OREx', 'Apophis'};
+        defaultTargetPaths = {"Milani_KERNELS", "Itokawa", "Bennu_OREx", ''};
         defaultTargetsDict;
     end
 
@@ -30,11 +30,11 @@ classdef CSPICEkerLoader
     methods (Access = public)
 
         % CONSTRUCTOR
-        function self = CSPICEkerLoader(KERNELS_BASE_PATH, enumScenarioName, targetFolderName)
+        function self = CSPICEkerLoader(KERNELS_BASE_PATH, enumScenarioName, charTargetFolderName)
             arguments
                 KERNELS_BASE_PATH
                 enumScenarioName
-                targetFolderName (1,1) {isstring, ischar} = ""
+                charTargetFolderName (1,1) {isstring, ischar} = ""
             end
                     
             % Define dictionary of (names, paths) to avoid it being shared
@@ -50,46 +50,61 @@ classdef CSPICEkerLoader
             % Clear all previously loaded kernels
             cspice_kclear();
 
-            % Load common kernels
-            cd(fullfile(self.KERNELS_BASE_PATH_, 'common/'));
-            cspice_furnsh('mkcommon.mk');
-                
             % Assign scenario specific data
+            bLoadCommonKernels = false;
             switch enumScenarioName
 
                 case EnumScenarioName.Didymos_Hera
                     
-                    if strcmpi(targetFolderName, "")
-                        targetFolderName = self.defaultTargetsDict('Didymos_Hera');
+                    if strcmpi(charTargetFolderName, "")
+                        charTargetFolderName = self.defaultTargetsDict('Didymos_Hera');
                     end
 
                 case EnumScenarioName.Itokawa
 
-                    if strcmpi(targetFolderName, "")
-                        targetFolderName = self.defaultTargetsDict('Itokawa');
+                    if strcmpi(charTargetFolderName, "")
+                        charTargetFolderName = self.defaultTargetsDict('Itokawa');
                     end
 
                 case EnumScenarioName.Bennu_OREx
 
-                    if strcmpi(targetFolderName, "")
-                        targetFolderName = self.defaultTargetsDict('Bennu_OREx');
+                    if strcmpi(charTargetFolderName, "")
+                        charTargetFolderName = self.defaultTargetsDict('Bennu_OREx');
                     end
                     
+                case EnumScenarioName.Apophis
+
+                    if strcmpi(charTargetFolderName, "")
+                        charTargetFolderName = self.defaultTargetsDict('Apophis');
+                    end
+                
+                    assert( not(isempty( which("InitializeEnv.m") ) ));
+
+                    % Use RCS-1 simulator initialization script
+                    InitializeEnv;
+                    
+                    return
+
                 otherwise
                     error("enumScenarioName is not a valid scenario.")
             end
             
-            
             % Move to kernels base folder to load metakernel            
-            tmpMKpath = char(fullfile(self.KERNELS_BASE_PATH_, targetFolderName, 'mk'));
+            tmpMKpath = char(fullfile(self.KERNELS_BASE_PATH_, charTargetFolderName, 'mk'));
      
             cd(tmpMKpath);
             cspice_furnsh('metakernel.mk'); % Load kernels
             cd(self.projectDir);
 
+
+            if bLoadCommonKernels == true
+                % Load common kernels
+                cd(fullfile(self.KERNELS_BASE_PATH_, 'common/'));
+                cspice_furnsh('mkcommon.mk');
+            end
+
             % Print number of loaded kernels
             fprintf("Total number of loaded kernels: %d\n", cspice_ktotal('all'))
-
             % TODO: add info to specify type of kernels loaded
         end    
     

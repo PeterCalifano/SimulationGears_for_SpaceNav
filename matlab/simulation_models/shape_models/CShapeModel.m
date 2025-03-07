@@ -35,7 +35,7 @@ classdef CShapeModel < CBaseDatastruct
         function self = CShapeModel(charLoadingMethod, inputData, charInputUnit, charTargetUnitOutput)
             arguments
                 charLoadingMethod    (1,:) string {mustBeA(charLoadingMethod, ["string", "char"]), mustBeMember(charLoadingMethod, ["mat", "cspice", "struct"])}
-                inputData            (1,1) string
+                inputData            (1,1) 
                 charInputUnit        (1,:) string {mustBeA(charInputUnit       , ["string", "char"]), mustBeMember(charInputUnit, ["m", "km"])} = 'km'
                 charTargetUnitOutput (1,:) string {mustBeA(charTargetUnitOutput, ["string", "char"]), mustBeMember(charTargetUnitOutput, ["m", "km"])} = 'm' % TODO add enumaration
             end
@@ -145,8 +145,12 @@ classdef CShapeModel < CBaseDatastruct
             % ACHTUNG: input struct is assumed to have fields with the same name as self.strShapeModel
             CheckIfModelAlreadyLoaded(self);
 
-            self.ui32triangVertexPtr = strShapeModel.i32triangVertexPtr;
-            self.dVerticesPos        = strShapeModel.dVerticesPos;
+            cellFieldnames = fieldnames(strShapeModel);
+            assert( not(isempty(cellFieldnames{contains(cellFieldnames, '32')} )), 'ERROR: automatic fieldnames resolution failed.');
+            assert( not(isempty(cellFieldnames{contains(cellFieldnames, 'dVert')} )), 'ERROR: automatic fieldnames resolution failed.');
+
+            self.ui32triangVertexPtr = uint32(strShapeModel.(cellFieldnames{contains(cellFieldnames, '32')} ));
+            self.dVerticesPos        = double(strShapeModel.(cellFieldnames{contains(cellFieldnames, 'dVert')} ));
 
             self.bHasData_ = true;
         end
