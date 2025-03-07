@@ -1,10 +1,10 @@
-function [o_dXSC_ref, o_dTimestamps, o_dqCAMwrtIN_ref, o_dqCAMwrtIN_est, objOdeSolution] = GenerateReferenceTraj(strScenConfig, bDEBUG_MODE)
+function [dXSC_ref, dTimestamps, dqCAMwrtIN_ref, dqCAMwrtIN_est, objOdeSolution] = GenerateReferenceTraj(strScenConfig, bDEBUG_MODE)
 arguments
     strScenConfig (1,1) {isstruct}
     bDEBUG_MODE    (1,1) logical = false
 end
 %% PROTOTYPE
-% [o_dXSC_ref, o_dTimestamps, o_dqCAMwrtIN_ref, o_dqCAMwrtIN_est] = GenerateReferenceTraj(strScenConfig, bDEBUG_MODE);
+% [dXSC_ref, dTimestamps, dqCAMwrtIN_ref, dqCAMwrtIN_est] = GenerateReferenceTraj(strScenConfig, bDEBUG_MODE);
 % -------------------------------------------------------------------------------------------------------------
 %% DESCRIPTION
 % What the function does
@@ -38,14 +38,14 @@ end
 
 % Convenience assignments
 if isfield(strScenConfig.strInitConditions, 'dInitKeplParams') && not(isfield(strScenConfig.strInitConditions, 'xState0'))
-    i_dNominalKeplParams = strScenConfig.strInitConditions.dInitKeplParams;
-    i_dGravParamMain = strScenConfig.strInitConditions.dGravParam;
+    dNominalKeplParams = strScenConfig.strInitConditions.dInitKeplParams;
+    dGravParamMain = strScenConfig.strInitConditions.dGravParam;
 
-    assert(length(i_dNominalKeplParams) == 6);
-    assert(length(i_dGravParamMain) == 1);
+    assert(length(dNominalKeplParams) == 6);
+    assert(length(dGravParamMain) == 1);
 
-    % i_dNominalKeplParams = [SMA, ECC, INCL, RAAN, OMEGA, THETA];
-    xSCref0 = kepl2rv(i_dNominalKeplParams, i_dGravParamMain);
+    % dNominalKeplParams = [SMA, ECC, INCL, RAAN, OMEGA, THETA];
+    xSCref0 = kepl2rv(dNominalKeplParams, dGravParamMain);
 
 elseif isfield(strScenConfig.strInitConditions, 'xState0')
     
@@ -112,37 +112,37 @@ objOdeSolution = ode113(@(time, xState) dynFuncHandle(time, xState), ...
     tspan, xSCref0, odeopts);
 toc
 
-o_dXSC_ref = deval(objOdeSolution, tspan)';
-o_dTimestamps = tspan;
+dXSC_ref = deval(objOdeSolution, tspan)';
+dTimestamps = tspan;
 
 if bDEBUG_MODE
     % PLOT REFERENCE
     figure;
-    plot3(o_dXSC_ref(:, 1), o_dXSC_ref(:, 2), o_dXSC_ref(:, 3), 'k-', 'LineWidth', 1.05);
+    plot3(dXSC_ref(:, 1), dXSC_ref(:, 2), dXSC_ref(:, 3), 'k-', 'LineWidth', 1.05);
     hold on;
     axis equal;
     grid on;
 end
 
 %% ATTITUDE TRAJECTORY
-i_drTargetPoint_IN = [0;0;0];
-i_dqCAMwrtSCB = [0; 0; 0; 1];
-i_bINVERSE_Z_AXIS = false;
+drTargetPoint_IN = [0;0;0];
+dqCAMwrtSCB = [0; 0; 0; 1];
+bINVERSE_Z_AXIS = false;
 
-o_dqSCBwrtIN_ref = zeros(length(tspan), 4);
-o_dqSCBwrtIN_est = zeros(length(tspan), 4);
-o_dqCAMwrtIN_ref = zeros(length(tspan), 4);
-o_dqCAMwrtIN_est = zeros(length(tspan), 4);
+dqSCBwrtIN_ref = zeros(length(tspan), 4);
+dqSCBwrtIN_est = zeros(length(tspan), 4);
+dqCAMwrtIN_ref = zeros(length(tspan), 4);
+dqCAMwrtIN_est = zeros(length(tspan), 4);
 
 for idt = 1:length(tspan)
 
-    [o_dqSCBwrtIN_ref(idt, :), o_dqSCBwrtIN_est(idt, :), ...
-        o_dqCAMwrtIN_ref(idt, :), o_dqCAMwrtIN_est(idt, :)] = simulateTBPointing(o_dXSC_ref(idt, 1:6)', ...
-        i_drTargetPoint_IN, ...
-        i_dqCAMwrtSCB, ...
+    [dqSCBwrtIN_ref(idt, :), dqSCBwrtIN_est(idt, :), ...
+        dqCAMwrtIN_ref(idt, :), dqCAMwrtIN_est(idt, :)] = simulateTBPointing(dXSC_ref(idt, 1:6)', ...
+        drTargetPoint_IN, ...
+        dqCAMwrtSCB, ...
         dSigmaAKE, ...
         bIS_VSRPplus, ...
-        i_bINVERSE_Z_AXIS, ...
+        bINVERSE_Z_AXIS, ...
         bIS_QLEFT_HANDED);
 
 end
@@ -150,12 +150,12 @@ end
 % Plot trajectory
 % try
 %     % TO REWORK
-%     plotAttitudeQuat(o_dqCAMwrtIN_ref, ...
+%     plotAttitudeQuat(dqCAMwrtIN_ref, ...
 %         [0,0,0], ...
-%         i_bIS_JPL_CONV, ...
-%         i_bPlotFrame, ...
-%         i_bAnimateFlag, ...
-%         i_dPauseTime);
+%         bIS_JPL_CONV, ...
+%         bPlotFrame, ...
+%         bAnimateFlag, ...
+%         dPauseTime);
 % catch
 %     warning('Function plotAttitudeQuat() not found');
 % 
