@@ -109,7 +109,7 @@ end
 % Integrate dynamics
 tic
 objOdeSolution = ode113(@(time, xState) dynFuncHandle(time, xState), ...
-    tspan, xSCref0, odeopts);
+                                        tspan, xSCref0, odeopts);
 toc
 
 dXSC_ref = deval(objOdeSolution, tspan)';

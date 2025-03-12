@@ -35,7 +35,7 @@ classdef CShapeModel < CBaseDatastruct
         function self = CShapeModel(charLoadingMethod, inputData, charInputUnit, charTargetUnitOutput)
             arguments
                 charLoadingMethod    (1,:) string {mustBeA(charLoadingMethod, ["string", "char"]), mustBeMember(charLoadingMethod, ["mat", "cspice", "struct"])}
-                inputData            (1,1) 
+                inputData            (1,:)
                 charInputUnit        (1,:) string {mustBeA(charInputUnit       , ["string", "char"]), mustBeMember(charInputUnit, ["m", "km"])} = 'km'
                 charTargetUnitOutput (1,:) string {mustBeA(charTargetUnitOutput, ["string", "char"]), mustBeMember(charTargetUnitOutput, ["m", "km"])} = 'm' % TODO add enumaration
             end

@@ -203,11 +203,11 @@ end
 strAccelInfo = struct();
 
 if nargout > 1
-    strAccelInfo.dAccMain = dAccTot;
-    strAccelInfo.dTotAcc3rdBody = dTotAcc3rdBody;
-    strAccelInfo.dAcc3rdSun = dAcc3rdSun;
-    strAccelInfo.dAccCannonBallSRP = dAccCannonBallSRP;
-    strAccelInfo.dAccNonSphr_IN = dAccNonSphr_IN;
+    strAccelInfo.dAccMain           = dAccTot;
+    strAccelInfo.dTotAcc3rdBody     = dTotAcc3rdBody;
+    strAccelInfo.dAcc3rdSun         = dAcc3rdSun;
+    strAccelInfo.dAccCannonBallSRP  = dAccCannonBallSRP;
+    strAccelInfo.dAccNonSphr_IN     = dAccNonSphr_IN;
 end
 
 dAccTot = dAccTot + dTotAcc3rdBody + dAcc3rdSun + dAccCannonBallSRP + dAccNonSphr_IN + dResidualAccel;
