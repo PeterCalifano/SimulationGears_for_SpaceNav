@@ -22,9 +22,9 @@ SIM_STOPTIME = 1.5*24*3600;
 % constant, angle is interpolated.
 
 
-scenario_name = CScenarioName.Itokawa_Hayabusa1;
+scenario_name = EnumScenarioName.Itokawa;
 
-kernelsPATH = '/home/peterc/devDir/nav-backend/simulationCodes/matlab/SPICE_kernels';
+kernelsPATH = '/home/peterc/devDir/nav-backend/simulationCodes/data/SPICE_kernels/';
 
 projectDir = pwd;
 cd(fullfile(kernelsPATH, "common"));
@@ -32,7 +32,7 @@ cspice_furnsh('mkcommon.mk');
 cd(projectDir);
 
 switch scenario_name
-    case  CScenarioName.Didymos_Hera
+    case  EnumScenarioName.Didymos_Hera
 
         kernelsPATH = fullfile(kernelsPATH, "hera_v110");
 
@@ -41,7 +41,7 @@ switch scenario_name
         FixedFrame = 'DIDYMOS_FIXED';
         InertialFrame = 'ECLIPJ2000';
 
-        dTARGET_GM_DEFAULT
+        % dTARGET_GM_DEFAULT
         dTARGET_RADIUS_DEFAULT = 0.39*1000; % [m]
 
 
@@ -87,10 +87,10 @@ switch scenario_name
         ET0 = cspice_str2et('Feb 15 2027 00:00:00');
 
 
-    case CScenarioName.Itokawa_Hayabusa1
+    case EnumScenarioName.Itokawa
 
         projectDir = pwd;
-        kernelsPATH = fullfile(kernelsPATH, "Itokawa_Hayabusa1/mk");
+        kernelsPATH = fullfile(kernelsPATH, "Itokawa/mk");
 
         cd(kernelsPATH)
         tmpKernelsPATH = char("metakernel.mk");
@@ -141,8 +141,8 @@ end
 
 ET_SPAN = ET0:ET0 + SIM_STOPTIME;
 
-i_ui8PolyDeg_attQuat = ATTQUAT_POLYDEG_GT;
-i_ui8PolyDeg = POSVEC_POLYDEG_GT;
+i_ui32PolyDeg_attQuat = ATTQUAT_POLYDEG_GT;
+i_ui32PolyDeg = POSVEC_POLYDEG_GT;
 
 %% Reference trajectory generation
 % NOTE: All quaternions are right-handed, scalar first.
@@ -171,14 +171,14 @@ strMainBodyRefData.dQuat_INfromTB = DCM2quatSeq(strMainBodyRefData.dDCM_INfromTB
 
 [strMainBodyRefData.dChbvCoeffs, dScaledInterpDomain, strMainBodyRefData.dswitchIntervals, ...
     strMainBodyRefData.strfitStats] = fitAttQuatChbvPolynmials( ...
-                                        i_ui8PolyDeg_attQuat, ...
+                                        i_ui32PolyDeg_attQuat, ...
                                         i_dInterpDomain, ...
                                         strMainBodyRefData.dQuat_INfromTB, ...
                                         i_dDomainLB, ...
                                         i_dDomainUB, ...
                                         i_bENABLE_AUTO_CHECK);
 
-i_strDynParams.strMainData.strAttData.ui8PolyDeg           = i_ui8PolyDeg_attQuat;
+i_strDynParams.strMainData.strAttData.ui32PolyDeg           = i_ui32PolyDeg_attQuat;
 i_strDynParams.strMainData.strAttData.dChbvPolycoeffs      = strMainBodyRefData.dChbvCoeffs;
 i_strDynParams.strMainData.strAttData.dsignSwitchIntervals = strMainBodyRefData.dswitchIntervals;
 i_strDynParams.strMainData.strAttData.dTimeLowBound        = i_dDomainLB;
@@ -212,10 +212,10 @@ i_strDynParams.strSRPdata.dP_SRP = 1367/physconst('lightspeed') * (1/(distFromSu
 % Printing of key value: Distance in AU from the SUN
 fprintf('\nAverage distance from the SUN in AU over ET_SPAN: %3.4f AU\n', distFromSunAU);
 
-[o_dChbvCoeffs, ~, ~] = fitChbvPolynomials(i_ui8PolyDeg, i_dInterpDomain, ...
+[o_dChbvCoeffs, ~, ~] = fitChbvPolynomials(i_ui32PolyDeg, i_dInterpDomain, ...
     strMainBodyRefData.dSunPosition_IN, i_dDomainLB, i_dDomainUB, i_bENABLE_AUTO_CHECK);
 
-i_strDynParams.strBody3rdData(1).strOrbitData.ui8PolyDeg      = i_ui8PolyDeg;
+i_strDynParams.strBody3rdData(1).strOrbitData.ui32PolyDeg      = i_ui32PolyDeg;
 i_strDynParams.strBody3rdData(1).strOrbitData.dChbvPolycoeffs = o_dChbvCoeffs;
 i_strDynParams.strBody3rdData(1).strOrbitData.dTimeLowBound   = i_dDomainLB;
 i_strDynParams.strBody3rdData(1).strOrbitData.dTimeUpBound    = i_dDomainUB;
@@ -233,7 +233,7 @@ i_strDynParams.strBody3rdData(1).dGM = cspice_bodvrd('SUN', 'GM', 1); % TODO: ch
 % [o_dChbvCoeffs, ~, ~] = fitChbvPolynomials(i_ui8PolyDeg, i_dInterpDomain, ...
 %     strMainBodyRefData.dDimorphosPosition_IN, i_dDomainLB, i_dDomainUB, i_bENABLE_AUTO_CHECK);
 % 
-% i_strDynParams.strBody3rdData(2).strOrbitData.ui8PolyDeg      = i_ui8PolyDeg;
+% i_strDynParams.strBody3rdData(2).strOrbitData.ui32PolyDeg      = i_ui8PolyDeg;
 % i_strDynParams.strBody3rdData(2).strOrbitData.dChbvPolycoeffs = o_dChbvCoeffs;
 % i_strDynParams.strBody3rdData(2).strOrbitData.dTimeLowBound   = i_dDomainLB;
 % i_strDynParams.strBody3rdData(2).strOrbitData.dTimeUpBound    = i_dDomainUB;
