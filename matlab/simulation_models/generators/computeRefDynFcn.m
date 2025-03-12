@@ -1,10 +1,15 @@
-function o_dxdt = computeRefDynFcn(i_dStateTimetag,...
-                                   i_dxState_IN,...
-                                   i_strDynParams)%#codegen
+function [dDxDt, strAccelInfo] = computeRefDynFcn(dStateTimetag,...
+                                                   dxState,...
+                                                   strDynParams)%#codegen
+arguments
+    dStateTimetag
+    dxState
+    strDynParams 
+end
 %% PROTOTYPE
-% o_dxdt = computeRefDynFcn(i_dStateTimetag,...
-%     i_dxState,...
-%     i_strDynParams)
+% dxdt = computeRefDynFcn(dStateTimetag,...
+%     dxState,...
+%     strDynParams)
 % -------------------------------------------------------------------------------------------------------------
 %% DESCRIPTION
 % What the function does
@@ -28,8 +33,9 @@ function o_dxdt = computeRefDynFcn(i_dStateTimetag,...
 % Name6                     []
 % -------------------------------------------------------------------------------------------------------------
 %% CHANGELOG
-% 08-07-2024      Pietro Califano       Coded from computeDynFcn and FUTURE codes for reference trajectory generation
-% 19-07-2024      Pietro Califano       1st version completed and verified
+% 08-07-2024    Pietro Califano   Coded from computeDynFcn and FUTURE codes for reference trajectory generation
+% 19-07-2024    Pietro Califano   1st version completed and verified
+% 12-03-2025    Pietro Califano   Upgrade for use in CScenarioGenerator   
 % -------------------------------------------------------------------------------------------------------------
 %% DEPENDENCIES
 % [-]
@@ -40,32 +46,32 @@ function o_dxdt = computeRefDynFcn(i_dStateTimetag,...
 %% Function code
 
 % Check for 3rd bodies
-if not(isfield(i_strDynParams, 'strBody3rdData'))
-    numOf3rdBodies = 0;
+if not(isfield(strDynParams, 'strBody3rdData'))
+    ui32NumOf3rdBodies = 0;
 else
-    numOf3rdBodies = length(i_strDynParams.strBody3rdData);
+    ui32NumOf3rdBodies = length(strDynParams.strBody3rdData);
 end
 
 % Check validity of timetags
-if not(isempty(i_strDynParams.strMainData.dSHcoeff))
-    if i_dStateTimetag <= i_strDynParams.strMainData.strAttData.dTimeLowBound
-        evalPoint = i_strDynParams.strMainData.strAttData.dTimeLowBound;
+if not(isempty(strDynParams.strMainData.dSHcoeff))
+    if dStateTimetag <= strDynParams.strMainData.strAttData.dTimeLowBound
+        dTimeEvalPoint = strDynParams.strMainData.strAttData.dTimeLowBound;
 
-    elseif i_dStateTimetag >= i_strDynParams.strMainData.strAttData.dTimeUpBound
-        evalPoint = i_strDynParams.strMainData.strAttData.dTimeUpBound;
+    elseif dStateTimetag >= strDynParams.strMainData.strAttData.dTimeUpBound
+        dTimeEvalPoint = strDynParams.strMainData.strAttData.dTimeUpBound;
 
     else
-        evalPoint = i_dStateTimetag;
+        dTimeEvalPoint = dStateTimetag;
     end
 
     % Compute attitude of Main at current time instant
     dDCMmainAtt_INfromTF  = coder.nullcopy(zeros(3, 3));
 
-    dTmpQuat = evalAttQuatChbvPolyWithCoeffs(i_strDynParams.strMainData.strAttData.ui32PolyDeg, 4, evalPoint,...
-        i_strDynParams.strMainData.strAttData.dChbvPolycoeffs, ...
-        i_strDynParams.strMainData.strAttData.dsignSwitchIntervals, ...
-        i_strDynParams.strMainData.strAttData.dTimeLowBound, ...
-        i_strDynParams.strMainData.strAttData.dTimeUpBound);
+    dTmpQuat = evalAttQuatChbvPolyWithCoeffs(strDynParams.strMainData.strAttData.ui32PolyDeg, 4, dTimeEvalPoint,...
+                                            strDynParams.strMainData.strAttData.dChbvPolycoeffs, ...
+                                            strDynParams.strMainData.strAttData.dsignSwitchIntervals, ...
+                                            strDynParams.strMainData.strAttData.dTimeLowBound, ...
+                                            strDynParams.strMainData.strAttData.dTimeUpBound);
 
     dDCMmainAtt_INfromTF(1:3, 1:3) = Quat2DCM(dTmpQuat, true);
 
@@ -75,50 +81,47 @@ end
 
 % Evaluate position Ephemerides of 3rd bodies
 
-dBodyEphemerides = coder.nullcopy(zeros(3*numOf3rdBodies, 1));
-d3rdBodiesGM = coder.nullcopy(zeros(numOf3rdBodies, 1));
+dBodyEphemerides = coder.nullcopy(zeros(3*ui32NumOf3rdBodies, 1));
+d3rdBodiesGM = coder.nullcopy(zeros(ui32NumOf3rdBodies, 1));
 
-ptrAlloc = 1;
+ui32PtrAlloc = 1;
 
+for idB = 1:ui32NumOf3rdBodies
 
-for idB = 1:numOf3rdBodies
+    if dStateTimetag <= strDynParams.strBody3rdData(idB).strOrbitData.dTimeLowBound
+        dTimeEvalPoint = strDynParams.strBody3rdData(idB).strOrbitData.dTimeLowBound;
 
-    if i_dStateTimetag <= i_strDynParams.strBody3rdData(idB).strOrbitData.dTimeLowBound
-        evalPoint = i_strDynParams.strBody3rdData(idB).strOrbitData.dTimeLowBound;
-
-    elseif i_dStateTimetag >= i_strDynParams.strBody3rdData(idB).strOrbitData.dTimeUpBound
-        evalPoint = i_strDynParams.strBody3rdData(idB).strOrbitData.dTimeUpBound;
+    elseif dStateTimetag >= strDynParams.strBody3rdData(idB).strOrbitData.dTimeUpBound
+        dTimeEvalPoint = strDynParams.strBody3rdData(idB).strOrbitData.dTimeUpBound;
     else
-        evalPoint = i_dStateTimetag;
+        dTimeEvalPoint = dStateTimetag;
     end
 
-    dBodyEphemerides(ptrAlloc:ptrAlloc+2) = evalChbvPolyWithCoeffs(i_strDynParams.strBody3rdData(idB).strOrbitData.ui32PolyDeg, ...
-                                                                 3, evalPoint,...
-                                                                 i_strDynParams.strBody3rdData(idB).strOrbitData.dChbvPolycoeffs, ...
-                                                                 i_strDynParams.strBody3rdData(idB).strOrbitData.dTimeLowBound, ...
-                                                                 i_strDynParams.strBody3rdData(idB).strOrbitData.dTimeUpBound);
+    dBodyEphemerides(ui32PtrAlloc:ui32PtrAlloc+2) = evalChbvPolyWithCoeffs(strDynParams.strBody3rdData(idB).strOrbitData.ui32PolyDeg, ...
+                                                                 3, dTimeEvalPoint,...
+                                                                 strDynParams.strBody3rdData(idB).strOrbitData.dChbvPolycoeffs, ...
+                                                                 strDynParams.strBody3rdData(idB).strOrbitData.dTimeLowBound, ...
+                                                                 strDynParams.strBody3rdData(idB).strOrbitData.dTimeUpBound);
     
-    d3rdBodiesGM(idB) = i_strDynParams.strBody3rdData(idB).dGM;
-
-    ptrAlloc = ptrAlloc + 3;
+    d3rdBodiesGM(idB) = strDynParams.strBody3rdData(idB).dGM;
+    ui32PtrAlloc = ui32PtrAlloc + 3;
 end
 
 % Compute SRP coefficient
-dCoeffSRP = (i_strDynParams.strSRPdata.dP_SRP * i_strDynParams.strSCdata.dReflCoeff * ...
-             i_strDynParams.strSCdata.dA_SRP)/i_strDynParams.strSCdata.dSCmass; % Move to compute outside, since this
+dCoeffSRP = (strDynParams.strSRPdata.dP_SRP * strDynParams.strSCdata.dReflCoeff * ...
+             strDynParams.strSCdata.dA_SRP) / strDynParams.strSCdata.dSCmass; % Move to compute outside, since this
 
 %% Evaluate RHS
 % ACHTUNG: Sun must be first in ephemerides and GM data
-
-o_dxdt = evalRHS_InertialDynOrbit(  i_dxState_IN, ...
-                            dDCMmainAtt_INfromTF, ...
-                            i_strDynParams.strMainData.dGM, ...
-                            i_strDynParams.strMainData.dRefRadius, ...
-                            dCoeffSRP, ...
-                            d3rdBodiesGM, ...
-                            dBodyEphemerides, ...
-                            i_strDynParams.strMainData.dSHcoeff, ...
-                            i_strDynParams.strMainData.ui16MaxSHdegree);
+[dDxDt, strAccelInfo] = evalRHS_InertialDynOrbit(  dxState, ...
+                                dDCMmainAtt_INfromTF, ...
+                                strDynParams.strMainData.dGM, ...
+                                strDynParams.strMainData.dRefRadius, ...
+                                dCoeffSRP, ...
+                                d3rdBodiesGM, ...
+                                dBodyEphemerides, ...
+                                strDynParams.strMainData.dSHcoeff, ...
+                                strDynParams.strMainData.ui16MaxSHdegree);
 
 
 end
