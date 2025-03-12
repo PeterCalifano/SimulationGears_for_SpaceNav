@@ -9,7 +9,7 @@ classdef CScenarioGenerator < handle
     % kernels (TODO).
     % -------------------------------------------------------------------------------------------------------------
     %% CHANGELOG
-    % 12-03-2025        Pietro Califano     First experimental version
+    % 12-03-2025        Pietro Califano     First experimental version (tested)
     % -------------------------------------------------------------------------------------------------------------
     %% METHODS
     % Method1: Description
@@ -253,8 +253,6 @@ classdef CScenarioGenerator < handle
             else
                 error('Unsupported or invalid generation mode.')
             end
-
-
 
         end
 
