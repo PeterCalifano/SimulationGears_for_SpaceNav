@@ -30,7 +30,7 @@ charInputImageDataPath = "/home/peterc/devDir/nav-backend/simulationCodes/data/d
 
 % Set scenario name for loading
 enumTargetName_Dyn      = EnumScenarioName.Apophis;     % Apophis, Itokawa, Bennu_OREx
-enumTargetName_Shape    = EnumScenarioName.Apophis;  % Apophis, Itokawa, Bennu_OREx
+enumTargetName_Shape    = EnumScenarioName.Apophis;     % Apophis, Itokawa, Bennu_OREx
 enumTrajName            = EnumTrajectoryNames.RTO_4t1_J11p0;
 
 % Load data from RCS-1 dataset
@@ -331,14 +331,73 @@ objScenarioGenerator = CScenarioGenerator(  [objDataset.dPosSC_W(:,objScenarioCo
                                             "bProvideAccelerationData", true);
 
 %% testScenarioGenerator_generateData
-objDataset = objScenarioGenerator.generateData();
+objDatasetReGen = objScenarioGenerator.generateData();
+
 
 % Plot trajectory
+ui32LastTimeID = 1584;
+
+figure;
+plot3(objDataset.dPosSC_W(1, 1:ui32LastTimeID), ...
+        objDataset.dPosSC_W(2, 1:ui32LastTimeID), ...
+        objDataset.dPosSC_W(3, 1:ui32LastTimeID), 'b--', 'DisplayName', 'Kernels');
+hold on
+plot3(objDatasetReGen.dPosSC_W(1, 1:ui32LastTimeID), ...
+        objDatasetReGen.dPosSC_W(2, 1:ui32LastTimeID), ...
+        objDatasetReGen.dPosSC_W(3, 1:ui32LastTimeID), 'r-', 'DisplayName', 'ScenarioGen');
+DefaultPlotOpts()
+xlabel('X [m]')
+ylabel('Y [m]')
+zlabel('Z [m]')
+legend()
+axis equal
+
+% Check position difference
+dRefDeltaPosition = objDataset.dPosSC_W - objDatasetReGen.dPosSC_W;
+
 figure
+subplot(3,1,1)
+plot(objScenarioConfig.dTimestamps(1:ui32LastTimeID), dRefDeltaPosition(1, 1:ui32LastTimeID))
+hold on
+xlabel('Time [s]')
+ylabel('X [m]')
+DefaultPlotOpts()
 
+subplot(3,1,2)
+plot(objScenarioConfig.dTimestamps(1:ui32LastTimeID), dRefDeltaPosition(2, 1:ui32LastTimeID))
+hold on
+xlabel('Time [s]')
+ylabel('Y [m]')
+DefaultPlotOpts()
 
+subplot(3,1,3)
+plot(objScenarioConfig.dTimestamps(1:ui32LastTimeID), dRefDeltaPosition(3, 1:ui32LastTimeID))
+hold on
+xlabel('Time [s]')
+ylabel('Z [m]')
+DefaultPlotOpts()
 
+% Check velocity difference
+dRefDeltaVelocity = objDataset.dVelSC_W - objDatasetReGen.dVelSC_W;
+figure
+subplot(3,1,1)
+plot(objScenarioConfig.dTimestamps(1:ui32LastTimeID), dRefDeltaVelocity(1, 1:ui32LastTimeID))
+hold on
+xlabel('Time [s]')
+ylabel('X [m/s]')
+DefaultPlotOpts()
 
+subplot(3,1,2)
+plot(objScenarioConfig.dTimestamps(1:ui32LastTimeID), dRefDeltaVelocity(2, 1:ui32LastTimeID))
+hold on
+xlabel('Time [s]')
+ylabel('Y [m/s]')
+DefaultPlotOpts()
 
-
+subplot(3,1,3)
+plot(objScenarioConfig.dTimestamps(1:ui32LastTimeID), dRefDeltaVelocity(3, 1:ui32LastTimeID))
+hold on
+xlabel('Time [s]')
+ylabel('Z [m/s]')
+DefaultPlotOpts()
 

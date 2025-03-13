@@ -121,7 +121,9 @@ classdef CScenarioGenerator < handle
         
         % MAIN ENTRY POINT FUNCTION
         function [objReferenceMissionData] = generateData(self)
-
+        
+            % TODO add code to write ephemerides to strDynParams if scenario generator is set to generate
+            % attitudes as well!
             assert(not(isempty(self.strDynParams)), 'ERROR: Dynamics parameters struct cannot be empty. Ensure to have it configure properly for SimulationGears library.')
 
             % Define variables
