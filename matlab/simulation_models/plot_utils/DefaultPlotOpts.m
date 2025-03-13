@@ -35,30 +35,39 @@ end
 
 %% Function code
 
+if nargin == 0
+    % Get figure and axis handles
+    objFig = gcf;
+else
+    % Assert input type
+    mustBeA(objFig, "matlab.ui.Figure");
+end
+
 % Set background color based on flag
-if kwargs.bUseBlackBackground == true
+if nargin == 1
+
+    charBackGroundColor = objFig.Color;
+
+    if all(charBackGroundColor < 1)
+        charTextColor       = "w";
+    end
+
+elseif kwargs.bUseBlackBackground == true
     % Get figure handle
    
     % charRenderer = 'opengl';
     charTextColor       = 'w'; % White text
     charBackGroundColor = 'k';
-else
+    
+elseif kwargs.bUseBlackBackground == false
 
     set(gca, 'Color', 'w'); % White background
     set(gcf, 'Color', 'w');
     charTextColor       = 'k'; % Black text
     charBackGroundColor = 'w';
 
-end
-
-if nargin == 0
-    % Get figure and axis handles
-    objFig = gcf;
-
-else
-    
-    % Assert input type
-    mustBeA(objFig, "matlab.ui.Figure");
+    set(gca, 'Color', 'w'); % White background
+    set(gcf, 'Color', 'w');
 
 end
 
