@@ -358,8 +358,211 @@ classdef CScenarioGenerator < handle
     end
 
     methods (Static, Access = public)
-
         % STATIC METHODS
+        function [charTargetName, charTargetFixedFrame, strDynParams] = LoadDefaultScenarioData(enumScenarioName, ...
+                                                                                                strDynParams, ...
+                                                                                                kwargs, ...
+                                                                                                settings)
+            arguments
+                enumScenarioName EnumScenarioName {mustBeA(enumScenarioName, ["EnumScenarioName", "string", "char"])}
+                strDynParams (1,1) = struct()
+            end
+            arguments
+                % TODO load from file if specified
+                kwargs.charSpherHarmCoeffInputFileName (1,:) string {mustBeA(kwargs.charSpherHarmCoeffInputFileName, ["string", "char"])} = ""
+            end
+            arguments
+                settings.bAddNonSphericalGravityCoeffs (1,1) logical {islogical, isscalar} = false;
+            end
+            %% INPUT
+            % in1 [dim] description
+            % Name1                     []
+            % Name2                     []
+            % Name3                     []
+            % -------------------------------------------------------------------------------------------------------------
+            %% OUTPUT
+            % out1 [dim] description
+            % Name1                     []
+            % Name2                     []
+            % Name3                     []
+            % -------------------------------------------------------------------------------------------------------------
+            %% CHANGELOG
+            % 14-03-2025    Pietro Califano     First version implemented from legacy codes
+            % -------------------------------------------------------------------------------------------------------------
+            %% DEPENDENCIES
+            % [-]
+            % -------------------------------------------------------------------------------------------------------------
+            %% Future upgrades
+            % [-]
+            % -------------------------------------------------------------------------------------------------------------
+
+            % Define empty fields if not provided
+            if isfield(strDynParams, 'strMainData')
+                if not(isfield(strDynParams.strMainData, 'dSHcoeff'))
+                    strDynParams.strMainData.dSHcoeff = [];
+                end
+
+                if not(isfield(strDynParams.strMainData, 'ui16MaxSHdegree'))
+                    strDynParams.strMainData.ui16MaxSHdegree = [];
+                end
+            else
+                strDynParams.strMainData.dSHcoeff = [];
+                strDynParams.strMainData.ui16MaxSHdegree = [];
+            end
+            
+
+            switch enumScenarioName
+                case EnumScenarioName.Itokawa
+                    % REFERENCE source: (Scheeres, 2006)
+                    charTargetName = 'ITOKAWA';
+                    charTargetFixedFrame = "ITOKAWA_FIXED";
+
+                    % try
+                    %     dTargetReferenceRadius  = mean(cspice_bodvrd(num2str(ui32ID),'RADII',3)); % [m] ACHTUNG: Value used for Gravity SH expansion!
+                    %     dTargetGravityParameter = cspice_bodvrd(num2str(ui32ID),'GM',1)*1e+09;            % [m^3/(s^2)]
+                    % catch
+                        warning('Fetch of Apophis data from kernels failed. Fallback to hardcoded data...')
+                        dTargetGravityParameter = 2.36; % m^3/s^2
+                        dTargetReferenceRadius  = 1000*0.161915; % [m] ACHTUNG: Value used for Gravity SH expansion!
+                    % end
+
+                case EnumScenarioName.Apophis
+                    % REFERENCE source: TODO
+                    charTargetName = 'APOPHIS';
+                    charTargetFixedFrame = "APOPHIS_FIXED";
+
+                    try
+                        ui32ID = 20099942;
+                        dTargetReferenceRadius  = mean(cspice_bodvrd(num2str(ui32ID),'RADII',3)); % [m] ACHTUNG: Value used for Gravity SH expansion!
+                        dTargetGravityParameter = cspice_bodvrd(num2str(ui32ID),'GM',1)*1e+09;            % [m^3/(s^2)]
+                    catch
+                        warning('Fetch of Apophis data from kernels failed. Fallback to hardcoded data...')
+                        dTargetGravityParameter = cspice_bodvrd(num2str(ui32ID),'GM',1) * 1e9;            % [m^3/(s^2)]
+                        dTargetReferenceRadius  = 1e3 * 0.175930344; % [m] ACHTUNG: Value used for Gravity SH expansion!
+                    end
+
+                case EnumScenarioName.Bennu_OREx
+
+                    charTargetName = 'BENNU';
+                    charTargetFixedFrame = 'IAU_BENNU'; % Check corresponding tf file
+                    dTargetGravityParameter = 4.892;
+                    dTargetReferenceRadius  = 245; % [m] ACHTUNG: Value used for Gravity SH expansion!
+
+                case EnumScenarioName.Didymos_Hera
+                    error('To implement')
+
+                otherwise
+                    error('Invalid scenario name. See EnumScenarioName enum class for supported ones.')
+            end
+
+
+            % Store basic data
+            strDynParams.strMainData.dGM        = dTargetGravityParameter;
+            strDynParams.strMainData.dRefRadius = dTargetReferenceRadius;
+
+
+            % Handle request of Spherical Harmonics coefficients
+            if settings.bAddNonSphericalGravityCoeffs == true
+
+                % Get data depending on scenario
+                CScenarioGenerator.LoadSpherHarmCoefficients(enumScenarioName, kwargs.charSpherHarmCoeffInputFileName);
+
+                strDynParams.strMainData.ui16MaxSHdegree = ui16MaxSHdegree;
+                dScaleFactors = ExtSHE_normFactors(strDynParams.strMainData.ui16MaxSHdegree);
+
+                % Compute unnormalized coefficients
+                strDynParams.strMainData.dSHcoeff = dClmSlm_normalized./dScaleFactors;
+
+            end
+
+        end
+    
+
+        function [dClmSlm_normalized, ui16MaxSHdegree] = LoadSpherHarmCoefficients(enumScenarioName, charSpherHarmCoeffInputFileName)
+            arguments
+                enumScenarioName EnumScenarioName {mustBeA(enumScenarioName, ["EnumScenarioName", "string", "char"])}
+                charSpherHarmCoeffInputFileName (1,:) string {mustBeA(charSpherHarmCoeffInputFileName, ["string", "char"])} = ""
+            end
+            
+            switch enumScenarioName
+                case EnumScenarioName.Itokawa
+                    % REFERENCE source: (Scheeres, 2006)
+                    % Itokawa Spherical harmonics expansion coefficients (Scheeres, 2006)
+
+                    if strcmpi(charSpherHarmCoeffInputFileName, "")
+                        % Use hardcoded values
+                        dClmSlm_normalized = [0.0,       0.0;
+                            -0.145216,  0.0;
+                            0.0,        0.0;
+                            0.219420,   0.0;
+                            0.036115,   0.0;
+                            -0.028139,  -0.006137;
+                            -0.046894,  -0.046894;
+                            0.069022,   0.033976;
+                            0.087852,   0.0;
+                            0.034069,   0.004870;
+                            -0.123263,  0.000098;
+                            -0.030673,  -0.015026;
+                            0.150282,   0.011627];
+
+                        ui16MaxSHdegree = 4;
+                    else
+
+                        % TODO: modify to use: [o_dCSlmCoeffCols, o_dlmPairs] = loadSHEcoeffModel(modelCoeffDataPath, ui16lMax, bENABLE_UNSCALING)
+                        % Normalized coefficients from l=1, m=1 as required by ExtSHE_AccTB function
+
+                        % Load Spherical Harmonics coeffs from file
+                        error('Not implemented yet >.<')
+                    end
+
+                case EnumScenarioName.Apophis
+                    % REFERENCE source: TODO
+
+                    % TODO: modify to use: [o_dCSlmCoeffCols, o_dlmPairs] = loadSHEcoeffModel(modelCoeffDataPath, ui16lMax, bENABLE_UNSCALING)
+                    % Normalized coefficients from l=1, m=1 as required by ExtSHE_AccTB function
+
+                    if strcmpi(charSpherHarmCoeffInputFileName, "")
+                        % Use hardcoded values
+                        dClmSlm_normalized = [];
+                        ui16MaxSHdegree = 0;
+                        warning('Unavailable hardcoded data')
+                    else
+
+                        % TODO: modify to use: [o_dCSlmCoeffCols, o_dlmPairs] = loadSHEcoeffModel(modelCoeffDataPath, ui16lMax, bENABLE_UNSCALING)
+                        % Normalized coefficients from l=1, m=1 as required by ExtSHE_AccTB function
+
+                        % Load Spherical Harmonics coeffs from file
+                        error('Not implemented yet >.<')
+                    end
+
+
+                case EnumScenarioName.Bennu_OREx
+
+                    if strcmpi(charSpherHarmCoeffInputFileName, "")
+                        % Use hardcoded values
+                        dClmSlm_normalized = [];
+                        ui16MaxSHdegree = 0;
+                    else
+
+                        % TODO: modify to use: [o_dCSlmCoeffCols, o_dlmPairs] = loadSHEcoeffModel(modelCoeffDataPath, ui16lMax, bENABLE_UNSCALING)
+                        % Normalized coefficients from l=1, m=1 as required by ExtSHE_AccTB function
+
+                        % Load Spherical Harmonics coeffs from file
+                        error('Not implemented yet >.<')
+                    end
+
+                    warning('Unavailable hardcoded data')
+
+                case EnumScenarioName.Didymos_Hera
+                    error('To implement')
+
+                otherwise
+                    error('Invalid scenario name. See EnumScenarioName enum class for supported ones.')
+            end
+
+        end
+
+
         function [objReferenceMissionData] = packageDataset(objCamera, ...        
                                                             enumWorldFrame, ...   
                                                             dTimestamps, ...      

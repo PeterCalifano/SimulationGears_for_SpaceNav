@@ -192,6 +192,8 @@ objCameraIntrinsics = objBlenderPyCommManager.objCameraIntrinsics;
 charNavBackendKernelsPATH = '/home/peterc/devDir/nav-backend/simulationCodes/data/SPICE_kernels';
 CSPICEkerLoader(charNavBackendKernelsPATH, enumTargetName_Shape); % DEVNOTE: currently required to load frames and ephemerides
 
+% TODO, add "LoadDefaultScenarioData" method in CScenarioGenerator to set these
+
 switch enumTargetName_Shape
 
     case "Apophis"
