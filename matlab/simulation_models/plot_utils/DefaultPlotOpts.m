@@ -44,16 +44,15 @@ else
 end
 
 % Set background color based on flag
-if nargin == 1
+if nargin == 1 && kwargs.bUseBlackBackground == false
 
     charBackGroundColor = objFig.Color;
 
-    if all(charBackGroundColor < 1)
+    if all(charBackGroundColor == 0)
         charTextColor       = "w";
     end
 
 elseif kwargs.bUseBlackBackground == true
-    % Get figure handle
    
     % charRenderer = 'opengl';
     charTextColor       = 'w'; % White text
@@ -63,6 +62,7 @@ elseif kwargs.bUseBlackBackground == false
 
     set(gca, 'Color', 'w'); % White background
     set(gcf, 'Color', 'w');
+    
     charTextColor       = 'k'; % Black text
     charBackGroundColor = 'w';
 
