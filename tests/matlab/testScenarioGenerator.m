@@ -274,8 +274,7 @@ addpath(genpath('/home/peterc/devDir/SLAM-repos/MSCKF_for_SpaceNav/matlab'));
 dEphemeridesTimegrid = objDataset.dTimestamps + dET0;
 [strDynParams, strMainBodyRefData] = DefineEnvironmentProperties(dEphemeridesTimegrid, ...
                                                                  enumTargetName_Dyn, ...
-                                                                 charInertialFrame, ...
-                                                                "objDataset", objDataset);
+                                                                 charInertialFrame);
 
 
 
