@@ -1,4 +1,4 @@
-classdef CScenarioGenerator < handle
+classdef CScenarioGenerator < CGeneralPropagator
     %% DESCRIPTION
     % Generator class constructing dataset object to define 3D scene over time, with spacecraft trajectory and 
     % attitude, Sun position, target position and attitude, ephemerides of additional bodies. Acceleration
@@ -25,13 +25,7 @@ classdef CScenarioGenerator < handle
     % -------------------------------------------------------------------------------------------------------------
 
     properties (SetAccess = protected, GetAccess = public)
-
-        dPosVelState0_W
-        dAttDCM0_W
         
-        dRelativeTimegrid
-        dEphemerisTimegrid
-
         % Orbit dynamics and attitude data
         strDynParams % TODO, transform to object
 
@@ -40,7 +34,6 @@ classdef CScenarioGenerator < handle
         enumGenerationMode
         enumWorldFrameName
         bDefaultConstructed         = true;
-        bEnableScenarioPlots        = false;
         bProvideAccelerationData    = false;
 
         % Attitude poiting generator
@@ -49,9 +42,6 @@ classdef CScenarioGenerator < handle
         % Sensors object
         objCamera = CCameraIntrinsics() % TODO currently a placeholder
 
-        % Handles
-        objOdeSolution            {mustBeScalarOrEmpty} = []
-        objOrbitDynamicFcnHandle  {mustBeScalarOrEmpty} = []
         % TO ADD
     end
 
@@ -77,7 +67,7 @@ classdef CScenarioGenerator < handle
                 % To select between Chbv polynomials and SPICE
                 settings.enumGenerationMode         (1,:) string {mustBeMember(settings.enumGenerationMode, ["OrbitDyn", "OrbitPointing", ""])} = "OrbitPointing"
                 settings.enumEphemerisMode          (1,:) string {mustBeMember(settings.enumEphemerisMode, ["SPICE", "interpolants"])} = "interpolants"
-                settings.bEnableScenarioPlots       (1,1) logical {islogical, isscalar} = false % TODO
+                settings.bEnablePlots               (1,1) logical {islogical, isscalar} = false % TODO
                 settings.bProvideAccelerationData   (1,1) logical {islogical, isscalar} = false 
             end
 
@@ -257,92 +247,6 @@ classdef CScenarioGenerator < handle
             end
 
         end
-
-        function [dxStateTrajectory, dTimegrid] = propagateOrbitTrajectory(self, varargparams, settings)
-            arguments
-                self
-            end
-            arguments (Repeating)
-                varargparams
-            end
-            arguments
-                settings.dTimestep (1,1) double {isscalar, isnumeric} = 0.0 % Default
-                settings.objOdeOpts {isstruct} = odeset('RelTol', 1E-12, 'AbsTol', 1E-12) % Default
-                settings.enumOdeFunctioName {mustBeMember(settings.enumOdeFunctioName, ["ode113", "ode45", "ode78"])}
-            end 
-
-            % TODO: integrates equations of motions of attitude kinematics
-
-            % [dxStateTrajectory, dTimegrid] = propagateState(objDynamicFcnHandle, ...
-            %                                                 self.dEphemerisTimegrid, ...
-            %                                                 self.dPosVelState0, ...
-            %                                                 varargparams, ...
-            %                                                 "dTimestep", settings.dTimestep, ...
-            %                                                 "objOdeOpts", settings.objOdeOpts, ...
-            %                                                 "enumOdeFunctioName", settings.enumOdeFunctioName);
-            
-            % Unwrap settings to cell
-            cellSettings = CScenarioGenerator.unwrapSettings(settings);
-            
-            % Call ODE-based propagator 
-            [dxStateTrajectory, dTimegrid] = CScenarioGenerator.propagateState(self.objOrbitDynamicFcnHandle, ...
-                                                                    self.dEphemerisTimegrid, ...
-                                                                    self.dPosVelState0_W, ...
-                                                                    varargparams, ...
-                                                                    cellSettings{:});
-        end
-
-
-        function [dxStateTrajectory, dTimegrid] = generateOrbitTrajectory(self, varargparams, settings)
-            arguments
-                self
-            end
-            arguments (Repeating)
-                varargparams
-            end
-            arguments
-                settings.dTimestep (1,1) double {isscalar, isnumeric} = 0.0 % Default
-                settings.objOdeOpts {isstruct} = odeset('RelTol', 1E-12, 'AbsTol', 1E-12) % Default
-                settings.enumOdeFunctioName {mustBeMember(settings.enumOdeFunctioName, ["ode113", "ode45", "ode78"])}
-            end 
-
-            % TODO: integrates equations of motions of attitude kinematics
-
-            % [dxStateTrajectory, dTimegrid] = propagateState(objDynamicFcnHandle, ...
-            %                                                 self.dEphemerisTimegrid, ...
-            %                                                 self.dPosVelState0, ...
-            %                                                 varargparams, ...
-            %                                                 "dTimestep", settings.dTimestep, ...
-            %                                                 "objOdeOpts", settings.objOdeOpts, ...
-            %                                                 "enumOdeFunctioName", settings.enumOdeFunctioName);
-
-            cellSettings = CScenarioGenerator.unwrapSettings(settings);
-
-            [dxStateTrajectory, dTimegrid] = propagateState(objDynamicFcnHandle, ...
-                                                            self.dEphemerisTimegrid, ...
-                                                            self.dPosVelState0_W, ...
-                                                            varargparams, ...
-                                                            cellSettings{:});
-        end
-
-
-        function [] = propagateAttitudePoitingProfile(self)
-            % Generate attitude pointing profile from CAttitudeGenerator class
-
-        end
-
-        function [] = propagateFreeAttitudeProfile(self)
-            % TODO: integrates equations of motions of attitude kinematics
-        end
-
-        function [] = propagateNavPoseTrajectory(self)
-            % TODO: integrates equations of motions of orbit dynamics + attitude kinematics
-        end
-
-        function [] = propagatePoseDynamicsTrajectory(self)
-            % TODO: integrates equations of motions of orbit and attitude dynamics + kinematics
-        end
-
     end
 
     methods (Access = protected)
@@ -619,61 +523,7 @@ classdef CScenarioGenerator < handle
             end
         end
 
-        function [dxStateTrajectory, dTimegrid] = propagateState(objDynamicFcnHandle, ...
-                                                                dTimegrid, ...
-                                                                dxState0, ...
-                                                                varargparams, ...
-                                                                settings)
-            arguments
-                objDynamicFcnHandle {mustBeA(objDynamicFcnHandle, 'function_handle')}
-                dTimegrid           (1,:) double {isvector, isnumeric}
-                dxState0            (:,1) double {isvector, isnumeric}
-            end
-            arguments (Repeating)
-                varargparams
-            end
-            arguments
-                settings.dTimestep (1,1) double {isscalar, isnumeric} = 0.0 % Default
-                settings.objOdeOpts {isstruct} = odeset('RelTol', 1E-12, 'AbsTol', 1E-12) % Default
-                settings.enumOdeFunctioName {mustBeMember(settings.enumOdeFunctioName, ["ode113", "ode45", "ode78"])} = "ode113"
-            end 
 
-
-            % objDynamicFcnHandle = @(dTime, dxState) objDynamicFcnHandle(dTime, dxState);
-            % cellOdeInput = {objDynamicFcnHandle, dTimegrid, dxState0, settings.objOdeOpts};
-
-            assert(length(dTimegrid) >= 2, 'ERROR: invalid timegrid. It must contain at least two time instants.')
-
-            % Determine timegrid if required
-            if length(dTimegrid) == 2 && not(settings.dTimestep == 0)
-                dTimegrid = dTimegrid(1):settings.dTimestep:dTimegrid(2);
-            end
-
-            switch settings.enumOdeFunctioName
-                case "ode113"
-
-                    [dTimegrid, dxStateTrajectory] = ode113(objDynamicFcnHandle, ...
-                                                            dTimegrid, ...
-                                                            dxState0, ...
-                                                            settings.objOdeOpts);
-
-                case "ode45"
-
-                    [dTimegrid, dxStateTrajectory] = ode45(objDynamicFcnHandle, ...
-                                                                dTimegrid, ...
-                                                                dxState0, ...
-                                                                settings.objOdeOpts);
-                case "ode78"
-
-                    [dTimegrid, dxStateTrajectory] = ode78(objDynamicFcnHandle, ...
-                                                                dTimegrid, ...
-                                                                dxState0, ...
-                                                                settings.objOdeOpts);
-
-                otherwise
-                    error('Unsupported ode function')
-            end
-        end
 
         
         % function [] = GenerateOrbitTrajectoryStatic()
@@ -691,30 +541,6 @@ classdef CScenarioGenerator < handle
         % function [] = GeneratePoseDynamicsTrajectoryStatic()
         %     % TODO: integrates equations of motions of orbit and attitude dynamics + kinematics
         % end
-
-
-        function cellSettings = unwrapSettings(settings)
-            arguments
-                settings (1,1) {isstruct}
-            end
-
-            cellFieldNames = fieldnames(settings);
-            cellSettings = cell(1, length(cellFieldNames));
-
-            ui32AllocCounter = 1;
-
-            for idF = 1:length(cellSettings)
-
-                % Store key
-                cellSettings{ui32AllocCounter} = cellFieldNames{idF};
-                ui32AllocCounter = ui32AllocCounter + 1;
-
-                % Store value
-                cellSettings{ui32AllocCounter} = settings.(cellFieldNames{idF});
-                ui32AllocCounter = ui32AllocCounter + 1;
-
-            end
-        end
 
     end
 
