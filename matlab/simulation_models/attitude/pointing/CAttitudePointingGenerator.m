@@ -120,10 +120,11 @@ classdef CAttitudePointingGenerator < handle
         end
 
         % PARTIAL TODO
-        function [self, dOutRot3, dDCM_FrameFromCAM] = pointToTarget_SunDirConstraint(self, dCameraPosition_Frame, ...
-                dTargetPosition_Frame, ...
-                dSunPosition_Frame, ...
-                options)
+        function [self, dOutRot3, dDCM_FrameFromPose] = pointToTarget_SunDirConstraint(self, ...
+                                                                                    dCameraPosition_Frame, ...
+                                                                                    dTargetPosition_Frame, ...
+                                                                                    dSunPosition_Frame, ...
+                                                                                    options)
             arguments (Input)
                 self
                 dCameraPosition_Frame (3, :) double = self.dCameraPosition_Frame
@@ -133,11 +134,13 @@ classdef CAttitudePointingGenerator < handle
             arguments (Input)
                 options.enumOutRot3Param (1,1) EnumRotParams {isa(options.enumOutRot3Param, ...
                     'EnumRotParams')} = EnumRotParams.DCM
+                options.dDCM_displacedPoseFromPose (3,3,:) double {ismatrix, isnumeric} = zeros(3) % Custom rotation to apply to the rotation
+                options.dSigmaDegRotAboutBoresight    (1,1)   double {isscalar, isnumeric} = 0.0 % Sigma to scatter camera pose around boresight
             end
             arguments (Output)
                 self    
                 dOutRot3                  {mustBeNumeric, mustBeNonNan, mustBeFinite}
-                dDCM_FrameFromCAM (3,3,:) {mustBeNumeric, mustBeNonNan, mustBeFinite}
+                dDCM_FrameFromPose        (3,3,:) {mustBeNumeric, mustBeNonNan, mustBeFinite}
             end
             
             ui32NumOfEntries = uint32(size(dCameraPosition_Frame, 2));
@@ -150,6 +153,9 @@ classdef CAttitudePointingGenerator < handle
             dCamBoresightZ_Frame = -(dCameraPosition_Frame./vecnorm(dCameraPosition_Frame, 2, 1));
 
             % TODO: Add "displacement option here"
+            assert(options.dSigmaDegRotAboutBoresight > 0, 'ERROR: a variance cannot be negative!');
+
+
 
             % Construct Y axis to satisfy Sun orthogonality constraint
             dCamPosFromSun_Frame = dSunPosition_Frame - dCameraPosition_Frame;
@@ -158,18 +164,31 @@ classdef CAttitudePointingGenerator < handle
 
             dCamDirY_Frame = dCamDirY_Frame./vecnorm(dCamDirY_Frame, 2, 1);
 
+            % Rotate Y axis of scatter angles if not zero
+            if options.dSigmaDegRotAboutBoresight > 0
+                % Sample rotation angle in [rad]
+                dScatterBoresightAngle = deg2rad(options.dSigmaDegRotAboutBoresight) * randn(1, size(dCamBoresightZ_Frame, 2));
+                dCamDirY_Frame = Rot3dVecAboutDir(dCamBoresightZ_Frame, dCamDirY_Frame, dScatterBoresightAngle);
+            end
+
             % Complete frame
             dCamDirX_Frame = cross(dCamDirY_Frame, dCamBoresightZ_Frame, 1);
             dCamDirX_Frame = dCamDirX_Frame./vecnorm(dCamDirX_Frame, 2, 1);
     
             % Assemble DCM
-            dDCM_FrameFromCAM = zeros(3, 3, ui32NumOfEntries, "double");
+            dDCM_FrameFromPose = zeros(3, 3, ui32NumOfEntries, "double");
 
             for idx = 1:ui32NumOfEntries
-                dDCM_FrameFromCAM(:,:, idx) = [dCamDirX_Frame(:, idx), dCamDirY_Frame(:, idx), dCamBoresightZ_Frame(:, idx)];
+                dDCM_FrameFromPose(:,:, idx) = [dCamDirX_Frame(:, idx), dCamDirY_Frame(:, idx), dCamBoresightZ_Frame(:, idx)];
             end
 
-            dOutRot3 = dDCM_FrameFromCAM; % TEMPORARY
+            % Apply additional custom rotation if required
+            if any( options.dDCM_displacedPoseFromPose ~= zeros(3,3, size(options.dDCM_displacedPoseFromPose, 3)) )
+                dDCM_FrameFromPose(:,:,:) = pagetranspose(pagemtimes(options.dDCM_displacedPoseFromPose, pagetranspose(dDCM_FrameFromPose)));
+            end
+
+            dOutRot3 = dDCM_FrameFromPose; % TEMPORARY
+
             if options.enumOutRot3Param ~= EnumRotParams.DCM
                 warning('Current version only supports EnumRotParams.DCM output parameterization.')
             end
