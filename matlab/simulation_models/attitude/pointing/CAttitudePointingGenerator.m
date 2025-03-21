@@ -57,7 +57,30 @@ classdef CAttitudePointingGenerator < handle
         % SETTERS
 
         % METHODS
-        % PARTIAL TODO
+        function [self, dCameraPositionToPoint_Frame, dCamBoresight_Frame] = displaceBoresightAlongSunRays(self, dReferenceDistance, ...
+                                                                                                                 dCameraPosition_Frame, ...
+                                                                                                                 dSunPosition_Frame, ...
+                                                                                                                 settings)
+            arguments
+                self
+                dReferenceDistance    (1,:) double {isscalar}
+                dCameraPosition_Frame (3,:) double {isvector} = self.dCameraPosition_Frame;
+                dSunPosition_Frame    (3,:) double {isvector} = self.dSunPosition_Frame;
+            end
+            arguments
+                settings.dScaleSigma (1,:) double {mustBeGreaterThan(settings.dScaleSigma, 0)} = 0;
+            end
+
+            % Call equivalent static method
+            [dCameraPositionToPoint_Frame, dCamBoresight_Frame] = self.DisplaceBoresightAlongSunRays(dCameraPosition_Frame, ...
+                                                                                                    dSunPosition_Frame, ...
+                                                                                                    dReferenceDistance, ...
+                                                                                                    "dScaleSigma", settings.dScaleSigma);
+
+
+        end
+
+
         function [self, dOutRot3, dDCM_FramefromCAM] = pointToTarget_PositionOnly(self, dCameraPosition_Frame, dTargetPosition_Frame, options)
             arguments
                 self
@@ -119,7 +142,6 @@ classdef CAttitudePointingGenerator < handle
             error('Not implemented yet')
         end
 
-        % PARTIAL TODO
         function [self, dOutRot3, dDCM_FrameFromPose] = pointToTarget_SunDirConstraint(self, ...
                                                                                     dCameraPosition_Frame, ...
                                                                                     dTargetPosition_Frame, ...
@@ -134,8 +156,9 @@ classdef CAttitudePointingGenerator < handle
             arguments (Input)
                 options.enumOutRot3Param (1,1) EnumRotParams {isa(options.enumOutRot3Param, ...
                     'EnumRotParams')} = EnumRotParams.DCM
-                options.dDCM_displacedPoseFromPose (3,3,:) double {ismatrix, isnumeric} = zeros(3) % Custom rotation to apply to the rotation
-                options.dSigmaDegRotAboutBoresight    (1,1)   double {isscalar, isnumeric} = 0.0 % Sigma to scatter camera pose around boresight
+                options.dDCM_displacedPoseFromPose      (3,3,:) double {ismatrix, isnumeric} = zeros(3) % Custom rotation to apply to the rotation
+                options.dSigmaDegRotAboutBoresight      (1,1)   double {isscalar, isnumeric} = 0.0 % Sigma to scatter camera pose around boresight
+                options.dSigmaOffPointingDegAlongSun       (1,1)   double {isscalar, isnumeric} = 0.0 % Sigma to scatter camera boresight along a direction pointing to Sun
             end
             arguments (Output)
                 self    
@@ -152,8 +175,20 @@ classdef CAttitudePointingGenerator < handle
             % Construct camera boresight
             dCamBoresightZ_Frame = -(dCameraPosition_Frame./vecnorm(dCameraPosition_Frame, 2, 1));
 
-            % TODO: Add "displacement option here"
-            assert(options.dSigmaDegRotAboutBoresight > 0, 'ERROR: a variance cannot be negative!');
+             
+            % Scatter boresight along Sun rays
+            if options.dSigmaOffPointingDegAlongSun > 0.0
+                
+                % Compute scale sigma from angle
+                dScaleSigma = vecnorm(dCameraPosition_Frame, 2, 1) * tan(deg2rad(options.dSigmaOffPointingDegAlongSun));
+
+
+                [self, ~, dCamBoresightZ_Frame] = displaceBoresightAlongSunRays(self, 0.0, ...
+                                                                            dCameraPosition_Frame, ...
+                                                                            dSunPosition_Frame, ...
+                                                                            "dScaleSigma", dScaleSigma);
+
+            end
 
 
 
@@ -161,14 +196,16 @@ classdef CAttitudePointingGenerator < handle
             dCamPosFromSun_Frame = dSunPosition_Frame - dCameraPosition_Frame;
 
             dCamDirY_Frame = cross(dCamBoresightZ_Frame, dCamPosFromSun_Frame./vecnorm(dCamPosFromSun_Frame, 2, 1), 1);
-
             dCamDirY_Frame = dCamDirY_Frame./vecnorm(dCamDirY_Frame, 2, 1);
 
             % Rotate Y axis of scatter angles if not zero
             if options.dSigmaDegRotAboutBoresight > 0
+
                 % Sample rotation angle in [rad]
+                assert(options.dSigmaDegRotAboutBoresight > 0, 'ERROR: a variance cannot be negative!');
                 dScatterBoresightAngle = deg2rad(options.dSigmaDegRotAboutBoresight) * randn(1, size(dCamBoresightZ_Frame, 2));
                 dCamDirY_Frame = Rot3dVecAboutDir(dCamBoresightZ_Frame, dCamDirY_Frame, dScatterBoresightAngle);
+
             end
 
             % Complete frame
@@ -247,6 +284,22 @@ classdef CAttitudePointingGenerator < handle
     end
 
     methods (Static, Access = public)
+
+        function [dCamDirY_Frame] = RandomGuassianBoresightRoll(dCamBoresightZ_Frame, ...
+                                                                dCamDirY_Frame, ...
+                                                                dSigmaDegRotAboutBoresight)
+            arguments
+                dCamBoresightZ_Frame 
+                dCamDirY_Frame 
+                dSigmaDegRotAboutBoresight 
+            end
+
+                % Sample rotation angle in [rad]
+                assert(dSigmaDegRotAboutBoresight > 0, 'ERROR: a variance cannot be negative!');
+                dScatterBoresightAngle = deg2rad(dSigmaDegRotAboutBoresight) * randn(1, size(dCamBoresightZ_Frame, 2));
+                dCamDirY_Frame = Rot3dVecAboutDir(dCamBoresightZ_Frame, dCamDirY_Frame, dScatterBoresightAngle);
+        end
+
         % TODO implement by moving class methods here and leaving only the call there.
         % Static methods implementations (called by instance methods)
         function [dOutRot3, dDCM_FrameFromCAM] = pointToTargetStatic_SunDirConstraint(dCameraPosition_Frame, ...
@@ -272,25 +325,93 @@ classdef CAttitudePointingGenerator < handle
         end
 
         % Auxiliary functions
-        function [self, dCameraPositionToPoint_Frame, dCamBoresight_Frame] = displaceBoresightAlongSunRays(self, ...
-                dCameraPosition_Frame, ...
-                dSunPosition_Frame, ...
-                dReferenceDistance, ...
-                settings)
+        function [dCameraPositionToPoint_Frame, dCamBoresightUnitVec_Frame] = DisplaceBoresightAlongSunRays(dBoresightVector_Frame, ...
+                                                                                                    dRefPoint_Frame, ...
+                                                                                                    dReferenceDistance, ...
+                                                                                                    settings)
             arguments
-                self
-                dCameraPosition_Frame (3,1) double {isvector}
-                dSunPosition_Frame    (3,1) double {isvector}
-                dReferenceDistance    (1,1) double {isscalar}
+                dBoresightVector_Frame  (3,:) double {isvector, isnumeric}
+                dRefPoint_Frame         (3,:) double {isvector, isnumeric} 
+                dReferenceDistance      (1,:) double {isnumeric} = 0;
             end
             arguments
-                settings.dScaleSigma (1,1) double {isscalar, mustBeGreaterThan(settings.dScaleSigma, 0)} = 0;
+                settings.dScaleSigma    (1,:) double {mustBeGreaterThan(settings.dScaleSigma, 0)} = 0;
+            end
+            %% SIGNATURE
+            % [dCameraPositionToPoint_Frame, dCamBoresight_Frame] = DisplaceBoresightAlongSunRays(dBoresightVector_Frame, ...
+            %                                                                             dRefPoint_Frame, ...
+            %                                                                             dReferenceDistance, ...
+            %                                                                             settings)
+            % -------------------------------------------------------------------------------------------------------------
+            %% DESCRIPTION
+            % Function displacing the boresight vector along a direction determined by dRefPoint_Frame in 3D
+            % space. dReferenceDistance is used as constant offset for the displacement, scattered of a
+            % value given by the optional scale sigma value (Gaussian distribution). Function supports
+            % vectorized mode.
+            % -------------------------------------------------------------------------------------------------------------
+            %% INPUT
+            % dCameraPosition_Frame (3,:) double {isvector, isnumeric}
+            % dRefPoint_Frame       (3,:) double {isvector, isnumeric}
+            % dReferenceDistance    (1,:) double {isscalar, isnumeric}
+            % settings.dScaleSigma  (1,:) double {isscalar, mustBeGreaterThan(settings.dScaleSigma, 0)} = 0;
+            % -------------------------------------------------------------------------------------------------------------
+            %% OUTPUT
+            % dCameraPositionToPoint_Frame
+            % dCamBoresight_Frame
+            % -------------------------------------------------------------------------------------------------------------
+            %% CHANGELOG
+            % 21-03-2025    Pietro Califano     Implement from previous function code, update for vect.
+            % -------------------------------------------------------------------------------------------------------------
+            %% DEPENDENCIES
+            % [-]
+            % -------------------------------------------------------------------------------------------------------------
+            %% Future upgrades
+            % [-]
+            % -------------------------------------------------------------------------------------------------------------
+            %% Function code
+            ui32NumOfSamples = size(dBoresightVector_Frame, 2);
+            assert( length(settings.dScaleSigma) == 1 || length(settings.dScaleSigma) == ui32NumOfSamples);
+            
+            dDeltaDir = zeros(3, ui32NumOfSamples);
+
+            % Compute direction delta unit vector
+            % TODO: verify whether the commented code is functionally equivalent
+            % dDeltaDir(1:3) = dot(dCameraPosition_Frame, dCameraPosition_Frame) * dSunPosition_Frame ...
+            %                 - dot(dCameraPosition_Frame, dSunPosition_Frame) * dCameraPosition_Frame;
+            %
+            % dDeltaDir(1:3) = dDeltaDir./norm(dDeltaDir); % Displacement along a perpendicular to position vector in the plane defined by this and the sun directions
+
+            % Direction orthogonal to camera position and Sun position plane
+            dRefPointNorms  = vecnorm(dRefPoint_Frame, 2, 1);
+            dBoresightNorms = vecnorm(dBoresightVector_Frame, 2, 1);
+
+            dAuxDir1 = cross(dRefPoint_Frame./dRefPointNorms, -dBoresightVector_Frame./dBoresightNorms, 1);
+            dAuxDir1 = dAuxDir1./vecnorm(dAuxDir1, 2, 1);
+
+            % Direction orthogonal to plane formed by camera position and AuxDir1, toward the Sun
+            dDeltaDir(:, :) = cross(-dBoresightVector_Frame./dBoresightNorms, dAuxDir1, 1);
+            dDeltaDir(:, :) = dDeltaDir./vecnorm(dDeltaDir, 2, 1);
+
+            % Set scale of change
+            if any(settings.dScaleSigma > 0)
+                dScaleScatterValue = settings.dScaleSigma .* randn(1, ui32NumOfSamples);
+            else
+                dScaleScatterValue = 0;
             end
 
-            error('Not implemented yet')
+            % Compute displacement scale and add random coefficient to randomize pointing "across" the limb
+            dScaleModulus = dReferenceDistance + dScaleScatterValue;
 
+            % Compute new camera position in Frame from look_at point
+            dCameraPositionToPoint_Frame = dBoresightVector_Frame - (dScaleModulus .* dDeltaDir);
+
+            if nargout > 1
+                dCamBoresightUnitVec_Frame = dCameraPositionToPoint_Frame./vecnorm(dCameraPositionToPoint_Frame, 2, 1);
+            end
         end
-        
+
+
+
         % TODO
         function [] = plot3DtrajectoryAndBoresight()
             arguments
