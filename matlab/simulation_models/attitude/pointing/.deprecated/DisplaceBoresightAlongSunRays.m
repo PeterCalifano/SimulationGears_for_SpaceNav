@@ -1,7 +1,7 @@
 function [dCameraPositionToPoint_Frame, dCamBoresight_Frame] = DisplaceBoresightAlongSunRays(dCameraPosition_Frame, ...
-                                                                                                            dSunPosition_Frame, ...
-                                                                                                            dReferenceDistance, ...
-                                                                                                            settings)
+                                                                                            dSunPosition_Frame, ...
+                                                                                            dReferenceDistance, ...
+                                                                                            settings)
 arguments
     dCameraPosition_Frame (3,1) double {isvector, isnumeric}   
     dSunPosition_Frame    (3,1) double {isvector, isnumeric}  
@@ -39,6 +39,7 @@ end
 % -------------------------------------------------------------------------------------------------------------
 %% Function code
 
+error('DEPRECATED: use static function in CAttitudePointingGenerator instead.');
 dDeltaDir = zeros(3,1);
 
 % Compute direction delta unit vector

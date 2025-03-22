@@ -41,6 +41,9 @@ end
 % [-]
 % -------------------------------------------------------------------------------------------------------------
 %% Function code
+
+error('DEPRECATED: use static function in CAttitudePointingGenerator instead.');
+
 assert(all(size(i_drCam) == [3,1],"all"))
 assert(all(size(i_drTargetBody) == [3,1],"all"))
 

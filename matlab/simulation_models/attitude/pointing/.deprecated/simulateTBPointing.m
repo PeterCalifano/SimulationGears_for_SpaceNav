@@ -82,6 +82,7 @@ end
 %           error (second scattering). The current version is not accurate.
 % -------------------------------------------------------------------------------------------------------------
 %% Function code
+error('DEPRECATED: use static function in CAttitudePointingGenerator instead.');
 
 assert(iscolumn(i_dXSC_IN_ref), 'Input state vector must be a column vector!')
 assert(iscolumn(i_drTargetPoint_IN), 'Input target position must be a column vector!')
