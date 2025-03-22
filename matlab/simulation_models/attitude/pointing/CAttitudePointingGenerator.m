@@ -57,22 +57,27 @@ classdef CAttitudePointingGenerator < handle
         % SETTERS
 
         % METHODS
-        function [self, dCameraPositionToPoint_Frame, dCamBoresight_Frame] = displaceBoresightAlongSunRays(self, dReferenceDistance, ...
+        function [self, dCameraPositionToPoint_Frame, dCamBoresight_Frame] = ComputeDisplacedBoresight(self, dDisplacementDegAngle, ...
                                                                                                                  dCameraPosition_Frame, ...
                                                                                                                  dSunPosition_Frame, ...
                                                                                                                  settings)
             arguments
                 self
-                dReferenceDistance    (1,:) double {isscalar}
-                dCameraPosition_Frame (3,:) double {isvector} = self.dCameraPosition_Frame;
-                dSunPosition_Frame    (3,:) double {isvector} = self.dSunPosition_Frame;
+                dDisplacementDegAngle   (1,:) double {isscalar}
+                dCameraPosition_Frame   (3,:) double {isvector} = self.dCameraPosition_Frame;
+                dSunPosition_Frame      (3,:) double {isvector} = self.dSunPosition_Frame;
             end
             arguments
-                settings.dScaleSigma (1,:) double {mustBeGreaterThan(settings.dScaleSigma, 0)} = 0;
+                settings.dScaleSigma                (1,:) double {mustBeGreaterThan(settings.dScaleSigma, 0)} = 0;
+                settings.dStochasticDisplacement    (1,1) logical = false;
             end
 
+            % Compute scale sigma from angle
+            dScaleSigma = vecnorm(dCameraPosition_Frame, 2, 1) * tan(deg2rad(options.dSigmaOffPointingDegAlongSun));
+
+
             % Call equivalent static method
-            [dCameraPositionToPoint_Frame, dCamBoresight_Frame] = self.DisplaceBoresightAlongSunRays(dCameraPosition_Frame, ...
+            [dCameraPositionToPoint_Frame, dCamBoresight_Frame] = self.ComputeDisplacedBoresight(dCameraPosition_Frame, ...
                                                                                                     dSunPosition_Frame, ...
                                                                                                     dReferenceDistance, ...
                                                                                                     "dScaleSigma", settings.dScaleSigma);
@@ -178,12 +183,7 @@ classdef CAttitudePointingGenerator < handle
              
             % Scatter boresight along Sun rays
             if options.dSigmaOffPointingDegAlongSun > 0.0
-                
-                % Compute scale sigma from angle
-                dScaleSigma = vecnorm(dCameraPosition_Frame, 2, 1) * tan(deg2rad(options.dSigmaOffPointingDegAlongSun));
-
-
-                [self, ~, dCamBoresightZ_Frame] = displaceBoresightAlongSunRays(self, 0.0, ...
+                [self, ~, dCamBoresightZ_Frame] = ComputeDisplacedBoresight(self, options.dSigmaOffPointingDegAlongSun, ...
                                                                             dCameraPosition_Frame, ...
                                                                             dSunPosition_Frame, ...
                                                                             "dScaleSigma", dScaleSigma);
@@ -325,42 +325,31 @@ classdef CAttitudePointingGenerator < handle
         end
 
         % Auxiliary functions
-        function [dCameraPositionToPoint_Frame, dCamBoresightUnitVec_Frame] = DisplaceBoresightAlongSunRays(dBoresightVector_Frame, ...
-                                                                                                    dRefPoint_Frame, ...
-                                                                                                    dReferenceDistance, ...
-                                                                                                    settings)
+        function [dCameraPositionToPoint_Frame, dCamBoresightUnitVec_Frame] = ComputeDisplacedBoresight(dLookAtPoint_Frame, ...
+                                                                                                        dRefPoint_Frame, ...
+                                                                                                        dReferenceDistance, ...
+                                                                                                        settings)
             arguments
-                dBoresightVector_Frame  (3,:) double {isvector, isnumeric}
+                dLookAtPoint_Frame  (3,:) double {isvector, isnumeric}
                 dRefPoint_Frame         (3,:) double {isvector, isnumeric} 
                 dReferenceDistance      (1,:) double {isnumeric} = 0;
             end
             arguments
+                settings.enumDisplacementMode (1,1) string {mustBeMember(settings.enumDisplacementMode, ["lookAtPoint", "rotate3d"])} = "lookAtPoint";
                 settings.dScaleSigma    (1,:) double {mustBeGreaterThan(settings.dScaleSigma, 0)} = 0;
             end
             %% SIGNATURE
-            % [dCameraPositionToPoint_Frame, dCamBoresight_Frame] = DisplaceBoresightAlongSunRays(dBoresightVector_Frame, ...
-            %                                                                             dRefPoint_Frame, ...
-            %                                                                             dReferenceDistance, ...
-            %                                                                             settings)
             % -------------------------------------------------------------------------------------------------------------
             %% DESCRIPTION
-            % Function displacing the boresight vector along a direction determined by dRefPoint_Frame in 3D
-            % space. dReferenceDistance is used as constant offset for the displacement, scattered of a
-            % value given by the optional scale sigma value (Gaussian distribution). Function supports
-            % vectorized mode.
+            % TODO
             % -------------------------------------------------------------------------------------------------------------
             %% INPUT
-            % dCameraPosition_Frame (3,:) double {isvector, isnumeric}
-            % dRefPoint_Frame       (3,:) double {isvector, isnumeric}
-            % dReferenceDistance    (1,:) double {isscalar, isnumeric}
-            % settings.dScaleSigma  (1,:) double {isscalar, mustBeGreaterThan(settings.dScaleSigma, 0)} = 0;
             % -------------------------------------------------------------------------------------------------------------
             %% OUTPUT
-            % dCameraPositionToPoint_Frame
-            % dCamBoresight_Frame
             % -------------------------------------------------------------------------------------------------------------
             %% CHANGELOG
             % 21-03-2025    Pietro Califano     Implement from previous function code, update for vect.
+            % 22-03-2025    Pietro Califano     Major reworking, provide implementation for two displacement modes
             % -------------------------------------------------------------------------------------------------------------
             %% DEPENDENCIES
             % [-]
@@ -369,9 +358,23 @@ classdef CAttitudePointingGenerator < handle
             % [-]
             % -------------------------------------------------------------------------------------------------------------
             %% Function code
-            ui32NumOfSamples = size(dBoresightVector_Frame, 2);
+            ui32NumOfSamples = size(dLookAtPoint_Frame, 2);
             assert( length(settings.dScaleSigma) == 1 || length(settings.dScaleSigma) == ui32NumOfSamples);
             
+            switch settings.enumDisplacementMode
+                case "lookAtPoint"
+                    [dCameraPositionToPoint_Frame, dCamBoresightUnitVec_Frame] = CAttitudePointingGenerator.ComputeDisplacedBoresight_LookAtPoint_(dLookAtPoint_Frame, ...
+                                                                                                                                                    dRefPoint_Frame, ...
+                                                                                                                                                    dReferenceDistance, ...
+                                                                                                                                                    settings);
+                case "rotate3d"
+                    [dCameraPositionToPoint_Frame, dCamBoresightUnitVec_Frame] = CAttitudePointingGenerator.ComputeDisplacedBoresight_Rotate3D_(dReferenceRotAxis, ...
+                                                                                                                                                dReferenceDistance, ...
+                                                                                                                                                settings);
+                otherwise
+                    error('Invalid displacement mode.')
+            end
+
             dDeltaDir = zeros(3, ui32NumOfSamples);
 
             % Compute direction delta unit vector
@@ -383,13 +386,13 @@ classdef CAttitudePointingGenerator < handle
 
             % Direction orthogonal to camera position and Sun position plane
             dRefPointNorms  = vecnorm(dRefPoint_Frame, 2, 1);
-            dBoresightNorms = vecnorm(dBoresightVector_Frame, 2, 1);
+            dBoresightNorms = vecnorm(dLookAtPoint_Frame, 2, 1);
 
-            dAuxDir1 = cross(dRefPoint_Frame./dRefPointNorms, -dBoresightVector_Frame./dBoresightNorms, 1);
+            dAuxDir1 = cross(dRefPoint_Frame./dRefPointNorms, -dLookAtPoint_Frame./dBoresightNorms, 1);
             dAuxDir1 = dAuxDir1./vecnorm(dAuxDir1, 2, 1);
 
             % Direction orthogonal to plane formed by camera position and AuxDir1, toward the Sun
-            dDeltaDir(:, :) = cross(-dBoresightVector_Frame./dBoresightNorms, dAuxDir1, 1);
+            dDeltaDir(:, :) = cross(-dLookAtPoint_Frame./dBoresightNorms, dAuxDir1, 1);
             dDeltaDir(:, :) = dDeltaDir./vecnorm(dDeltaDir, 2, 1);
 
             % Set scale of change
@@ -403,11 +406,14 @@ classdef CAttitudePointingGenerator < handle
             dScaleModulus = dReferenceDistance + dScaleScatterValue;
 
             % Compute new camera position in Frame from look_at point
-            dCameraPositionToPoint_Frame = dBoresightVector_Frame - (dScaleModulus .* dDeltaDir);
+            dCameraPositionToPoint_Frame = dLookAtPoint_Frame - (dScaleModulus .* dDeltaDir);
 
             if nargout > 1
                 dCamBoresightUnitVec_Frame = dCameraPositionToPoint_Frame./vecnorm(dCameraPositionToPoint_Frame, 2, 1);
             end
+
+
+
         end
 
 
@@ -425,7 +431,7 @@ classdef CAttitudePointingGenerator < handle
     methods (Access = protected)
         % METHODS
         % TODO
-        function [self, dCameraPositionToPoint_Frame, dCamBoresight_Frame] = displaceBoresightAlongSunRays_(self, ...
+        function [self, dCameraPositionToPoint_Frame, dCamBoresight_Frame] = ComputeDisplacedBoresight_(self, ...
                 dCameraPosition_Frame, ...
                 dSunPosition_Frame, ...
                 dReferenceDistance, ...
