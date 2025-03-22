@@ -5,6 +5,7 @@ classdef CAttitudePointingGenerator < handle
     %% CHANGELOG
     % 08-12-2024    Pietro Califano     Class implemented from adapted codes for pointing generation
     % 12-02-2025    Pietro Califano     Update of class to add Sun position as input and static methods
+    % 22-03-2025    Pietro Califano     [MAJOR] Upgrade class usage with new general-purpose methods
     % -------------------------------------------------------------------------------------------------------------
     %% METHODS
     % Method1: Description
@@ -21,11 +22,13 @@ classdef CAttitudePointingGenerator < handle
 
     properties (SetAccess = protected, GetAccess = public)
 
-        dCameraPosition_Frame = -ones(3,1);
-        dTargetPosition_Frame = -ones(3,1);
-        dSunPosition_Frame    = -ones(3,1);
+        dCameraPosition_Frame   = -ones(3,1);
+        dTargetPosition_Frame   = -ones(3,1);
+        dSunPosition_Frame      = zeros(3,1);
+        dVelocity_Frame         = zeros(3,1);
+        dAuxiliaryAxis          = zeros(3,1);
 
-        bInvertZaxisForBlender    = false;
+        % bInvertZaxisForBlender    = false;
         bShowAttitudePointingPlot = false;
         bVerbose                  = false;
     end
@@ -41,14 +44,19 @@ classdef CAttitudePointingGenerator < handle
             end
 
             arguments
-                options.bInvertZaxisForBlender (1,1) logical {islogical, isscalar} = false;
+                options.bVerbose                    (1,1) logical {islogical, isscalar} = false;
+                options.bShowAttitudePointingPlot   (1,1) logical {islogical, isscalar} = false;
+                % options.bInvertZaxisForBlender      (1,1) logical {islogical, isscalar} = false;
             end
 
             % Assign properties
-            self.dCameraPosition_Frame  = dCameraPosition_Frame;
-            self.dTargetPosition_Frame  = dTargetPosition_Frame;
-            self.dSunPosition_Frame     = dSunPosition_Frame;
-            self.bInvertZaxisForBlender = options.bInvertZaxisForBlender;
+            self.dCameraPosition_Frame      = dCameraPosition_Frame;
+            self.dTargetPosition_Frame      = dTargetPosition_Frame;
+            self.dSunPosition_Frame         = dSunPosition_Frame;
+            self.bVerbose                   = options.bVerbose;
+            self.bShowAttitudePointingPlot  = options.bShowAttitudePointingPlot;
+
+            % self.bInvertZaxisForBlender = options.bInvertZaxisForBlender;
 
         end
 
@@ -56,97 +64,172 @@ classdef CAttitudePointingGenerator < handle
 
         % SETTERS
 
-        % METHODS
-        function [self, dCameraPositionToPoint_Frame, dCamBoresight_Frame] = ComputeDisplacedBoresight(self, dDisplacementDegAngle, ...
-                                                                                                                 dCameraPosition_Frame, ...
-                                                                                                                 dSunPosition_Frame, ...
-                                                                                                                 settings)
-            arguments
+        % PUBLIC METHODS
+        % Main entry-point function (all calls)
+        function [self, dOutRot3, dDCM_FrameFromPose, dOffPointingAngles] = pointToTarget(self, ...
+                                                                        dCameraPosition_Frame, ...
+                                                                        dTargetPosition_Frame, ...
+                                                                        kwargs, ...
+                                                                        options)
+            arguments (Input)
                 self
-                dDisplacementDegAngle   (1,:) double {isscalar}
-                dCameraPosition_Frame   (3,:) double {isvector} = self.dCameraPosition_Frame;
-                dSunPosition_Frame      (3,:) double {isvector} = self.dSunPosition_Frame;
+                dCameraPosition_Frame (3, :) double = self.dCameraPosition_Frame
+                dTargetPosition_Frame (3, :) double = self.dTargetPosition_Frame
             end
-            arguments
-                settings.dScaleSigma                (1,:) double {mustBeGreaterThan(settings.dScaleSigma, 0)} = 0;
-                settings.dStochasticDisplacement    (1,1) logical = false;
+            arguments (Input)
+                kwargs.dSunPosition_Frame   (3, :) double = self.dSunPosition_Frame;
+                kwargs.dVelocity_Frame      (3, :) double = self.dVelocity_Frame;
+                kwargs.dAuxiliaryAxis       (3, :) double = self.dAuxiliaryAxis;
             end
-
-            % Compute scale sigma from angle
-            dScaleSigma = vecnorm(dCameraPosition_Frame, 2, 1) * tan(deg2rad(options.dSigmaOffPointingDegAlongSun));
-
-
-            % Call equivalent static method
-            [dCameraPositionToPoint_Frame, dCamBoresight_Frame] = self.ComputeDisplacedBoresight(dCameraPosition_Frame, ...
-                                                                                                    dSunPosition_Frame, ...
-                                                                                                    dReferenceDistance, ...
-                                                                                                    "dScaleSigma", settings.dScaleSigma);
-
-
-        end
-
-
-        function [self, dOutRot3, dDCM_FramefromCAM] = pointToTarget_PositionOnly(self, dCameraPosition_Frame, dTargetPosition_Frame, options)
-            arguments
+            arguments (Input)
+                options.enumConstraintType              (1,:) string {mustBeMember(options.enumConstraintType, ["YorthogonalSun", "trackLVLH", "auxiliaryAxis"])} = "YorthogonalSun"
+                options.enumOutRot3Param                (1,1) EnumRotParams {isa(options.enumOutRot3Param, 'EnumRotParams')} = EnumRotParams.DCM
+                options.dDCM_displacedPoseFromPose      (3,3,:) double {ismatrix, isnumeric} = zeros(3,3) % Custom rotation to apply to the rotation
+                options.dSigmaDegRotAboutBoresight      (1,:)   double {isvector, isnumeric} = 0.0 % Sigma to scatter camera pose around boresight
+                options.dSigmaOffPointingDegAngle       (1,:)   double {isvector, isnumeric} = 0.0 % Sigma to scatter camera boresight in a random direction
+                options.enumOffPointingMode             (1,1) string {mustBeMember(options.enumOffPointingMode, ["randomAxis", "refAxisOutOfPlane", "refAxisInPlane"])} = "randomAxis";
+                options.dReferenceAxis_Frame            (3,:) double {ismatrix, isnumeric} = zeros(3,0)
+            end
+            arguments (Output)
                 self
-                dCameraPosition_Frame (3, :) double {ismatrix, mustBeNumeric} = self.dCameraPosition_Frame
-                dTargetPosition_Frame (3, :) double {ismatrix, mustBeNumeric} = self.dTargetPosition_Frame
-            end
-            arguments
-                options.enumOutRot3Param (1,1) EnumRotParams {isa(options.enumOutRot3Param, ...
-                    'EnumRotParams')} = EnumRotParams.DCM
-                options.dAuxiliaryAxis (3,1) double {isvector} = [0; 0; 1];
+                dOutRot3                  {mustBeNumeric, mustBeNonNan, mustBeFinite}
+                dDCM_FrameFromPose        (3,3,:) {mustBeNumeric, mustBeNonNan, mustBeFinite}
+                dOffPointingAngles        (:,1)   double {isvector, isnumeric}
             end
 
+            % Determine number of entries
             ui32NumOfEntries = uint32(size(dCameraPosition_Frame, 2));
-            assert(size(dTargetPosition_Frame, 2) == 1 || size(dTargetPosition_Frame, 2) == ui32NumOfEntries, ...
-                'Target position must have size equal to either a [3x1] vector (implicit expansion) or dCameraPosition_Frame array.')
+            
+            % Perform input checks (common)
+            assert(ui32NumOfEntries == size(dTargetPosition_Frame, 2) || size(dTargetPosition_Frame, 2) == 1)
+            
+            charOffPoint = "";
+            charBoreRoll = "";
 
-            % Camera pointing direction (Z axis)
-            dCamBoresightZ_Frame = dTargetPosition_Frame - dCameraPosition_Frame;
+            % Perform input checks (cosntraint specific)
+            if options.enumConstraintType == "YorthogonalSun"
+                assert(ui32NumOfEntries == size(kwargs.dSunPosition_Frame, 2) || size(kwargs.dSunPosition_Frame, 2) == 1)
+                assert( all(vecnorm(kwargs.dSunPosition_Frame, 2, 1) ~= 0 ), "Invalid input data: Sun position cannot be zero for YorthogonalSun contraint type.");
+            
+            elseif options.enumConstraintType == "trackLVLH"
+                assert(ui32NumOfEntries == size(kwargs.dVelocity_Frame, 2) || size(kwargs.dVelocity_Frame, 2) == 1)
+                assert( all(vecnorm(kwargs.dVelocity_Frame, 2, 1) ~= 0 ), "Invalid input data: velocity vectors cannot be zero for trackLVLH contraint type.");
 
-            if self.bInvertZaxisForBlender
-                dCamBoresightZ_Frame = -dCamBoresightZ_Frame;
             end
-            % Normalize direction
-            dCamBoresightZ_Frame = dCamBoresightZ_Frame./vecnorm(dCamBoresightZ_Frame, 2, 1);
 
-            % Camera X axis (Right)
-            dAuxiliaryAxis = options.dAuxiliaryAxis;
+            % Compute camera boresight from lookAt point
+            dLookAtPointFromCam_Frame = dTargetPosition_Frame - dCameraPosition_Frame;
+            dCamBoresightZ_Frame = dLookAtPointFromCam_Frame./vecnorm(dLookAtPointFromCam_Frame, 2, 1);
 
-            if ui32NumOfEntries > 1
-                dAuxiliaryAxis = repmat(dAuxiliaryAxis, 1, ui32NumOfEntries);
+            % Scatter boresight TODO
+            if any(options.dSigmaOffPointingDegAngle > 0.0)
+                    
+                %function [dCamBoresightAxis_Frame, dCamLookAtPoint_Frame] = ApplyAxisOffPointing(dCamLookAtPoint_Frame, ...
+                %                                                                             dReferenceAxis_Frame, ...
+                %                                                                            kwargs, ...
+                %                                                                            options)
+                % arguments
+                %     dCamLookAtPoint_Frame   (3,:) double {isvector, isnumeric}
+                %     dReferenceAxis_Frame    (3,:) double {isvector, isnumeric} = zeros(3,0)
+                % end
+                % arguments
+                %     kwargs.dDisplaceValue               (1,:) double {isvector, isnumeric} = 0; % Interpreted as angle or distance depending on enumDisplacementMode
+                %     options.enumDisplacementMethod      (1,1) string {mustBeMember(options.enumDisplacementMethod, ["lookAtPoint", "rotate3d"])} = "lookAtPoint";
+                %     options.dSigmaOffPointingDegAngle   (1,:) double {isscalar, isnumeric} = 0.0 % Sigma to scatter camera boresight in a random direction
+                %     options.dScaleDistOffPointing       (1,:) double {isscalar, isnumeric} = 0.0
+                %     options.enumOffPointingMode         (1,1) string {mustBeMember(options.enumOffPointingMode, ["randomAxis", "refAxisOutOfPlane", "refAxisInPlane"])} = "randomAxis";
+                % end
+
+                dCamBoresightZ_Frame = self.ApplyAxisOffPointing(dLookAtPointFromCam_Frame, ...
+                                                                 options.dReferenceAxis_Frame, ...
+                                                                 "enumDisplacementMethod", "rotate3d", ...
+                                                                 "dSigmaOffPointingDegAngle", options.dSigmaOffPointingDegAngle, ...
+                                                                 "enumOffPointingMode", options.enumOffPointingMode);
+
+                % Compute off-pointing half-cone angle
+                dOffPointingAngles = transpose(acosd(dot(dLookAtPointFromCam_Frame./vecnorm(dLookAtPointFromCam_Frame, 2, 1), dCamBoresightZ_Frame)));
+
+                charOffPoint = "+ off-pointing";
+            else
+                dOffPointingAngles = zeros(ui32NumOfEntries, 1);
             end
 
-            dCamDirX_Frame = cross(dAuxiliaryAxis, dCamBoresightZ_Frame, 1);
+            % Construct camera Y axis 
+            dCamDirY_Frame = self.DefineYaxisFromConstraint(dCameraPosition_Frame, ...
+                                                            dCamBoresightZ_Frame, ...
+                                                            "enumConstraintType", options.enumConstraintType, ...
+                                                            "dSunPosition_Frame", self.dSunPosition_Frame, ...
+                                                            "dVelocity_Frame", self.dVelocity_Frame, ...
+                                                            "dAuxiliaryAxis", self.dAuxiliaryAxis);
+                                                                        
+            % Rotate Y axis of scatter angles if not zero
+            if options.dSigmaDegRotAboutBoresight > 0
+
+                [dCamDirY_Frame] = self.ApplyRandomGuassianBoresightRoll(dCamBoresightZ_Frame, ...
+                                                                    dCamDirY_Frame, ...
+                                                                    options.dSigmaDegRotAboutBoresight);
+
+                charBoreRoll = "+ boresight roll";
+            end
+
+            % Complete frame enforcing right-handed triad constraint
+            dCamDirX_Frame = cross(dCamDirY_Frame, dCamBoresightZ_Frame, 1);
             dCamDirX_Frame = dCamDirX_Frame./vecnorm(dCamDirX_Frame, 2, 1);
-
-            % Camera Y axis (Left)
-            dCamDirY_Frame = cross(dCamBoresightZ_Frame, dCamDirX_Frame);
-            dCamDirY_Frame = dCamDirY_Frame./vecnorm(dCamDirY_Frame, 2, 1);
-
-            % Compute attitude rotation matrix
-            dDCM_FramefromCAM = zeros(3,3, ui32NumOfEntries, "double");
-
+        
+            % Assemble DCMs
+            dDCM_FrameFromPose = zeros(3, 3, ui32NumOfEntries, "double");
             for idx = 1:ui32NumOfEntries
-                dDCM_FramefromCAM(:,:, idx) = [dCamDirX_Frame(:, idx), dCamDirY_Frame(:, idx), dCamBoresightZ_Frame(:, idx)];
+                dDCM_FrameFromPose(:,:, idx) = [dCamDirX_Frame(:, idx), dCamDirY_Frame(:, idx), dCamBoresightZ_Frame(:, idx)];
             end
-            % Get Quaternion corresponding to the DCM
-            % dQuat_INfromCAM = self.DCM2quat_(i_dDCM_fromCAMtoIN, i_bIS_VSRPplus);
-            dOutRot3 = dDCM_FramefromCAM; % TEMPORARY
-            if options.enumOutRot3Param ~= EnumRotParams.DCM 
-                warning('Current version only supports EnumRotParams.DCM output parameterization.')
+
+            % Apply additional custom rotation if provided (e.g. to account for sensor poses)
+            if any( options.dDCM_displacedPoseFromPose ~= zeros(3,3, size(options.dDCM_displacedPoseFromPose, 3)) )
+                dDCM_FrameFromPose(:,:,:) = pagetranspose(pagemtimes(options.dDCM_displacedPoseFromPose, pagetranspose(dDCM_FrameFromPose)));
+            end
+
+            % Define output according to required parameterization TODO
+            switch options.enumOutRot3Param
+                case EnumRotParams.DCM
+                    % Copy only
+                    dOutRot3 = dDCM_FrameFromPose;
+
+                case EnumRotParams.MRP
+                    % Convert DCM to MRP % TODO
+                    error('Not implemented yet')
+                case EnumRotParams.QUAT_VSRPplus
+                    % Convert DCM to QUAT_VSRPplus (scalar last)
+                    dOutRot3 = DCM2quatSeq(dDCM_FrameFromPose, true);
+
+                case EnumRotParams.QUAT_SVRPplus
+                    % Convert DCM to QUAT_VSRPplus (scalar first)
+                    dOutRot3 = DCM2quatSeq(dDCM_FrameFromPose, false);
+
+                otherwise
+                    error('Invalid rotation parameterization. Please select one defined in EnumRotParams class.')
+            end
+
+
+            if self.bShowAttitudePointingPlot == true
+                
+                dSceneEntityDCM_RenderFrameFromOF = eye(3,3);
+                objSceneFig = 0;
+
+                % Construct figure with plot
+                for idE = ceil(linspace(1, double(ui32NumOfEntries), min(50, ui32NumOfEntries)))
+                    [objSceneFig] = PlotSceneFrames_DCM(dTargetPosition_Frame(:, idE), ...
+                                                        dSceneEntityDCM_RenderFrameFromOF, ...
+                                                        dCameraPosition_Frame(:, idE), ...
+                                                        dDCM_FrameFromPose(:,:,idE)', ...
+                                                        'bUseBlackBackground', true, ...
+                                                        "charFigTitle", sprintf("Attitude pointing generator output %s %s", charBoreRoll, charOffPoint), ...
+                                                        "objFig", objSceneFig, ...
+                                                        "bEnableLegend", false, ...
+                                                        "cellPlotColors", {"r", "g", "b", "w", "w", "w"});
+                end
             end
         end
 
-        % TODO
-        function self = pointToTarget_LVLH(self)
-            arguments
-                self
-            end
-            error('Not implemented yet')
-        end
-
+        % LEGACY FUNCTION (keep to prevent breaking codes)
         function [self, dOutRot3, dDCM_FrameFromPose] = pointToTarget_SunDirConstraint(self, ...
                                                                                     dCameraPosition_Frame, ...
                                                                                     dTargetPosition_Frame, ...
@@ -163,7 +246,6 @@ classdef CAttitudePointingGenerator < handle
                     'EnumRotParams')} = EnumRotParams.DCM
                 options.dDCM_displacedPoseFromPose      (3,3,:) double {ismatrix, isnumeric} = zeros(3) % Custom rotation to apply to the rotation
                 options.dSigmaDegRotAboutBoresight      (1,1)   double {isscalar, isnumeric} = 0.0 % Sigma to scatter camera pose around boresight
-                options.dSigmaOffPointingDegAlongSun       (1,1)   double {isscalar, isnumeric} = 0.0 % Sigma to scatter camera boresight along a direction pointing to Sun
             end
             arguments (Output)
                 self    
@@ -172,26 +254,16 @@ classdef CAttitudePointingGenerator < handle
             end
             
             ui32NumOfEntries = uint32(size(dCameraPosition_Frame, 2));
+            
+            % Perform input checks
             assert(ui32NumOfEntries == size(dTargetPosition_Frame, 2) || size(dTargetPosition_Frame, 2) == 1)
             assert(ui32NumOfEntries == size(dSunPosition_Frame, 2) || size(dSunPosition_Frame, 2) == 1)
-        
             assert( all(vecnorm(dSunPosition_Frame, 2, 1) ~= 0 ), "Invalid input data: Sun position cannot be zero.");
 
-            % Construct camera boresight
-            dCamBoresightZ_Frame = -(dCameraPosition_Frame./vecnorm(dCameraPosition_Frame, 2, 1));
-
-             
-            % Scatter boresight along Sun rays
-            if options.dSigmaOffPointingDegAlongSun > 0.0
-                [self, ~, dCamBoresightZ_Frame] = ComputeDisplacedBoresight(self, options.dSigmaOffPointingDegAlongSun, ...
-                                                                            dCameraPosition_Frame, ...
-                                                                            dSunPosition_Frame, ...
-                                                                            "dScaleSigma", dScaleSigma);
-
-            end
-
-
-
+            % Compute camera boresight from lookAt point
+            dLookAtPointFromCam_Frame = dTargetPosition_Frame - dCameraPosition_Frame;
+            dCamBoresightZ_Frame = -(dLookAtPointFromCam_Frame./vecnorm(dLookAtPointFromCam_Frame, 2, 1));
+            
             % Construct Y axis to satisfy Sun orthogonality constraint
             dCamPosFromSun_Frame = dSunPosition_Frame - dCameraPosition_Frame;
 
@@ -201,10 +273,9 @@ classdef CAttitudePointingGenerator < handle
             % Rotate Y axis of scatter angles if not zero
             if options.dSigmaDegRotAboutBoresight > 0
 
-                % Sample rotation angle in [rad]
-                assert(options.dSigmaDegRotAboutBoresight > 0, 'ERROR: a variance cannot be negative!');
-                dScatterBoresightAngle = deg2rad(options.dSigmaDegRotAboutBoresight) * randn(1, size(dCamBoresightZ_Frame, 2));
-                dCamDirY_Frame = Rot3dVecAboutDir(dCamBoresightZ_Frame, dCamDirY_Frame, dScatterBoresightAngle);
+                [dCamDirY_Frame] = self.ApplyRandomGuassianBoresightRoll(dCamBoresightZ_Frame, ...
+                                                                    dCamDirY_Frame, ...
+                                                                    options.dSigmaDegRotAboutBoresight);
 
             end
 
@@ -224,75 +295,23 @@ classdef CAttitudePointingGenerator < handle
                 dDCM_FrameFromPose(:,:,:) = pagetranspose(pagemtimes(options.dDCM_displacedPoseFromPose, pagetranspose(dDCM_FrameFromPose)));
             end
 
-            dOutRot3 = dDCM_FrameFromPose; % TEMPORARY
-
+            dOutRot3 = dDCM_FrameFromPose; 
             if options.enumOutRot3Param ~= EnumRotParams.DCM
                 warning('Current version only supports EnumRotParams.DCM output parameterization.')
             end
-
-            % i_dq_TFfromIN             = zeros(ui32nPoses, 4);
-            % i_dq_CAMfromIN_forBlender = zeros(ui32nPoses, 4);
-            % 
-            % for idP = 1:ui32nPoses
-            % 
-            %     i_dDCM_TFfromIN(:, :, idP) = transpose(dDCM_Target_INfromTB(:,:, idP));
-            %     % Matix is built like [Xrow; Yrow; Zrow] where the axes are the cameras ones in Inertial
-            %     dDCM_CAMfromIN(:,:, idP) = [dCamDirX_Frame(idP, :); dCamDirY_Frame(idP, :); dCamBoresightZ_Frame(idP, :)];
-
-                % Construct attitude quaternion for Blender
-
-                % Generate quaternion as required by Blender
-                % i_bQUAT2BLENDER = true;
-                % bINVERSE_Z_AXIS = true;
-                % i_bIS_JPL_CONV = false;
-                % i_dq_CAMfromIN_forBlender(idP, :) = simulateTBpointing_PosOnly(dZaxisCam_IN(:, idP), i_drTargetBody_IN(idP, :), ...
-                %     i_bIS_JPL_CONV, bINVERSE_Z_AXIS, i_bQUAT2BLENDER);
-                % dXdir_IN = i_dDCM_CAMfromIN(1, :, idT);
-                % dYdir_IN = i_dDCM_CAMfromIN(2, :, idT);
-                % dZdir_IN = i_dDCM_CAMfromIN(3, :, idT);
-
-            %     dDCM_tmp_forBlender(:,:, idP) = [-dCamDirX_Frame(idP, :); dCamDirY_Frame(idP, :); -dCamBoresightZ_Frame(idP, :)]; %#ok<SAGROW>
-            % 
-            %     i_dq_CAMfromIN_forBlender(idP, :) = DCM2quat(dDCM_tmp_forBlender(:,:, idP), false);
-            % 
-            %     % Convert to attitude quaternion through attitude matrix
-            %     i_dq_TFfromIN(idP, :) = DCM2quat(i_dDCM_TFfromIN(:,:,idP), false);
-            % 
-            % end
-
-
         end
-
-        % TODO
-        function self = setGeneratorState(self)
-            arguments
-                self
-            end
-            error('Not implemented yet')
-
-        end
-        
-        % TODO
-        function self = printGeneratorState(self)
-           arguments
-                self
-            end
-            error('Not implemented yet')
-
-        end
-
     end
 
     methods (Static, Access = public)
-
-        function [dCamDirY_Frame] = RandomGuassianBoresightRoll(dCamBoresightZ_Frame, ...
-                                                                dCamDirY_Frame, ...
-                                                                dSigmaDegRotAboutBoresight)
+        function [dCamDirY_Frame] = ApplyRandomGuassianBoresightRoll(dCamBoresightZ_Frame, ...
+                                                                    dCamDirY_Frame, ...
+                                                                    dSigmaDegRotAboutBoresight)
             arguments
                 dCamBoresightZ_Frame 
                 dCamDirY_Frame 
                 dSigmaDegRotAboutBoresight 
             end
+            % Sampling functions for boresight roll
 
                 % Sample rotation angle in [rad]
                 assert(dSigmaDegRotAboutBoresight > 0, 'ERROR: a variance cannot be negative!');
@@ -300,56 +319,161 @@ classdef CAttitudePointingGenerator < handle
                 dCamDirY_Frame = Rot3dVecAboutDir(dCamBoresightZ_Frame, dCamDirY_Frame, dScatterBoresightAngle);
         end
 
-        % TODO implement by moving class methods here and leaving only the call there.
-        % Static methods implementations (called by instance methods)
-        function [dOutRot3, dDCM_FrameFromCAM] = pointToTargetStatic_SunDirConstraint(dCameraPosition_Frame, ...
-            dTargetPosition_Frame, ...
-            dSunPosition_Frame, ...
-            options)
 
-        end
-
-        function [] = pointToTargetStatic_LVLH()
-            arguments
-                
+        function [dCamDirY_Frame] = DefineYaxisFromConstraint(dCameraPosition_Frame, dCamBoresightZ_Frame, kwargs, options)
+            arguments (Input)
+                dCameraPosition_Frame (3, :) double {ismatrix, isnumeric}
+                dCamBoresightZ_Frame  (3, :) double {ismatrix, isnumeric}
             end
-            error('Not implemented yet')
+            arguments (Input)
+                kwargs.dSunPosition_Frame   (3, :) double = zeros(3,1);
+                kwargs.dVelocity_Frame      (3, :) double = zeros(3,1);
+                kwargs.dAuxiliaryAxis       (3, :) double = zeros(3,1);
+            end
+            arguments (Input)
+                options.enumConstraintType      (1,:) string {mustBeMember(options.enumConstraintType, ["YorthogonalSun", "trackLVLH", "auxiliaryAxis"])} = "YorthogonalSun"
+            end
+            % Function defining the Y axis of the camera frame according to the constraint mode
+
+            switch options.enumConstraintType
+                case "YorthogonalSun"
+                    assert( all(vecnorm(kwargs.dSunPosition_Frame, 2, 1) ~= 0 ), "Invalid input data: Sun position cannot be zero for YorthogonalSun contraint type." );
+
+                    % Construct Y axis to satisfy Sun orthogonality constraint
+                    dCamPosFromSun_Frame = kwargs.dSunPosition_Frame - dCameraPosition_Frame;
+                    dCamDirY_Frame = cross(dCamBoresightZ_Frame, dCamPosFromSun_Frame./vecnorm(dCamPosFromSun_Frame, 2, 1), 1);
+                    dCamDirY_Frame = dCamDirY_Frame./vecnorm(dCamDirY_Frame, 2, 1);
+                    return
+
+                case "trackLVLH"
+                    assert( all(vecnorm(kwargs.dVelocity_Frame, 2, 1) ~= 0 ), "Invalid input data: velocity vectors cannot be zero for trackLVLH contraint type." );
+                    % Construct Y axis to satisfy trackLVLH constraint (+X along velocity)
+                    dCamDirY_Frame = cross(dCamBoresightZ_Frame, kwargs.dVelocity_Frame./vecnorm(kwargs.dVelocity_Frame, 2, 1), 1);
+                    dCamDirY_Frame = dCamDirY_Frame./vecnorm(dCamDirY_Frame, 2, 1);
+                    return
+
+                case "auxiliaryAxis"
+                    assert( all(vecnorm(kwargs.dAuxiliaryAxis, 2, 1) ~= 0 ), "Invalid input data: auxiliary axis cannot be zero for auxiliaryAxis contraint type." );
+                    % Construct Y axis to satisfy auxiliary axis constraint (+X axis)
+                    dCamDirY_Frame = cross(dCamBoresightZ_Frame, dCameraPosition_Frame.dAuxiliaryAxis./vecnorm(dCameraPosition_Frame.dAuxiliaryAxis, 2, 1), 1);
+                    dCamDirY_Frame = dCamDirY_Frame./vecnorm(dCamDirY_Frame, 2, 1);
+                    return
+            end
         end
 
-        function [dOutRot3, dDCM_FrameFromCAM] = pointToTargetStatic_positionOnly(dCameraPosition_Frame, ...
-                dTargetPosition_Frame, ...
-                dSunPosition_Frame, ...
-                options)
-            error('Not implemented yet')
 
-        end
-
-        % Auxiliary functions
-        function [dCameraPositionToPoint_Frame, dCamBoresightUnitVec_Frame] = ComputeDisplacedBoresight(dLookAtPoint_Frame, ...
-                                                                                                        dRefPoint_Frame, ...
-                                                                                                        dReferenceDistance, ...
-                                                                                                        settings)
+        function [dCamBoresightAxis_Frame, dCamLookAtPoint_Frame] = ApplyAxisOffPointing(dCamLookAtPoint_Frame, ...
+                                                                                        dReferenceAxis_Frame, ...
+                                                                                        kwargs,...
+                                                                                        options)
             arguments
-                dLookAtPoint_Frame  (3,:) double {isvector, isnumeric}
-                dRefPoint_Frame         (3,:) double {isvector, isnumeric} 
-                dReferenceDistance      (1,:) double {isnumeric} = 0;
+                dCamLookAtPoint_Frame   (3,:) double {ismatrix, isnumeric}
+                dReferenceAxis_Frame    (3,:) double {ismatrix, isnumeric} = zeros(3,0)
             end
             arguments
-                settings.enumDisplacementMode (1,1) string {mustBeMember(settings.enumDisplacementMode, ["lookAtPoint", "rotate3d"])} = "lookAtPoint";
-                settings.dScaleSigma    (1,:) double {mustBeGreaterThan(settings.dScaleSigma, 0)} = 0;
+                kwargs.dDisplaceOffsetValue         (1,:) double {isscalar, isnumeric} = 0.0 % "Deterministic" offset
+                options.enumDisplacementMethod      (1,1) string {mustBeMember(options.enumDisplacementMethod, ["lookAtPoint", "rotate3d"])} = "lookAtPoint";
+                options.dSigmaOffPointingDegAngle   (1,:) double {isscalar, isnumeric} = 0.0 % Sigma to scatter camera boresight in a random direction
+                options.dScaleDistOffPointing       (1,:) double {isscalar, isnumeric} = 0.0
+                options.enumOffPointingMode         (1,1) string {mustBeMember(options.enumOffPointingMode, ["randomAxis", "refAxisOutOfPlane", "refAxisInPlane"])} = "randomAxis";
+            end
+            
+            % Verify inputs
+            bConditionAngle = any(options.dSigmaOffPointingDegAngle > 0);
+            bConditionScale = any(options.dScaleDistOffPointing > 0);
+           
+            % Compute default outputs
+            dCamBoresightAxis_Frame = dCamLookAtPoint_Frame./vecnorm(dCamLookAtPoint_Frame, 2, 1);
+
+            if strcmpi(options.enumDisplacementMethod, "lookAtPoint") && ( max( abs(options.dScaleDistOffPointing) ) - min(vecnorm(dCamLookAtPoint_Frame, 2, 1) ) > 1e-2 ) 
+                warning("Displacement method is lookAtPoint, but dScaleDistOffPointing and dCamLookAtPoint_Frame are similar in magnitude. This may be unintended and will cause large off-pointing values!");
+            end
+
+            if not(bConditionAngle || bConditionScale)
+                warning('No applied off-pointing: dSigmaOffPointingDegAngle and dScaleDistOffPointing both set to zero value.')
+                return
+            end
+
+            % Check if both provided, override to angle by default
+            if bConditionAngle && bConditionScale
+                warning('Both dSigmaOffPointingDegAngle and dScaleDistOffPointing provided: using dSigmaOffPointingDegAngle by default.')
+                bConditionAngle = true;
+                options.enumDisplacementMethod = "rotate3d";
+            end
+
+            if bConditionAngle % Generate off-pointing from angle
+                options.enumDisplacementMethod = "rotate3d";
+                dDisplaceSigma = deg2rad(options.dSigmaOffPointingDegAngle);
+
+            else % Generate of-pointing from reference distance
+                options.enumDisplacementMethod = "lookAtPoint";
+                dDisplaceSigma = options.dScaleDistOffPointing;
+
+            end
+
+            if strcmpi(options.enumOffPointingMode, "randomAxis")
+                dReferenceAxis_Frame = randn(3,size(dCamLookAtPoint_Frame, 2)); % Default is random axis
+                dReferenceAxis_Frame = dReferenceAxis_Frame./vecnorm(dReferenceAxis_Frame, 2, 1);
+            else
+                assert(size(dReferenceAxis_Frame, 2) >= 1, 'ERROR: reference axes must be provided for "refAxisOutOfPlane", "refAxisInPlane" off-pointing modes')
+            end
+
+            % Compute displaced boresight axis
+            [dCamBoresightAxis_Frame(1:3, :), dCamLookAtPoint_Frame(1:3,:)] = CAttitudePointingGenerator.ComputeDisplacedBoresight(dCamLookAtPoint_Frame, ...
+                                                                                                    dReferenceAxis_Frame, ...
+                                                                                                    kwargs.dDisplaceOffsetValue, ...
+                                                                                                    "dDisplaceSigma", dDisplaceSigma, ...
+                                                                                                    "enumDisplacementMode", options.enumDisplacementMethod);
+
+
+
+
+        end
+
+        function [dBoresightUnitVec_Frame, dNewLookAtPoint_Frame] = ComputeDisplacedBoresight(dLookAtPoint_Frame, ...
+                                                                                                dReferenceAxis_Frame, ...
+                                                                                                dDisplaceValue, ...
+                                                                                                settings)
+            arguments
+                dLookAtPoint_Frame      (3,:) double {isvector, isnumeric}
+                dReferenceAxis_Frame    (3,:) double {isvector, isnumeric} = randn(3,size(dLookAtPoint_Frame, 2)); % Default is random axis
+                dDisplaceValue          (1,:) double {isvector, isnumeric} = 0; % Interpreted as angle or distance depending on enumDisplacementMode
+            end
+            arguments
+                settings.enumDisplacementMode               (1,1) string {mustBeMember(settings.enumDisplacementMode, ["lookAtPoint", "rotate3d"])} = "lookAtPoint";
+                settings.dDisplaceSigma                     (1,1) double {mustBeGreaterThanOrEqual(settings.dDisplaceSigma, 0)} = 0;
+                settings.bDisplaceOrthogonalToRefAxisPlane  (1,1) logical {islogical, isscalar} = false
+                settings.enumDisplaceDistribution           (1,:) string {mustBeMember(settings.enumDisplaceDistribution, ["uniform", "gaussian", "time_correlation"])} = "gaussian";
             end
             %% SIGNATURE
+            % [dCamBoresightUnitVec_Frame, dNewLookAtPoint_Frame] = ComputeDisplacedBoresight(dLookAtPoint_Frame, ...
+            %                                                                                     dReferenceAxis_Frame, ...
+            %                                                                                     dDisplaceValue, ...
+            %                                                                                     settings)
             % -------------------------------------------------------------------------------------------------------------
             %% DESCRIPTION
             % TODO
             % -------------------------------------------------------------------------------------------------------------
             %% INPUT
+            % arguments
+            %     dLookAtPoint_Frame      (3,:) double {isvector, isnumeric}
+            %     dReferenceAxis_Frame    (3,:) double {isvector, isnumeric} = randn(3,size(dLookAtPoint_Frame, 2)); % Default is random axis
+            %     dDisplaceValue          (1,:) double {isvector, isnumeric} = 0; % Interpreted as angle or distance depending on enumDisplacementMode
+            % end
+            % arguments
+            %     settings.enumDisplacementMode               (1,1) string {mustBeMember(settings.enumDisplacementMode, ["lookAtPoint", "rotate3d"])} = "lookAtPoint";
+            %     settings.dDisplaceSigma                     (1,1) double {mustBeGreaterThanOrEqual(settings.dDisplaceSigma, 0)} = 0;
+            %     settings.bDisplaceOrthogonalToRefAxisPlane  (1,1) logical {islogical, isscalar} = false
+            %     settings.enumDisplaceDistribution           (1,:) string {mustBeMember(settings.enumDisplaceDistribution, ["uniform", "gaussian"])} = "gaussian";
+            % end
             % -------------------------------------------------------------------------------------------------------------
             %% OUTPUT
+            % dBoresightUnitVec_Frame
+            % dNewLookAtPoint_Frame
             % -------------------------------------------------------------------------------------------------------------
             %% CHANGELOG
             % 21-03-2025    Pietro Califano     Implement from previous function code, update for vect.
-            % 22-03-2025    Pietro Califano     Major reworking, provide implementation for two displacement modes
+            % 22-03-2025    Pietro Califano     [MAJOR] Reworking, provide implementation for two displacement modes
             % -------------------------------------------------------------------------------------------------------------
             %% DEPENDENCIES
             % [-]
@@ -359,110 +483,148 @@ classdef CAttitudePointingGenerator < handle
             % -------------------------------------------------------------------------------------------------------------
             %% Function code
             ui32NumOfSamples = size(dLookAtPoint_Frame, 2);
-            assert( length(settings.dScaleSigma) == 1 || length(settings.dScaleSigma) == ui32NumOfSamples);
+            assert( length(settings.dDisplaceSigma) == 1 || length(settings.dDisplaceSigma) == ui32NumOfSamples);
+            assert( length(dDisplaceValue) == 1 || length(dDisplaceValue) == ui32NumOfSamples);
+
+            dBoresightUnitVec_Frame = zeros(3, ui32NumOfSamples);
+            dNewLookAtPoint_Frame   = zeros(3, ui32NumOfSamples);
             
+            % Ensure reference axis are unit vectors
+            dReferenceAxis_Frame = dReferenceAxis_Frame./vecnorm(dReferenceAxis_Frame, 2, 1);
+
+            % Apply randomization of displacement value (angle or distance)
+            if settings.dDisplaceSigma > 0
+            
+                switch settings.enumDisplaceDistribution
+
+                    case "gaussian"
+                        % Sample Gaussian distribution
+                        dDisplaceValue = dDisplaceValue + settings.dDisplaceSigma .* randn(1, ui32NumOfSamples);
+                    case "uniform"
+                        % Compute uniform distribution interval and sample
+                        dUniformRange = 0.5 * sqrt( 12 * (settings.dDisplaceSigma).^2 );
+                        dInterval = [-dUniformRange, dUniformRange]; 
+                        dDisplaceValue = dDisplaceValue + uniformScatter(dInterval(1), dInterval(2), ui32NumOfSamples);
+                    case "time_correlation"
+                        error('Not implemented yet')
+                        % Run simulation of FOGM stochastic process dynamics
+                        % TODO
+                    otherwise
+                        error('Invalid or not yet implemented case.')
+                end
+
+            end
+
+            % Quick return case (do nothing!)
+            if all(settings.dDisplaceSigma == 0) && all(settings.dDisplaceValue == 0)
+                warning('No displacement or displacement scattering was provided: no displacement applied, returning input values.')
+                return
+            end
+
+
+            % Apply displacement using selected displacement mode
             switch settings.enumDisplacementMode
                 case "lookAtPoint"
-                    [dCameraPositionToPoint_Frame, dCamBoresightUnitVec_Frame] = CAttitudePointingGenerator.ComputeDisplacedBoresight_LookAtPoint_(dLookAtPoint_Frame, ...
-                                                                                                                                                    dRefPoint_Frame, ...
-                                                                                                                                                    dReferenceDistance, ...
-                                                                                                                                                    settings);
+                    [dBoresightUnitVec_Frame(1:3,:), dNewLookAtPoint_Frame(1:3,:)] = CAttitudePointingGenerator.ComputeDisplacedBoresight_LookAtPoint_(dLookAtPoint_Frame, ...
+                                                                                                                                    dReferenceAxis_Frame, ...
+                                                                                                                                    dDisplaceValue, ...
+                                                                                                                                    "bDisplaceOrthogonalToRefAxisPlane", settings.bDisplaceOrthogonalToRefAxisPlane);
                 case "rotate3d"
-                    [dCameraPositionToPoint_Frame, dCamBoresightUnitVec_Frame] = CAttitudePointingGenerator.ComputeDisplacedBoresight_Rotate3D_(dReferenceRotAxis, ...
-                                                                                                                                                dReferenceDistance, ...
-                                                                                                                                                settings);
+                     [dBoresightUnitVec_Frame(1:3,:)] = CAttitudePointingGenerator.ComputeDisplacedBoresight_Rotate3D_(dLookAtPoint_Frame, ...
+                                                                                                                    dReferenceAxis_Frame, ...
+                                                                                                                    dDisplaceValue, ...
+                                                                                                                    "bDisplaceOrthogonalToRefAxisPlane", settings.bDisplaceOrthogonalToRefAxisPlane);
                 otherwise
                     error('Invalid displacement mode.')
             end
 
-            dDeltaDir = zeros(3, ui32NumOfSamples);
 
-            % Compute direction delta unit vector
-            % TODO: verify whether the commented code is functionally equivalent
-            % dDeltaDir(1:3) = dot(dCameraPosition_Frame, dCameraPosition_Frame) * dSunPosition_Frame ...
-            %                 - dot(dCameraPosition_Frame, dSunPosition_Frame) * dCameraPosition_Frame;
-            %
-            % dDeltaDir(1:3) = dDeltaDir./norm(dDeltaDir); % Displacement along a perpendicular to position vector in the plane defined by this and the sun directions
+        end
 
-            % Direction orthogonal to camera position and Sun position plane
-            dRefPointNorms  = vecnorm(dRefPoint_Frame, 2, 1);
-            dBoresightNorms = vecnorm(dLookAtPoint_Frame, 2, 1);
-
-            dAuxDir1 = cross(dRefPoint_Frame./dRefPointNorms, -dLookAtPoint_Frame./dBoresightNorms, 1);
-            dAuxDir1 = dAuxDir1./vecnorm(dAuxDir1, 2, 1);
-
-            % Direction orthogonal to plane formed by camera position and AuxDir1, toward the Sun
-            dDeltaDir(:, :) = cross(-dLookAtPoint_Frame./dBoresightNorms, dAuxDir1, 1);
-            dDeltaDir(:, :) = dDeltaDir./vecnorm(dDeltaDir, 2, 1);
-
-            % Set scale of change
-            if any(settings.dScaleSigma > 0)
-                dScaleScatterValue = settings.dScaleSigma .* randn(1, ui32NumOfSamples);
-            else
-                dScaleScatterValue = 0;
+        function [dNewLookAtPoint, dLookAtPointUnitVec] = ComputeDisplacedBoresight_LookAtPoint_(dLookAtPoint, dReferenceAxis, dDisplacementNorms, options)
+            arguments
+                dLookAtPoint        (3,:) double {ismatrix, isnumeric}
+                dReferenceAxis      (3,:) double {ismatrix, isnumeric}
+                dDisplacementNorms  (1,:) double {isvector, isnumeric} 
+                options.bDisplaceOrthogonalToRefAxisPlane (1,1) logical {islogical, isscalar} = false
             end
+            
+            % Compute directions from dLookAtPoint
+            dLookAtPointNorms   = vecnorm(dLookAtPoint, 2, 1);
+            dLookAtPointUnitVec = dLookAtPoint./dLookAtPointNorms;
+            
+            ui32NumOfSamples = length(dLookAtPointNorms);
+            dDisplaceUnitVec = zeros(3, ui32NumOfSamples);
 
-            % Compute displacement scale and add random coefficient to randomize pointing "across" the limb
-            dScaleModulus = dReferenceDistance + dScaleScatterValue;
+            if options.bDisplaceOrthogonalToRefAxisPlane
+                %% Displace in-plane toward reference axis direction
 
-            % Compute new camera position in Frame from look_at point
-            dCameraPositionToPoint_Frame = dLookAtPoint_Frame - (dScaleModulus .* dDeltaDir);
+                % Compute component of dReferenceAxis orthogonal to dLookAtPointUnitVec, in plane
+                dDisplaceUnitVec(:,:) = dReferenceAxis - dot(dLookAtPointUnitVec, dReferenceAxis, 1) * dLookAtPointUnitVec; 
+
+            else
+                %% Displace orthogonal to plane of reference axis and lookAtPoint
+
+                % Compute component of dReferenceAxis orthogonal to dLookAtPointUnitVec, orthogonal to plane
+                dDisplaceUnitVec(:,:) = cross(dReferenceAxis, dLookAtPointUnitVec, 1);
+
+            end
+        
+            % Normalize to unit vector
+            dDisplaceUnitVec = dDisplaceUnitVec./vecnorm(dDisplaceUnitVec, 2, 1);
+
+            % Compute new lookAtPoint in Frame 
+            dNewLookAtPoint = dLookAtPoint - (dDisplacementNorms .* dDisplaceUnitVec);
 
             if nargout > 1
-                dCamBoresightUnitVec_Frame = dCameraPositionToPoint_Frame./vecnorm(dCameraPositionToPoint_Frame, 2, 1);
+                dLookAtPointUnitVec = dNewLookAtPoint./vecnorm(dNewLookAtPoint, 2, 1);
             end
-
-
 
         end
 
-
-
-        % TODO
-        function [] = plot3DtrajectoryAndBoresight()
+        function [dBoresightUnitVec_Frame] = ComputeDisplacedBoresight_Rotate3D_(dBoresightVector, dReferenceAxis, dRotDisplaceAngle, options)
             arguments
-
+                dBoresightVector                            (3,:) double {ismatrix, isnumeric}
+                dReferenceAxis                              (3,:) double {ismatrix, isnumeric}
+                dRotDisplaceAngle                           (1,:) double {isvector, isnumeric}
+                options.bDisplaceOrthogonalToRefAxisPlane   (1,1) logical {islogical, isscalar} = false
             end
-            disp('Not implemented yet')
-            % title('Camera positions, boresights and Sun directions')
+
+            % Compute directions from dLookAtPoint
+            dAuxNorms               = vecnorm(dBoresightVector, 2, 1);
+            dBoresightUnitVec_Frame = dBoresightVector./dAuxNorms;
+
+            ui32NumOfSamples = length(dAuxNorms);
+            dRotationAxisUnitVec = zeros(3, ui32NumOfSamples);
+
+            if options.bDisplaceOrthogonalToRefAxisPlane
+                %% Displace in-plane toward reference axis direction
+                % Rotation axis is orthogonal to plane containing reference axis and dBoresightUnitVec_Frame
+                dRotationAxisUnitVec(1:3, :) = cross(dReferenceAxis, dBoresightUnitVec_Frame, 1);
+                    
+            else
+                %% Displace orthogonal to plane of reference axis and lookAtPoint
+                % Rotation axis is orthogonal component of dReferenceAxis (automatically used by rotation
+                % function based on Rodrigues' formula)
+                dRotationAxisUnitVec(1:3, :) = dReferenceAxis;
+            end
+
+            % Normalize to unit vector
+            dRotationAxisUnitVec = dRotationAxisUnitVec./vecnorm(dRotationAxisUnitVec, 2, 1);
+
+            % Rotate boresight vector about dRotationAxisUnitVec
+            dBoresightUnitVec_Frame = Rot3dVecAboutDir(dRotationAxisUnitVec, dBoresightUnitVec_Frame, dRotDisplaceAngle);
+            
+
         end
+
     end
 
     methods (Access = protected)
         % METHODS
-        % TODO
-        function [self, dCameraPositionToPoint_Frame, dCamBoresight_Frame] = ComputeDisplacedBoresight_(self, ...
-                dCameraPosition_Frame, ...
-                dSunPosition_Frame, ...
-                dReferenceDistance, ...
-                settings)
-            arguments
-                self
-                dCameraPosition_Frame (3,1) double {isvector} % Defaults in self
-                dSunPosition_Frame    (3,1) double {isvector}
-                dReferenceDistance    (1,1) double {isscalar}
-            end
-            arguments
-                settings.dScaleSigma (1,1) double {isscalar, mustBeGreaterThan(settings.dScaleSigma, 0)} = 0;
-            end
-
-                        error('Not implemented yet')
-
-        end
     
-    
-        % Internal implementation (temporary)
-        function dq_INfromCAM = DCM2quat_(self, i_dDCM_fromCAMtoIN, i_bIS_VSRPplus)
-            arguments
-                self
-                i_dDCM_fromCAMtoIN
-                i_bIS_VSRPplus
-
-            end
-
-        end
-
-        % Sanity checks internal functions
+   
+        % Sanity checks internal functions %TODO
         function [] = assertPositionValidity(self)
             arguments
                 self

@@ -1,13 +1,13 @@
-function [objFig, cellFramesAxesGlobal] = PlotSceneFrames_Quat(dSceneEntityOriginArray_RenderFrame, ...
-                                                            dSceneEntityQuatArray_RenderFrameFromTF, ...
+function [objFig, cellFramesAxesGlobal] = PlotSceneFrames_DCM(dSceneEntityOriginArray_RenderFrame, ...
+                                                            dSceneEntityDCMarray_RenderFrameFromTF, ...
                                                             dCameraOrigin_RenderFrame, ...
-                                                            dCameraQuat_RenderFrameFromCam, ...
+                                                            dCameraDCM_RenderFrameFromCam, ...
                                                             kwargs)
 arguments
     dSceneEntityOriginArray_RenderFrame     (3,:) double {ismatrix, isnumeric}
-    dSceneEntityQuatArray_RenderFrameFromTF (4,:) double {ismatrix, isnumeric}
+    dSceneEntityDCMarray_RenderFrameFromTF  (3,3,:) double {ismatrix, isnumeric}
     dCameraOrigin_RenderFrame               (3,1) double {ismatrix, isnumeric}
-    dCameraQuat_RenderFrameFromCam          (4,1) double {ismatrix, isnumeric} 
+    dCameraDCM_RenderFrameFromCam           (3,3,:) double {ismatrix, isnumeric}
 end
 arguments
     kwargs.cellPlotColors       (1,:) cell = {};
@@ -36,15 +36,15 @@ end
 % The function support names and colours assignment following the "rule of zero" like in C++, that is,
 % either you specify all names/colours or let the function decide them for you automagically. Colours of
 % cameras axes are always R-G-B, while scene objects are randomized using hsv and randperm. 
-% Input data are the camera origin/quaternion in a generic RenderFrame. Similarly, an array of scene objects
+% Input data are the camera origin/DCM in a generic RenderFrame. Similarly, an array of scene objects
 % can be provided (any number). Background can optionally be set to black.
 % -------------------------------------------------------------------------------------------------------------
 %% INPUT
 % arguments
 %     dSceneEntityOriginArray_RenderFrame     (3,:) double {ismatrix, isnumeric}
-%     dSceneEntityQuatArray_RenderFrameFromTF (4,:) double {ismatrix, isnumeric}
+%     dSceneEntityDCMarray_RenderFrameFromTF  (3,3,:) double {ismatrix, isnumeric}
 %     dCameraOrigin_RenderFrame               (3,1) double {ismatrix, isnumeric}
-%     dCameraQuat_RenderFrameFromCam          (4,1) double {ismatrix, isnumeric} 
+%     dCameraDCM_RenderFrameFromCam           (3,3,:) double {ismatrix, isnumeric}
 % end
 % arguments
 %     kwargs.cellPlotColors       (1,:) cell = {};
@@ -53,14 +53,15 @@ end
 %     kwargs.objFig               (1,1) {isscalar, mustBeA(kwargs.objFig, ["double", "matlab.ui.Figure"])} = 0;
 %     kwargs.bUseBlackBackground  (1,1) logical {islogical, isscalar} = false;
 %     kwargs.bEnableLegend        (1,1) logical {isscalar, islogical} = true;
-%     kwargs.dAxisScale           (1,1) double {isscalar, isnumeric} = 1.0          
+%     kwargs.dAxisScale           (1,1) double {isscalar, isnumeric} = 1.0     
+%     kwargs.bUsePhysicalPosition (1,1) logical {islogical, isscalar} = false;
 % end
 % -------------------------------------------------------------------------------------------------------------
 %% OUTPUT
 % objFig               (1,1) {isscalar, mustBeA(kwargs.objFig, ["double", "matlab.ui.Figure"])} = gcf;
 % -------------------------------------------------------------------------------------------------------------
 %% CHANGELOG
-% 08-02-2025    Pietro Califano     First version implemented adapting RCS-1 PlotPairPQ1 (major upgrade)
+% 22-02-2025    Pietro Califano     Implemented by modifying interface of PlotSceneFrames_Quat
 % -------------------------------------------------------------------------------------------------------------
 %% DEPENDENCIES
 % [-]
@@ -74,10 +75,6 @@ end
 
 % Heuristic coefficient to scale camera position
 dScaleCoeff = 2 * kwargs.dAxisScale;
-
-% Ensure quaternions are normalized
-dSceneEntityQuatArray_RenderFrameFromTF = dSceneEntityQuatArray_RenderFrameFromTF./norm(dSceneEntityQuatArray_RenderFrameFromTF);
-dCameraQuat_RenderFrameFromCam = dCameraQuat_RenderFrameFromCam./norm(dCameraQuat_RenderFrameFromCam);
 
 % Normalize scale for visualization
 if not(all(dSceneEntityOriginArray_RenderFrame == 0)) % Normalize positions of bodies to unity
@@ -157,10 +154,8 @@ else
 end
 
 % Plot camera frame
-dCamDCM_RenderFrameFromCam          = quat2rotm(dCameraQuat_RenderFrameFromCam');
-
 [cellCameraAxes, dCamBoresightaxisVec] = PlotFrameFromDCM(dCameraOrigin_RenderFrame, ...
-                                                           dCamDCM_RenderFrameFromCam, ...
+                                                           dCameraDCM_RenderFrameFromCam, ...
                                                            kwargs.cellPlotColors(1:3), ...
                                                            kwargs.cellPlotNames(1:3), ...
                                                            objFig, ...
@@ -190,12 +185,9 @@ ui32EntityPtr = 4;
 
 for idE = 1:dNumOfEntities
 
-    % Convert quaternions to rotation matrices
-    dSceneEntityDCM_RenderFrameFromTF   = quat2rotm(dSceneEntityQuatArray_RenderFrameFromTF(:, idE)');
-
     % Plot idE frame
     [cellFrameAxes] = PlotFrameFromDCM(dSceneEntityOriginArray_RenderFrame(:, idE), ...
-                                       dSceneEntityDCM_RenderFrameFromTF, ...
+                                       dSceneEntityDCMarray_RenderFrameFromTF(:,:, idE), ...
                                        kwargs.cellPlotColors(ui32EntityPtr:ui32EntityPtr+2), ...
                                        kwargs.cellPlotNames(ui32EntityPtr:ui32EntityPtr+2), ...
                                        objFig, ...
