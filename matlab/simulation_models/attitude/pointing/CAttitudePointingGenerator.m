@@ -7,12 +7,6 @@ classdef CAttitudePointingGenerator < handle
     % 12-02-2025    Pietro Califano     Update of class to add Sun position as input and static methods
     % 22-03-2025    Pietro Califano     [MAJOR] Upgrade class usage with new general-purpose methods
     % -------------------------------------------------------------------------------------------------------------
-    %% METHODS
-    % Method1: Description
-    % -------------------------------------------------------------------------------------------------------------
-    %% PROPERTIES
-    % Property1: Description, dtype, nominal size
-    % -------------------------------------------------------------------------------------------------------------
     %% DEPENDENCIES
     % [-]
     % -------------------------------------------------------------------------------------------------------------
@@ -30,7 +24,6 @@ classdef CAttitudePointingGenerator < handle
 
         % bInvertZaxisForBlender    = false;
         bShowAttitudePointingPlot = false;
-        bVerbose                  = false;
     end
 
 
@@ -53,7 +46,6 @@ classdef CAttitudePointingGenerator < handle
             self.dCameraPosition_Frame      = dCameraPosition_Frame;
             self.dTargetPosition_Frame      = dTargetPosition_Frame;
             self.dSunPosition_Frame         = dSunPosition_Frame;
-            self.bVerbose                   = options.bVerbose;
             self.bShowAttitudePointingPlot  = options.bShowAttitudePointingPlot;
 
             % self.bInvertZaxisForBlender = options.bInvertZaxisForBlender;
