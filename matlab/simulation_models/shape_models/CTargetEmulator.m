@@ -215,6 +215,10 @@ classdef CTargetEmulator < CSceneObject
         
         % PUBLIC METHODS
         function [self, dPointsPositionsGT_TB, i32LandmarksID] = GenerateSimulatedPoints_TB(self, enumPointGTsamplingMethod)
+            arguments
+                self
+                enumPointGTsamplingMethod (1,1) EnumPointGTsamplingMethod = EnumPointGTsamplingMethod.PICK_UNIFORM_RANDOM_ID
+            end
             % DEVNOTE: deprecated GenerateSimulatedPoints_TB method currently kept for legacy reasons
             [self, dPointsPositionsGT_TB, i32LandmarksID] = SampleMeshPoints(self, enumPointGTsamplingMethod);
         end
@@ -242,7 +246,9 @@ classdef CTargetEmulator < CSceneObject
             if self.ui32NumOfPointsGT > 0 && bREUSE_FLAG == false
                 
                 % Generate landmarks in target fixed frame
-                [dAllPointsPositionsGT_TB] = generateLandmarksMap(self.objShapeModel.getShapeStruct(), self.ui32NumOfPointsGT);
+
+                strShapeStruct = self.objShapeModel.getShapeStruct();
+                [dAllPointsPositionsGT_TB] = generateLandmarksMap(strShapeStruct, min(self.ui32NumOfPointsGT, size(strShapeStruct.dVerticesPos, 2)) );
 
                 self.dPointsPositionsGT_TB = dAllPointsPositionsGT_TB(2:4, :);
                 self.i32LandmarksID = int32(dAllPointsPositionsGT_TB(1, :));

@@ -44,7 +44,7 @@ if bCodegen_RayTracePointVisibility_EllipsLocalPA
 
     strCameraData = orderfields(strCameraData);
 
-    strShapeModel.ui32triangVertexPtr = coder.typeof(int32(0),  [3, ui32MaxNumTriangs], [0, 1]);
+    strShapeModel.ui32triangVertexPtr = coder.typeof(uint32(0),  [3, ui32MaxNumTriangs], [0, 1]);
     strShapeModel.dVerticesPos        = coder.typeof(0,         [3, ui32MaxNumTriangs], [0, 1]);
 
     strShapeModel = orderfields(strShapeModel);
@@ -142,7 +142,7 @@ if bCodegen_RayTracePointVisibility_ShadowRays
     strCameraData = orderfields(strCameraData);
 
 
-    strShapeModel.ui32triangVertexPtr = coder.typeof(int32(0),  [3, ui32MaxNumTriangs], [0, 1]);
+    strShapeModel.ui32triangVertexPtr = coder.typeof(uint32(0),  [3, ui32MaxNumTriangs], [0, 1]);
     strShapeModel.dVerticesPos        = coder.typeof(0,         [3, ui32MaxNumTriangs], [0, 1]);
 
     strShapeModel = orderfields(strShapeModel);

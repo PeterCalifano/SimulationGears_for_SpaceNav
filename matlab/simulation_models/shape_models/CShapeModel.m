@@ -70,6 +70,9 @@ classdef CShapeModel < CBaseDatastruct
                 [self] = LoadModelFromStruct(self, inputData);
             end
 
+            % Update unit scaling 
+            self.dVerticesPos = self.unitScaler * self.dVerticesPos;
+
             % Get number of vertices
             self.ui32NumOfVertices = size(self.dVerticesPos, 2);
         end
@@ -129,14 +132,14 @@ classdef CShapeModel < CBaseDatastruct
             % Get number of vertices and triangles
             [nVertices, nTriangles] = cspice_dskz02(kernelhandle, dladsc);
             % Get triangles from SPICE (p: plates)
-            trianglesVertices = cspice_dskp02(kernelhandle, dladsc, 1, nTriangles);
+            ui32TrianglesVertices = cspice_dskp02(kernelhandle, dladsc, 1, nTriangles);
 
             % Get vertices from SPICE (v: vertices)
-            modelVertices = self.unitScaler * cspice_dskv02(kernelhandle, dladsc, 1, nVertices);
+            dModelVertices = cspice_dskv02(kernelhandle, dladsc, 1, nVertices);
 
             % Assign data to object attributes
-            self.ui32triangVertexPtr = trianglesVertices;
-            self.dVerticesPos        = modelVertices;
+            self.ui32triangVertexPtr = ui32TrianglesVertices;
+            self.dVerticesPos        = dModelVertices;
 
             self.bHasData_ = true;
         end
