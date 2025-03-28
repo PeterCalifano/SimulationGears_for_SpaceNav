@@ -80,10 +80,10 @@ classdef CGeneralPropagator < handle
 
             % Call ODE-based propagator
             [dxStateTrajectory, dTimegrid] = CScenarioGenerator.propagateState(self.objOrbitDynamicFcnHandle, ...
-                self.dEphemerisTimegrid, ...
-                self.dPosVelState0_W, ...
-                varargparams, ...
-                cellSettings{:});
+                                                                            self.dEphemerisTimegrid, ...
+                                                                            self.dPosVelState0_W, ...
+                                                                            varargparams, ...
+                                                                            cellSettings{:});
         end
 
         function [] = propagateAttitudePoitingProfile(self)
@@ -129,7 +129,7 @@ classdef CGeneralPropagator < handle
             arguments
                 settings.dTimestep (1,1) double {isscalar, isnumeric} = 0.0 % Default
                 settings.objOdeOpts {isstruct} = odeset('RelTol', 1E-12, 'AbsTol', 1E-12) % Default
-                settings.enumOdeFunctioName {mustBeMember(settings.enumOdeFunctioName, ["ode113", "ode45", "ode78"])} = "ode113"
+                settings.enumOdeFunctioName {mustBeMember(settings.enumOdeFunctioName, ["ode113", "ode45", "ode78", "RK4", "RK8"])} = "ode113"
             end
 
 
@@ -157,6 +157,7 @@ classdef CGeneralPropagator < handle
                         dTimegrid, ...
                         dxState0, ...
                         settings.objOdeOpts);
+                    
                 case "ode78"
 
                     [dTimegrid, dxStateTrajectory] = ode78(objDynamicFcnHandle, ...
@@ -164,10 +165,41 @@ classdef CGeneralPropagator < handle
                         dxState0, ...
                         settings.objOdeOpts);
 
+                case "RK4"
+                    error('Not implemented yet')
+                case "RK8"
+                    error('Not implemented yet')
+
                 otherwise
                     error('Unsupported ode function')
             end
         end
+
+
+        function [] = propagatedStateAutoDiff(objDynamicFcnHandle, ...
+                                                dTimegrid, ...
+                                                dxState0, ...
+                                                varargparams, ...
+                                                settings)
+            arguments
+                objDynamicFcnHandle {mustBeA(objDynamicFcnHandle, 'function_handle')}
+                dTimegrid           (1,:) double {isvector, isnumeric}
+                dxState0            (:,1) double {isvector, isnumeric}
+            end
+            arguments (Repeating)
+                varargparams
+            end
+            arguments
+                settings.dTimestep (1,1) double {isscalar, isnumeric} = 0.0 % Default
+                settings.objOdeOpts {isstruct} = odeset('RelTol', 1E-12, 'AbsTol', 1E-12) % Default
+                settings.enumOdeFunctioName {mustBeMember(settings.enumOdeFunctioName, ["ode113", "ode45", "ode78", "RK4", "RK8"])} = "ode113"
+            end
+
+            % TODO implement integrator manager as in IntegratorStepRKX functions
+            
+
+        end
+
 
         function cellSettings = unwrapSettings(settings)
             arguments
