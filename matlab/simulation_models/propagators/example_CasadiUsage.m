@@ -22,7 +22,7 @@ dInputValue = ones(size(objIn));
 objFcnOut       = objFcn(dInputValue); % Output is casadi.DM type
 objFcnJacOut    = objFcnJAC(dInputValue);
 
-dOutput = fullobjXstateAD = objFlowFcn(dxState0, dGravParam);
+dOutput = objFcnOut(dInputValue);
 (objFcnOut);    % Convert to MATLAB double
 dOutJac = full(objFcnJacOut); % Convert to MATLAB double
 
@@ -33,11 +33,10 @@ import casadi.*
 % Random Earth orbit used as an example
 dTimeGrid = 0:10;
 dxState0 = [12000; 5000; 0; 0; 5; 0;];
-% dGravParam = 398600; % Numeric type
-dGravParam = casadi.MX.sym('mu', 1, 1);
+dGravParam = 398600; % Numeric type
+objGravParam = casadi.MX.sym('mu', 1, 1);
 
-dxState = zeroobjXstateAD = objFlowFcn(dxState0, dGravParam);
-s(6, length(dTimeGrid));
+dxState = zeros(6, length(dTimeGrid));
 dxState(:,1) = dxState0;
 
 % Initialize casadi variable
@@ -51,26 +50,25 @@ for idt = 1:length(dTimeGrid)-1 %#ok<*UNRCH>
     % Apply Euler step to point wise numerical value
     dDeltaStep = dTimeGrid(idt+1) - dTimeGrid(idt);
     % dxState(:, idt+1) = EulerStep(dGravParam, dxState(:, idt), dDeltaStep);
-objXstateAD = objFlowFcn(dxState0, dGravParam);
 
     % Apply Euler integrator symbolically
-    objStateFlow_t0tf = EulerStep(dGravParam, objStateFlow_t0tf, dDeltaStep);
+    objStateFlow_t0tf = EulerStep(objGravParam, objStateFlow_t0tf, dDeltaStep);
 
 end
 
 % Eval result at initial condition to get final state at tf
-objFlowFcn = cobjXstateAD = objFlowFcn(dxState0, dGravParam);
-objXstateAD = objFlowFcn(dxState0, dGravParam);
-asadi.Function('EulerFlow2BP', {objXstate_t0, dGravParam}, {objStateFlow_t0tf});
+objFlowFcn = casadi.Function('EulerFlow2BP', {objXstate_t0, objGravParam}, {objStateFlow_t0tf});
 objXstateAD = objFlowFcn(dxState0, dGravParam);
 
 % Check difference
 dErrNorm = norm(full(objXstateAD - dxState(:,end)));
 
 % Now compute STM t0->tf
-objSTM_t0tf = objStateFlow_t0tf.jacobian(objXstate_t0)
-objSTMfcn_t0tf = casadi.Function('EulerSTM2BP', {objXstate_t0}, {objSTM_t0tf});
-dSTM_t0tf = full(objSTMfcn_t0tf(dxState0)); % full() just converts from casadi.DM nume6rical type to MATLAB double
+objSTM_t0tf             = objStateFlow_t0tf.jacobian(objXstate_t0);
+objFlow_t0tf_gravParam  = objStateFlow_t0tf.jacobian(objGravParam);
+
+objSTMfcn_t0tf = casadi.Function('EulerSTM2BP', {objXstate_t0, objGravParam}, {objSTM_t0tf});
+dSTM_t0tf = full(objSTMfcn_t0tf(dxState0, dGravParam)); % full() just converts from casadi.DM nume6rical type to MATLAB double
 
 % The most efficient way: using casadi integrator
 % TODO
