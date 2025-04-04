@@ -2,35 +2,31 @@ function [dDxDt, strAccelInfo] = computeRefDynFcn(dStateTimetag,...
                                                    dxState,...
                                                    strDynParams)%#codegen
 arguments
-    dStateTimetag
-    dxState
-    strDynParams 
+    dStateTimetag   (1,1) {isscalar, isnumeric}
+    dxState         (:,1) {isvector, isnumeric}
+    strDynParams    (1,1) {isstruct}
 end
 %% PROTOTYPE
-% dxdt = computeRefDynFcn(dStateTimetag,...
-%     dxState,...
-%     strDynParams)
+% [dDxDt, strAccelInfo] = computeRefDynFcn(dStateTimetag,...
+%                                           dxState,...
+%                                           strDynParams)
 % -------------------------------------------------------------------------------------------------------------
 %% DESCRIPTION
-% What the function does
+% This function computes the reference dynamics for a spacecraft or object in orbit. 
+% It evaluates the right-hand side (RHS) of the equations of motion in an inertial frame, considering 
+% gravitational forces, solar radiation pressure (SRP), and third-body perturbations if provided. 
+% The function also handles the computation of attitude and ephemerides for the main body and third bodies.
 % -------------------------------------------------------------------------------------------------------------
 %% INPUT
-% in1 [dim] description
-% Name1                     []
-% Name2                     []
-% Name3                     []
-% Name4                     []
-% Name5                     []
-% Name6                     []
+% arguments
+%     dStateTimetag   (1,1) {isscalar, isnumeric}
+%     dxState         (:,1) {isvector, isnumeric}
+%     strDynParams    (1,1) {isstruct}
+% end
 % -------------------------------------------------------------------------------------------------------------
 %% OUTPUT
-% out1 [dim] description
-% Name1                     []
-% Name2                     []
-% Name3                     []
-% Name4                     []
-% Name5                     []
-% Name6                     []
+% dDxDt
+% % strAccelInfo
 % -------------------------------------------------------------------------------------------------------------
 %% CHANGELOG
 % 08-07-2024    Pietro Califano   Coded from computeDynFcn and FUTURE codes for reference trajectory generation
@@ -43,7 +39,6 @@ end
 %% Future upgrades
 % [-]
 % -------------------------------------------------------------------------------------------------------------
-%% Function code
 
 % Check for 3rd bodies
 if not(isfield(strDynParams, 'strBody3rdData'))
