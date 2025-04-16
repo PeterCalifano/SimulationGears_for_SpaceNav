@@ -8,6 +8,9 @@
 		},
 		{
 			"path": "../CommManagersIndex/CommManager4MATLAB"
+		},
+		{
+			"path": "../simulationUtils"
 		}
 	],
 	"settings": {
