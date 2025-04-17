@@ -86,14 +86,15 @@ classdef CGeneralPropagator < handle
                                                                             cellSettings{:});
         end
 
-        function [] = propagateAttitudePoitingProfile(self)
-            % Generate attitude pointing profile from CAttitudeGenerator class
-
-        end
-
-        function [] = propagateFreeAttitudeProfile(self)
-            % TODO: integrates equations of motions of attitude kinematics
-        end
+        % TODO
+        %function [] = propagateAttitudePoitingProfile(self)
+        %    % Generate attitude pointing profile from CAttitudeGenerator class
+        %end
+        
+        % TODO
+        %function [] = propagateFreeAttitudeProfile(self)
+        %    % TODO: integrates equations of motions of attitude kinematics
+        %end
 
         function [] = propagateNavPoseTrajectory(self)
             % TODO: integrates equations of motions of orbit dynamics + attitude kinematics
@@ -114,10 +115,10 @@ classdef CGeneralPropagator < handle
     methods (Access = public, Static)
 
         function [dxStateTrajectory, dTimegrid] = propagateState(objDynamicFcnHandle, ...
-                dTimegrid, ...
-                dxState0, ...
-                varargparams, ...
-                settings)
+                                                                dTimegrid, ...
+                                                                dxState0, ...
+                                                                varargparams, ...
+                                                                settings)
             arguments
                 objDynamicFcnHandle {mustBeA(objDynamicFcnHandle, 'function_handle')}
                 dTimegrid           (1,:) double {isvector, isnumeric}
@@ -222,6 +223,22 @@ classdef CGeneralPropagator < handle
                 ui32AllocCounter = ui32AllocCounter + 1;
 
             end
+        end
+
+
+
+
+        %%% Additional tools from "simulationUtils" repository (private)
+        function [y, tInt,te, ye, ie] = PropagateOrbitTrajectoryHF_Static(xi, t_vect, data, kwargs, options)
+            arguments
+                xi
+                t_vect
+                data
+                kwargs
+                options
+            end
+
+            error('Not implemented yet')
         end
 
     end
