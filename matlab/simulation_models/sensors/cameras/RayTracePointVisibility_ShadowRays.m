@@ -2,10 +2,11 @@ function [bAllPointsVisibilityMask, dProjectedPoints_UV] = RayTracePointVisibili
                                                                                                dPointsPositions_TB, ...
                                                                                                strTargetBodyData, ...
                                                                                                strCameraData, ...
-                                                                                               dSunPosition_TB, ...
+                                                                                            dSunPosition_TB, ...
                                                                                                bDEBUG_MODE, ...
                                                                                                bTwoSidedTest, ...
-                                                                                               bPointsAreMeshVertices) %#codegen
+                                                                                               bPointsAreMeshVertices, ...
+                                                                                               bSkipIlluminationCheck) %#codegen
 arguments
     ui32PointsIdx           (1,:) uint32
     dPointsPositions_TB     (3,:) double
@@ -15,6 +16,7 @@ arguments
     bDEBUG_MODE             (1,1) logical {islogical} = false
     bTwoSidedTest           (1,1) logical {islogical} = false;
     bPointsAreMeshVertices  (1,1) logical {islogical} = true;
+    bSkipIlluminationCheck  (1,1) logical {islogical} = false;
 end
 %% PROTOTYPE
 % 
@@ -213,6 +215,12 @@ parfor idL = 1:i32NumOfPointsToTrace
                 % Intersection farther than point detected --> point visible by camera
                 % Cast shadow ray to light and check for illumination occlusion
                 
+                if bSkipIlluminationCheck == true
+                    % Skip illumination check
+                    bPointsVisibilityMask(idL) = true;
+                    break;
+                end
+
                 % Compute ray direction (to Sun)
                 dSunDirFromPoint_TB = dSunPosition_TB - [dPointPosX_TB(idL); dPointPosY_TB(idL); dPointPosZ_TB(idL)];
                 dSunDirFromPoint_TB = dSunDirFromPoint_TB./norm(dSunDirFromPoint_TB);

@@ -19,7 +19,6 @@ coder_config.OptimizeReductions = true;
 ui32MaxNumPoints  = 1.2e5;
 ui32MaxNumTriangs = 2e5;
 
-
 bCodegen_RayTracePointVisibility_EllipsLocalPA              = true;
 bCodegen_RayTracePointVisibility_ShadowRays                 = true;
 bCodegen_RayTracePointVisibility_VectorizedShadowRays       = true;
@@ -153,8 +152,10 @@ if bCodegen_RayTracePointVisibility_ShadowRays
     strTargetBodyData  = orderfields(strTargetBodyData);
 
     dSunDir_TB                         = coder.typeof(0, [3,1]);
-    bDEBUG_MODE     = coder.typeof(false, [1,1]);
-    bTwoSidedTest   = coder.typeof(false, [1,1]);
+    bDEBUG_MODE             = coder.typeof(false, [1,1]);
+    bTwoSidedTest           = coder.typeof(false, [1,1]);
+    bPointsAreMeshVertices  = coder.typeof(false, [1,1]);
+    bSkipIlluminationCheck  = coder.typeof(false, [1,1]);
 
     % Function args
     % ui32PointsIdx       (1,:) uint32
@@ -172,6 +173,9 @@ if bCodegen_RayTracePointVisibility_ShadowRays
     args_cell{1,5} = dSunDir_TB;
     args_cell{1,6} = bDEBUG_MODE;
     args_cell{1,7} = bTwoSidedTest;
+    args_cell{1,8} = bPointsAreMeshVertices;
+    args_cell{1,9} = bSkipIlluminationCheck;
+
 
     % coder.getArgTypes % Function call to automatically specify input
     % arguments. Note that this takes the specific sizes used in the function
