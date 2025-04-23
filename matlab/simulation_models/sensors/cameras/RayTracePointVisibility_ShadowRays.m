@@ -141,6 +141,7 @@ i32triangVertPtr3 = ui32triangVertexPtr(3, :);
 bPointsVisibilityMask = false(i32NumOfPointsToTrace, 1); % Initialize visibility mask as "no visibility"
 
 % Visibility check for each landmark (position in TB frame)
+% TODO add at least one layer of BVH, with a single bounding box for the whole mesh
 parfor idL = 1:i32NumOfPointsToTrace
     if bDEBUG_MODE == true 
         if mod(i32NumOfPointsToTrace/idL, 5)
@@ -208,7 +209,6 @@ parfor idL = 1:i32NumOfPointsToTrace
                 %%%%%%%%%%%%%%%%%%%%%% DEBUG %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
                 % PlotRays(dCamPosition_TB, [dPointPosX_TB(idL); dPointPosY_TB(idL); dPointPosZ_TB(idL)], dIntersectPoint_TB);
                 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
                 break;
 
             elseif (dRayToPointsFromCamNorm(idL) - dIntersectDistance) <= eps('single') && bTmpIntersectFlag == true
@@ -225,7 +225,7 @@ parfor idL = 1:i32NumOfPointsToTrace
                 dSunDirFromPoint_TB = dSunPosition_TB - [dPointPosX_TB(idL); dPointPosY_TB(idL); dPointPosZ_TB(idL)];
                 dSunDirFromPoint_TB = dSunDirFromPoint_TB./norm(dSunDirFromPoint_TB);
 
-                % NOTE: for loop over all triangles of mesh inside (one-sided test)
+                % NOTE: for loop over all triangles of mesh inside (one-sided test, in principle)
                 [bLightOcclusion] = TraceShadowRay([dPointPosX_TB(idL); dPointPosY_TB(idL); dPointPosZ_TB(idL)], ...
                                             dSunDirFromPoint_TB, ...
                                             dVerticesPos, ...
@@ -237,24 +237,23 @@ parfor idL = 1:i32NumOfPointsToTrace
                                             bPointsAreMeshVertices);
 
                 bPointsVisibilityMask(idL) = not(bLightOcclusion); % Point is visible if light not occluded
-        
                 %%%%%%%%%%%%%%%%%%%%%% DEBUG %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
                 % PlotRays(dCamPosition_TB, [dPointPosX_TB(idL); dPointPosY_TB(idL); dPointPosZ_TB(idL)], dIntersectPoint_TB, dSunPosition_TB);
                 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-
-                % DEVNOTE: conditions below possibly wrong
-            % elseif bTmpIntersectFlag == false 
-                % One-sided test may return no intersection because computation has been culled.
-                % continue;
-
-            % elseif bTmpIntersectFlag == false && bTwoSidedTest == true
-            % This case is only possible when
-
+                if bPointsVisibilityMask(idL)
+                    break;
+                end
+                
+            elseif id == ui32NumTrianglesInSubset && bTmpIntersectFlag == false
+                if bPointsVisibilityMask(idL) == false && not(bPointsAreMeshVertices)
+                    % No intersection detected after testing all triangles and point not occluded by mesh --> point visible
+                    bPointsVisibilityMask(idL) = true;
+                end
             end
         end
 
     end % Loop over triangles
+
 end % Parallelized Loop over points to trace
 
 if bDEBUG_MODE == true
