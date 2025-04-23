@@ -240,7 +240,7 @@ parfor idL = 1:i32NumOfPointsToTrace
                 %%%%%%%%%%%%%%%%%%%%%% DEBUG %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
                 % PlotRays(dCamPosition_TB, [dPointPosX_TB(idL); dPointPosY_TB(idL); dPointPosZ_TB(idL)], dIntersectPoint_TB, dSunPosition_TB);
                 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-                if bPointsVisibilityMask(idL)
+                if bLightOcclusion
                     break;
                 end
                 
