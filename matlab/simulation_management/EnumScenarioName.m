@@ -16,11 +16,12 @@ classdef EnumScenarioName
 %% Function code
 
 enumeration
-    Didymos_Hera
+    %Didymos_Hera
     Itokawa
     % Eros_NEAR
-    Bennu_OREx
+    Bennu
     Apophis
+    Moon
 end
 
 end
