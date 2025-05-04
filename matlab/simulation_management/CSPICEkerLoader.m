@@ -21,8 +21,8 @@ classdef CSPICEkerLoader
     end
 
     properties (Access = private)
-        defaultTargetNames = {'Didymos_Hera', 'Itokawa', 'Bennu_OREx', 'Apophis'};
-        defaultTargetPaths = {"Milani_KERNELS", "Itokawa", "Bennu_OREx", ''};
+        defaultTargetNames = {'Didymos', 'Itokawa', 'Bennu', 'Apophis', 'Moon'};
+        defaultTargetPaths = {"Milani_KERNELS", "Itokawa", "Bennu_OREx", "", ""};
         defaultTargetsDict;
     end
 
@@ -54,10 +54,10 @@ classdef CSPICEkerLoader
             bLoadCommonKernels = false;
             switch enumScenarioName
 
-                case EnumScenarioName.Didymos_Hera
+                case EnumScenarioName.Didymos
                     
                     if strcmpi(charTargetFolderName, "")
-                        charTargetFolderName = self.defaultTargetsDict('Didymos_Hera');
+                        charTargetFolderName = self.defaultTargetsDict('Didymos');
                     end
 
                 case EnumScenarioName.Itokawa
@@ -66,10 +66,10 @@ classdef CSPICEkerLoader
                         charTargetFolderName = self.defaultTargetsDict('Itokawa');
                     end
 
-                case EnumScenarioName.Bennu_OREx
+                case EnumScenarioName.Bennu
 
                     if strcmpi(charTargetFolderName, "")
-                        charTargetFolderName = self.defaultTargetsDict('Bennu_OREx');
+                        charTargetFolderName = self.defaultTargetsDict('Bennu');
                     end
                     
                 case EnumScenarioName.Apophis
@@ -84,7 +84,13 @@ classdef CSPICEkerLoader
                     InitializeEnv;
                     
                     return
+                case EnumScenarioName.Moon
 
+                    if strcmpi(charTargetFolderName, "")
+                        charTargetFolderName = self.defaultTargetsDict('Moon');
+                    end
+            
+                    error('Not added yet')
                 otherwise
                     error("enumScenarioName is not a valid scenario.")
             end

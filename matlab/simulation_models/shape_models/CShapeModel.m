@@ -18,7 +18,6 @@ classdef CShapeModel < CBaseDatastruct
 
     properties (SetAccess = protected, GetAccess = public)
 
-        charTargetUnitOutput = 'm';
 
     end
 
@@ -35,19 +34,22 @@ classdef CShapeModel < CBaseDatastruct
         ui32TrianglesTexIndex = [];
         dNormals = [];
         ui32TrianglesNormalsIndex = [];
+        charModelName = ""
+        charTargetUnitOutput = 'm';
     end
 
     methods (Access = public)
         % CONSTRUCTOR 
-        function self = CShapeModel(enumLoadingMethod, inputData, charInputUnit, charTargetUnitOutput, bVertFacesOnly)
+        function self = CShapeModel(enumLoadingMethod, inputData, charInputUnit, charTargetUnitOutput, bVertFacesOnly, charModelName)
             arguments
-                enumLoadingMethod    (1,:) string {mustBeA(enumLoadingMethod, ["string", "char"]), ...
+                enumLoadingMethod       (1,:) string {mustBeA(enumLoadingMethod, ["string", "char"]), ...
                                                 mustBeMember(enumLoadingMethod, ["mat", "cspice", "struct", "file_obj"])}
-                inputData            (1,:)
-                charInputUnit        (1,:) string {mustBeA(charInputUnit       , ["string", "char"]), ...
+                inputData               (1,:)
+                charInputUnit           (1,:) string {mustBeA(charInputUnit       , ["string", "char"]), ...
                                                     mustBeMember(charInputUnit, ["m", "km"])} = 'km'
-                charTargetUnitOutput (1,:) string {mustBeA(charTargetUnitOutput, ["string", "char"]), mustBeMember(charTargetUnitOutput, ["m", "km"])} = 'm' % TODO add enumaration
-                bVertFacesOnly (1,1) {islogical} = true;
+                charTargetUnitOutput    (1,:) string {mustBeA(charTargetUnitOutput, ["string", "char"]), mustBeMember(charTargetUnitOutput, ["m", "km"])} = 'm' % TODO add enumaration
+                bVertFacesOnly          (1,1) {islogical} = true;
+                charModelName           (1,:) char = ""
             end
 
             self.charTargetUnitOutput = charTargetUnitOutput;
@@ -83,6 +85,9 @@ classdef CShapeModel < CBaseDatastruct
                 [self] = self.LoadModelFromObj_(inputData, bVertFacesOnly);
 
             end
+        
+            % Write model name 
+            self.charModelName = charModelName;
 
             % Update unit scaling 
             self.dVerticesPos = self.unitScaler * self.dVerticesPos;
