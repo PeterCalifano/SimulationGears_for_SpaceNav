@@ -193,7 +193,8 @@ if bCodegen_RayTracePointVisibility_ShadowRays
 end
 
 
-if bCodegen_RayTracePointVisibility_VectorizedShadowRays
+if bCodegen_RayTracePointVisibility_VectorizedShadowRays && 0
+    % DEVNOTE: disabled. This function is not up to date.
 
     % [bAllPointsVisibilityMask_ParallelRTwithShadowRays, dProjectedPoints_UV] = ParallelRayTracePointVisibility_ShadowRays(uint32(ui32pointsIDs), ...
     %                                                                                                                         dPointsPositionsGT_TB, ...

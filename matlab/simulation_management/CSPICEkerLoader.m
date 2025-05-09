@@ -6,6 +6,7 @@ classdef CSPICEkerLoader
 % -------------------------------------------------------------------------------------------------------------
 %% CHANGELOG
 % 17-08-2024        Pietro Califano         Initial class definition with default values
+% 09-05-2025        Pietro Califano         Minor improvements for usability
 % -------------------------------------------------------------------------------------------------------------
 %% DEPENDENCIES
 % CSPICE mice
@@ -30,11 +31,12 @@ classdef CSPICEkerLoader
     methods (Access = public)
 
         % CONSTRUCTOR
-        function self = CSPICEkerLoader(KERNELS_BASE_PATH, enumScenarioName, charTargetFolderName)
+        function self = CSPICEkerLoader(charKERNELS_BASE_PATH, enumScenarioName, bLoadCommonKernels, charTargetFolderName)
             arguments
-                KERNELS_BASE_PATH
-                enumScenarioName
-                charTargetFolderName (1,1) {isstring, ischar} = ""
+                charKERNELS_BASE_PATH
+                enumScenarioName     (1,:) string {mustBeA(enumScenarioName, ["EnumScenarioName", "string", "char"])}
+                bLoadCommonKernels   (1,1) logical {islogical} = false;
+                charTargetFolderName (1,1) {isstring, ischar} = "";
             end
                     
             % Define dictionary of (names, paths) to avoid it being shared
@@ -45,13 +47,13 @@ classdef CSPICEkerLoader
             % TODO
             
             % Store kernels base path
-            self.KERNELS_BASE_PATH_ = KERNELS_BASE_PATH;
-        
+            assert(isfolder(charKERNELS_BASE_PATH), 'ERROR: specified path is not a valid or existing folder');
+            self.KERNELS_BASE_PATH_ = charKERNELS_BASE_PATH;
+            
             % Clear all previously loaded kernels
             cspice_kclear();
 
             % Assign scenario specific data
-            bLoadCommonKernels = false;
             switch enumScenarioName
 
                 case EnumScenarioName.Didymos
