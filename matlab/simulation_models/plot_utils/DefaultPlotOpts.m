@@ -50,6 +50,8 @@ if nargin == 1 && kwargs.bUseBlackBackground == false
 
     if all(charBackGroundColor == 0)
         charTextColor       = "w";
+    else
+        charTextColor       = "k";
     end
 
 elseif kwargs.bUseBlackBackground == true

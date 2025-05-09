@@ -51,7 +51,7 @@ vLines = regexp(charFileText, vPattern, 'tokens', 'lineanchors');
 if ~isempty(vLines)
     vTokens = vertcat(vLines{:});
     dVerticesCoords = str2double(vTokens);
-    dVerticesCoords = reshape(dVerticesCoords, 3, [])';
+    dVerticesCoords = reshape(dVerticesCoords', 3, []);
 else
     dVerticesCoords = zeros(0,3);
 end
@@ -63,7 +63,7 @@ vtLines = regexp(charFileText, vtPattern, 'tokens', 'lineanchors');
 if ~isempty(vtLines) && not(bVertFacesOnly)
     vtTokens = vertcat(vtLines{:});
     dTexCoords = str2double(vtTokens);
-    dTexCoords = reshape(dTexCoords, 2, [])';
+    dTexCoords = reshape(dTexCoords', 2, []);
 else
     dTexCoords = zeros(0,2);
 end
@@ -76,7 +76,7 @@ vnLines = regexp(charFileText, vnPattern, 'tokens', 'lineanchors');
 if ~isempty(vnLines) && not(bVertFacesOnly)
     vnTokens = vertcat(vnLines{:});
     dNormals = str2double(vnTokens);
-    dNormals = reshape(dNormals, 3, [])';
+    dNormals = reshape(dNormals', 3, []);
 else
     dNormals = zeros(0,3);
 end
@@ -112,14 +112,16 @@ end
 % Parse face lines
 fTokens = regexp(charFileText, charPattern, 'tokens', 'lineanchors');
 
-if ~isempty(fTokens) && not(bVertFacesOnly)
+if ~isempty(fTokens)
 
     dValues = str2double(vertcat(fTokens{:}));
-    dFacesMatrix = reshape(dValues, numel(vidx) + numel(tidx) + numel(nidx), [])';
-    ui32TrianglesIndex = uint32(dFacesMatrix(:, vidx));
+    dFacesMatrix = reshape(dValues', numel(vidx) + numel(tidx) + numel(nidx), []);
+    ui32TrianglesIndex = uint32(dFacesMatrix(vidx, :));
 
-    if bHasVT, ui32TrianglesTexIndex = uint32(dFacesMatrix(:, tidx)); end
-    if bHasVN, ui32TrianglesNormalsIndex   = uint32(dFacesMatrix(:, nidx)); end
+    if not(bVertFacesOnly)
+        if bHasVT, ui32TrianglesTexIndex = uint32(dFacesMatrix(tidx, :)); end
+        if bHasVN, ui32TrianglesNormalsIndex   = uint32(dFacesMatrix(nidx, :)); end
+    end
 end
 
 dElapsedTime = toc;

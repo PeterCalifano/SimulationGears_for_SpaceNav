@@ -195,9 +195,24 @@ classdef CShapeModel < CBaseDatastruct
 
         function [self] = LoadModelFromObj_(self, charObjFilePath, bVertFacesOnly)
 
+            checkIfModelAlreadyLoaded(self);
+
             [self.ui32triangVertexPtr, self.dVerticesPos, ...
              self.dTexCoords, self.ui32TrianglesTexIndex, ...
              self.dNormals, self.ui32TrianglesNormalsIndex] = CShapeModel.LoadModelFromObj(charObjFilePath, bVertFacesOnly);
+    
+            % Transpose vertices and triangles
+            self.ui32triangVertexPtr = self.ui32triangVertexPtr;
+            self.dVerticesPos        = self.dVerticesPos;
+
+            if not(bVertFacesOnly)
+                self.dTexCoords = transpose(self.dTexCoords);
+                self.ui32TrianglesTexIndex = transpose(self.ui32TrianglesTexIndex);
+                self.dNormals = transpose(self.dNormals);
+                self.ui32TrianglesNormalsIndex = transpose(self.ui32TrianglesNormalsIndex);
+            end
+
+            self.bHasData_ = true;
 
         end
 
@@ -214,7 +229,7 @@ classdef CShapeModel < CBaseDatastruct
                 ui32TrianglesTexIndex, dNormals, ui32TrianglesNormalsIndex] = LoadModelFromObj(charObjFilePath, bVertFacesOnly) %#codegen
             arguments
                 charObjFilePath (1,1) string {mustBeA(charObjFilePath, ["string", "char"])}
-                bVertFacesOnly (1,1) {islogical} = true;
+                bVertFacesOnly  (1,1) {islogical} = true;
             end
             %% SIGNATURE
             % [ui32TrianglesIndex, dVerticesCoords, dTexCoords, ...
@@ -263,7 +278,7 @@ classdef CShapeModel < CBaseDatastruct
             if ~isempty(vLines)
                 vTokens = vertcat(vLines{:});
                 dVerticesCoords = str2double(vTokens);
-                dVerticesCoords = reshape(dVerticesCoords, 3, [])';
+                dVerticesCoords = reshape(dVerticesCoords', 3, []);
             else
                 dVerticesCoords = zeros(0,3);
             end
@@ -323,15 +338,18 @@ classdef CShapeModel < CBaseDatastruct
 
             % Parse face lines
             fTokens = regexp(charFileText, charPattern, 'tokens', 'lineanchors');
+            assert(not(isempty(fTokens)), 'ERROR: no faces detected in obj file. Something in regexpr interpreter may have failed.')
 
-            if ~isempty(fTokens) && not(bVertFacesOnly)
+            if ~isempty(fTokens)
 
                 dValues = str2double(vertcat(fTokens{:}));
-                dFacesMatrix = reshape(dValues, numel(vidx) + numel(tidx) + numel(nidx), [])';
-                ui32TrianglesIndex = uint32(dFacesMatrix(:, vidx));
+                dFacesMatrix = reshape(dValues', numel(vidx) + numel(tidx) + numel(nidx), []);
+                ui32TrianglesIndex = uint32(dFacesMatrix(vidx, :));
 
-                if bHasVT, ui32TrianglesTexIndex = uint32(dFacesMatrix(:, tidx)); end
-                if bHasVN, ui32TrianglesNormalsIndex   = uint32(dFacesMatrix(:, nidx)); end
+                if not(bVertFacesOnly)
+                    if bHasVT, ui32TrianglesTexIndex = uint32(dFacesMatrix(tidx, :)); end
+                    if bHasVN, ui32TrianglesNormalsIndex   = uint32(dFacesMatrix(nidx, :)); end
+                end
             end
 
             dElapsedTime = toc;
