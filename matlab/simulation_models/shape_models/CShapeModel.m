@@ -40,7 +40,13 @@ classdef CShapeModel < CBaseDatastruct
 
     methods (Access = public)
         % CONSTRUCTOR 
-        function self = CShapeModel(enumLoadingMethod, inputData, charInputUnit, charTargetUnitOutput, bVertFacesOnly, charModelName)
+        function self = CShapeModel(enumLoadingMethod, ...
+                                    inputData, ...
+                                    charInputUnit, ...
+                                    charTargetUnitOutput, ...
+                                    bVertFacesOnly, ...
+                                    charModelName, ...
+                                    bLoadShapeModel)
             arguments
                 enumLoadingMethod       (1,:) string {mustBeA(enumLoadingMethod, ["string", "char"]), ...
                                                 mustBeMember(enumLoadingMethod, ["mat", "cspice", "struct", "file_obj"])}
@@ -50,6 +56,7 @@ classdef CShapeModel < CBaseDatastruct
                 charTargetUnitOutput    (1,:) string {mustBeA(charTargetUnitOutput, ["string", "char"]), mustBeMember(charTargetUnitOutput, ["m", "km"])} = 'm' % TODO add enumaration
                 bVertFacesOnly          (1,1) {islogical} = true;
                 charModelName           (1,:) char = ""
+                bLoadShapeModel         (1,1) {islogical} = true;
             end
 
             self.charTargetUnitOutput = charTargetUnitOutput;
@@ -66,36 +73,40 @@ classdef CShapeModel < CBaseDatastruct
                 self.unitScaler = 1E-3;
             end
             
-            % Call input specific loading function
-            if strcmpi(enumLoadingMethod, 'cspice')
+            if bLoadShapeModel
+                % Call input specific loading function
+                if strcmpi(enumLoadingMethod, 'cspice')
 
-                if strcmpi(charInputUnit, 'm') 
-                    warning("CSpice usually provides models' vertices in km, but 'meters' has been specified. Make sure this is correct.")
+                    if strcmpi(charInputUnit, 'm')
+                        warning("CSpice usually provides models' vertices in km, but 'meters' has been specified. Make sure this is correct.")
+                    end
+
+                    [self] = self.LoadModelFromSPICE(inputData);
+
+                elseif strcmpi(enumLoadingMethod, 'mat')
+                    [self] = self.LoadModelFromMat(inputData);
+
+                elseif strcmpi(enumLoadingMethod, 'struct')
+                    [self] = self.LoadModelFromStruct(inputData);
+
+                elseif strcmpi(enumLoadingMethod, 'file_obj')
+                    [self] = self.LoadModelFromObj_(inputData, bVertFacesOnly);
+
                 end
-
-                [self] = self.LoadModelFromSPICE(inputData);
-
-            elseif strcmpi(enumLoadingMethod, 'mat')
-                [self] = self.LoadModelFromMat(inputData);
-
-            elseif strcmpi(enumLoadingMethod, 'struct')
-                [self] = self.LoadModelFromStruct(inputData);
-
-            elseif strcmpi(enumLoadingMethod, 'file_obj')
-                [self] = self.LoadModelFromObj_(inputData, bVertFacesOnly);
-
             end
         
             % Write model name 
             self.charModelName = charModelName;
 
-            % Update unit scaling 
-            self.dVerticesPos = self.unitScaler * self.dVerticesPos;
-
             % Get number of vertices
             self.ui32NumOfVertices = size(self.dVerticesPos, 2);
+            
+            if self.ui32NumOfVertices > 0
+                % Update unit scaling
+                self.dVerticesPos = self.unitScaler * self.dVerticesPos;
+            end
         end
-        
+
         %% GETTERS
         % Get shape model vertices and indices
         function [strData] = getShapeStruct(self)
@@ -338,7 +349,9 @@ classdef CShapeModel < CBaseDatastruct
 
             % Parse face lines
             fTokens = regexp(charFileText, charPattern, 'tokens', 'lineanchors');
-            assert(not(isempty(fTokens)), 'ERROR: no faces detected in obj file. Something in regexpr interpreter may have failed.')
+            assert(not(isempty(fTokens)), ['ERROR: no faces detected in obj file. ' ...
+                'Something in regexpr interpreter may have failed. ' ...
+                'Your file may contain quads, but this function only supports triangular meshes.'])
 
             if ~isempty(fTokens)
 

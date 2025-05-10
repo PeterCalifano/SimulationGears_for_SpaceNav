@@ -98,9 +98,9 @@ classdef CSPICEkerLoader
             end
             
             % Move to kernels base folder to load metakernel            
-            tmpMKpath = char(fullfile(self.KERNELS_BASE_PATH_, charTargetFolderName, 'mk'));
+            charTmpMKpath = char(fullfile(self.KERNELS_BASE_PATH_, charTargetFolderName, 'mk'));
      
-            cd(tmpMKpath);
+            cd(charTmpMKpath);
             cspice_furnsh('metakernel.mk'); % Load kernels
             cd(self.projectDir);
 
