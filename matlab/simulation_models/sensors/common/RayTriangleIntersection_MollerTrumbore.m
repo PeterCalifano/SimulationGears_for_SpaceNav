@@ -164,7 +164,7 @@ else
     % Compute scaled U barycentric coordinate 
     dUbarycenCoord = dot(dRayOriginFromV0, dP);
 
-    if (dUbarycenCoord < 0.0 && dUbarycenCoord > dDet)
+    if (dUbarycenCoord < 0.0 || dUbarycenCoord > dDet)
         % Triangle u-missed
         bIntersectionFlag       = false;
         dUbarycenCoord          = 0;
