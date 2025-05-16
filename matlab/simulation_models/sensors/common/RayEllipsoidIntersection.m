@@ -4,14 +4,24 @@ function [bIntersectFlag, dIntersectDistance, bFailureFlag, dIntersectPoint, ...
                                                                                                              dEllipsoidCentre_Frame, ...
                                                                                                              dEllipsoidInvDiagShapeCoeffs, ...
                                                                                                              dDCM_TFfromFrame, ...
-                                                                                                             dDCM_EstTFfromFrame) %#codegen
-arguments
-    dRayOrigin_Frame                    (3,1) double
-    dRayDirection_Frame                 (3,1) double
-    dEllipsoidCentre_Frame              (3,1) double
-    dEllipsoidInvDiagShapeCoeffs        (:,1) double % [1/a^2; 1/b^2; 1/c^2]
-    dDCM_TFfromFrame                    (3,3) double = eye(3)           % Required for jacobians
-    dDCM_EstTFfromFrame                 (3,3) double = dDCM_TFfromFrame % Rotation including attitude error estimate
+                                                                                                             dDCM_EstTFfromFrame, ...
+                                                                                                             bEvaluateJacobians) %#codegen
+arguments (Input)
+    dRayOrigin_Frame                    (3,1) double {isvector, isnumeric}
+    dRayDirection_Frame                 (3,1) double {isvector, isnumeric}
+    dEllipsoidCentre_Frame              (3,1) double {ismatrix, isnumeric}
+    dEllipsoidInvDiagShapeCoeffs        (:,1) double {ismatrix, isnumeric} % [1/a^2; 1/b^2; 1/c^2]
+    dDCM_TFfromFrame                    (3,3) double {ismatrix, isnumeric} = eye(3)           % Required for jacobians
+    dDCM_EstTFfromFrame                 (3,3) double {ismatrix, isnumeric} = dDCM_TFfromFrame % Rotation including attitude error estimate
+    bEvaluateJacobians                  (1,2) {islogical, isscalar} = [true, true]; 
+end
+arguments (Output)
+    bIntersectFlag
+    dIntersectDistance
+    bFailureFlag
+    dIntersectPoint
+    dJacIntersectDistance_RayOrigin
+    dJacIntersectDistance_TargetAttErr
 end
 %% SIGNATURE
 % [bIntersectFlag, dIntersectDistance, bFailureFlag, dIntersectPoint, ...
@@ -23,24 +33,30 @@ end
 %                                                                                                              dDCM_EstTFfromFrame) %#codegen
 % -------------------------------------------------------------------------------------------------------------
 %% DESCRIPTION
-% Function to compute intersection of a 3D ellipsoid with a ray (line in 3D).
+% Function to compute intersection of a 3D ellipsoid with a ray (line in 3D). Jacobians are evaluated if
+% required by the user and flag is set to true.
 % -------------------------------------------------------------------------------------------------------------
 %% INPUT
-% dRayOrigin                      (3,1) double
-% dRayDirection                   (3,1) double
-% dEllipsoidCentre                (3,1) double
-% dEllipsoidInvDiagShapeCoeffs    (:,1) double % [1/a^2; 1/b^2; 1/c^2]
-% dDCM_TFfromFrame                (3,3) double = eye(3)
+% dRayOrigin_Frame                    (3,1) double {isvector, isnumeric}
+% dRayDirection_Frame                 (3,1) double {isvector, isnumeric}
+% dEllipsoidCentre_Frame              (3,1) double {ismatrix, isnumeric}
+% dEllipsoidInvDiagShapeCoeffs        (:,1) double {ismatrix, isnumeric} % [1/a^2; 1/b^2; 1/c^2]
+% dDCM_TFfromFrame                    (3,3) double {ismatrix, isnumeric} = eye(3)           % Required for jacobians
+% dDCM_EstTFfromFrame                 (3,3) double {ismatrix, isnumeric} = dDCM_TFfromFrame % Rotation including attitude error estimate
+% bEvaluateJacobians                  (1,2) {islogical, isscalar} = [true, true];
 % -------------------------------------------------------------------------------------------------------------
 %% OUTPUT
-% out1 [dim] description
-% Name1                     []
-% Name2                     []
-% Name3                     []
+% bIntersectFlag
+% dIntersectDistance
+% bFailureFlag
+% dIntersectPoint
+% dJacIntersectDistance_RayOrigin
+% dJacIntersectDistance_TargetAttErr
 % -------------------------------------------------------------------------------------------------------------
 %% CHANGELOG
 % 02-03-2025        Pietro Califano         First version of intersection test implemented.
 % 04-03-2025        Pietro Califano         Implement jacobian evaluation wrt ray origin and target attitude
+% 14-05-2025        Pietro Califano         Add flag to require/skip evaluation of jacobians
 % -------------------------------------------------------------------------------------------------------------
 %% DEPENDENCIES
 % [-]
@@ -69,11 +85,11 @@ end
 dEllipsoidMatrix = diag(dEllipsoidInvDiagShapeCoeffs); % TODO check this is correct
 
 % Initialize output
-bIntersectFlag      = false;
-bFailureFlag        = false;
-dIntersectPoint     = zeros(3, 1);
-dIntersectDistance  = zeros(1, 1);
-dJacIntersectDistance_RayOrigin   = zeros(1, 3);
+bIntersectFlag                      = false;
+bFailureFlag                        = false;
+dIntersectPoint                     = zeros(3, 1);
+dIntersectDistance                  = zeros(1, 1);
+dJacIntersectDistance_RayOrigin     = zeros(1, 3);
 dJacIntersectDistance_TargetAttErr  = zeros(1, 3);
 
 % Compute 2nd order intersection equation
@@ -120,7 +136,7 @@ dIntersectPoint(:) = dRayOrigin_Frame + dRayDirection_Frame * dIntersectDistance
 
 %% Jacobian evaluation
 % DEVNOTE TODO: can be optimized both in terms of memory and computations
-if nargout > 4
+if nargout > 4 && bEvaluateJacobians(1)
     % Pre-compute shared quantities
     dInvSqrtDelta   = 1/dSqrtDelta;
     dJac_cCoeff_RayOriginInTF = dRayOriginFromEllipsCentre' * ( dEllipsoidMatrix + transpose(dEllipsoidMatrix) ); % * eye(3);
@@ -137,7 +153,7 @@ if nargout > 4
 
     dJacIntersectDistance_RayOrigin(:,:) = dInvAcoeff * dJacIntersectDist_RayOriginInTF * dDCM_EstTFfromFrame;
 
-    if nargout > 5
+    if nargout > 5 && bEvaluateJacobians(2)
         % Compute auxiliary quantities
         dCameraPosFromCentre_FramePreConv = dDCM_TFfromFrame * (dEllipsoidCentre_FramePreConv);
 
