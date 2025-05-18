@@ -33,7 +33,30 @@ classdef SPose3 < CBaseDatastruct
                 self.bDefaultConstructed = false;
             end
         end
-        
+
+        function self = changeReferenceFrame(self, dDCM_NewFrameFromFrame)
+            arguments
+                self
+                dDCM_NewFrameFromFrame (3,3) {ismatrix, isnumeric}
+            end
+
+            self.dPosition_Frame         = dDCM_NewFrameFromFrame * self.dPosition_Frame;
+            self.dDCM_FrameFromPoseFrame = dDCM_NewFrameFromFrame * self.dDCM_FrameFromPoseFrame;
+        end
+
+        function [objNewPose] = composeRightSide(self, objOtherPose3)
+            arguments
+                self
+                objOtherPose3 {mustBeA(objOtherPose3, "SPose3")}
+            end
+            
+            % Compute new pose3
+            dPositionFromOther_Frame        = self.dPosition_Frame - objOtherPose3.dPosition_Frame;
+            dDCM_OtherFrameFromPoseFrame    = transpose(objOtherPose3.dDCM_FrameFromPoseFrame) * self.dDCM_FrameFromPoseFrame;
+
+            objNewPose = SPose3(dPositionFromOther_Frame, dDCM_OtherFrameFromPoseFrame);
+        end
+
         % GETTERS
         % Just methods for syntactic sugar
         function dPosition_Frame = translation(self)
