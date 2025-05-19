@@ -140,13 +140,18 @@ if nargout > 4 && bEvaluateJacobians(1)
     % Pre-compute shared quantities
     dInvSqrtDelta   = 1/dSqrtDelta;
     dJac_cCoeff_RayOriginInTF = dRayOriginFromEllipsCentre' * ( dEllipsoidMatrix + transpose(dEllipsoidMatrix) ); % * eye(3);
-
+    
+    dSign = 0.0;
     if dSignSelector == 1
         dSign = 1.0;
     elseif dSignSelector == 2
         dSign = -1.0;
     end
 
+    if coder.target('MATLAB') || coder.target('MEX')
+        assert(abs(dSign) > 0, 'ERROR: dSign variable cannot be zero.')
+    end
+    
     % Compute jacobian of intersection distance wrt ray origin in input Frame 
     dJacIntersectDist_RayOriginInTF = - dRayDirection_Frame' * dEllipsoidMatrix + ...
              (-dSign * dInvSqrtDelta * (2 * dbCoeff * dRayDirection_Frame' * dEllipsoidMatrix - daCoeff * dJac_cCoeff_RayOriginInTF) );
