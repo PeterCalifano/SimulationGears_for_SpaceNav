@@ -38,8 +38,6 @@ end %#codegen
 %     dResidualAccel) %#codegen
 % -------------------------------------------------------------------------------------------------------------
 %% DESCRIPTION
-% NOTE: Code generation not tested. It is likely that some modifications in how memory and variables are
-% handled by this function will be required to do it.
 % ACHTUNG: Sun is always assumed to be the first body in the list of d3rdBodiesGM and processed in this way.
 % -------------------------------------------------------------------------------------------------------------
 %% INPUT
@@ -182,11 +180,11 @@ if ~isempty(dBodyEphemerides)
         dAuxTerm1 = dPosSunToSC./(SCdistToSun)^3;
         dAuxTerm2 = dSunPos_IN./( norm(dSunPos_IN)^3);
 
-        if all(dAuxTerm1 < eps, 'all') && all(dAuxTerm2 < eps, 'all')
-            dAuxTerm3 = zeros(3,1);
-        else
+        % if all(dAuxTerm1 < eps, 'all') && all(dAuxTerm2 < eps, 'all')
+        %     dAuxTerm3 = zeros(3,1);
+        % else
             dAuxTerm3 = dAuxTerm1 - dAuxTerm2;
-        end
+        % end
 
         % Sun 3rd Body acceleration
         dAcc3rdSun(1:3) = d3rdBodiesGM(1) * dAuxTerm3;
