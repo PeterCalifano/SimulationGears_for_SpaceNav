@@ -317,7 +317,7 @@ classdef (Abstract) CBaseDatastruct < handle
 
                 if isstruct(tmpFieldValue)
                     % Recursive cleaning for nested struct
-                    strCleanedStruct = CleanAndSortStructFields(tmpFieldValue);
+                    strCleanedStruct = CBaseDatastruct.CleanAndSortStructFields(tmpFieldValue);
                     % Remove field if nested struct is empty
                     if isempty(fieldnames(strCleanedStruct))
                         strOutputStruct = rmfield(strOutputStruct, charFieldName);
