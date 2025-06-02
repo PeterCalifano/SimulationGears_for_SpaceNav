@@ -36,7 +36,7 @@ classdef CCameraIntrinsics < cameraIntrinsics
 
             if nargin > 2
                 % Compute FoV from intrinsics 
-                self.dFovHW(1) =  2*atan(0.5 * imageSizeHW(1) / focalLength_uv(2));
+                self.dFovHW(1) =  2*atan(0.5 * imageSizeHW(1) / focalLength_uv(1));
                 self.dFovHW(2) =  2*atan(0.5 * imageSizeHW(2) / focalLength_uv(2));
                 self.bDefaultConstructed = false;
                 
