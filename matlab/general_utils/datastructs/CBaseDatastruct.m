@@ -8,6 +8,8 @@ classdef (Abstract) CBaseDatastruct < handle
     % 17-02-2025    Pietro Califano     Behaviour change: default is now to save object in mat file directly
     % 01-05-2025    Pietro Califano     Complete prototype implementation of methods to dump to different
     %                                   formats and recursively convert object to struct
+    % 02-06-2025    Pietro Califano     Upgrade to remove empty fields when dumping to struct, json, yaml;
+    %                                   fix yml dump pipeline, add warning suppression
     % -------------------------------------------------------------------------------------------------------------
     %% METHODS
     % [-]
@@ -23,7 +25,7 @@ classdef (Abstract) CBaseDatastruct < handle
     % -------------------------------------------------------------------------------------------------------------
 
     properties (SetAccess = public, GetAccess = public)
-        bDefaultConstructed = true;
+        bDefaultConstructed {islogical, isscalar} = true;
         charDataHash;
         charInstanceName;
     end
@@ -126,7 +128,11 @@ classdef (Abstract) CBaseDatastruct < handle
             arguments
                 self
                 charFilename    (1,:) string {mustBeA(charFilename, ["string", "char"])} = fullfile('.', lower(string(class(self))));
-                charFormat      (1,:) string {mustBeA(charFormat, ["string", "char"]), mustBeMember(charFormat, ["json", "yaml", "mat", "struct"])} = "mat"
+                charFormat      (1,:) string {mustBeA(charFormat, ["string", "char"]), mustBeMember(charFormat, ["json", "yaml", "mat", "struct", "yml"])} = "mat"
+            end
+
+            if charFormat == "yml"
+                charFormat = "yaml"; % To allow both formats
             end
 
             % Object saving method
@@ -213,9 +219,15 @@ classdef (Abstract) CBaseDatastruct < handle
                 objDatastruct (:,1)
             end
 
+            % Disable warning temporarily
+            warning('off', 'MATLAB:structOnObject');
+
             % Do shallow conversion first      
             outStruct = struct(objDatastruct);
             
+            % Enable warnings again
+            warning('on', 'MATLAB:structOnObject');
+
             % Recursively convert any nested object/cell/struct
             cellFlds = fieldnames(outStruct);
 
@@ -224,6 +236,13 @@ classdef (Abstract) CBaseDatastruct < handle
                 outStruct.(charName) = CBaseDatastruct.convertValue_(outStruct.(charName));
             end
 
+            % Remove bDefaultConstructedField if existing
+            if isfield(outStruct, "bDefaultConstructed")
+                outStruct = rmfield(outStruct, "bDefaultConstructed");
+            end
+
+            % Remove empty fields and order struct
+            outStruct = CBaseDatastruct.CleanAndSortStructFields(outStruct);
         end
     
 
@@ -265,6 +284,65 @@ classdef (Abstract) CBaseDatastruct < handle
         end
     end
 
+
+    methods (Static, Access = public)
+        function strOutputStruct = CleanAndSortStructFields(strInputStruct)
+            %CLEANSORTSTRUCTFIELDS Recursively remove empty fields from a struct and sort fields
+            %   strOutputStruct = CLEANSORTSTRUCTFIELDS(strInputStruct) takes a struct strInputStruct
+            %   (possibly nested) and returns strOutputStruct where any field whose value is empty is removed.
+            %   All nested structs are cleaned recursively, and their fields are sorted alphabetically.
+
+            arguments
+                strInputStruct (1,1) struct   % Input struct to clean and sort
+            end
+
+            % Initialize output as a copy of the input
+            strOutputStruct = strInputStruct;
+
+            % Retrieve all field names (cell array of char)
+            cellFieldNames = fieldnames(strInputStruct);
+
+            % Loop through each field using a index
+            for dIdx = 1:numel(cellFieldNames)
+                charFieldName = cellFieldNames{dIdx};
+                tmpFieldValue   = strInputStruct.(charFieldName);
+
+                if isstruct(tmpFieldValue)
+                    % Recursive cleaning for nested struct
+                    strCleanedStruct = CleanAndSortStructFields(tmpFieldValue);
+                    % Remove field if nested struct is empty
+                    if isempty(fieldnames(strCleanedStruct))
+                        strOutputStruct = rmfield(strOutputStruct, charFieldName);
+                    else
+                        strOutputStruct.(charFieldName) = strCleanedStruct;
+                    end
+
+                elseif isempty(tmpFieldValue)
+                    % Remove field if its value is empty
+                    strOutputStruct = rmfield(strOutputStruct, charFieldName);
+                end
+            end
+
+            % After cleaning, sort remaining fields alphabetically
+            if ~isempty(strOutputStruct) && isstruct(strOutputStruct)
+                try
+                    % Use MATLAB's built-in orderfields (R2017b+)
+                    strOutputStruct = orderfields(strOutputStruct);
+                catch
+                    % Fallback for older MATLAB versions
+                    cellSortedFieldNames = sort(fieldnames(strOutputStruct));
+                    strReorderedStruct  = struct();
+                    for dIdx2 = 1:numel(cellSortedFieldNames)
+                        charSortedName = cellSortedFieldNames{dIdx2};
+                        strReorderedStruct.(charSortedName) = strOutputStruct.(charSortedName);
+                    end
+                    strOutputStruct = strReorderedStruct;
+                end
+            end
+        end
+
+    end
+
     methods (Static, Access = private)
         
         function outValue = convertValue_(inVal)
@@ -304,6 +382,7 @@ classdef (Abstract) CBaseDatastruct < handle
                 outValue = inVal;
             end
         end
+
     end
 
 end
