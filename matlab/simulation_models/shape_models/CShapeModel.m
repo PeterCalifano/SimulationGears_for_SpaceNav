@@ -16,9 +16,10 @@ classdef CShapeModel < CBaseDatastruct
     % [-]
     % -------------------------------------------------------------------------------------------------------------
 
-    properties (SetAccess = protected, GetAccess = public)
-
-
+    properties (SetAccess = public, GetAccess = public)
+        dTargetShapeMatrix_OF {ismatrix, isnumeric} = zeros(0,0,'double')
+        dObjectReferenceSize {isscalar, isnumeric}  = zeros(0,0)
+        charTargetUnitOutput = 'm';
     end
 
     properties (SetAccess = protected, GetAccess = public)
@@ -35,7 +36,7 @@ classdef CShapeModel < CBaseDatastruct
         dNormals = [];
         ui32TrianglesNormalsIndex = [];
         charModelName = ""
-        charTargetUnitOutput = 'm';
+
     end
 
     methods (Access = public)

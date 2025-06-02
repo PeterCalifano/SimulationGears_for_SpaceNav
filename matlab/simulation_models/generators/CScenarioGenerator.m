@@ -325,7 +325,6 @@ classdef CScenarioGenerator < CGeneralPropagator
                     %     dTargetReferenceRadius  = mean(cspice_bodvrd(num2str(ui32ID),'RADII',3)); % [m] ACHTUNG: Value used for Gravity SH expansion!
                     %     dTargetGravityParameter = cspice_bodvrd(num2str(ui32ID),'GM',1)*1e+09;            % [m^3/(s^2)]
                     % catch
-                        warning('Fetch of Apophis data from kernels failed. Fallback to hardcoded data...')
                         dTargetGravityParameter = 2.36; % m^3/s^2
                         dTargetReferenceRadius  = 1000*0.161915; % [m] ACHTUNG: Value used for Gravity SH expansion!
                     % end
@@ -342,7 +341,7 @@ classdef CScenarioGenerator < CGeneralPropagator
                     catch
                         warning('Fetch of Apophis data from kernels failed. Fallback to hardcoded data...')
                         dTargetReferenceRadius  = 1e3 * 0.175930344; % [m] ACHTUNG: Value used for Gravity SH expansion!
-                                                dTargetGravityParameter = 3.003435675;            % [m^3/(s^2)]
+                        dTargetGravityParameter = 3.003435675;            % [m^3/(s^2)]
                     end
 
                 case EnumScenarioName.Bennu_OREx
