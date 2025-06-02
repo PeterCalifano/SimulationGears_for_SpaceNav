@@ -480,7 +480,9 @@ classdef CAttitudePointingGenerator < handle
             %                                                                                     settings)
             % -------------------------------------------------------------------------------------------------------------
             %% DESCRIPTION
-            % TODO
+            % This function computes the displaced boresight unit vector and the new look-at point based on the provided parameters.
+            % It supports two modes of displacement: "lookAtPoint" and "rotate3d". The displacement can be defined as an angle or a distance.
+            % The function can also apply a randomization of the displacement value based on a Gaussian or uniform distribution.
             % -------------------------------------------------------------------------------------------------------------
             %% INPUT
             % arguments

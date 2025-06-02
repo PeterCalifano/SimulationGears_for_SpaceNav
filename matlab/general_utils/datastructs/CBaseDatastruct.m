@@ -82,7 +82,11 @@ classdef (Abstract) CBaseDatastruct < handle
             strData = CBaseDatastruct.toStructStatic(self);
         end
        
-        function [charYamlString] = toYaml(self)
+        function [charYamlString] = toYaml(self, bSaveAsWrapped)
+            arguments
+                self
+                bSaveAsWrapped {islogical, isscalar} = false
+            end
             % Check yaml package is available
             if isempty( which('yaml.dumpFile') )
                 error('YAML toolbox not found. Please install Martin Koch''s yaml and add it to your MATLAB path.');
@@ -92,11 +96,15 @@ classdef (Abstract) CBaseDatastruct < handle
             charClassName = class(self);
             charClassName = strcat("obj",charClassName);
 
-            % Recursively convert to strOut first
-            strTmp.(charClassName) = self.toStruct();
+            if bSaveAsWrapped
+                % Recursively convert to strOut first
+                strTmp.(charClassName) = self.toStruct();
+            else
+                strTmp = self.toStruct();
+            end
 
             % Emit a YAML string
-            charYamlString = yaml.dump(strTmp);
+            charYamlString = yaml.dump(strTmp, "auto");
 
         end
 
