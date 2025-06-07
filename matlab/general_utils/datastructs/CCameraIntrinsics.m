@@ -89,5 +89,16 @@ classdef CCameraIntrinsics < cameraIntrinsics
                
         end
 
+        function [dFovInDegrees] = computeFovInDegrees(dImageSizeHW, dFocalLengthInPix)
+            arguments
+                dImageSizeHW      (2,1) double
+                dFocalLengthInPix (2,1) double
+            end
+
+            dFovInDegrees(1) =  2*atand(0.5 * double(dImageSizeHW(1)) / dFocalLengthInPix(1));
+            dFovInDegrees(2) =  2*atand(0.5 * double(dImageSizeHW(2)) / dFocalLengthInPix(2));
+
+        end
+
     end
 end
