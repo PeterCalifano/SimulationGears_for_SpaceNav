@@ -181,7 +181,7 @@ classdef (Abstract) CBaseDatastruct < handle
 
                 case "yaml"
                     if isempty(charFileExt) || strcmpi(charFileExt, "")
-                        charFilename = strcat(charFilename, '.yaml');
+                        charFilename = strcat(charFilename, '.yml');
                     end
                     
                     % Check yaml package is available
