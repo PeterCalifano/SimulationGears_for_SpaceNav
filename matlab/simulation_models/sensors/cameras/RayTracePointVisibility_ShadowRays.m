@@ -122,6 +122,9 @@ dPointPosZ_TB = dPointPosZ_TB(bPointsToRayTrace);
 
 i32NumOfPointsToTrace = int32( length(dPointPosX_TB) );
 
+% Prune array of points indices based on FoV
+ui32PointsIdx = ui32PointsIdx(bPointsToRayTrace);
+
 % Compute norms of relative positions of points wrt camera
 dRayToPointsFromCam_TB  = [dPointPosX_TB; dPointPosY_TB; dPointPosZ_TB] - dCamPosition_TB;
 dRayToPointsFromCamNorm = vecnorm(dRayToPointsFromCam_TB, 2, 1);
@@ -136,6 +139,16 @@ dPointDirFromCamZ_TB = dRayToPointsFromCam_TB(3, :);
 i32triangVertPtr1 = ui32triangVertexPtr(1, :); % Improved mem access speed
 i32triangVertPtr2 = ui32triangVertexPtr(2, :); 
 i32triangVertPtr3 = ui32triangVertexPtr(3, :); 
+
+% Field of view check for triangles: create mask to reduce number of intersections
+% TODO: review
+% bTriangVerticesVisibilityMask
+% [dProjectedTriangVert_UV] = pinholeProjectArrayHP_DCM(strCameraData.dKcam, 
+%                                                         dDCM_INfromCAM' * dDCM_INfromTB, 
+%                                                         dCamPosition_TB, 
+%                                                         dVerticesPos);
+
+bTriangVerticesVisibilityMask = ((dProjectedTriangVert_UV(1, :) > 0 & dProjectedTriangVert_UV(1, :) < dResX) & (dProjectedTriangVert_UV(2, :) > 0 & dProjectedTriangVert_UV(2, :) < dResY))';
 
 %% MAIN computation loop
 bPointsVisibilityMask = false(i32NumOfPointsToTrace, 1); % Initialize visibility mask as "no visibility"
@@ -172,9 +185,15 @@ parfor idL = 1:i32NumOfPointsToTrace
 
         if bPointsAreMeshVertices
             % If vertices are used as points, exclude the triangle containing the point as vertices from the intersection check
-            bDoRayTrace = all(i32triangVertPtr1_tmp ~= ui32PointsIdx(idL) & i32triangVertPtr2_tmp ~= ui32PointsIdx(idL) & ...
-                            i32triangVertPtr3_tmp ~= ui32PointsIdx(idL));            
+            bDoRayTrace = all(i32triangVertPtr1_tmp ~= ui32PointsIdx(idL) & ...
+                              i32triangVertPtr2_tmp ~= ui32PointsIdx(idL) & ...
+                              i32triangVertPtr3_tmp ~= ui32PointsIdx(idL));       
         end
+
+        % Check if all three vertices of the triangle are not visible --> continue without testing the idth triangle
+        %if all( bTriangVerticesVisibilityMask([i32triangVertPtr1_tmp, i32triangVertPtr2_tmp, i32triangVertPtr3_tmp]) == false )
+        %    continue;
+        %end
 
         if bDoRayTrace == true
 
@@ -254,6 +273,14 @@ parfor idL = 1:i32NumOfPointsToTrace
                     bPointsVisibilityMask(idL) = true;
                 end
             end
+
+        elseif id == ui32NumTrianglesInSubset && bNoIntersect == false
+
+            % No intersection detected after testing all triangles and point not occluded by mesh AND it is part of the discarded triangles (bDoRayTrace was false)--> point visible
+            if bPointsVisibilityMask(idL) == false
+                bPointsVisibilityMask(idL) = true;
+            end
+
         end
 
     end % Loop over triangles
