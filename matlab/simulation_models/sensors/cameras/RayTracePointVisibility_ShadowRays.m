@@ -158,6 +158,9 @@ parfor idL = 1:i32NumOfPointsToTrace
     dTmpTriangleVertices = coder.nullcopy(zeros(3, 3));
     bDoRayTrace = true; % Default: perform intersection check for all triangles
 
+    % "Global" intersect flag
+    bNoIntersect = false; % Becomes true only if any triangle is intersected
+
     for id = 1:ui32NumTrianglesInSubset
 
         idT = ui32TrianglesIDsubset(id);
@@ -191,6 +194,7 @@ parfor idL = 1:i32NumOfPointsToTrace
                 bTwoSidedTest, ...
                 false); % Normal ray, one-sided test
 
+            bNoIntersect = bNoIntersect || bTmpIntersectFlag;
 
             %%%%%%%%%%%%%%%%%%%%%% DEBUG %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
             % [bTmpIntersectFlag_check, ~, ~, dIntersectDistance_check] = RayTwoSidedTriangleIntersection_MollerTrembore(dCamPosition_TB, ...
@@ -244,8 +248,8 @@ parfor idL = 1:i32NumOfPointsToTrace
                     break;
                 end
                 
-            elseif id == ui32NumTrianglesInSubset && bTmpIntersectFlag == false
-                if bPointsVisibilityMask(idL) == false && not(bPointsAreMeshVertices)
+            elseif id == ui32NumTrianglesInSubset && bNoIntersect == false
+                if bPointsVisibilityMask(idL) == false
                     % No intersection detected after testing all triangles and point not occluded by mesh --> point visible
                     bPointsVisibilityMask(idL) = true;
                 end
