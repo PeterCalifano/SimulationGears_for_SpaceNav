@@ -148,7 +148,10 @@ i32triangVertPtr3 = ui32triangVertexPtr(3, :);
 %                                                         dCamPosition_TB, 
 %                                                         dVerticesPos);
 
-bTriangVerticesVisibilityMask = ((dProjectedTriangVert_UV(1, :) > 0 & dProjectedTriangVert_UV(1, :) < dResX) & (dProjectedTriangVert_UV(2, :) > 0 & dProjectedTriangVert_UV(2, :) < dResY))';
+% bTriangVerticesVisibilityMask = ((dProjectedTriangVert_UV(1, :) > 0 & ...
+%                     dProjectedTriangVert_UV(1, :) < dResX) & ...
+%                     (dProjectedTriangVert_UV(2, :) > 0 & ...
+%                     dProjectedTriangVert_UV(2, :) < dResY))';
 
 %% MAIN computation loop
 bPointsVisibilityMask = false(i32NumOfPointsToTrace, 1); % Initialize visibility mask as "no visibility"
