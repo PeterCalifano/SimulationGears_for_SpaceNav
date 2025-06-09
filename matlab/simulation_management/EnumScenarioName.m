@@ -22,6 +22,8 @@ enumeration
     Bennu
     Apophis
     Moon
+    Mars
+    Ceres
 end
 
 end
