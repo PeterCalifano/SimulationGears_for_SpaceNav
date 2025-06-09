@@ -3,7 +3,8 @@ classdef CCameraIntrinsics < cameraIntrinsics
 % Class to store optical cameras intrinsic parameters (calibration) for pinhole projection model
 % -------------------------------------------------------------------------------------------------------------
 %% CHANGELOG
-% 10-10-2024        Pietro Califano         Class implementation as wrapper of cameraIntrinsics
+% 10-10-2024    Pietro Califano     Class implementation as wrapper of cameraIntrinsics
+% 09-06-2025    Pietro Califano     Update to add new conveniency methods and attributes
 % -------------------------------------------------------------------------------------------------------------
 %% DEPENDENCIES
 % [-]
