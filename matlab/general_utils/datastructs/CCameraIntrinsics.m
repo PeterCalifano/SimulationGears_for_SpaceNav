@@ -15,6 +15,7 @@ classdef CCameraIntrinsics < cameraIntrinsics
     properties (SetAccess = protected, GetAccess = public)
         bDefaultConstructed logical = true;
         dFovHW              double  = zeros(2,1); % [rad]
+        dMeanIFovInRad          double  = zeros(2,1); % [rad]
         % TODO remove inheritance from cameraIntrinsics and add fields here
     end
 
@@ -40,6 +41,9 @@ classdef CCameraIntrinsics < cameraIntrinsics
                 self.dFovHW(2) =  2*atan(0.5 * imageSizeHW(2) / focalLength_uv(2));
                 self.bDefaultConstructed = false;
                 
+                % Compute mean IFOV
+                self.dMeanIFovInRad = self.dFovHW ./ imageSizeHW;
+
             elseif nargin > 0 && nargin < 3
                 warning('You should specify all the intrinsic parameters for the instance to be a valid one. Make sure to do so before using it.')
             end
@@ -99,6 +103,16 @@ classdef CCameraIntrinsics < cameraIntrinsics
             dFovInDegrees(2) =  2*atand(0.5 * double(dImageSizeHW(2)) / dFocalLengthInPix(2));
 
         end
+
+        function [dMeanIFovInRad] = computeIFovInRad(dFovInRadHW, dImageSizeHW)
+            arguments
+                dFovInRadHW       (2,1) double
+                dImageSizeHW      (2,1) double
+            end
+
+            dMeanIFovInRad = dFovInRadHW ./ dImageSizeHW;
+        end
+
 
     end
 end
