@@ -42,7 +42,7 @@ classdef CCameraIntrinsics < cameraIntrinsics
                 self.bDefaultConstructed = false;
                 
                 % Compute mean IFOV
-                self.dMeanIFovInRad = self.dFovHW ./ imageSizeHW;
+                self.dMeanIFovInRad = self.dFovHW ./ imageSizeHW(:);
 
             elseif nargin > 0 && nargin < 3
                 warning('You should specify all the intrinsic parameters for the instance to be a valid one. Make sure to do so before using it.')
