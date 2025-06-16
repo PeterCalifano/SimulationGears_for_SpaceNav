@@ -279,19 +279,26 @@ classdef CScenarioGenerator < CGeneralPropagator
                 settings.bAddNonSphericalGravityCoeffs (1,1) logical {islogical, isscalar} = false;
             end
             %% INPUT
-            % in1 [dim] description
-            % Name1                     []
-            % Name2                     []
-            % Name3                     []
+            % arguments
+            %     enumScenarioName EnumScenarioName {mustBeA(enumScenarioName, ["EnumScenarioName", "string", "char"])}
+            %     strDynParams (1,1) = struct()
+            % end
+            % arguments
+            %     % TODO load from file if specified
+            %     kwargs.charSpherHarmCoeffInputFileName (1,:) string {mustBeA(kwargs.charSpherHarmCoeffInputFileName, ["string", "char"])} = ""
+            % end
+            % arguments
+            %     settings.bAddNonSphericalGravityCoeffs (1,1) logical {islogical, isscalar} = false;
+            % end
             % -------------------------------------------------------------------------------------------------------------
             %% OUTPUT
-            % out1 [dim] description
-            % Name1                     []
-            % Name2                     []
-            % Name3                     []
+            % charTargetName
+            % charTargetFixedFrame
+            % strDynParams
             % -------------------------------------------------------------------------------------------------------------
             %% CHANGELOG
             % 14-03-2025    Pietro Califano     First version implemented from legacy codes
+            % 15-06-2025    Pietro Califano     Fix incorrect measurement unit for Apophis radius
             % -------------------------------------------------------------------------------------------------------------
             %% DEPENDENCIES
             % [-]
@@ -326,7 +333,7 @@ classdef CScenarioGenerator < CGeneralPropagator
                     %     dTargetGravityParameter = cspice_bodvrd(num2str(ui32ID),'GM',1)*1e+09;            % [m^3/(s^2)]
                     % catch
                         dTargetGravityParameter = 2.36; % m^3/s^2
-                        dTargetReferenceRadius  = 1000*0.161915; % [m] ACHTUNG: Value used for Gravity SH expansion!
+                        dTargetReferenceRadius  = 1E+03 * 0.161915; % [m] ACHTUNG: Value used for Gravity SH expansion!
                     % end
 
                 case EnumScenarioName.Apophis
@@ -336,12 +343,12 @@ classdef CScenarioGenerator < CGeneralPropagator
 
                     try
                         ui32ID = 20099942;
-                        dTargetReferenceRadius  = mean(cspice_bodvrd(num2str(ui32ID),'RADII',3)); % [m] ACHTUNG: Value used for Gravity SH expansion!
-                        dTargetGravityParameter = cspice_bodvrd(num2str(ui32ID),'GM',1)*1e+09;            % [m^3/(s^2)]
+                        dTargetReferenceRadius  = 1E+03 * mean(cspice_bodvrd(num2str(ui32ID),'RADII',3)); % [m] ACHTUNG: Value used for Gravity SH expansion!
+                        dTargetGravityParameter = 1E+09 * cspice_bodvrd(num2str(ui32ID),'GM',1) ;         % [m^3/(s^2)]
                     catch
                         warning('Fetch of Apophis data from kernels failed. Fallback to hardcoded data...')
-                        dTargetReferenceRadius  = 1e3 * 0.175930344; % [m] ACHTUNG: Value used for Gravity SH expansion!
-                        dTargetGravityParameter = 3.003435675;            % [m^3/(s^2)]
+                        dTargetReferenceRadius  = 1E+03 * 0.175930344; % [m] ACHTUNG: Value used for Gravity SH expansion!
+                        dTargetGravityParameter = 3.003435675;         % [m^3/(s^2)]
                     end
 
                 case EnumScenarioName.Bennu_OREx
