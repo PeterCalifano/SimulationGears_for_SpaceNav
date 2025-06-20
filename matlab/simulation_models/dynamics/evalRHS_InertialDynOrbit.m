@@ -88,6 +88,7 @@ end
 dSunPos_IN = zeros(3,1);
 ui8N3rdBodies = uint8(size(dBodyEphemerides, 2)) - 1;
 d3rdBodiesPos_IN = zeros(3, length(ui8N3rdBodies));
+dMainBodyPos_IN = zeros(3,1);
 
 if ~isempty(dBodyEphemerides)
 
@@ -160,15 +161,19 @@ if ~isempty(dBodyEphemerides)
                 dPos3rdBodiesToSC(:) = dxState_IN(ui16posVelIdx(1:3)) - d3rdBodiesPos_IN(1:3, idB);
 
                 % Compute 3rd body acceleration
+                d3rdBodyPosFromMain_IN = d3rdBodiesPos_IN(:, idB) - dMainBodyPos_IN;
+
                 dTotAcc3rdBody(:) = dTotAcc3rdBody(1:3) + d3rdBodiesGM(idB+1) * ...
-                                                 ( dPos3rdBodiesToSC./( norm(dPos3rdBodiesToSC) )^3 - ...
-                                                 d3rdBodiesPos_IN(:, idB)./(norm(d3rdBodiesPos_IN(:, idB))^3) );
+                                                 ( dPos3rdBodiesToSC./( norm(dPos3rdBodiesToSC) )^3 + ...
+                                                 d3rdBodyPosFromMain_IN./(norm(d3rdBodyPosFromMain_IN)^3) );
             end
 
         end
 
         % Compute SC position relative to bodies
         dPosSunToSC(:) = dxState_IN(ui16posVelIdx(1:3)) - dSunPos_IN;
+        dPosSunFromMain_IN = dSunPos_IN - dMainBodyPos_IN;
+
         SCdistToSun(:) = norm(dPosSunToSC);
 
         if coder.target('MATLAB') || coder.target('MEX')
@@ -178,12 +183,12 @@ if ~isempty(dBodyEphemerides)
         % DEVNOTE: replace with more accurate formula to handle it in double precision
         % Current solution only bypasses the issue caused by the difference.
         dAuxTerm1 = dPosSunToSC./(SCdistToSun)^3;
-        dAuxTerm2 = dSunPos_IN./( norm(dSunPos_IN)^3);
+        dAuxTerm2 = dPosSunFromMain_IN./( norm(dPosSunFromMain_IN)^3);
 
         % if all(dAuxTerm1 < eps, 'all') && all(dAuxTerm2 < eps, 'all')
         %     dAuxTerm3 = zeros(3,1);
         % else
-            dAuxTerm3 = dAuxTerm1 - dAuxTerm2;
+        dAuxTerm3 = dAuxTerm1 + dAuxTerm2;
         % end
 
         % Sun 3rd Body acceleration
