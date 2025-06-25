@@ -14,8 +14,9 @@ classdef CCameraIntrinsics < cameraIntrinsics
 % -------------------------------------------------------------------------------------------------------------
     
     properties (SetAccess = protected, GetAccess = public)
-        bDefaultConstructed logical = true;
-        dFovHW              double  = zeros(2,1); % [rad]
+        bDefaultConstructed logical     = true;
+        dPixelSize          double      = zeros(2,1); % [micro_m]
+        dFovHW              double      = zeros(2,1); % [rad]
         dMeanIFovInRad          double  = zeros(2,1); % [rad]
         % TODO remove inheritance from cameraIntrinsics and add fields here
     end
