@@ -8,7 +8,7 @@ classdef (Abstract) CBaseDatastructWithTimes < CBaseDatastruct
     % TODO
     % -------------------------------------------------------------------------------------------------------------
     %% CHANGELOG
-    % 04-02-2025    Pietro Califano     First prototype implementation
+    % 04-02-2025    Pietro Califano     First prototype implementation.
     % -------------------------------------------------------------------------------------------------------------
     %% METHODS
     % [-]
@@ -24,18 +24,18 @@ classdef (Abstract) CBaseDatastructWithTimes < CBaseDatastruct
     % -------------------------------------------------------------------------------------------------------------
 
     properties 
-        dTimestamps                  (1,:)  double {isnumeric, isvector} = [];
+        dTimestamps         (1,:)  double {isnumeric, isvector} = [];
+        charTimeUnits       char {mustBeA(charTimeUnits, ["string", "char"])} = 's';
     end
 
     methods (Access = public)
         function self = CBaseDatastructWithTimes(dTimestamps)
             arguments
-                dTimestamps                  (1, :)     double {isnumeric, isvector} = [];
-
+                dTimestamps         (1, :)     double {isnumeric, isvector} = [];
             end
             
             % Store REQUIRED attributes
-            self.dTimestamps                = dTimestamps                  ;
+            self.dTimestamps   = dTimestamps;
         end
 
         % GETTERS
