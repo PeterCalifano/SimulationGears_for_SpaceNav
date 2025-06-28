@@ -83,15 +83,16 @@ end
 fprintf("\nFetching data to build reference mission plan from kernels...\n")
 
 % Validate target ID
-if isnumeric(varTargetID)
-    varTargetID = int32(varTargetID);
-else
-    try
-        varTargetID = char(varTargetID);
-    catch
-        error('Invalid input datatype for varTargetID: must be an integer numeric value or a string/char. Got: %s.', class(varTargetID))
-    end
+[varTargetID, charTargetID] = ValidateID_(varTargetID);
+[~, varReferenceCentre] = ValidateID_(varReferenceCentre);
+ui32CounterAddBodies = length(kwargs.AdditionalTargetsID);
+
+for idC = 1:ui32CounterAddBodies
+    [~, kwargs.AdditionalTargetsID{idC}] = ValidateID_(kwargs.AdditionalTargetsID);
 end
+
+kwargs.varTargetBodyID = ValidateID_(kwargs.varTargetBodyID);
+
 
 % Validate/handle name of kernel path
 % if iobject(enumTrajectKernelName)
@@ -102,7 +103,7 @@ end
 %     enumTrajectKernelName = char(enumTrajectKernelName);
 % end
 enumTrajectKernelName = char(enumTrajectKernelName);
-charKernelFilePath = char( fullfile(charTrajKernelFolderPath, sprintf("%s.bsp", enumTrajectKernelName)) );
+charKernelFilePath = char( fullfile(kwargs.charTrajKernelFolderPath, sprintf("%s.bsp", enumTrajectKernelName)) );
 
 if not(isfile(charKernelFilePath))
     error('SPK Kernel file not found at %s.', charKernelFilePath);
@@ -131,7 +132,7 @@ if kwargs.bLoadManoeuvres == true
 
     [dTargetCover, dManVectors, dManMagnitudes, dStatePreMan, ...
         dPrePostManTime, dStatePostMan, ui32NumIntervals] = GetManoeuvresFromSPK(varTargetID, ...
-                                                                        "charKernelFolderPath", charTrajKernelFolderPath, ...
+                                                                        "charKernelFolderPath", kwargs.charTrajKernelFolderPath, ...
                                                                         "charKernelNameWithoutExt", enumTrajectKernelName, ...
                                                                         "charKernelLengthUnits", kwargs.charKernelLengthUnits, ...
                                                                         "charOutputLengthUnits", kwargs.charOutputLengthUnits, ...
@@ -173,7 +174,7 @@ end
 
 % Print monitoring information
 fprintf('Using %s timegrid with relative bounds from ET0: [%8.0f, %8.0f].\nData spans a total of %s.\n', ...
-    upper(charGridType), dTimegridVect(1), dTimegridVect(end), formatElapsedTime(dTimegridVect(end) - dTimegridVect(1)));
+    upper(charGridType), dTimegridVect(1), dTimegridVect(end), FormatElapsedTime_(dTimegridVect(end) - dTimegridVect(1)));
 
 % Check that last entry of timegrid is within allowed bounds
 assert(dAbsTimegrid(end) <= dETf, "ERROR: last time instant specified in absolute timegrid is outside allowed ET bounds! %6.2g < %6.2g\n", dETf, dTimegridVect(end));
@@ -201,12 +202,12 @@ catch ME
 end
 
 % Spacecraft state in World Frame from reference centre
-dStateSC_WorldFrame = cspice_spkezr(varTargetID, dAbsTimegrid, char(enumWorldFrame), 'NONE', varReferenceCentre);
+dStateSC_WorldFrame = cspice_spkezr(charTargetID, dAbsTimegrid, char(enumWorldFrame), 'NONE', varReferenceCentre);
 
 try
     % Target state in World Frame
     % TODO: does spice define frames with a specific origin or only as attitude?
-    dTargetPosition_WorldFrame = cspice_spkpos(varTargetBodyID, dAbsTimegrid, char(enumWorldFrame), 'NONE', varReferenceCentre); % TODO which observer?? TBC
+    dTargetPosition_WorldFrame = cspice_spkpos(kwargs.varTargetBodyID, dAbsTimegrid, char(enumWorldFrame), 'NONE', varReferenceCentre); % TODO which observer?? TBC
 catch ME
     warning('Attempt to retrieve target body position failed with error: %s', string(ME.message) );
 end
@@ -214,8 +215,8 @@ end
 try
     % Target attitude in World Frame
     dTargetDCM_TBfromWorld = cspice_pxform(char(enumWorldFrame), char(enumTargetFrame), dAbsTimegrid);
-catch
-    warning('Attempt to retrieve target body attitude failed with error: %s', string(ME.message) );
+catch ME
+    error('Attempt to retrieve target body attitude failed with error: %s', string(ME.message) );
 end
 
 %% Process additional targets if available in loaded kernel sets
@@ -308,14 +309,24 @@ if nargout == 1
 end
 %% Additional data (if required)
 % State of spacecraft in Target Frame
-dStateSC_TargetFixed = cspice_spkezr(varTargetID, dAbsTimegrid, char(enumTargetFrame), 'NONE', varReferenceCentre);
-
+try
+    dStateSC_TargetFixed = cspice_spkezr(charTargetID, dAbsTimegrid, char(enumTargetFrame), 'NONE', varReferenceCentre);
+catch ME
+    warning('Attempt to retrieve spacecraft state in target body frame failed with error: %s', string(ME.message) );
+    dStateSC_TargetFixed = [];
+end
 if nargout == 2
     return;
 end
 
 % Apophis position to Sun in target frame
-dSunPosition_TargetFixed = cspice_spkpos('SUN', dAbsTimegrid, char(enumTargetFrame), 'NONE', varReferenceCentre);
+try
+    dSunPosition_TargetFixed = cspice_spkpos('SUN', dAbsTimegrid, char(enumTargetFrame), 'NONE', varReferenceCentre);
+catch
+    warning('Attempt to retrieve Sun position in target body frame failed with error: %s', string(ME.message) );
+    dStateSC_TargetFixed = [];
+end
+
 
 if nargout == 3
     return;
@@ -324,7 +335,7 @@ end
 end
 
 % Local function to get elapsed time as string
-function charElapsedTime = formatElapsedTime(dSeconds)
+function charElapsedTime = FormatElapsedTime_(dSeconds)
 
 dDays = floor(dSeconds / (24 * 3600)); % Convert to days
 dHours = floor(dSeconds / 3600);       % Convert to hours
@@ -344,4 +355,23 @@ elseif dMinutes >= 1
 else
     charElapsedTime = sprintf('%02d sec', floor(dSeconds));
 end
+end
+
+function [varTargetID, charTargetID] = ValidateID_(varTargetID)
+
+dTmpNumber = str2double(varTargetID);
+bIsNumberTargetID = not(isnan(dTmpNumber));
+
+if isnumeric(varTargetID) || bIsNumberTargetID
+    varTargetID = int32(varTargetID);
+    charTargetID = char(sprintf('%d', varTargetID));
+else
+    try
+        varTargetID = char(varTargetID);
+        charTargetID = char(varTargetID);
+    catch
+        error('Invalid input datatype for target ID: must be an integer numeric value or a string/char. Got: %s.', class(varTargetID))
+    end
+end
+
 end

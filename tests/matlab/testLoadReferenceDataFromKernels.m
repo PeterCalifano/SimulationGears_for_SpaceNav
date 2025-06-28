@@ -5,13 +5,14 @@ clc
 
 % TEST SETUP
 dInitialRelTimestamp = 0; % DEVNOTE: this is a necessary assumption in the current implementation
-dFramesDeltaTime
+dFramesDeltaTime = 60;
 dTotalTimeDuration = 8 * 86400;
 dTimegridVect = dInitialRelTimestamp : dFramesDeltaTime : dInitialRelTimestamp + dTotalTimeDuration;
 
 %% test_LoadReferenceDataRCS1
 % Test original implementation tailored for RCS-1 mission
 charKernelLengthUnits = 'km';
+enumTrajName = EnumTrajectoryNames.RTO_4t1_J11p0;
 
 objDataset  = LoadReferenceDataRCS1(enumTrajName, ...
                                     dTimegridVect, ...
@@ -22,16 +23,21 @@ objDataset  = LoadReferenceDataRCS1(enumTrajName, ...
 
 %% test_LoadReferenceDataFromKernels
 % Test on FUTURE kernels
+charKernelPathRoot = "/home/peterc/devDir/projects-DART/data/future/phase-C/kernels/mk/";
+charCurrentDir = pwd;
+cd(charKernelPathRoot)
+cspice_furnsh('kernels.mk')
+cd(charCurrentDir);
 
-varTargetID                 = "";
-enumTrajectKernelName       = "";
+varTargetID                 = int32(-10003001);
+enumTrajectKernelName       = "kernelFUT_h600";
 
 enumWorldFrame              = "J2000";
 varReferenceCentre          = "EARTH";
-enumTargetFrame             = "ECI"; 
+enumTargetFrame             = "IAU_EARTH"; 
 
-charTrajKernelFolderPath    = "";
-varTargetBodyID             = "";
+charTrajKernelFolderPath    = "/home/peterc/devDir/projects-DART/data/future/phase-C/kernels/trajectories";
+varTargetBodyID             = "MOON";
 
 cellAdditionalTargetsID     = {};
 cellAdditionalTargetNames   = {};
