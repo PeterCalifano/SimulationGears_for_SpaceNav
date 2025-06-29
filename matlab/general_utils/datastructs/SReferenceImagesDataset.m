@@ -11,6 +11,7 @@ classdef SReferenceImagesDataset < SReferenceMissionDesign % TODO the name of th
     %% CHANGELOG
     % 17-02-2025    Pietro Califano     Derived from SReferenceMissionDesign to add data necessary to use
     %                                   datasets for navigation simulations (e.g. camera params)
+    % 29-06-2025    Pietro Califano     Complete extension to handle multiple bodies data
     % -------------------------------------------------------------------------------------------------------------
     %% METHODS
     % [-]

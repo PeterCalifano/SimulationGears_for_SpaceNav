@@ -14,6 +14,7 @@ arguments (Input)
     enumTargetFrame         (1,1) {mustBeA(enumTargetFrame, ["SEnumFrameName", "string", "char"])} = enumWorldFrame
 end
 arguments (Input)
+    kwargs.bIsTimeGridRelative      (1,1) logical {mustBeScalarOrEmpty} = true
     kwargs.charTrajKernelFolderPath (1,:) char {ischar, isstring, mustBeFolder} = '.'
     kwargs.dDeltaTimeStep           (1,1) double {isscalar, mustBeNumeric} = 60.0
     kwargs.dEphTimes0toFinal        (2,1) double {isvector, mustBeNumeric} = [0;0]
@@ -21,8 +22,10 @@ arguments (Input)
     kwargs.charKernelLengthUnits    (1,:) char {ischar, isstring, mustBeMember(kwargs.charKernelLengthUnits, ["km", "m"])} = "km";
     kwargs.charOutputLengthUnits    (1,:) char {ischar, isstring, mustBeMember(kwargs.charOutputLengthUnits, ["km", "m"])} = "km";
     kwargs.varTargetBodyID          {mustBeA(kwargs.varTargetBodyID, ["string", "char", "double", "int32", "uint32", "single"])} = varReferenceCentre % Defaults to reference centre in most cases
-    kwargs.AdditionalTargetsID      {iscell} = {};
-    kwargs.AdditionalTargetNames    {iscell} = {};
+    kwargs.cellAdditionalTargetsID         {iscell} = {};
+    kwargs.cellAdditionalTargetFrames      {iscell} = {};
+    kwargs.cellAdditionalTargetNames       {iscell} = {};
+    kwargs.bAdditionalBodiesRequireAttitude (1,:) logical {islogical} = false(0,0);
 end
 arguments (Output)
     objReferenceMissionData     (1,1) SReferenceImagesDataset
@@ -85,10 +88,10 @@ fprintf("\nFetching data to build reference mission plan from kernels...\n")
 % Validate target ID
 [varTargetID, charTargetID] = ValidateID_(varTargetID);
 [~, varReferenceCentre] = ValidateID_(varReferenceCentre);
-ui32CounterAddBodies = length(kwargs.AdditionalTargetsID);
+ui32CounterAddBodies = length(kwargs.cellAdditionalTargetsID);
 
-for idC = 1:ui32CounterAddBodies
-    [~, kwargs.AdditionalTargetsID{idC}] = ValidateID_(kwargs.AdditionalTargetsID);
+for idB = 1:ui32CounterAddBodies
+    [~, kwargs.cellAdditionalTargetsID{idB}] = ValidateID_(kwargs.cellAdditionalTargetsID{idB});
 end
 
 kwargs.varTargetBodyID = ValidateID_(kwargs.varTargetBodyID);
@@ -154,7 +157,7 @@ if not(isempty(dTimegridVect))
     dFirstTime = dTimegridVect(1);
     assert(dFirstTime >= 0, sprintf("ERROR: input timegrid must only contain non-negative real numbers! Found initial timestamp: %6g\n", dFirstTime));
 
-    if abs(dFirstTime - dET0) < 100
+    if not(kwargs.bIsTimeGridRelative)
 
         bIsInputTimegridRelative = false;
         charGridType = "absolute";
@@ -221,29 +224,39 @@ end
 
 %% Process additional targets if available in loaded kernel sets
 % kwargs.varTargetBodyID          {mustBeA(kwargs.varTargetBodyID, ["string", "char", "double", "int32", "uint32", "single"])} = varReferenceCentre % Defaults to reference centre in most cases
-% kwargs.AdditionalTargetsID      {iscell} = {};
-% kwargs.AdditionalTargetNames    {iscell} = {};
-assert(isempty(kwargs.AdditionalTargetNames) || length(kwargs.AdditionalTargetsID) == length(kwargs.AdditionalTargetNames), ...
-    'ERROR: AdditionalTargetNames and AdditionalTargetsID must have the same length if any name has to be specified. Else leave AdditionalTargetNames as empty.');
+% kwargs.cellAdditionalTargetsID      {iscell} = {};
+% kwargs.cellAdditionalTargetNames    {iscell} = {};
+assert(isempty(kwargs.cellAdditionalTargetNames) || length(kwargs.cellAdditionalTargetsID) == length(kwargs.cellAdditionalTargetNames), ...
+    'ERROR: cellAdditionalTargetNames and cellAdditionalTargetsID must have the same length if any name has to be specified. Else leave cellAdditionalTargetNames as empty.');
 
-if ~isempty(kwargs.AdditionalTargetsID)
+assert( (isempty(kwargs.cellAdditionalTargetFrames) && not(any(kwargs.bAdditionalBodiesRequireAttitude)) ) ||...
+    length(kwargs.cellAdditionalTargetsID) == length(kwargs.cellAdditionalTargetFrames), ...
+    'ERROR: cellAdditionalTargetFrames and cellAdditionalTargetsID must have the same length if any name has to be specified. Else leave cellAdditionalTargetFrames as empty.');
 
-    ui32NumAdditionalBodies = uint32(length(kwargs.AdditionalTargetsID));
-    cellTargetTags = cell(1, ui32NumAdditionalBodies);
-    cellTargetPos_W = cell(1, ui32NumAdditionalBodies);
+
+if ~isempty(kwargs.cellAdditionalTargetsID)
+
+    ui32NumAdditionalBodies = uint32(length(kwargs.cellAdditionalTargetsID));
+    cellTargetTags          = cell(1, ui32NumAdditionalBodies);
+    cellTargetPos_W         = cell(1, ui32NumAdditionalBodies);
+    cellTargetDCM_TBfromW   = cell(1, ui32NumAdditionalBodies);
+
+    if isempty(kwargs.bAdditionalBodiesRequireAttitude)
+        kwargs.bAdditionalBodiesRequireAttitude = false(1, ui32NumAdditionalBodies);
+    end
 
     ui32AllocIdx = uint32(1);
     ui32CounterAddBodies = 0;
     for idB = 1:ui32NumAdditionalBodies
 
         % Get target ID
-        varTargetBodyID_ = kwargs.AdditionalTargetsID{idB};
+        varTargetBodyID_ = kwargs.cellAdditionalTargetsID{idB};
 
         try
             dTmpTargetPosition_WorldFrame = cspice_spkpos(varTargetBodyID_, dAbsTimegrid, char(enumWorldFrame), 'NONE', varReferenceCentre); 
 
-            if not(isempty(kwargs.AdditionalTargetNames))
-                charTmpTargetName = string(kwargs.AdditionalTargetNames(idB));
+            if not(isempty(kwargs.cellAdditionalTargetNames))
+                charTmpTargetName = string(kwargs.cellAdditionalTargetNames(idB));
             else
                 if isnumeric(varTargetBodyID_)
                     charTmpTargetName = num2str(varTargetBodyID_);
@@ -258,13 +271,20 @@ if ~isempty(kwargs.AdditionalTargetsID)
             % Add name tags to cell array
             cellTargetTags{idB} = charTmpTargetName;
 
-        catch
-            warning('Attempt to retrieve target body attitude failed with error: %s', string(ME.message) );
+            % Attempt to fetch attitude data wrt World frame
+            if kwargs.bAdditionalBodiesRequireAttitude(idB)
+                dTmpTargetAttitudeDCM_TBfromW = cspice_pxform(char(enumWorldFrame), ...
+                                                    char(kwargs.cellAdditionalTargetFrames{idB}), dAbsTimegrid);
+                cellTargetDCM_TBfromW{idB} = dTmpTargetAttitudeDCM_TBfromW;
+            end
+
+        catch ME
+            warning('Attempt to retrieve target body position or attitude failed with error: %s', string(ME.message) );
             continue;
         end
         ui32AllocIdx = ui32AllocIdx + 3;
+        ui32CounterAddBodies = ui32CounterAddBodies + 1;
     end
-
 end
 
 
@@ -297,9 +317,11 @@ end
 if ui32CounterAddBodies > 0
 
     % Add additional bodies cells
-    objReferenceMissionData.cellAdditionalBodiesPos_W   = cellTargetPos_W(1:ui32CounterAddBodies);
-    objReferenceMissionData.cellAdditionalBodiesTags    = cellTargetTags(1:ui32CounterAddBodies);
-   
+    objReferenceMissionData.cellAdditionalBodiesPos_W       = cellTargetPos_W(1:ui32CounterAddBodies);
+    objReferenceMissionData.cellAdditionalBodiesTags        = cellTargetTags(1:ui32CounterAddBodies);
+
+    objReferenceMissionData.cellAdditionalBodiesDCM_TBfromW = cellTargetDCM_TBfromW(1:ui32CounterAddBodies);
+    objReferenceMissionData.cellAdditionalTargetFrames      = kwargs.cellAdditionalTargetFrames(1:ui32CounterAddBodies);
 end
 
 

@@ -53,9 +53,11 @@ classdef SReferenceMissionDesign < CBaseDatastructWithTimes
         dEarthPosition_W                (3, :) double {isnumeric, ismatrix} = [];
         dRelativeTimestamps             (1, :) double {isnumeric, ismatrix} = [];
 
-        cellAdditionalBodiesPos_W       {iscell} = {};
-        cellAdditionalBodiesTags        {iscell} = {};
-  
+        cellAdditionalBodiesPos_W         {iscell} = {};
+        cellAdditionalBodiesDCM_TBfromW   {iscell} = {};
+        cellAdditionalTargetFrames        {iscell} = {};
+        cellAdditionalBodiesTags          {iscell} = {};
+
         charLengthUnits char {mustBeA(charLengthUnits, ["string", "char"])} = '';
     end
 
