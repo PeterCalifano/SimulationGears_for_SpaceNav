@@ -4,8 +4,9 @@ classdef EnumScenarioName
 % MATLAB simulation environment.
 % -------------------------------------------------------------------------------------------------------------
 %% CHANGELOG
-% 17-08-2024        Pietro Califano         Class definition.
-% 12-02-2025        Pietro Califano         Add Apophis for RCS1
+% 17-08-2024    Pietro Califano     Class definition.
+% 12-02-2025    Pietro Califano     Add Apophis for RCS1
+% 30-06-2025    Pietro Califano     Extend to support new version of generation programs.
 % -------------------------------------------------------------------------------------------------------------
 %% DEPENDENCIES
 % [-]
@@ -24,6 +25,8 @@ enumeration
     Moon
     Mars
     Ceres
+    NotDefined
+    Earth
 end
 
 end

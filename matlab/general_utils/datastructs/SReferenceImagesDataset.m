@@ -28,6 +28,7 @@ classdef SReferenceImagesDataset < SReferenceMissionDesign % TODO the name of th
 
     properties (SetAccess = public, GetAccess = public)
         objCamera {mustBeA(objCamera, ["CCameraIntrinsics", "cameraIntrinsics", "CProjectiveCamera"])} = CCameraIntrinsics();
+        bImageAcquisitionMask (1,:) {islogical, isvector} = false(0,0); % Mask for images acquisition
     end
 
 

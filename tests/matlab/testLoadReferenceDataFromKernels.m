@@ -114,10 +114,11 @@ charOutputLengthUnits       = "km";
                                                                                                        "bIsTimeGridRelative", false, ...
                                                                                                        "bAdditionalBodiesRequireAttitude", bRequireAdditionalBodiesAttitude, ...
                                                                                                        "cellAdditionalTargetFrames", cellAdditionalTargetsFrames);
+
 % Plot position and velocity in world frame
-PlotDatasetPositionVelocity(objDataset);
+PlotDatasetPositionVelocity(objReferenceMissionData);
 
 
 % Plot 3D trajectory in target fixed frame
-[objSceneFig] = VisualizeTrajectory3dSceneAndPoses(objDataset);
+[objSceneFig] = VisualizeTrajectory3dSceneAndPoses(objReferenceMissionData);
 
