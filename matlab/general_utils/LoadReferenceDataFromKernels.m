@@ -26,6 +26,10 @@ arguments (Input)
     kwargs.cellAdditionalTargetFrames      {iscell} = {};
     kwargs.cellAdditionalTargetNames       {iscell} = {};
     kwargs.bAdditionalBodiesRequireAttitude (1,:) logical {islogical} = false(0,0);
+    kwargs.charKernelTimescale       (1,:) char {ischar, isstring, mustBeMember(kwargs.charKernelTimescale, ...
+                                                        ["TAI", "TDB", "TDT", "TT", "ET", "JDTDB", "JDTDT", "JED", "GPS"])} = "ET";
+    kwargs.charUserDefTimescale     (1,:) char {ischar, isstring, mustBeMember(kwargs.charUserDefTimescale, ...
+                                                        ["TAI", "TDB", "TDT", "TT", "ET", "JDTDB", "JDTDT", "JED", "GPS"])} = "ET";
 end
 arguments (Output)
     objReferenceMissionData     (1,1) SReferenceImagesDataset
@@ -85,6 +89,11 @@ end
 %% Function code
 fprintf("\nFetching data to build reference mission plan from kernels...\n")
 
+% Convert timegrid if user defined time scale differ from kernel timescale
+if not(strcmpi(kwargs.charKernelTimescale, kwargs.charUserDefTimescale))
+    dTimegridVect = cspice_unitim(dTimegridVect, kwargs.charUserDefTimescale, kwargs.charKernelTimescale);
+end
+
 % Validate target ID
 [varTargetID, charTargetID] = ValidateID_(varTargetID);
 [~, varReferenceCentre] = ValidateID_(varReferenceCentre);
@@ -95,8 +104,6 @@ for idB = 1:ui32CounterAddBodies
 end
 
 kwargs.varTargetBodyID = ValidateID_(kwargs.varTargetBodyID);
-
-
 % Validate/handle name of kernel path
 % if iobject(enumTrajectKernelName)
 %     % Input is an enumeration class
@@ -113,6 +120,7 @@ if not(isfile(charKernelFilePath))
 end
 
 % Determine ETO, ETf for data fetching
+% TODO change name of variable, must be generic for different time scales
 if all(kwargs.dEphTimes0toFinal == [0;0], 'all')
 
     fprintf("No initial and final ephemeris time specified. Using default values retrieve from cspice_spkcov.\n")
@@ -164,7 +172,7 @@ if not(isempty(dTimegridVect))
         dAbsTimegrid = dTimegridVect;
         dTimegridVect = dTimegridVect - dET0; % Re-write timegrid as relative;
     else
-        % Convert timegrid to Ephemeris Time
+        % Convert timegrid to absolute Time grid (ET, GPS, etc.)
         dAbsTimegrid = dTimegridVect + dET0;
     end
 
@@ -253,7 +261,8 @@ if ~isempty(kwargs.cellAdditionalTargetsID)
         varTargetBodyID_ = kwargs.cellAdditionalTargetsID{idB};
 
         try
-            dTmpTargetPosition_WorldFrame = cspice_spkpos(varTargetBodyID_, dAbsTimegrid, char(enumWorldFrame), 'NONE', varReferenceCentre); 
+            dTmpTargetPosition_WorldFrame = cspice_spkpos(varTargetBodyID_, dAbsTimegrid, ...
+                                char(enumWorldFrame), 'NONE', varReferenceCentre); 
 
             if not(isempty(kwargs.cellAdditionalTargetNames))
                 charTmpTargetName = string(kwargs.cellAdditionalTargetNames(idB));
@@ -297,9 +306,23 @@ end
 %                                dEarthPosition_W, ...
 %                                optional)
 
+% Convert timegrid if user defined time scale differ from kernel timescale
+if not(strcmpi(kwargs.charKernelTimescale, kwargs.charUserDefTimescale))
+    dAbsTimegrid_userDefScale = cspice_unitim(dAbsTimegrid, kwargs.charKernelTimescale, kwargs.charUserDefTimescale);
+else
+    dAbsTimegrid_userDefScale = dAbsTimegrid;
+end
+
+% Convert quantities before assignment if needed
+[dStateSC_WorldFrame]        = ScaleUnits(dStateSC_WorldFrame, kwargs);
+[dTargetPosition_WorldFrame] = ScaleUnits(dTargetPosition_WorldFrame, kwargs);
+[dSunPosition_WorldFrame]    = ScaleUnits(dSunPosition_WorldFrame, kwargs);
+[dEarthPosition_WorldFrame]  = ScaleUnits(dEarthPosition_WorldFrame, kwargs);
+
+
 objReferenceMissionData = SReferenceImagesDataset(CCameraIntrinsics(), ...
                                                   enumWorldFrame, ...
-                                                  dAbsTimegrid, ...
+                                                  dAbsTimegrid_userDefScale, ...
                                                   dStateSC_WorldFrame, ...
                                                   dTargetDCM_TBfromWorld, ...
                                                   dTargetPosition_WorldFrame, ...
@@ -307,14 +330,29 @@ objReferenceMissionData = SReferenceImagesDataset(CCameraIntrinsics(), ...
                                                   dEarthPosition_WorldFrame, ...
                                                   "dRelativeTimestamps", dTimegridVect, ...
                                                   "charLengthUnits", kwargs.charOutputLengthUnits);
+% Set time format
+objReferenceMissionData.enumTimeScale = kwargs.charUserDefTimescale;
+
 
 if bHasManoeuvres
+    % Convert timegrid if user defined time scale differ from kernel timescale
+    dPreManTime_userDefScale = zeros(1, size(dPrePostManTime, 1));
+    if not(strcmpi(kwargs.charKernelTimescale, kwargs.charUserDefTimescale))
+        dPreManTime_userDefScale(:) = cspice_unitim(dPrePostManTime(:,1)', kwargs.charKernelTimescale, kwargs.charUserDefTimescale);
+    else
+        dPreManTime_userDefScale(:) = dPrePostManTime(:,1);
+    end
+
     % Assign manoeuvres data
-    objReferenceMissionData.dManoeuvresStartTimestamps  = dPrePostManTime(:,1); % Pre-manoeuvre timestamp in ET
+    objReferenceMissionData.dManoeuvresStartTimestamps  = dPreManTime_userDefScale; % Pre-manoeuvre timestamp in ET
     objReferenceMissionData.dManoeuvresDeltaV_SC        = dManVectors; % Actually in World Frame
 end
 
 if ui32CounterAddBodies > 0
+
+    for idB = 1:ui32CounterAddBodies
+        [cellTargetPos_W{idB}]        = ScaleUnits(cellTargetPos_W{idB}, kwargs);
+    end
 
     % Add additional bodies cells
     objReferenceMissionData.cellAdditionalBodiesPos_W       = cellTargetPos_W(1:ui32CounterAddBodies);
@@ -397,3 +435,22 @@ else
 end
 
 end
+
+function [dArrayToScale] = ScaleUnits(dArrayToScale, kwargs)
+if strcmpi(kwargs.charOutputLengthUnits, 'm') && strcmpi(kwargs.charKernelLengthUnits, 'km')
+
+    try
+        dArrayToScale         = 1000 * dArrayToScale;
+    catch ME
+        warning('Scaling failed due to error: %s', string(ME.message) )
+    end
+elseif strcmpi(kwargs.charOutputLengthUnits, 'km') && strcmpi(kwargs.charKernelLengthUnits, 'm')
+
+    try
+        dArrayToScale         = 1./1000 * dArrayToScale;
+    catch ME
+        warning('Scaling failed due to error: %s', string(ME.message) )
+    end
+end
+end
+
