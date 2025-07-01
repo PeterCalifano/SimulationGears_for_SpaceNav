@@ -16,10 +16,15 @@ arguments (Input)
     dDeltaTime   (1,1) double   {mustBePositive}
 end
 arguments (Input)
-    kwargs.ui32NumStepsBefore  (1,1) uint32 {mustBeNumeric, mustBeScalarOrEmpty} = 5
-    kwargs.ui32NumStepsAfter   (1,1) uint32 {mustBeNumeric, mustBeScalarOrEmpty} = 5
-    kwargs.ui32MaxNumWindows   (1,1) uint32 {mustBeScalarOrEmpty} = 1E4
-    kwargs.dMinWindowDuration  (1,1) double {mustBeNumeric, mustBePositive, mustBeScalarOrEmpty} = 20
+    kwargs.ui32NumStepsBefore       (1,1) uint32 {mustBeNumeric, mustBeScalarOrEmpty} = 5
+    kwargs.ui32NumStepsAfter        (1,1) uint32 {mustBeNumeric, mustBeScalarOrEmpty} = 5
+    kwargs.ui32MaxNumWindows        (1,1) uint32 {mustBeScalarOrEmpty} = 1E4
+    kwargs.dMinWindowDuration       (1,1) double {mustBeNumeric, mustBePositive, mustBeScalarOrEmpty} = 20
+    kwargs.dMaxDuration             (1,1) double {mustBeNumeric, mustBeScalarOrEmpty} = -1
+    kwargs.charKernelTimescale      (1,:) char {ischar, isstring, mustBeMember(kwargs.charKernelTimescale, ...
+                                                    ["TAI", "TDB", "TDT", "TT", "ET", "JDTDB", "JDTDT", "JED", "GPS"])} = "ET";
+    kwargs.charUserDefTimescale     (1,:) char {ischar, isstring, mustBeMember(kwargs.charUserDefTimescale, ...
+                                                        ["TAI", "TDB", "TDT", "TT", "ET", "JDTDB", "JDTDT", "JED", "GPS"])} = "ET";
 end
 arguments (Output)
     dTimeGrid           (1,:) double  {mustBeVector, mustBeNonnegative}
@@ -52,6 +57,11 @@ dMaxT = max(dEndTstamps);
 dTStart = dMinT - double(kwargs.ui32NumStepsBefore) * dDeltaTime;
 dTEnd   = dMaxT + double(kwargs.ui32NumStepsAfter) * dDeltaTime;
 
+% Constrain maximum duration if max provided
+if kwargs.dMaxDuration > 0
+    dTEnd = dTStart + min(dTEnd-dTStart, kwargs.dMaxDuration);
+end
+
 %%% Build timegrid
 dTotalNumSteps = floor( (dTEnd - dTStart) / dDeltaTime) + 1;
 % dTimeGrid = dTStart + (0 : dTotalNumSteps - 1) * dDeltaTime;
@@ -64,6 +74,11 @@ bInsideWindowMask = false(1, length(dTimeGrid));
 for iW = 1:numel(dBeginTstamps)
     bInsideWindowMask = bInsideWindowMask | ...
         (dTimeGrid >= dBeginTstamps(iW) & dTimeGrid <= dEndTstamps(iW));
+end
+
+% Convert timegrid if user defined time scale differs
+if not(strcmpi(kwargs.charKernelTimescale, kwargs.charUserDefTimescale))
+    dTimeGrid = cspice_unitim(dTimeGrid, kwargs.charKernelTimescale, kwargs.charUserDefTimescale);
 end
 
 end
