@@ -81,7 +81,7 @@ dCameraQuat_RenderFrameFromCam = dCameraQuat_RenderFrameFromCam./norm(dCameraQua
 
 % Normalize scale for visualization
 if not(all(dSceneEntityOriginArray_RenderFrame == 0)) % Normalize positions of bodies to unity
-    dSceneEntityOriginArray_RenderFrame = dAxisScale * dSceneEntityOriginArray_RenderFrame./norm(dSceneEntityOriginArray_RenderFrame);
+    dSceneEntityOriginArray_RenderFrame = kwargs.dAxisScale * dSceneEntityOriginArray_RenderFrame./norm(dSceneEntityOriginArray_RenderFrame);
 end
 
 % Normalize position of camera to unity

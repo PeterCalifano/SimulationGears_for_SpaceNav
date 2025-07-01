@@ -76,14 +76,16 @@ end
 % Heuristic coefficient to scale camera position
 dScaleCoeff = 2 * kwargs.dAxisScale;
 
-% Normalize scale for visualization
-if not(all(dSceneEntityOriginArray_RenderFrame == 0)) % Normalize positions of bodies to unity
-    dSceneEntityOriginArray_RenderFrame = dAxisScale * dSceneEntityOriginArray_RenderFrame./norm(dSceneEntityOriginArray_RenderFrame);
-end
-
 % Normalize position of camera to unity
-if not(all(dCameraOrigin_RenderFrame == 0)) && not(kwargs.bUsePhysicalPosition)
+if not(all(dCameraOrigin_RenderFrame == 0)) && not(kwargs.bUsePhysicalPosition) && all(dSceneEntityOriginArray_RenderFrame == 0)
     dCameraOrigin_RenderFrame = dScaleCoeff * dCameraOrigin_RenderFrame./norm(dCameraOrigin_RenderFrame);
+    dAxisScale_Camera = kwargs.dAxisScale;
+    dAxisScale_Target = kwargs.dAxisScale;
+else
+    dTargetDists = vecnorm(dSceneEntityOriginArray_RenderFrame, 2, 1);
+
+    dAxisScale_Camera = mean(dTargetDists, 'all');
+    dAxisScale_Target = 0.2 * mean(dTargetDists, 'all');
 end
 
 % Handle empty input arguments for names
@@ -159,7 +161,7 @@ end
                                                            kwargs.cellPlotColors(1:3), ...
                                                            kwargs.cellPlotNames(1:3), ...
                                                            objFig, ...
-                                                           "dAxisScale", kwargs.dAxisScale);
+                                                           "dAxisScale", dAxisScale_Camera);
 
 % Set view along camera boresight
 view(-[dCamBoresightaxisVec(1), dCamBoresightaxisVec(2), dCamBoresightaxisVec(3)]);
@@ -191,7 +193,7 @@ for idE = 1:dNumOfEntities
                                        kwargs.cellPlotColors(ui32EntityPtr:ui32EntityPtr+2), ...
                                        kwargs.cellPlotNames(ui32EntityPtr:ui32EntityPtr+2), ...
                                        objFig, ...
-                                       "dAxisScale", kwargs.dAxisScale);
+                                       "dAxisScale", dAxisScale_Target);
 
     % Group all scene entities axes frames into one single cell
     cellFramesAxesGlobal(ui32EntityPtr:ui32EntityPtr+2) = cellFrameAxes(:);
