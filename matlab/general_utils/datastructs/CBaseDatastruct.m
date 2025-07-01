@@ -373,7 +373,7 @@ classdef (Abstract) CBaseDatastruct < handle
 
             elseif iscell(inVal)
                 % Recurse on CELLS
-                outValue = cellfun(@CBaseDatastruct.convertValue, inVal, 'UniformOutput',false);
+                outValue = cellfun(@CBaseDatastruct.convertValue_, inVal, 'UniformOutput',false);
  
             elseif isstruct(inVal)
                 % Recurse on STRUCTS
@@ -381,7 +381,7 @@ classdef (Abstract) CBaseDatastruct < handle
 
                 for idj = 1:numel(subflds)
                     charFieldName = subflds{idj};
-                    inVal.(charFieldName) = CBaseDatastruct.convertValue(inVal.(charFieldName));
+                    inVal.(charFieldName) = CBaseDatastruct.convertValue_(inVal.(charFieldName));
                 end
 
                 outValue = inVal;
