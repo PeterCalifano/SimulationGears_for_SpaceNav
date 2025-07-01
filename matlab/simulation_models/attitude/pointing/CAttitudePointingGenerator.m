@@ -20,7 +20,7 @@ classdef CAttitudePointingGenerator < handle
         dTargetPosition_Frame   = -ones(3,1);
         dSunPosition_Frame      = zeros(3,1);
         dVelocity_Frame         = zeros(3,1);
-        dAuxiliaryAxis          = zeros(3,1);
+        dAuxiliaryAxis          = [1;0;0];
 
         % bInvertZaxisForBlender    = false;
         bShowAttitudePointingPlot = false;
@@ -147,6 +147,10 @@ classdef CAttitudePointingGenerator < handle
                 charOffPoint = "+ off-pointing";
             else
                 dOffPointingAngles = zeros(ui32NumOfEntries, 1);
+            end
+
+            if not(all(kwargs.dAuxiliaryAxis == 0))
+                self.dAuxiliaryAxis = kwargs.dAuxiliaryAxis;
             end
 
             % Construct camera Y axis 
@@ -383,7 +387,7 @@ classdef CAttitudePointingGenerator < handle
                 case "auxiliaryAxis"
                     assert( all(vecnorm(kwargs.dAuxiliaryAxis, 2, 1) ~= 0 ), "Invalid input data: auxiliary axis cannot be zero for auxiliaryAxis contraint type." );
                     % Construct Y axis to satisfy auxiliary axis constraint (+X axis)
-                    dCamDirY_Frame = cross(dCamBoresightZ_Frame, dCameraPosition_Frame.dAuxiliaryAxis./vecnorm(dCameraPosition_Frame.dAuxiliaryAxis, 2, 1), 1);
+                    dCamDirY_Frame = cross(dCamBoresightZ_Frame, repmat(kwargs.dAuxiliaryAxis./vecnorm(kwargs.dAuxiliaryAxis, 2, 1), 1, size(dCamBoresightZ_Frame,2)), 1);
                     dCamDirY_Frame = dCamDirY_Frame./vecnorm(dCamDirY_Frame, 2, 1);
                     return
             end
