@@ -91,8 +91,8 @@ classdef CSPICEkerLoader
                     if strcmpi(charTargetFolderName, "")
                         charTargetFolderName = self.defaultTargetsDict('Moon');
                     end
-            
-                    error('Not added yet')
+                    return
+                    % error('Nots added yet')
                 otherwise
                     error("enumScenarioName is not a valid scenario.")
             end
@@ -103,7 +103,6 @@ classdef CSPICEkerLoader
             cd(charTmpMKpath);
             cspice_furnsh('metakernel.mk'); % Load kernels
             cd(self.projectDir);
-
 
             if bLoadCommonKernels == true
                 % Load common kernels
