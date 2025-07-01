@@ -52,7 +52,10 @@ classdef SReferenceMissionDesign < CBaseDatastructWithTimes
         dSunPosition_W                  (3, :) double {isnumeric, ismatrix} = [];
         dEarthPosition_W                (3, :) double {isnumeric, ismatrix} = [];
         dRelativeTimestamps             (1, :) double {isnumeric, ismatrix} = [];
-
+        enumTimeScale                   (1, :) char {ischar, isstring, mustBeMember(enumTimeScale, ...
+                                                     ["TAI", "TDB", "TDT", "TT", "ET", "JDTDB", "JDTDT", "JED", "GPS", "N/D"])} = "N/D";
+        
+        ui32TargetPointingID              (1,:) uint32 {isnumeric} = []
         cellAdditionalBodiesPos_W         {iscell} = {};
         cellAdditionalBodiesDCM_TBfromW   {iscell} = {};
         cellAdditionalTargetFrames        {iscell} = {};
