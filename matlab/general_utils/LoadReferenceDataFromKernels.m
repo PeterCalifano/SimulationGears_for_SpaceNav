@@ -1,6 +1,6 @@
 function [objReferenceMissionData, dStateSC_TargetFixed, dSunPosition_TargetFixed] = LoadReferenceDataFromKernels(varTargetID, ...
                                                                                                                    enumTrajectKernelName, ...
-                                                                                                                   dTimegridVect, ...
+                                                                                                                   dTimegridVect_kernelTimeScale, ...
                                                                                                                    enumWorldFrame, ...
                                                                                                                    varReferenceCentre, ...
                                                                                                                    enumTargetFrame, ...
@@ -8,7 +8,7 @@ function [objReferenceMissionData, dStateSC_TargetFixed, dSunPosition_TargetFixe
 arguments (Input)
     varTargetID             {mustBeA(varTargetID, ["string", "char", "double", "int32", "uint32", "single"])} 
     enumTrajectKernelName   (1,:) {mustBeA(enumTrajectKernelName, ["string", "char", "EnumTrajectoryNames", "EnumTrajectKernelName"])}
-    dTimegridVect           (1,:) double {ismatrix, mustBeNumeric}
+    dTimegridVect_kernelTimeScale           (1,:) double {ismatrix, mustBeNumeric}
     enumWorldFrame          (1,1) {mustBeA(enumWorldFrame, ["SEnumFrameName", "string", "char"])}  % Enumeration class indicating the W frame in which the data are expressed
     varReferenceCentre      (1,1) {mustBeA(varReferenceCentre, ["SEnumFrameName", "string", "char", "double", "int32", "uint32"])}
     enumTargetFrame         (1,1) {mustBeA(enumTargetFrame, ["SEnumFrameName", "string", "char"])} = enumWorldFrame
@@ -30,6 +30,7 @@ arguments (Input)
                                                         ["TAI", "TDB", "TDT", "TT", "ET", "JDTDB", "JDTDT", "JED", "GPS"])} = "ET";
     kwargs.charUserDefTimescale     (1,:) char {ischar, isstring, mustBeMember(kwargs.charUserDefTimescale, ...
                                                         ["TAI", "TDB", "TDT", "TT", "ET", "JDTDB", "JDTDT", "JED", "GPS"])} = "ET";
+    kwargs.bUseKernelInitialTimestamp (1,1) logical {mustBeScalarOrEmpty} = false
 end
 arguments (Output)
     objReferenceMissionData     (1,1) SReferenceImagesDataset
@@ -81,6 +82,7 @@ end
 % -------------------------------------------------------------------------------------------------------------
 %% CHANGELOG
 % 25-06-2025        Pietro Califano     Derived from LoadReferenceRCS1 and generalized for any SPK kernel
+
 % -------------------------------------------------------------------------------------------------------------
 %% DEPENDENCIES
 % SReferenceImagesDataset; SReferenceMissionDesign
@@ -89,9 +91,11 @@ end
 %% Function code
 fprintf("\nFetching data to build reference mission plan from kernels...\n")
 
-% Convert timegrid if user defined time scale differ from kernel timescale
-if not(strcmpi(kwargs.charKernelTimescale, kwargs.charUserDefTimescale))
-    dTimegridVect = cspice_unitim(dTimegridVect, kwargs.charUserDefTimescale, kwargs.charKernelTimescale);
+% Convert timegrid if user defined time scale differ from kernel timescale and not relative timegrid
+if not(strcmpi('ET', kwargs.charKernelTimescale)) && not(kwargs.bIsTimeGridRelative)
+    dETtimegridVect = cspice_unitim(dTimegridVect_kernelTimeScale, kwargs.charKernelTimescale, 'ET');
+else
+    dETtimegridVect = dTimegridVect_kernelTimeScale;
 end
 
 % Validate target ID
@@ -120,20 +124,35 @@ if not(isfile(charKernelFilePath))
 end
 
 % Determine ETO, ETf for data fetching
-% TODO change name of variable, must be generic for different time scales
-if all(kwargs.dEphTimes0toFinal == [0;0], 'all')
+if all(kwargs.dEphTimes0toFinal == [0;0], 'all') && kwargs.bUseKernelInitialTimestamp
 
-    fprintf("No initial and final ephemeris time specified. Using default values retrieve from cspice_spkcov.\n")
-    [dET0f] = cspice_spkcov(charKernelFilePath, varTargetID, 1e5) ;
+    fprintf("No initial and final ephemeris time specified. Using default values retrieved from cspice_spkcov.\n")
+    [dTime0f_kernelTimeScale] = cspice_spkcov(charKernelFilePath, varTargetID, 1e5) ;
+    
+    % Get initial and final times of the SPK
+    dET0f = cspice_unitim(dTime0f_kernelTimeScale', kwargs.charKernelTimescale, 'ET');
 
     dET0 = dET0f(1);
     dETf = dET0f(end);
+
+elseif not(kwargs.bUseKernelInitialTimestamp)
+    % Fix relative timegrid wrt initial time of the grid
+    dET0 = dETtimegridVect(1);
+    dETf = dETtimegridVect(end);
+    
+    dTime0f_kernelTimeScale = [dTimegridVect_kernelTimeScale(1), dTimegridVect_kernelTimeScale(end)];
 
 else
     % Get ephemeris times bounds from input
     dET0 = kwargs.dEphTimes0toFinal(1);
     dETf = kwargs.dEphTimes0toFinal(2);
+    
+    dTime0f_kernelTimeScale = cspice_unitim(kwargs.dEphTimes0toFinal', 'ET', kwargs.charKernelTimescale);
 end
+
+% Assign initial and final times in kernel timescale
+dTime0_kernelTimeScale = dTime0f_kernelTimeScale(1);
+dTimef_kernelTimeScale = dTime0f_kernelTimeScale(end);
 
 fprintf("Initial and final ephemeris time bounds: [%10.1f, %10.1f].\n", dET0, dETf);
 
@@ -155,40 +174,51 @@ if kwargs.bLoadManoeuvres == true
     end
 end
 
-% Determine if timegrid is relative or absolute
+% Build relative and absolute timegrids
 bIsInputTimegridRelative = true; %#ok<*NASGU> % Default assumption
 charGridType = "relative";
 
-if not(isempty(dTimegridVect))
+if not(isempty(dETtimegridVect))
 
     % Check initial time instant
-    dFirstTime = dTimegridVect(1);
+    dFirstTime = dETtimegridVect(1);
     assert(dFirstTime >= 0, sprintf("ERROR: input timegrid must only contain non-negative real numbers! Found initial timestamp: %6g\n", dFirstTime));
 
     if not(kwargs.bIsTimeGridRelative)
 
         bIsInputTimegridRelative = false;
         charGridType = "absolute";
-        dAbsTimegrid = dTimegridVect;
-        dTimegridVect = dTimegridVect - dET0; % Re-write timegrid as relative;
+        
+        % ET timegrid
+        dAbsTimegrid_ET = dETtimegridVect;
+        dRelativeTimegridVect = dETtimegridVect - dET0; % Re-write timegrid as relative;
+        
+        % User defined time grid
+        % dAbsTimegrid_UserDef = dTimegridVect_kernelTimeScale;
+        dTimegridVect_kernelTimeScale = dTimegridVect_kernelTimeScale - dTime0_kernelTimeScale;
+
     else
-        % Convert timegrid to absolute Time grid (ET, GPS, etc.)
-        dAbsTimegrid = dTimegridVect + dET0;
+        % Compute timegrid to absolute time grid (ET, GPS, etc.)
+        dAbsTimegrid_ET = dETtimegridVect + dET0;
+        % dAbsTimegrid_UserDef = dTimegridVect_kernelTimeScale + dTime0_kernelTimeScale;
     end
 
 else
     % Build timegrid if not provided
     fprintf("No timegrid was specified as input. Building it to cover entire Ephemeris Time interval with timestep: %4.0f [s]\n", kwargs.dDeltaTimeStep)
-    dTimegridVect = 0:kwargs.dDeltaTimeStep:(dETf - dET0); % Define relative timegrid first
-    dAbsTimegrid = dTimegridVect + dET0;
+    dRelativeTimegridVect = 0:kwargs.dDeltaTimeStep:(dETf - dET0); % Define relative timegrid first
+    dAbsTimegrid_ET = dRelativeTimegridVect + dET0;
 end
 
 % Print monitoring information
 fprintf('Using %s timegrid with relative bounds from ET0: [%8.0f, %8.0f].\nData spans a total of %s.\n', ...
-    upper(charGridType), dTimegridVect(1), dTimegridVect(end), FormatElapsedTime_(dTimegridVect(end) - dTimegridVect(1)));
+    upper(charGridType), dRelativeTimegridVect(1), dRelativeTimegridVect(end), FormatElapsedTime_(dETtimegridVect(end) - dETtimegridVect(1)));
 
 % Check that last entry of timegrid is within allowed bounds
-assert(dAbsTimegrid(end) <= dETf, "ERROR: last time instant specified in absolute timegrid is outside allowed ET bounds! %6.2g < %6.2g\n", dETf, dTimegridVect(end));
+assert(dAbsTimegrid_ET(end) <= dETf, "ERROR: last time instant specified in absolute timegrid is outside allowed ET bounds! %6.2g < %6.2g\n", dETf, dETtimegridVect(end));
+
+% Convert ET timegrid to kernel timescale
+dAbsTimegrid_kernelTimeScale = cspice_unitim(dETtimegridVect, 'ET', kwargs.charKernelTimescale);
 
 %% Load kernels
 try
@@ -200,32 +230,32 @@ end
 %% Fetch data
 try
     % Sun position in World frame from reference centre
-    dSunPosition_WorldFrame = cspice_spkpos('SUN', dAbsTimegrid, char(enumWorldFrame), 'NONE', varReferenceCentre);
+    dSunPosition_WorldFrame = cspice_spkpos('SUN', dAbsTimegrid_ET, char(enumWorldFrame), 'NONE', varReferenceCentre);
 catch ME
     warning('Attempt to retrieve Sun position failed with error: %s', string(ME.message) );
 end
 
 try
     % Earth position in World frame from reference centre
-    dEarthPosition_WorldFrame = - cspice_spkpos('EARTH', dAbsTimegrid, char(enumWorldFrame), 'NONE', varReferenceCentre);
+    dEarthPosition_WorldFrame = - cspice_spkpos('EARTH', dAbsTimegrid_ET, char(enumWorldFrame), 'NONE', varReferenceCentre);
 catch ME
     warning('Attempt to retrieve Earth position failed with error: %s', string(ME.message) );
 end
 
 % Spacecraft state in World Frame from reference centre
-dStateSC_WorldFrame = cspice_spkezr(charTargetID, dAbsTimegrid, char(enumWorldFrame), 'NONE', varReferenceCentre);
+dStateSC_WorldFrame = cspice_spkezr(charTargetID, dAbsTimegrid_kernelTimeScale, char(enumWorldFrame), 'NONE', varReferenceCentre);
 
 try
     % Target state in World Frame
     % TODO: does spice define frames with a specific origin or only as attitude?
-    dTargetPosition_WorldFrame = cspice_spkpos(kwargs.varTargetBodyID, dAbsTimegrid, char(enumWorldFrame), 'NONE', varReferenceCentre); % TODO which observer?? TBC
+    dTargetPosition_WorldFrame = cspice_spkpos(kwargs.varTargetBodyID, dAbsTimegrid_ET, char(enumWorldFrame), 'NONE', varReferenceCentre); % TODO which observer?? TBC
 catch ME
     warning('Attempt to retrieve target body position failed with error: %s', string(ME.message) );
 end
 
 try
     % Target attitude in World Frame
-    dTargetDCM_TBfromWorld = cspice_pxform(char(enumWorldFrame), char(enumTargetFrame), dAbsTimegrid);
+    dTargetDCM_TBfromWorld = cspice_pxform(char(enumWorldFrame), char(enumTargetFrame), dAbsTimegrid_ET);
 catch ME
     error('Attempt to retrieve target body attitude failed with error: %s', string(ME.message) );
 end
@@ -261,7 +291,7 @@ if ~isempty(kwargs.cellAdditionalTargetsID)
         varTargetBodyID_ = kwargs.cellAdditionalTargetsID{idB};
 
         try
-            dTmpTargetPosition_WorldFrame = cspice_spkpos(varTargetBodyID_, dAbsTimegrid, ...
+            dTmpTargetPosition_WorldFrame = cspice_spkpos(varTargetBodyID_, dAbsTimegrid_ET, ...
                                 char(enumWorldFrame), 'NONE', varReferenceCentre); 
 
             if not(isempty(kwargs.cellAdditionalTargetNames))
@@ -283,7 +313,7 @@ if ~isempty(kwargs.cellAdditionalTargetsID)
             % Attempt to fetch attitude data wrt World frame
             if kwargs.bAdditionalBodiesRequireAttitude(idB)
                 dTmpTargetAttitudeDCM_TBfromW = cspice_pxform(char(enumWorldFrame), ...
-                                                    char(kwargs.cellAdditionalTargetFrames{idB}), dAbsTimegrid);
+                                                    char(kwargs.cellAdditionalTargetFrames{idB}), dAbsTimegrid_ET);
                 cellTargetDCM_TBfromW{idB} = dTmpTargetAttitudeDCM_TBfromW;
             end
 
@@ -307,10 +337,10 @@ end
 %                                optional)
 
 % Convert timegrid if user defined time scale differ from kernel timescale
-if not(strcmpi(kwargs.charKernelTimescale, kwargs.charUserDefTimescale))
-    dAbsTimegrid_userDefScale = cspice_unitim(dAbsTimegrid, kwargs.charKernelTimescale, kwargs.charUserDefTimescale);
+if not(strcmpi('ET', kwargs.charUserDefTimescale))
+    dAbsTimegrid_userDefScale = cspice_unitim(dAbsTimegrid_ET, 'ET', kwargs.charUserDefTimescale);
 else
-    dAbsTimegrid_userDefScale = dAbsTimegrid;
+    dAbsTimegrid_userDefScale = dAbsTimegrid_ET;
 end
 
 % Convert quantities before assignment if needed
@@ -328,7 +358,7 @@ objReferenceMissionData = SReferenceImagesDataset(CCameraIntrinsics(), ...
                                                   dTargetPosition_WorldFrame, ...
                                                   dSunPosition_WorldFrame, ...
                                                   dEarthPosition_WorldFrame, ...
-                                                  "dRelativeTimestamps", dTimegridVect, ...
+                                                  "dRelativeTimestamps", dRelativeTimegridVect, ...
                                                   "charLengthUnits", kwargs.charOutputLengthUnits);
 % Set time format
 objReferenceMissionData.enumTimeScale = kwargs.charUserDefTimescale;
@@ -337,6 +367,7 @@ objReferenceMissionData.enumTimeScale = kwargs.charUserDefTimescale;
 if bHasManoeuvres
     % Convert timegrid if user defined time scale differ from kernel timescale
     dPreManTime_userDefScale = zeros(1, size(dPrePostManTime, 1));
+
     if not(strcmpi(kwargs.charKernelTimescale, kwargs.charUserDefTimescale))
         dPreManTime_userDefScale(:) = cspice_unitim(dPrePostManTime(:,1)', kwargs.charKernelTimescale, kwargs.charUserDefTimescale);
     else
@@ -370,7 +401,7 @@ end
 %% Additional data (if required)
 % State of spacecraft in Target Frame
 try
-    dStateSC_TargetFixed = cspice_spkezr(charTargetID, dAbsTimegrid, char(enumTargetFrame), 'NONE', varReferenceCentre);
+    dStateSC_TargetFixed = cspice_spkezr(charTargetID, dAbsTimegrid_ET, char(enumTargetFrame), 'NONE', varReferenceCentre);
 catch ME
     warning('Attempt to retrieve spacecraft state in target body frame failed with error: %s', string(ME.message) );
     dStateSC_TargetFixed = [];
@@ -381,7 +412,7 @@ end
 
 % Apophis position to Sun in target frame
 try
-    dSunPosition_TargetFixed = cspice_spkpos('SUN', dAbsTimegrid, char(enumTargetFrame), 'NONE', varReferenceCentre);
+    dSunPosition_TargetFixed = cspice_spkpos('SUN', dAbsTimegrid_ET, char(enumTargetFrame), 'NONE', varReferenceCentre);
 catch
     warning('Attempt to retrieve Sun position in target body frame failed with error: %s', string(ME.message) );
     dStateSC_TargetFixed = [];
