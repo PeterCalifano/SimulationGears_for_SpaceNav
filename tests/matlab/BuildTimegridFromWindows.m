@@ -25,6 +25,7 @@ arguments (Input)
                                                     ["TAI", "TDB", "TDT", "TT", "ET", "JDTDB", "JDTDT", "JED", "GPS"])} = "ET";
     kwargs.charUserDefTimescale     (1,:) char {ischar, isstring, mustBeMember(kwargs.charUserDefTimescale, ...
                                                         ["TAI", "TDB", "TDT", "TT", "ET", "JDTDB", "JDTDT", "JED", "GPS"])} = "ET";
+    kwargs.i32TargetLabelID         (1,1) int32 = -1
 end
 arguments (Output)
     dTimeGrid           (1,:) double  {mustBeVector, mustBeNonnegative}
@@ -33,6 +34,7 @@ end
 
 % Read the windows file
 charWindowsFilestring = jsondecode(fileread(charJsonPath));
+
 dBeginTstamps = arrayfun(@(s) s.t_start, charWindowsFilestring);
 dEndTstamps   = arrayfun(@(s) s.t_end,   charWindowsFilestring);
 
@@ -49,6 +51,12 @@ dEndTstamps       = dEndTstamps(bIdxValidDuration);
 ui32NumWindows = min(length(dBeginTstamps), kwargs.ui32MaxNumWindows);
 dBeginTstamps = dBeginTstamps(1:ui32NumWindows);
 dEndTstamps   = dEndTstamps(1:ui32NumWindows);
+
+if kwargs.i32TargetLabelID >= 0
+    % Filter windows based on target ID
+    ui32TargetLabelIDs = arrayfun(@(s) s.lbl, charWindowsFilestring);
+    ui32TargetLabelIDs = ui32TargetLabelIDs(1:ui32NumWindows);
+end
 
 % Compute extended time limits for the timegrid
 dMinT = min(dBeginTstamps);
@@ -74,6 +82,31 @@ bInsideWindowMask = false(1, length(dTimeGrid));
 for iW = 1:numel(dBeginTstamps)
     bInsideWindowMask = bInsideWindowMask | ...
         (dTimeGrid >= dBeginTstamps(iW) & dTimeGrid <= dEndTstamps(iW));
+end
+
+% Filter based on target ID if provided
+if kwargs.i32TargetLabelID >= 0
+    bInsideWindowTargetMask = false(1, length(bInsideWindowMask));
+    ui32ImageAcquisitionWindCount = uint32(0);
+
+    if kwargs.i32TargetLabelID >= 0
+            % Build visibility mask of specific target ID
+        for iW = 1:numel(dBeginTstamps)
+            
+            if ui32TargetLabelIDs(iW) == kwargs.i32TargetLabelID
+                bCurrentWindMask = (dTimeGrid >= dBeginTstamps(iW) & dTimeGrid <= dEndTstamps(iW));
+                bInsideWindowTargetMask(bCurrentWindMask) = true;
+
+                ui32ImageAcquisitionWindCount = ui32ImageAcquisitionWindCount + uint32(1);
+            end
+        end
+
+    end
+
+    % Update output mask
+    bInsideWindowMask = bInsideWindowTargetMask & bInsideWindowMask;
+    assert(ui32ImageAcquisitionWindCount == sum(ui32TargetLabelIDs == kwargs.i32TargetLabelID), ...
+        'ERROR: mismatch of number of image acquisition windows due to target visibility. Something may have gone wrong.')
 end
 
 % Convert timegrid if user defined time scale differs
