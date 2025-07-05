@@ -19,7 +19,15 @@ arguments
     bSkipIlluminationCheck  (1,1) logical {islogical} = false;
 end
 %% PROTOTYPE
-% 
+% [bAllPointsVisibilityMask, dProjectedPoints_UV] = RayTracePointVisibility_ShadowRays(ui32PointsIdx, ...
+%                                                                                      dPointsPositions_TB, ...
+%                                                                                      strTargetBodyData, ...
+%                                                                                      strCameraData, ...
+%                                                                                      dSunPosition_TB, ...
+%                                                                                      bDEBUG_MODE, ...
+%                                                                                      bTwoSidedTest, ...
+%                                                                                      bPointsAreMeshVertices, ...
+%                                                                                      bSkipIlluminationCheck) %#codegen
 % -------------------------------------------------------------------------------------------------------------
 %% DESCRIPTION
 % -Preliminary checks performed:
@@ -44,16 +52,14 @@ end
 % dProjectedPoints_UV
 % -------------------------------------------------------------------------------------------------------------
 %% CHANGELOG
-% 30-11-2024    Pietro Califano    New optimized version implemented from CheckLMvisibility_rayTrace
-% 02-12-2024    Pietro Califano    Unit testing completed, verification and autocoding OK
+% 30-11-2024    Pietro Califano               New optimized version implemented from CheckLMvisibility_rayTrace
+% 02-12-2024    Pietro Califano               Unit testing completed, verification and autocoding OK
+% 10-06-2025    P. Califano, L. Cesarini.     Fix incorrect visibility conditions for edge cases (points not discarded
+%                                             by ray tracing and visible)
 % -------------------------------------------------------------------------------------------------------------
 %% DEPENDENCIES
-% 1) fastRayTriangleIntersection()
+% RayTriangleIntersection_MollerTrumbore()
 % -------------------------------------------------------------------------------------------------------------
-%% Future upgrades
-% 
-% -------------------------------------------------------------------------------------------------------------
-
 % Defaults
 
 % TARGET BODY
@@ -283,8 +289,7 @@ parfor idL = 1:i32NumOfPointsToTrace
             if bPointsVisibilityMask(idL) == false
                 bPointsVisibilityMask(idL) = true;
             end
-
-        end
+        end % Ray trace if conditional branch
 
     end % Loop over triangles
 
@@ -299,7 +304,6 @@ end
 bAllPointsVisibilityMask = bPointsToRayTrace;
 bAllPointsVisibilityMask(bPointsToRayTrace == 1) = bPointsVisibilityMask;
 dProjectedPoints_UV = dProjectedPoints_UV(:, bAllPointsVisibilityMask);
-
 
 end
 
