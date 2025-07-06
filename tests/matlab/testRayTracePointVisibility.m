@@ -67,7 +67,6 @@ strVisibilityCheckOptions = orderfields(strVisibilityCheckOptions);
 strFcnOptions.dIllumAngleThr                = strVisibilityCheckOptions.dIllumAngleThr;
 strFcnOptions.dLosAngleThr                  = strVisibilityCheckOptions.dLosAngleThr;
 strFcnOptions.bENABLE_HEUR_GEOM_FEAS_CHECK  = true;
-
 strFcnOptions.bTwoSidedTest = true;
 strFcnOptions.bPointsAreMeshVertices = true;
 
