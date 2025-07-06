@@ -10,11 +10,19 @@ dCameraPosition_TB = [1000; 0; 0];
 dSunPositionScaled_TB   = [980; 600; 0];
 dSunPosition_TB   = 1e6 * dSunPositionScaled_TB;
 
-% dDCM_INfromCAM (NOTE: IN is used here for legacy reasons)
-strCamera.dQuat_INfromCAM = simulateTBpointing_PosOnly(dCameraPosition_TB, dPosVector_W, true, false, false);
-dDCM_INfromCAM = Quat2DCM(strCamera.dQuat_INfromCAM, true);
+ui32MaxNumPoints = 5000;
+ui32pointsIDs = ui32pointsIDs(1:ui32MaxNumPoints);
+dPointsPositionsGT_TB = dPointsPositionsGT_TB(:,1:ui32MaxNumPoints);
 
+% dDCM_INfromCAM (NOTE: IN is used here for legacy reasons)
+objAttitudePointGeneratior = CAttitudePointingGenerator(dCameraPosition_TB, ...
+                                                        dPosVector_W, ...
+                                                        dSunPosition_TB);
+[objAttitudePointGeneratior, dDCM_INfromCAM] = objAttitudePointGeneratior.pointToTarget("dAuxiliaryAxis", [1;0;0]);
+ 
+strShapeModel.ui32triangVertexPtr = uint32(strShapeModel.ui32triangVertexPtr);
 strShapeModel = orderfields(strShapeModel);
+
 strTargetBodyData.strShapeModel = strShapeModel;
 strTargetBodyData.dDCM_INfromTB = dRot3_WfromTB;
 
@@ -60,17 +68,20 @@ strFcnOptions.dIllumAngleThr                = strVisibilityCheckOptions.dIllumAn
 strFcnOptions.dLosAngleThr                  = strVisibilityCheckOptions.dLosAngleThr;
 strFcnOptions.bENABLE_HEUR_GEOM_FEAS_CHECK  = true;
 
-i_strTargetBody = objTargetEmulator.getTargetStruct();
+strFcnOptions.bTwoSidedTest = true;
+strFcnOptions.bPointsAreMeshVertices = true;
+
+strTargetBody = objTargetEmulator.getTargetStruct();
 
 %% legacyTest_CheckLMvisibility_rayTrace_MEX
 % Legacy function for equivalence test (MEX because MATLAB version is too slow)
 % MEx equivalence test and timing
-% i_strTargetBody = orderfields(i_strTargetBody);
+% strTargetBody = orderfields(strTargetBody);
 % strCamera = orderfields(strCamera);
 % strVisibilityCheckOptions = orderfields(strVisibilityCheckOptions);
 % 
 % fcnHandle_LEGACY = @() CheckLMvisibility_rayTrace_MEX([double(ui32pointsIDs); dPointsPositionsGT_TB], ...
-%     i_strTargetBody, strCamera, dSunPosition_TB./norm(dSunPosition_TB), strVisibilityCheckOptions);
+%     strTargetBody, strCamera, dSunPosition_TB./norm(dSunPosition_TB), strVisibilityCheckOptions);
 % 
 % [dAvgRunTime_LEGACY, dTimings_LEGACY] = AverageFunctionTiming(fcnHandle_LEGACY, 5);
 
@@ -101,6 +112,9 @@ p1 = profile('info');
 
 %% test_RayTracePointVisibility_ShadowRays
 bTwoSidedTest = true;
+bPointsAreMeshVertices = true;
+bSkipIlluminationCheck = false;
+
 profile('clear')
 profile('off')
 tic
@@ -110,57 +124,14 @@ tic
                                                                                          strCameraData, ...
                                                                                          dSunPosition_TB, ...
                                                                                          bDEBUG_MODE, ...
-                                                                                         bTwoSidedTest); 
+                                                                                         bTwoSidedTest, ...
+                                                                                         bPointsAreMeshVertices, ...
+                                                                                         bSkipIlluminationCheck); 
 try
     p2 = profile('info');
 catch
 end
 toc
-
-% rayTriGPU
-
-
-profile('clear')
-profile('off')
-tic
-[bAllPointsVisibilityMask_VectorizedRTwithShadowRays, ~] = RayTracePointVisibility_VectorizedShadowRays_MEX(uint32(ui32pointsIDs), ...
-                                                                                                            dPointsPositionsGT_TB, ...
-                                                                                                            strTargetBodyData, ...
-                                                                                                            strCameraData, ...
-                                                                                                            dSunPosition_TB, ...
-                                                                                                            bDEBUG_MODE, ...
-                                                                                                            bTwoSidedTest);
-
-try
-    p4 = profile('info');
-catch
-end
-toc
-
-% 
-% tic
-% [bAllPointsVisibilityMask_RTwithShadowRays, ~] = RayTracePointVisibility_ShadowRays_full_MEX(uint32(ui32pointsIDs), ...
-%                                                                                     dPointsPositionsGT_TB, ...
-%                                                                                     strTargetBodyData, ...
-%                                                                                     strCameraData, ...
-%                                                                                     dSunPosition_TB, ...
-%                                                                                     bDEBUG_MODE, ...
-%                                                                                     bTwoSidedTest); 
-% p2 = profile('info');
-% toc
-
-% tic
-% [bAllPointsVisibilityMask_RTwithShadowRays, ~] = RayTracePointVisibility_ShadowRays_shadowOneSidedMEX(uint32(ui32pointsIDs), ...
-%                                                                                     dPointsPositionsGT_TB, ...
-%                                                                                     strTargetBodyData, ...
-%                                                                                     strCameraData, ...
-%                                                                                     dSunPosition_TB, ...
-%                                                                                     bDEBUG_MODE, ...
-%                                                                                     bTwoSidedTest); 
-% p2 = profile('info');
-% toc
-
-% profile viewer
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% DEBUG EMULATOR %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % % PASSED, result is identical.
@@ -291,7 +262,8 @@ set(gcf, 'Color', 'k'); % Full figure background
 title('Projected 2D visible points in Image Plane');
 
 % Plot only visible points
-objVisibleProj_EllipsLocalPA = scatter(dProjectedPoints_UV(1, bVisiblePoints_EllipsLocalPA), dProjectedPoints_UV(2, bVisiblePoints_EllipsLocalPA), 5, ...
+objVisibleProj_EllipsLocalPA = scatter(dProjectedPoints_UV(1, bVisiblePoints_EllipsLocalPA), ...
+                                    dProjectedPoints_UV(2, bVisiblePoints_EllipsLocalPA), 5, ...
     'b', 'filled', 'DisplayName', 'RT + Ellips. Local PA');
 hold on
 objVisibleProj_ShadowRays = plot(dProjectedPoints_UV(1, bVisiblePoints_RTwithShadowRays), dProjectedPoints_UV(2, bVisiblePoints_RTwithShadowRays), ...

@@ -29,6 +29,8 @@ ui32MAX_NUM_GT = 10000;
 objTargetEmulator = CTargetEmulator(objShapeModel, uint32(ui32MAX_NUM_GT));
 
 strShapeStruct = objTargetEmulator.getShapeStruct();
+strShapeStruct.ui32triangVertexPtr = uint32(strShapeStruct.ui32triangVertexPtr);
+
 [targetPos, targetDCM] = objTargetEmulator.GetPose();
 
 % Get landmarks from target emulators
