@@ -8,7 +8,7 @@ charProjectDir = pwd;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 enumConcurrentEstimatorType = "MSCKF";
-enumFrontEndType = EnumFrontEnd.ALGORITHM;
+enumFrontEndType = EnumFrontEndType.ALGORITHM;
 
 if enumConcurrentEstimatorType ~= "SR_USKF"
     rmpath("/home/peterc/devDir/nav-backend/simulationCodes/matlab/src/SRUSKF");
@@ -85,7 +85,7 @@ fprintf('\nRNG seed: %d\n', ui32SEED_NUM );
 
 % objScenConfig = SScenarioConfiguration();
 % Variables to add
-% enumFrontEndType              = EnumFrontEnd.EMULATOR;
+% enumFrontEndType              = EnumFrontEndType.EMULATOR;
 % bApplyGroundTruthScattering   = true; % TBD, may become a struct/class with separated flags for each option
 % dInitialWorldEphTime          = 0
 % dFinalWorldEphTime            = 0

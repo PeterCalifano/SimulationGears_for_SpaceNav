@@ -175,27 +175,22 @@ bUseBlackBackground = true; % Set to false for white background
 objFigPointCloud = figure('Renderer','opengl');
 
 % Set background color based on flag
-
 if bUseBlackBackground == true
-    set(gca, 'Color', 'k'); % Axes background
-    set(gcf, 'Color', 'k'); % Figure background
     charTextColor = 'w'; % White text
 else
-    set(gca, 'Color', 'w'); % White background
-    set(gcf, 'Color', 'w');
     charTextColor = 'k'; % Black text
 end
 
 % Plot the mesh using patch
 objPatchModel = patch('Vertices', strShapeModel.dVerticesPos', 'Faces', strShapeModel.ui32triangVertexPtr', ...
-      'FaceColor', [0.7 0.7 0.7], 'EdgeColor', 'none', 'FaceAlpha', 1, 'DisplayName', '3D model');
+      'FaceColor', [1.0, 1.0, 1.0], 'EdgeColor', 'none', 'FaceAlpha', 1, 'DisplayName', '3D model');
 hold on
 axis equal
-lighting gouraud;
+lighting flat;
 camlight('headlight');
 
 objPointCloud_GT = plot3(dPointsPositionsGT_TB(1, :), dPointsPositionsGT_TB(2, :), ...
-    dPointsPositionsGT_TB(3,:), 'g.', 'MarkerSize', 4, 'DisplayName', 'All GT points');
+    dPointsPositionsGT_TB(3,:), 'g*', 'MarkerSize', 3, 'DisplayName', 'All GT points');
 
 DefaultPlotOpts()
 grid off
@@ -204,7 +199,7 @@ ylabel('Y [m]', 'Color', charTextColor);
 zlabel('Z [m]', 'Color', charTextColor);
 set(gca, 'XColor', charTextColor, 'YColor', charTextColor, 'ZColor', charTextColor);
 
-camproj('perspective'); % Use perspective projection
+% camproj('perspective'); % Use perspective projection
 campos(dCameraPosition_TB'); % Set camera to camera position
 camtarget(-dCameraPosition_TB')
 % view(dCameraPosition_TB'); % Camera direction % TODO (PC) use this when showing plots of emulator!
@@ -215,7 +210,7 @@ camtarget(-dCameraPosition_TB')
 
 % Plot sun direction (TODO use this representation for the Sun in SLAM plots, much better)
 hold on;
-lineScale = 1.5; 
+lineScale = 0.5; 
 objDirToSun = plot3([0, lineScale * dSunPositionScaled_TB(1)], ...
                     [0, lineScale * dSunPositionScaled_TB(2)], ...
                     [0, lineScale * dSunPositionScaled_TB(3)], 'r-', ...
@@ -228,15 +223,27 @@ hold on;
 % Local phase angle check (ellipsoid assumption)
 dPointsPositionsGT_RTwithEllipsLocalPA = dPointsPositionsGT_TB(:, bAllPointsVisibilityMask_legacyEllipsLocalPA);
 objPointCloud_RTwithEllipsLocalPA = plot3(dPointsPositionsGT_RTwithEllipsLocalPA(1, :), dPointsPositionsGT_RTwithEllipsLocalPA(2, :), ...
-                dPointsPositionsGT_RTwithEllipsLocalPA(3,:), 'b.', 'MarkerSize', 5, 'DisplayName', 'RT + Ellips. Local PA');
+                dPointsPositionsGT_RTwithEllipsLocalPA(3,:), 'bxo', 'MarkerSize', 4, 'DisplayName', 'RT + Ellips. Local PA');
 
 dPointsPositionsGT_RTwithShadowRays = dPointsPositionsGT_TB(:, bAllPointsVisibilityMask_RTwithShadowRays);
 objPointCloud_RTwithShadowRays = plot3(dPointsPositionsGT_RTwithShadowRays(1, :), dPointsPositionsGT_RTwithShadowRays(2, :), ...
-                dPointsPositionsGT_RTwithShadowRays(3,:), '.', 'Color', '#FFA500', 'MarkerSize', 5, 'DisplayName', 'RT + Shadow ray');
+                dPointsPositionsGT_RTwithShadowRays(3,:), 'x', 'Color', '#FFA500', 'MarkerSize', 4, 'DisplayName', 'RT + Shadow ray');
+
+% Set background color based on flag
+if bUseBlackBackground == true
+    set(gca, 'Color', 'k'); % Axes background
+    set(gcf, 'Color', 'k'); % Figure background
+else
+    set(gca, 'Color', 'w'); % White background
+    set(gcf, 'Color', 'w');
+end
 
 % Add legend
-legend([objPatchModel, objPointCloud_GT, objDirToSun, objPointCloud_RTwithEllipsLocalPA, objPointCloud_RTwithShadowRays], 'TextColor', charTextColor);
+legend([objPatchModel, objPointCloud_GT, objDirToSun, ...
+    objPointCloud_RTwithEllipsLocalPA, objPointCloud_RTwithShadowRays], 'TextColor', charTextColor);
 hold off;
+
+
 
 %%%%%%%%%%%%%%%%%
 % 2D Image projection plot
