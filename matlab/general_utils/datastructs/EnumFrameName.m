@@ -6,6 +6,8 @@ classdef EnumFrameName < SEnumFrameName
         CAMI
         CSF
         SC
+        J2000
+        ECLIPJ2000
     end
 end
 

@@ -59,7 +59,7 @@ classdef CScenarioGenerator < CGeneralPropagator
                 strDynParams      (1,1) struct {isstruct} = struct();
             end
             arguments
-                kwargs.enumWorldFrameName (1,:) {mustBeA(kwargs.enumWorldFrameName, "SEnumFrameName")} = EnumFrameName.IN
+                kwargs.enumWorldFrameName (1,:) {mustBeA(kwargs.enumWorldFrameName, "SEnumFrameName")} = EnumFrameName.J2000
                 kwargs.dEphemerisTimegrid (1,:) double {isvector, isnumeric} = 0.0
                 kwargs.objOrbitDynamicFcnHandle = [] % Assign if not empty
             end

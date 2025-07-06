@@ -191,4 +191,21 @@ classdef SReferenceMissionDesign < CBaseDatastructWithTimes
 
     end
 
+    methods (Access = public)
+        function [dStateSC_W, self] = dStateSC_W(self, dStateSC_W)
+            arguments
+                self
+                dStateSC_W {ismatrix, isnumeric} = [];
+            end
+
+            if not(isempty(dStateSC_W))
+                self.dPosSC_W = dStateSC_W(1:3, :);
+                self.dVelSC_W = dStateSC_W(4:6, :);
+            else
+                dStateSC_W = [self.dPosSC_W; self.dVelSC_W];
+            end
+
+        end
+    end
+
 end
