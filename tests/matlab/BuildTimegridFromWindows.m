@@ -25,7 +25,8 @@ arguments (Input)
                                                     ["TAI", "TDB", "TDT", "TT", "ET", "JDTDB", "JDTDT", "JED", "GPS"])} = "ET";
     kwargs.charUserDefTimescale     (1,:) char {ischar, isstring, mustBeMember(kwargs.charUserDefTimescale, ...
                                                         ["TAI", "TDB", "TDT", "TT", "ET", "JDTDB", "JDTDT", "JED", "GPS"])} = "ET";
-    kwargs.i32TargetLabelID         (1,1) int32 = -1
+    kwargs.i32TargetLabelID         (1,1) int32  = -1
+    kwargs.dInitialRelTime          (1,1) double = 0.0 
 end
 arguments (Output)
     dTimeGrid           (1,:) double  {mustBeVector, mustBeNonnegative}
@@ -33,10 +34,17 @@ arguments (Output)
 end
 
 % Read the windows file
-charWindowsFilestring = jsondecode(fileread(charJsonPath));
+charWindowsFileString = jsondecode(fileread(charJsonPath));
 
-dBeginTstamps = arrayfun(@(s) s.t_start, charWindowsFilestring);
-dEndTstamps   = arrayfun(@(s) s.t_end,   charWindowsFilestring);
+dBeginTstamps = arrayfun(@(s) s.t_start, charWindowsFileString);
+dEndTstamps   = arrayfun(@(s) s.t_end,   charWindowsFileString);
+
+%%% Filter based on initial relative time
+dRelBeginTimes = dBeginTstamps - dBeginTstamps(1);
+bIdxValidRelBeginTimes = dRelBeginTimes >= kwargs.dInitialRelTime;
+
+dBeginTstamps = dBeginTstamps(bIdxValidRelBeginTimes);
+dEndTstamps   = dEndTstamps  (bIdxValidRelBeginTimes);
 
 %%% Apply constraints on time windows
 % Calculate window durations
@@ -54,7 +62,11 @@ dEndTstamps   = dEndTstamps(1:ui32NumWindows);
 
 if kwargs.i32TargetLabelID >= 0
     % Filter windows based on target ID
-    ui32TargetLabelIDs = arrayfun(@(s) s.lbl, charWindowsFilestring);
+    ui32TargetLabelIDs = arrayfun(@(s) s.lbl, charWindowsFileString);
+
+    % Apply filtering masks
+    ui32TargetLabelIDs = ui32TargetLabelIDs(bIdxValidRelBeginTimes);
+    ui32TargetLabelIDs = ui32TargetLabelIDs(bIdxValidDuration);
     ui32TargetLabelIDs = ui32TargetLabelIDs(1:ui32NumWindows);
 end
 
