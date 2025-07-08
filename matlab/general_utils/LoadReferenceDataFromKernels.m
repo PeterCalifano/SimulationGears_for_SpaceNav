@@ -200,6 +200,7 @@ if not(isempty(dETtimegridVect))
     else
         % Compute timegrid to absolute time grid (ET, GPS, etc.)
         dAbsTimegrid_ET = dETtimegridVect + dET0;
+        dRelativeTimegridVect = dETtimegridVect;
         % dAbsTimegrid_UserDef = dTimegridVect_kernelTimeScale + dTime0_kernelTimeScale;
     end
 
@@ -218,7 +219,7 @@ fprintf('Using %s timegrid with relative bounds from ET0: [%8.0f, %8.0f].\nData 
 assert(dAbsTimegrid_ET(end) <= dETf, "ERROR: last time instant specified in absolute timegrid is outside allowed ET bounds! %6.2g < %6.2g\n", dETf, dETtimegridVect(end));
 
 % Convert ET timegrid to kernel timescale
-dAbsTimegrid_kernelTimeScale = cspice_unitim(dETtimegridVect, 'ET', kwargs.charKernelTimescale);
+dAbsTimegrid_kernelTimeScale = cspice_unitim(dAbsTimegrid_ET, 'ET', kwargs.charKernelTimescale);
 
 %% Load kernels
 try
