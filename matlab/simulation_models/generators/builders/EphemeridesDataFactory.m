@@ -3,6 +3,7 @@ function [strDynParams, strMainBodyRefData] = EphemeridesDataFactory(dEphemTimeg
                                                                      ui32AttitudePolyDeg, ...
                                                                      strDynParams, ...
                                                                      strMainBodyRefData, ...
+                                                                     str3rdBodyRefData, ...
                                                                      kwargs)
 arguments
     dEphemTimegrid
@@ -10,6 +11,7 @@ arguments
     ui32AttitudePolyDeg
     strDynParams
     strMainBodyRefData
+    str3rdBodyRefData = []
 end
 arguments
     kwargs.bGroundTruthEphemerides (1,1) logical {isscalar, islogical} = true
@@ -17,6 +19,13 @@ arguments
 end
 % TODO
 %% SIGNATURE
+% [strDynParams, strMainBodyRefData] = EphemeridesDataFactory(dEphemTimegrid, ...
+%                                                             ui32EphemerisPolyDeg,...
+%                                                             ui32AttitudePolyDeg, ...
+%                                                             strDynParams, ...
+%                                                             strMainBodyRefData, ...
+%                                                             str3rdBodyRefData, ...
+%                                                             kwargs)
 % -------------------------------------------------------------------------------------------------------------
 %% DESCRIPTION
 % What the function does
@@ -37,6 +46,8 @@ end
 % -------------------------------------------------------------------------------------------------------------
 %% CHANGELOG
 % 19-02-2025    Pietro Califano     First version copy-pasting previous implementation
+% 10-07-2025    Pietro Califano     Extend to support definition of 3rd body attitude and position
+%                                   ephemerides from input reference data
 % -------------------------------------------------------------------------------------------------------------
 %% DEPENDENCIES
 % [-]
@@ -90,14 +101,54 @@ strDynParams.strBody3rdData(1).strOrbitData.dChbvPolycoeffs  = dTmpChbvCoeffs;
 strDynParams.strBody3rdData(1).strOrbitData.dTimeLowBound    = dDomainLB;
 strDynParams.strBody3rdData(1).strOrbitData.dTimeUpBound     = dDomainUB;
 
-%% Add any other body here, index starting from (2)
+%% Add 3rd bodies
+if not(isempty(str3rdBodyRefData))
 
-% [dChbvCoeffs, ~, ~] = fitChbvPolynomials(ui32PolyDeg, dInterpDomain, ...
-%     strMainBodyRefData.dSunPosition_IN, dDomainLB, dDomainUB, bENABLE_AUTO_CHECK);
-% 
-% strDynParams.strBody3rdData(2).strOrbitData.ui32PolyDeg      = ui32EphemerisPolyDeg;
-% strDynParams.strBody3rdData(2).strOrbitData.dChbvPolycoeffs  = dChbvCoeffs;
-% strDynParams.strBody3rdData(2).strOrbitData.dTimeLowBound    = dDomainLB;
-% strDynParams.strBody3rdData(2).strOrbitData.dTimeUpBound     = dDomainUB;
+    for idB = 1:length(str3rdBodyRefData)
+        % Get position data
+
+        assert(isfield(str3rdBodyRefData, "strOrbitData"));
+        dPosition_IN = str3rdBodyRefData(idB).strOrbitData.dPosition_IN;
+
+        [dChbvCoeffs, ~, ~] = fitChbvPolynomials(ui32PolyDeg, ...
+                                                 dInterpDomain, ...
+                                                    dPosition_IN, ...
+                                                    dDomainLB, ...
+                                                    dDomainUB, ...
+                                                    bENABLE_AUTO_CHECK);
+
+        strDynParams.strBody3rdData(idB+1).strOrbitData.ui32PolyDeg      = ui32EphemerisPolyDeg;
+        strDynParams.strBody3rdData(idB+1).strOrbitData.dChbvPolycoeffs  = dChbvCoeffs;
+        strDynParams.strBody3rdData(idB+1).strOrbitData.dTimeLowBound    = dDomainLB;
+        strDynParams.strBody3rdData(idB+1).strOrbitData.dTimeUpBound     = dDomainUB;
+    
+        if isfield(str3rdBodyRefData(idB), "strAttData")
+
+            % Fit attitude data (convert to quaternion first
+            dQuat_INfromTB = DCM2quatSeq(str3rdBodyRefData(idB).strAttData.dDCM_INfromTB , false);
+
+            [dTmpChbvCoeffs, ~, dTmpSwitchIntervals, ...
+                strTmpFitStats] = fitAttQuatChbvPolynmials(ui32AttitudePolyDeg, ...
+                                                            dInterpDomain, ...
+                                                            dQuat_INfromTB, ...
+                                                            dDomainLB, ...
+                                                            dDomainUB, ...
+                                                            kwargs.bEnableInterpValidation); %#ok<ASGLU>
+
+            strDynParams.strBody3rdData(idB+1).strAttData.ui32PolyDeg          = ui32AttitudePolyDeg;
+            strDynParams.strBody3rdData(idB+1).strAttData.dChbvPolycoeffs      = dTmpChbvCoeffs;
+            strDynParams.strBody3rdData(idB+1).strAttData.dsignSwitchIntervals = dTmpSwitchIntervals;
+            strDynParams.strBody3rdData(idB+1).strAttData.dTimeLowBound        = dDomainLB;
+            strDynParams.strBody3rdData(idB+1).strAttData.dTimeUpBound         = dDomainUB;
+
+        end
+    
+    end
+
+
+
+end
+
+
 
 end

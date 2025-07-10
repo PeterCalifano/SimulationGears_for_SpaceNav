@@ -70,7 +70,6 @@ end %#codegen
 % -------------------------------------------------------------------------------------------------------------
 
 %% INPUT MANAGEMENT
-
 if coder.target('MATLAB') || coder.target('MEX')
     if isempty(ui16StatesIdx)
         % If empty, assume that state is (position, velocity)
@@ -105,7 +104,6 @@ if ~isempty(dBodyEphemerides)
         end
 
     end
-
 end
 
 %% Function code: Acceleration models computation
