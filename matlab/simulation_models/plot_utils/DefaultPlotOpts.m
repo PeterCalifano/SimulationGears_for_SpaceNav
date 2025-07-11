@@ -5,6 +5,7 @@ end
 arguments
     kwargs.bUseBlackBackground  (1,1) logical {islogical, isscalar} = false;
     kwargs.charRenderer         (1,:) string {mustBeA(kwargs.charRenderer, ["string", "char"])} = 'painters'; % 'opengl'
+    kwargs.bEnableGrid          (1,1) logical = true
 end
 % TODO: move this function to SimulationGears_for_SpaceNav!
 %% PROTOTYPE
@@ -24,7 +25,8 @@ end
 % [-]
 % -------------------------------------------------------------------------
 % CHANGELOG
-%    18-04-2023    Pietro Califano    Coded and tested
+%    18-04-2023     Pietro Califano     Coded and tested
+%    11-07-2025     Pietro Califano     Upgrade for usage in Gears frameworks
 % -------------------------------------------------------------------------
 % DEPENDENCIES
 % [-]
@@ -81,7 +83,15 @@ ApplyOptions(objFig, objCurrentAx, kwargs.charRenderer, charTextColor, charBackG
 end
 
 %% LOCAL FUNCTION
-function ApplyOptions(objFig, objCurrentAx, charRenderer, charTextColor, charBackGroundColor)
+function ApplyOptions(objFig, objCurrentAx, charRenderer, charTextColor, charBackGroundColor, bEnableGrid)
+arguments
+    objFig
+    objCurrentAx
+    charRenderer
+    charTextColor
+    charBackGroundColor
+    bEnableGrid (1,1) logical = true;
+end
 
 % Recall figure
 figure(objFig);
@@ -90,8 +100,10 @@ figure(objFig);
 set(objFig, 'Renderer', charRenderer);
 
 % Apply plot options
-grid minor
-axis auto;
+if bEnableGrid
+    grid minor
+    axis auto;
+end
 
 objCurrentAx.XAxisLocation = 'bottom';
 try
