@@ -1,4 +1,4 @@
-classdef (Abstract) CBaseDatastruct < handle
+classdef (Abstract) CBaseDatastruct < handle & matlab.mixin.Copyable
     %% DESCRIPTION
     % Base class for datastructs with import/export methods to struct, yaml, json and mat file.
     % -------------------------------------------------------------------------------------------------------------
