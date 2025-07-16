@@ -11,7 +11,7 @@ classdef SReferenceMissionDesign < CBaseDatastructWithTimes
     % 01-02-2025    Pietro Califano     First prototype implementation
     % 11-02-2025    Pietro Califano     Upgrade and adaptation to use class for RCS1 trajectory data
     % 25-06-2025    Pietro Califano     Add new attributes to store additional bodies position data
-    % 15-07-2025    Pietro Califano     Update class with new conveniency methods to produce plots and 
+    % 16-07-2025    Pietro Califano     Update class with new conveniency methods to produce plots and 
     %                                   attitude data directly from dataset
     % -------------------------------------------------------------------------------------------------------------
     %% METHODS
@@ -21,9 +21,6 @@ classdef SReferenceMissionDesign < CBaseDatastructWithTimes
     % TODO
     % -------------------------------------------------------------------------------------------------------------
     %% DEPENDENCIES
-    % [-]
-    % -------------------------------------------------------------------------------------------------------------
-    %% Future upgrades
     % [-]
     % -------------------------------------------------------------------------------------------------------------
 
@@ -175,7 +172,7 @@ classdef SReferenceMissionDesign < CBaseDatastructWithTimes
     
         function plotInterpDatasetComparison(self, ...
                                             dTimeGridOriginal, ...
-                                            dTimeGridTarget, ...
+                                            dTimegrid, ...
                                             dInterpPosSC_W, ...
                                             dInterpVelSC_W, ...
                                             dInterpSunPosition_W, ...
@@ -185,7 +182,7 @@ classdef SReferenceMissionDesign < CBaseDatastructWithTimes
             arguments
                 self
                 dTimeGridOriginal           double {mustBeVector}
-                dTimeGridTarget             double {mustBeVector}
+                dTimegrid             double {mustBeVector}
                 dInterpPosSC_W              double {ismatrix}
                 dInterpVelSC_W              double {ismatrix}
                 dInterpSunPosition_W        double {ismatrix}
@@ -217,7 +214,7 @@ classdef SReferenceMissionDesign < CBaseDatastructWithTimes
                 dTmpInterp      = cellDataInterp{ui32VecIdx};
 
                 figure('Name', ...
-                    sprintf('Compare – %s', cellstrVectorNames{ui32VecIdx}), ...
+                    sprintf('Compare - %s', cellstrVectorNames{ui32VecIdx}), ...
                     'NumberTitle','off');
 
                 if contains(cellstrVectorNames{ui32VecIdx}, 'DCM')
@@ -231,7 +228,7 @@ classdef SReferenceMissionDesign < CBaseDatastructWithTimes
                 for ui32StateIdx = uint32(1):ui32NumStates
 
                     subplot(ui32NumStates, 1, double(ui32StateIdx));
-                    plot(dTimeGridTarget,    dTmpInterp(ui32StateIdx,:), ...
+                    plot(dTimegrid,    dTmpInterp(ui32StateIdx,:), ...
                         '.-', 'LineWidth', 1.2); 
                     hold on;
                     plot(dTimeGridOriginal,  dTmpOrig(ui32StateIdx,:), ...
@@ -268,21 +265,21 @@ classdef SReferenceMissionDesign < CBaseDatastructWithTimes
             objInterpDataset = copy(self);
 
             if not(isempty(kwargs.dTargetTimegrid))
-                dTimeGridTarget = kwargs.dTargetTimegrid;
+                dTimegrid = kwargs.dTargetTimegrid;
 
             elseif not(isempty(kwargs.dDeltaTimeMultiplier))
                 % Dataset timegrid definition
                 dNewDeltaTime = kwargs.dDeltaTimeMultiplier * (self.dTimestamps(2) - self.dTimestamps(1));
-                dTimeGridTarget = objDataset.dTimestamps(1):dNewDeltaTime:objDataset.dTimestamps(end);
+                dTimegrid = objDataset.dTimestamps(1):dNewDeltaTime:objDataset.dTimestamps(end);
             else
                 error('Invalid inputs: either dTargetTimegrid or dDeltaTimeMultiplier must be provided.')
             end
 
-            dRelTimeGridTarget = dTimeGridTarget - dTimeGridTarget(1);
+            dRelTimeGridTarget = dTimegrid - dTimegrid(1);
 
             % Interpolate position/velocity data
             dTimeGridOriginal = self.dTimestamps;
-                objSplinerHandle = @(dInputData) spline(dTimeGridOriginal, dInputData, dTimeGridTarget);
+                objSplinerHandle = @(dInputData) spline(dTimeGridOriginal, dInputData, dTimegrid);
 
                 dInterpPosSC_W          = objSplinerHandle( self.dPosSC_W );
                 dInterpVelSC_W          = objSplinerHandle( self.dVelSC_W );
@@ -291,8 +288,8 @@ classdef SReferenceMissionDesign < CBaseDatastructWithTimes
                 dInterpTargetPosition_W = objSplinerHandle( self.dTargetPosition_W );
 
                 % Interpolate target attitude
-                dInterpDCM_TBfromW = zeros(3,3, length(dTimeGridTarget));
-                ui32InterpGridCheckID_  = zeros(1, length(dTimeGridTarget), 'uint32');
+                dInterpDCM_TBfromW = zeros(3,3, length(dTimegrid));
+                ui32InterpGridCheckID_  = zeros(1, length(dTimegrid), 'uint32');
 
                 ui32InterPtr = uint32(1);
 
@@ -303,11 +300,11 @@ classdef SReferenceMissionDesign < CBaseDatastructWithTimes
                     dTime1_ = dTimeGridOriginal(idQ + 1);
 
                     % Get all times in the target timegrid within it idQ interval
-                    bInitMask = dTimeGridTarget >= dTime0_;
-                    bEndMask  = dTimeGridTarget < dTime1_;
+                    bInitMask = dTimegrid >= dTime0_;
+                    bEndMask  = dTimegrid < dTime1_;
                     bExtractionIdx = bInitMask & bEndMask;
 
-                    dInterpTargetTimesInInterval_ = dTimeGridTarget(bExtractionIdx);
+                    dInterpTargetTimesInInterval_ = dTimegrid(bExtractionIdx);
                     ui32TargetIndices = find(bExtractionIdx > 0);
 
                     % Compute quaternion from DCMs
@@ -336,12 +333,12 @@ classdef SReferenceMissionDesign < CBaseDatastructWithTimes
 
                 % Add last time instant
                 dInterpDCM_TBfromW(:,:,end) = self.dDCM_TBfromW(:,:, end);
-                assert(length(unique(ui32InterpGridCheckID_)) == length(dTimeGridTarget), 'ERROR: duplicated indices found in interpolation index. Please check allocation logic!');
+                assert(length(unique(ui32InterpGridCheckID_)) == length(dTimegrid), 'ERROR: duplicated indices found in interpolation index. Please check allocation logic!');
 
                 if kwargs.bDisplayComparison
                     % Plot interpolated vs original data
                     self.plotInterpDatasetComparison(dTimeGridOriginal, ...
-                                                dTimeGridTarget         , ...
+                                                dTimegrid         , ...
                                                 dInterpPosSC_W          , ...
                                                 dInterpVelSC_W          , ...
                                                 dInterpSunPosition_W    , ...
@@ -352,7 +349,7 @@ classdef SReferenceMissionDesign < CBaseDatastructWithTimes
 
 
                 % Update fields
-                objInterpDataset.dTimestamps       = dTimeGridTarget;
+                objInterpDataset.dTimestamps       = dTimegrid;
                 objInterpDataset.dPosSC_W          = dInterpPosSC_W;
                 objInterpDataset.dVelSC_W          = dInterpVelSC_W;
                 objInterpDataset.dSunPosition_W    = dInterpSunPosition_W;
@@ -369,10 +366,16 @@ classdef SReferenceMissionDesign < CBaseDatastructWithTimes
         end
 
 
-        function [objFig_PosVel, objFig_PhaseAngle] = plotDatasetData(self, ui32TargetIndex)
+        function [objFig_PosVel, objFig_PhaseAngle, objTargetAttitudeFig] = plotDatasetData(self, kwargs)
             arguments
                 self            (1,1) {mustBeA(self, "SReferenceMissionDesign")}
-                ui32TargetIndex (1,1) uint32 {isscalar} = 0
+            end
+            arguments
+                kwargs.ui32TargetIndex          (1,1) uint32 {isscalar} = 0
+                kwargs.bPlotPhaseAngles         (1,1) logical {islogical, isscalar} = true
+                kwargs.bPlotTargetAttitude      (1,1) logical {islogical, isscalar} = false
+                kwargs.bPlotSpacecraftAttitude  (1,1) logical {islogical, isscalar} = false
+                kwargs.dTargetAttitudeSet2      = [];
             end
             % DEVNOTE: basic version of method to plot visualizations of data contained in the dataset
             % object. May be expanded with many functionalities and options
@@ -382,34 +385,54 @@ classdef SReferenceMissionDesign < CBaseDatastructWithTimes
 
             % Plot phase angle evolution in time
             objFig_PhaseAngle = [];
-            if ui32TargetIndex == 0
+            if kwargs.ui32TargetIndex == 0
                 dTarget_W = self.dTargetPosition_W;
             else
                 try
-                    dTarget_W = self.cellAdditionalBodiesPos_W{ui32TargetIndex};
+                    dTarget_W = self.cellAdditionalBodiesPos_W{kwargs.ui32TargetIndex};
                 catch ME
                     warning('Error in getting position of target body ID%d: %s. Are you sure that the dataset contain any additional body?', ...
-                        ui32TargetIndex, string(ME.message));
+                        kwargs.ui32TargetIndex, string(ME.message));
                     return
                 end
             end
 
-            objFig_PhaseAngle = figure;
+            if kwargs.bPlotPhaseAngles
+                objFig_PhaseAngle = figure;
 
-            dCamPosFromTarget_W = self.dPosSC_W - dTarget_W;
-            dSunPosFromTarget_W = self.dSunPosition_W - dTarget_W;
-            dPhaseAngles = acosd(dot(dCamPosFromTarget_W./vecnorm(dCamPosFromTarget_W, 2, 1), dSunPosFromTarget_W./vecnorm(dSunPosFromTarget_W, 2, 1)));
+                dCamPosFromTarget_W = self.dPosSC_W - dTarget_W;
+                dSunPosFromTarget_W = self.dSunPosition_W - dTarget_W;
+                dPhaseAngles = acosd(dot(dCamPosFromTarget_W./vecnorm(dCamPosFromTarget_W, 2, 1), dSunPosFromTarget_W./vecnorm(dSunPosFromTarget_W, 2, 1)));
 
-            plot(self.dTimestamps, dPhaseAngles, 'r-', 'DisplayName', 'Dataset poses', 'LineWidth', 1.05);
-            % plot(objDataset.dTimestamps(bImageAcquisitionMask), dPhaseAngles(bImageAcquisitionMask), ...
-            %     'r.', 'DisplayName', 'Image acquisition', 'linestyle', 'none');
-            xlabel('Time ET [s]')
-            ylabel('Phase angle [deg]')
-            grid minor
-            legend();
-            return
+                plot(self.dTimestamps, dPhaseAngles, 'r-', 'DisplayName', 'Dataset poses', 'LineWidth', 1.05);
+                % plot(objDataset.dTimestamps(bImageAcquisitionMask), dPhaseAngles(bImageAcquisitionMask), ...
+                %     'r.', 'DisplayName', 'Image acquisition', 'linestyle', 'none');
+                xlabel('Time ET [s]')
+                ylabel('Phase angle [deg]')
+                grid minor
+                legend();
+            end
 
+            if kwargs.bPlotTargetAttitude
+                % Plot target attitude if required
+                dDataVec1 = self.dDCM_TBfromW;
+                dDataVec2 = kwargs.dTargetAttitudeSet2;
+                assert(isempty(kwargs.dTargetAttitudeSet2) || (ndims(dDataVec2) == 3 && size(dDataVec2,1) == 3 && size(dDataVec2,2) == 3), ...
+                    'ERROR: set 2 for target attitude is not a valid array. Must be [3,3,N] containing DCM data or empty.');
 
+                % Plot target attitude data
+                objTargetAttitudeFig = self.plotVectorData_(dDataVec1, ...
+                                                         dDataVec2, ...
+                                                        "bIsDataDCM", true, ...
+                                                        "cellSetNames", {'Reference target attitude', '2nd attitude set'});
+            else
+                objTargetAttitudeFig = [];
+            end
+
+            if kwargs.bPlotSpacecraftAttitude
+                % Plot target attitude if required
+                % TODO
+            end
         end
 
         function [objSceneFig] = visualizeTrajectory3dSceneAndPoses(self)
@@ -422,7 +445,77 @@ classdef SReferenceMissionDesign < CBaseDatastructWithTimes
     end
 
     methods (Access = protected)
-        % NONE
+        function [objFig] = plotVectorData_(self, dDataVec1, dDataVec2, kwargs)
+            arguments
+                self
+                dDataVec1  {isnumeric}
+                dDataVec2  = []
+            end
+            arguments
+                kwargs.cellSetNames {iscell} = {'Set1', 'Set2'};
+                kwargs.bIsDataDCM (1,1) logical = false
+            end
+
+            % objFig = figure('Name', ...
+            %                 sprintf('%s', charFigName), ...
+            %                 'NumberTitle','off');
+            objFig = figure();
+            dTimegrid = self.dTimestamps;
+            assert(length(kwargs.cellSetNames) <= 2, 'ERROR: current implementation only supports plots containing 2 sets of vector data.');
+
+            if kwargs.bIsDataDCM
+                % Convert DCM to quaternion sequence
+                dDataVec1    = DCM2quatSeq(dDataVec1, false);
+
+                if not(isempty(dDataVec2))
+                    dDataVec2  = DCM2quatSeq(dDataVec2, false);
+                end
+            end
+
+            % Get number of plot entries
+            ui32NumStates   = size(dDataVec1,1);
+            ui32NumCols = floor(ui32NumStates/2);
+            ui32NumRows = ceil( ui32NumStates / ui32NumCols);
+
+            % Plot states in tiled layout
+            tiledlayout(ui32NumRows, ui32NumCols, ...
+                       "TileSpacing", "compact");
+    
+            for ui32StateIdx = uint32(1):ui32NumStates
+                nexttile;
+                    
+                % Plot data set 1
+                cellObjPlots{1,1} = plot(dTimegrid, dDataVec1(ui32StateIdx,:), '.-', ...
+                                        'LineWidth', 1.2, ...
+                                        'DisplayName', string(kwargs.cellSetNames{1})); 
+                hold on;
+
+                if not(isempty(dDataVec2))
+                    % Plot data set 2
+                    cellObjPlots{1,2} = plot(dTimeGridOriginal,  dDataVec1(ui32StateIdx,:), ...
+                                        '*',  'MarkerSize', 1, ...
+                                        'LineStyle', 'none', ...
+                                        'DisplayName', string(kwargs.cellSetNames{2}));
+                end
+
+                if not(isempty(kwargs.cellSetNames))
+                    ylabel(sprintf('%s (%u)', strrep(kwargs.cellVectorNames{ui32VecIdx}, '_', ' '), ui32StateIdx));
+                else
+
+                end
+
+                if ui32StateIdx == ui32NumStates || mod(ui32StateIdx, ui32NumRows) == 0
+                    xlabel('Time [s]');
+                else
+                    set(gca,'XTickLabel',[]);
+                end
+
+                legend([cellObjPlots{:}], 'Location', 'best');
+                grid on;
+
+            end
+        end
+
     end
 
     methods (Access = public, Static)
@@ -448,26 +541,36 @@ classdef SReferenceMissionDesign < CBaseDatastructWithTimes
                 objDataset (1,1) {mustBeA(objDataset, "SReferenceMissionDesign")}
             end
             arguments
-                kwargs.placeholder = [];
+                kwargs.bShowAttitudePointingPlot       (1,1) logical {islogical, isscalar} = false
+                kwargs.dSigmaBoresightRollAngle        (1,1) double {isscalar, isnumeric} = 0.0;
+                kwargs.dSigmaOffPointingDegAngle       (1,1) double {isscalar, isnumeric} = 0.0;
+                kwargs.enumConstraintType              (1,:) string {mustBeMember(kwargs.enumConstraintType, ["YorthogonalSun", "trackLVLH", "auxiliaryAxis"])} = "YorthogonalSun"
+                kwargs.enumOutRot3Param                (1,1) EnumRotParams {isa(kwargs.enumOutRot3Param, 'EnumRotParams')} = EnumRotParams.DCM
+                kwargs.dDCM_displacedPoseFromPose      (3,3,:) double {ismatrix, isnumeric} = zeros(3,3) % Custom rotation to apply to the rotation
+                kwargs.enumOffPointingMode             (1,1) string {mustBeMember(kwargs.enumOffPointingMode, ["randomAxis", "refAxisOutOfPlane", "refAxisInPlane"])} = "randomAxis";
+                kwargs.dReferenceAxis_Frame            (3,:) double {ismatrix, isnumeric} = zeros(3,0)
+                kwargs.enumDisplaceDistribution           (1,:) string {mustBeMember(kwargs.enumDisplaceDistribution, ...
+                    ["uniform", "gaussian", "time_correlation", "gaussian_same_on_batch", "uniform_same_on_batch"])} = "gaussian";
             end
             
             % TODO add kwargs
             objPointingGenerator = CAttitudePointingGenerator(objDataset.dPosSC_W, ...
                                                                 objDataset.dTargetPosition_W, ...
                                                                 objDataset.dSunPosition_W, ...
-                                                                "bShowAttitudePointingPlot", false);
+                                                                "bShowAttitudePointingPlot", kwargs.bShowAttitudePointingPlot);
 
-            dSigmaBoresightRollAngle = 0.0;
-            dSigmaOffPointingDegAngle = 0.0;
 
             [objPointingGenerator, dRot3Param, dCameraAttDCM_WfromOF, dOffPointingAngles] = objPointingGenerator.pointToTarget(...
-                                                                                    "dSigmaDegRotAboutBoresight", dSigmaBoresightRollAngle, ...
-                                                                                    "enumOffPointingMode", "randomAxis", ...
-                                                                                    "dSigmaOffPointingDegAngle", dSigmaOffPointingDegAngle, ...
-                                                                                    "enumDisplaceDistribution", "gaussian"); %#ok<*UNRCH>
+                                                                                    "dSigmaDegRotAboutBoresight", kwargs.dSigmaBoresightRollAngle, ...
+                                                                                    "enumOffPointingMode", kwargs.enumOffPointingMode, ...
+                                                                                    "dSigmaOffPointingDegAngle", kwargs.dSigmaOffPointingDegAngle, ...
+                                                                                    "enumDisplaceDistribution", kwargs.enumDisplaceDistribution, ...
+                                                                                    "dReferenceAxis_Frame", kwargs.dReferenceAxis_Frame, ...
+                                                                                    "enumConstraintType", kwargs.enumConstraintType, ...
+                                                                                    "enumOutRot3Param", kwargs.enumOutRot3Param, ...
+                                                                                    "dDCM_displacedPoseFromPose", kwargs.dDCM_displacedPoseFromPose); %#ok<*UNRCH>
         end
-
-
+  
 
         function [objPosesPointCloudDataset] = ConvertToSPoses3PointCloudImagesDataset(objDataset)
             arguments (Input)
