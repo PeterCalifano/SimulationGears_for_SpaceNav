@@ -82,7 +82,8 @@ classdef CAttitudePointingGenerator < handle
                 options.enumOffPointingMode             (1,1) string {mustBeMember(options.enumOffPointingMode, ["randomAxis", "refAxisOutOfPlane", "refAxisInPlane"])} = "randomAxis";
                 options.dReferenceAxis_Frame            (3,:) double {ismatrix, isnumeric} = zeros(3,0)
                 options.enumDisplaceDistribution           (1,:) string {mustBeMember(options.enumDisplaceDistribution, ...
-                                                            ["uniform", "gaussian", "time_correlation", "gaussian_same_on_batch", "uniform_same_on_batch"])} = "gaussian";            end
+                                                            ["uniform", "gaussian", "time_correlation", "gaussian_same_on_batch", "uniform_same_on_batch"])} = "gaussian";            
+            end
             arguments (Output)
                 self
                 dOutRot3                  {mustBeNumeric, mustBeNonNan, mustBeFinite}
