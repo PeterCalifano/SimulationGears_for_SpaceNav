@@ -323,7 +323,7 @@ classdef SReferenceMissionDesign < CBaseDatastructWithTimes
 
                     % Convert back to DCMs and allocate
                     ui32NumNewInterpEntries = uint32(length(dInterpTargetTimesInInterval_));
-                    dInterpDCM_TBfromW(1:3, 1:3, ui32InterPtr:ui32InterPtr+ui32NumNewInterpEntries-1) = QuatSeq2DCM(dInterpTargetBodyQuat_TBfromW', false);
+                    dInterpDCM_TBfromW(1:3, 1:3, ui32InterPtr:ui32InterPtr+ui32NumNewInterpEntries-1) = QuatSeq2DCM(dInterpTargetBodyQuat_TBfromW, false);
                     ui32InterpGridCheckID_(ui32InterPtr:ui32InterPtr+ui32NumNewInterpEntries-1) = ui32TargetIndices;
 
                     % Update ptr
