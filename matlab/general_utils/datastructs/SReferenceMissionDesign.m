@@ -452,16 +452,27 @@ classdef SReferenceMissionDesign < CBaseDatastructWithTimes
                 dDataVec2  = []
             end
             arguments
-                kwargs.cellSetNames {iscell} = {'Set1', 'Set2'};
-                kwargs.bIsDataDCM (1,1) logical = false
+                kwargs.cellSetNames     {iscell} = {'Set1', 'Set2'};
+                kwargs.cellStatesNames  {iscell} = {}
+                kwargs.bIsDataDCM       (1,1) logical = false
+                kwargs.ui32Decimation   (1,1) uint32 = 1
             end
+
+            % TODO improve robustness to incorrect sizes and inputs!
 
             % objFig = figure('Name', ...
             %                 sprintf('%s', charFigName), ...
             %                 'NumberTitle','off');
             objFig = figure();
+            set(objFig, 'Renderer', 'opengl'); %#ok<FGREN>
             dTimegrid = self.dTimestamps;
             assert(length(kwargs.cellSetNames) <= 2, 'ERROR: current implementation only supports plots containing 2 sets of vector data.');
+                
+            ui32Size = length(dTimegrid);
+            bDecimationMask = true(1, ui32Size);
+            if kwargs.ui32Decimation > 1
+                bDecimationMask(2:kwargs.ui32Decimation:ui32Size) = false;
+            end
 
             if kwargs.bIsDataDCM
                 % Convert DCM to quaternion sequence
@@ -480,28 +491,28 @@ classdef SReferenceMissionDesign < CBaseDatastructWithTimes
             % Plot states in tiled layout
             tiledlayout(ui32NumRows, ui32NumCols, ...
                        "TileSpacing", "compact");
-    
+
             for ui32StateIdx = uint32(1):ui32NumStates
                 nexttile;
                     
                 % Plot data set 1
-                cellObjPlots{1,1} = plot(dTimegrid, dDataVec1(ui32StateIdx,:), '.-', ...
+                cellObjPlots{1,1} = plot(dTimegrid(bDecimationMask), dDataVec1(ui32StateIdx, bDecimationMask), '.-', ...
                                         'LineWidth', 1.2, ...
                                         'DisplayName', string(kwargs.cellSetNames{1})); 
                 hold on;
 
                 if not(isempty(dDataVec2))
                     % Plot data set 2
-                    cellObjPlots{1,2} = plot(dTimeGridOriginal,  dDataVec1(ui32StateIdx,:), ...
-                                        '*',  'MarkerSize', 1, ...
-                                        'LineStyle', 'none', ...
+                    cellObjPlots{1,2} = plot(dTimegrid(bDecimationMask),  dDataVec2(ui32StateIdx, bDecimationMask), ...
+                                        '--',  'MarkerSize', 1, ...
+                                        'LineStyle', '--', ...
                                         'DisplayName', string(kwargs.cellSetNames{2}));
                 end
 
-                if not(isempty(kwargs.cellSetNames))
-                    ylabel(sprintf('%s (%u)', strrep(kwargs.cellVectorNames{ui32VecIdx}, '_', ' '), ui32StateIdx));
+                if not(isempty(kwargs.cellStatesNames))
+                    ylabel(sprintf('%s (%u)', strrep(kwargs.cellStatesNames{ui32VecIdx}, '_', ' '), ui32StateIdx));
                 else
-
+                    ylabel(sprintf('State %d', ui32StateIdx));
                 end
 
                 if ui32StateIdx == ui32NumStates || mod(ui32StateIdx, ui32NumRows) == 0
