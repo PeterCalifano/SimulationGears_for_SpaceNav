@@ -82,9 +82,12 @@ classdef CSPICEkerLoader
                 
                     assert( not(isempty( which("InitializeEnv.m") ) ));
 
-                    % Use RCS-1 simulator initialization script
-                    InitializeEnv;
-                    
+                    % Remove path to functions
+                    charDirRoot = fileparts(which("InitializeEnv.m"));
+                    rmpath( genpath(fullfile(charDirRoot, "functions")) );
+                    rmpath( genpath(fullfile(charDirRoot, "KLTtest")) );
+                    rmpath( genpath(fullfile(charDirRoot, "KLTtest")) );
+                    addpath( genpath(fullfile("selfContainedTools/testCaseGenerator")) )
                     return
                 case EnumScenarioName.Moon
 
