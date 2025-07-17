@@ -97,7 +97,7 @@ classdef CSPICEkerLoader
                     return
                     % error('Nots added yet')
                 otherwise
-                    error("enumScenarioName is not a valid scenario.")
+                    error("Scenario %s is not a valid scenario. Please make sure the name is capitalized but lower, like 'Itokawa'.", enumScenarioName)
             end
             
             % Move to kernels base folder to load metakernel            
