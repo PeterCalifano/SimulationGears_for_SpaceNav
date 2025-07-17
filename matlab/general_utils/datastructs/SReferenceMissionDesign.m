@@ -27,7 +27,7 @@ classdef SReferenceMissionDesign < CBaseDatastructWithTimes
     properties (SetAccess = public, GetAccess = public)
         
         % Reference definition
-        enumWorldFrame                  (1,1) {mustBeA(enumWorldFrame, ["SEnumFrameName", "string", "char"])} = EnumFrameName.IN  % Enumeration class indicating the W frame to which the data are attached
+        enumWorldFrame                  (1,1) {mustBeA(enumWorldFrame, ["SEnumFrameName", "string", "char"])} = "IN"  % Enumeration class indicating the W frame to which the data are attached
 
         % Orbit and attitude data
         dPosSC_W                        (3, :) double {isnumeric, ismatrix} = zeros(3,0);
