@@ -143,12 +143,20 @@ classdef SReferenceMissionDesign < CBaseDatastructWithTimes
                 self
                 dScaleFactor (1,1) double {isnumeric, isscalar}
             end
+            
             self.dPosSC_W             = dScaleFactor * self.dPosSC_W;
             self.dVelSC_W             = dScaleFactor * self.dVelSC_W;
             self.dTargetPosition_W    = dScaleFactor * self.dTargetPosition_W;
             self.dSunPosition_W       = dScaleFactor * self.dSunPosition_W;
             self.dEarthPosition_W     = dScaleFactor * self.dEarthPosition_W;
             self.dManoeuvresDeltaV_SC = dScaleFactor * self.dManoeuvresDeltaV_SC;
+
+            if not(isempty(self.cellAdditionalBodiesPos_W))
+                for idB = 1:length(self.cellAdditionalBodiesPos_W)
+                    self.cellAdditionalBodiesPos_W{idB} = dScaleFactor * self.cellAdditionalBodiesPos_W{idB};
+                end
+            end
+
         end
         % GETTERS
         

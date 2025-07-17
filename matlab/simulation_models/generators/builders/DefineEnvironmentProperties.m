@@ -71,7 +71,7 @@ if kwargs.objDataset.bDefaultConstructed
         warning('Minimum time in ephemeris timegrid < 1e6. This is being used to query CSPICE but seems to small. Make sure it is as intended!')
     end
 
-    % Get target fixed frame attitude wrt Inertial frame
+    % Get target fixed frame attitude wrt Inertial frame    
     strAdditionalData.dDCM_INfromTB = cspice_pxform(char(charTargetFixedFrame), char(charInertialFrame), dEphemeridesTimegrid);
 
     % Get Sun position in Inertial frame
