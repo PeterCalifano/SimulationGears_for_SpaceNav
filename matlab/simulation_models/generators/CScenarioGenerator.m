@@ -325,10 +325,12 @@ classdef CScenarioGenerator < CGeneralPropagator
                     charTargetName = 'ITOKAWA';
                     charTargetFixedFrame = "ITOKAWA_FIXED";
 
-                    % try
-                    %     dTargetReferenceRadius  = mean(cspice_bodvrd(num2str(ui32ID),'RADII',3)); % [m] ACHTUNG: Value used for Gravity SH expansion!
-                    %     dTargetGravityParameter = cspice_bodvrd(num2str(ui32ID),'GM',1)*1e+09;            % [m^3/(s^2)]
-                    % catch
+                    try
+                        ui32ID = 2025143;
+                        dTargetReferenceRadius  = 1E+03 * mean(cspice_bodvrd(num2str(ui32ID),'RADII',3)); % [m] ACHTUNG: Value used for Gravity SH expansion!
+                        dTargetGravityParameter = 1E+09 * cspice_bodvrd(num2str(ui32ID),'GM',1);            % [m^3/(s^2)]
+                    catch
+                        warning('Fetch of Itokawa data from kernels failed. Fallback to hardcoded data...')
                         dTargetGravityParameter = 2.36; % m^3/s^2
                         dTargetReferenceRadius  = 1E+03 * 0.161915; % [m] ACHTUNG: Value used for Gravity SH expansion!
                     % end
@@ -348,14 +350,19 @@ classdef CScenarioGenerator < CGeneralPropagator
                         dTargetGravityParameter = 3.003435675;         % [m^3/(s^2)]
                     end
 
-                case EnumScenarioName.Bennu_OREx
+                case EnumScenarioName.Bennu
+
                     charTargetName = 'BENNU';
                     charTargetFixedFrame = 'IAU_BENNU'; % Check corresponding tf file
                     dTargetGravityParameter = 4.892;
                     dTargetReferenceRadius  = 245; % [m] ACHTUNG: Value used for Gravity SH expansion!
 
-                case EnumScenarioName.Didymos_Hera
-                    error('To implement')
+                case EnumScenarioName.Didymos
+
+                    charTargetName = 'DIDYMOS';
+                    charTargetFixedFrame = 'IAU_DIDYMOS'; 
+                    dTargetGravityParameter = 34.3;   % m^3/s^2 
+                    dTargetReferenceRadius = 355.15; % [m] 
 
                 case EnumScenarioName.Earth
                     charTargetName = 'EARTH';
@@ -372,7 +379,6 @@ classdef CScenarioGenerator < CGeneralPropagator
                 otherwise
                     error('Invalid scenario name. See EnumScenarioName enum class for supported ones.')
             end
-
 
             % Store basic data
             strDynParams.strMainData.dGM        = dTargetGravityParameter;
