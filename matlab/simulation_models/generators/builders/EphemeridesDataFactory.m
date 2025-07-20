@@ -108,12 +108,12 @@ if not(isempty(str3rdBodyRefData)) && length(strDynParams.strBody3rdData) > 1
         if isfield(str3rdBodyRefData, "strOrbitData")
             try
                 dPosition_W = str3rdBodyRefData(idB).strOrbitData.dPosition_W;
-                [dChbvCoeffs, ~, ~] = fitChbvPolynomials(ui32PolyDeg, ...
+                [dChbvCoeffs, ~, ~] = fitChbvPolynomials(ui32EphemerisPolyDeg, ...
                                                         dInterpDomain, ...
                                                             dPosition_W, ...
                                                             dDomainLB, ...
                                                             dDomainUB, ...
-                                                            bENABLE_AUTO_CHECK);
+                                                            kwargs.bEnableInterpValidation);
 
                 strDynParams.strBody3rdData(idB+1).strOrbitData.ui32PolyDeg      = ui32EphemerisPolyDeg;
                 strDynParams.strBody3rdData(idB+1).strOrbitData.dChbvPolycoeffs  = dChbvCoeffs;
@@ -121,7 +121,7 @@ if not(isempty(str3rdBodyRefData)) && length(strDynParams.strBody3rdData) > 1
                 strDynParams.strBody3rdData(idB+1).strOrbitData.dTimeUpBound     = dDomainUB;
 
             catch ME
-                warning("EphemeridesDataFactory: Failed to fit orbit data for 3rd body %d due to error: %s. \nSkipping ephemeris fitting.", string(ME.message), idB);
+                warning("EphemeridesDataFactory: Failed to fit orbit data for 3rd body %d due to error: %s. \nSkipping ephemeris fitting.", idB, string(ME.message));
                 strDynParams.strBody3rdData(idB+1).strOrbitData.ui32PolyDeg      = 0;
                 strDynParams.strBody3rdData(idB+1).strOrbitData.dChbvPolycoeffs  = [];
                 strDynParams.strBody3rdData(idB+1).strOrbitData.dTimeLowBound    = [];
@@ -151,7 +151,7 @@ if not(isempty(str3rdBodyRefData)) && length(strDynParams.strBody3rdData) > 1
                 strDynParams.strBody3rdData(idB+1).strAttData.dTimeUpBound         = dDomainUB;
             
             catch ME
-                warning("EphemeridesDataFactory: Failed to fit attitude data for 3rd body %d due to error: %s. \nSkipping attitude fitting.", string(ME.message), idB);
+                warning("EphemeridesDataFactory: Failed to fit attitude data for 3rd body %d due to error: %s. \nSkipping attitude fitting.", idB, string(ME.message));
                 strDynParams.strBody3rdData(idB+1).strAttData.ui32PolyDeg          = 0;
                 strDynParams.strBody3rdData(idB+1).strAttData.dChbvPolycoeffs      = [];
                 strDynParams.strBody3rdData(idB+1).strAttData.dsignSwitchIntervals = [];
