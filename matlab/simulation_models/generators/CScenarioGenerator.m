@@ -333,7 +333,7 @@ classdef CScenarioGenerator < CGeneralPropagator
                         warning('Fetch of Itokawa data from kernels failed. Fallback to hardcoded data...')
                         dTargetGravityParameter = 2.36; % m^3/s^2
                         dTargetReferenceRadius  = 1E+03 * 0.161915; % [m] ACHTUNG: Value used for Gravity SH expansion!
-                    % end
+                    end
 
                 case EnumScenarioName.Apophis
                     % REFERENCE source: TODO
