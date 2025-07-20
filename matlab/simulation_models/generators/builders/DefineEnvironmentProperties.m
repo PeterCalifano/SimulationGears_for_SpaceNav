@@ -131,8 +131,13 @@ strDynParams.strSRPdata.dP_SRP0 = 1367/299792458 * (1/(dDistFromSunAU)^2); % [N/
 fprintf('\nAverage distance from the SUN in AU: %3.4f AU\n', dDistFromSunAU);
 
 % Add Sun gravity parameter
-strDynParams.strBody3rdData(1).dGM = 1E+09 * cspice_bodvrd('SUN', 'GM', 1); % Output is in m^3/s^2
-% strDynParams.strBody3rdData(1).dGM = cspice_bodvrd('SUN', 'GM', 1); % Output is in km^3/s^2
+try
+    strDynParams.strBody3rdData(1).dGM = cspice_bodvrd('SUN', 'GM', 1); % Output is in m^3/s^2
+catch ME
+    warning('ERROR occurred while fetching Sun GM: %s. Setting to default value in m^3/s^2.', string(ME.message));
+    % If not available, set to default value
+    strDynParams.strBody3rdData(1).dGM = 1E+09 * 1.32712440041279419 * 1E20; % [m^3/s^2] - JPL DE440
+end
 
 %% Spacecraft data
 dDefaultReflCoeff = 1.29;  % Global CR
