@@ -299,11 +299,9 @@ classdef CScenarioGenerator < CGeneralPropagator
             %% CHANGELOG
             % 14-03-2025    Pietro Califano     First version implemented from legacy codes
             % 15-06-2025    Pietro Califano     Fix incorrect measurement unit for Apophis radius
+            % 21-07-2025    Pietro Califano     Add new scenarios, updates to support future-nav simulations
             % -------------------------------------------------------------------------------------------------------------
             %% DEPENDENCIES
-            % [-]
-            % -------------------------------------------------------------------------------------------------------------
-            %% Future upgrades
             % [-]
             % -------------------------------------------------------------------------------------------------------------
 
@@ -320,7 +318,6 @@ classdef CScenarioGenerator < CGeneralPropagator
                 strDynParams.strMainData.dSHcoeff = [];
                 strDynParams.strMainData.ui16MaxSHdegree = [];
             end
-            
 
             switch enumScenarioName
                 case EnumScenarioName.Itokawa
@@ -352,7 +349,6 @@ classdef CScenarioGenerator < CGeneralPropagator
                     end
 
                 case EnumScenarioName.Bennu_OREx
-
                     charTargetName = 'BENNU';
                     charTargetFixedFrame = 'IAU_BENNU'; % Check corresponding tf file
                     dTargetGravityParameter = 4.892;
@@ -361,6 +357,18 @@ classdef CScenarioGenerator < CGeneralPropagator
                 case EnumScenarioName.Didymos_Hera
                     error('To implement')
 
+                case EnumScenarioName.Earth
+                    charTargetName = 'EARTH';
+                    charTargetFixedFrame = 'IAU_EARTH'; 
+                    dTargetGravityParameter = 3.986004418E+14; % [m^3/s^2]
+                    dTargetReferenceRadius  = 6371.0E+03; % [m] ACHTUNG: Value used for Gravity SH expansion!
+
+                case EnumScenarioName.Moon
+                    charTargetName = 'MOON';
+                    charTargetFixedFrame = 'IAU_MOON'; 
+                    dTargetGravityParameter = 4.9048695E+12; % [m^3/s^2]
+                    dTargetReferenceRadius  = 1737.4E+03; % [m] ACHTUNG: Value used for Gravity SH expansion!
+                
                 otherwise
                     error('Invalid scenario name. See EnumScenarioName enum class for supported ones.')
             end
@@ -370,9 +378,12 @@ classdef CScenarioGenerator < CGeneralPropagator
             strDynParams.strMainData.dGM        = dTargetGravityParameter;
             strDynParams.strMainData.dRefRadius = dTargetReferenceRadius;
 
-
             % Handle request of Spherical Harmonics coefficients
             if settings.bAddNonSphericalGravityCoeffs == true
+                
+                % Check input values
+                mustBeNonnegative(kwargs.ui16MaxSHdegree, ...
+                    "ERROR: Maximum SH degree must be a non-negative integer.")
 
                 % Get data depending on scenario
                 CScenarioGenerator.LoadSpherHarmCoefficients(enumScenarioName, kwargs.charSpherHarmCoeffInputFileName);
@@ -394,6 +405,16 @@ classdef CScenarioGenerator < CGeneralPropagator
                 charSpherHarmCoeffInputFileName (1,:) string {mustBeA(charSpherHarmCoeffInputFileName, ["string", "char"])} = ""
             end
             
+            if strcmpi(charSpherHarmCoeffInputFileName, "") % If empty, use hardcoded values if available else throw error
+                enumScenarioName = "from_file";
+                % Check inputs
+                assert(not(isempty(kwargs.charSpherHarmCoeffInputFileName)), ...
+                    "ERROR: Spherical Harmonics coefficients input file name cannot be empty if bAddNonSphericalGravityCoeffs is true.")
+
+                mustBeFile(kwargs.charSpherHarmCoeffInputFileName, ...
+                            "Spherical Harmonics coefficients input file not found. Provide a valid file name.")
+            end
+
             switch enumScenarioName
                 case EnumScenarioName.Itokawa
                     % REFERENCE source: (Scheeres, 2006)
@@ -466,8 +487,11 @@ classdef CScenarioGenerator < CGeneralPropagator
                 case EnumScenarioName.Didymos_Hera
                     error('To implement')
 
+                case "from_file"
+                    % TODO implement loading from file
+                    error('Not implemented yet >.<')
                 otherwise
-                    error('Invalid scenario name. See EnumScenarioName enum class for supported ones.')
+                    error('Invalid scenario name or filename! See EnumScenarioName enum class for supported ones (with default values) or provide a valid input file).')
             end
 
         end
