@@ -314,21 +314,21 @@ classdef CScenarioGenerator < CGeneralPropagator
                 strDynParams.strMainData.ui16MaxSHdegree = [];
             end
             
-
             switch enumScenarioName
                 case EnumScenarioName.Itokawa
                     % REFERENCE source: (Scheeres, 2006)
                     charTargetName = 'ITOKAWA';
                     charTargetFixedFrame = "ITOKAWA_FIXED";
 
-                    % try
-                    %     dTargetReferenceRadius  = mean(cspice_bodvrd(num2str(ui32ID),'RADII',3)); % [m] ACHTUNG: Value used for Gravity SH expansion!
-                    %     dTargetGravityParameter = cspice_bodvrd(num2str(ui32ID),'GM',1)*1e+09;            % [m^3/(s^2)]
-                    % catch
-                        warning('Fetch of Apophis data from kernels failed. Fallback to hardcoded data...')
+                    try
+                        ui32ID = 2025143;
+                        dTargetReferenceRadius  = mean(cspice_bodvrd(num2str(ui32ID),'RADII',3)); % [m] ACHTUNG: Value used for Gravity SH expansion!
+                        dTargetGravityParameter = cspice_bodvrd(num2str(ui32ID),'GM',1)*1e+09;            % [m^3/(s^2)]
+                    catch
+                        warning('Fetch of Itokawa data from kernels failed. Fallback to hardcoded data...')
                         dTargetGravityParameter = 2.36; % m^3/s^2
                         dTargetReferenceRadius  = 1000*0.161915; % [m] ACHTUNG: Value used for Gravity SH expansion!
-                    % end
+                    end
 
                 case EnumScenarioName.Apophis
                     % REFERENCE source: TODO
@@ -342,28 +342,30 @@ classdef CScenarioGenerator < CGeneralPropagator
                     catch
                         warning('Fetch of Apophis data from kernels failed. Fallback to hardcoded data...')
                         dTargetReferenceRadius  = 1e3 * 0.175930344; % [m] ACHTUNG: Value used for Gravity SH expansion!
-                                                dTargetGravityParameter = 3.003435675;            % [m^3/(s^2)]
+                        dTargetGravityParameter = 3.003435675;            % [m^3/(s^2)]
                     end
 
-                case EnumScenarioName.Bennu_OREx
+                case EnumScenarioName.Bennu
 
                     charTargetName = 'BENNU';
                     charTargetFixedFrame = 'IAU_BENNU'; % Check corresponding tf file
                     dTargetGravityParameter = 4.892;
                     dTargetReferenceRadius  = 245; % [m] ACHTUNG: Value used for Gravity SH expansion!
 
-                case EnumScenarioName.Didymos_Hera
-                    error('To implement')
+                case EnumScenarioName.Didymos
+
+                    charTargetName = 'DIDYMOS';
+                    charTargetFixedFrame = 'IAU_DIDYMOS'; 
+                    dTargetGravityParameter = 34.3;   % m^3/s^2 
+                    dTargetReferenceRadius = 355.15; % [m] 
 
                 otherwise
                     error('Invalid scenario name. See EnumScenarioName enum class for supported ones.')
             end
 
-
             % Store basic data
             strDynParams.strMainData.dGM        = dTargetGravityParameter;
             strDynParams.strMainData.dRefRadius = dTargetReferenceRadius;
-
 
             % Handle request of Spherical Harmonics coefficients
             if settings.bAddNonSphericalGravityCoeffs == true
