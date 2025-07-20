@@ -52,8 +52,11 @@ end
 
 strDynParams = kwargs.strDynParams;
 str3rdBodyRefData = kwargs.str3rdBodyRefData;
-if length(fieldnames(strDynParams)) 
-    strDynParams.strSCdata = []; 
+
+for idField = 1:length(fieldnames(strDynParams))
+    if not(isfield(strDynParams, "strSCdata"))
+        strDynParams.strSCdata = struct();
+    end
 end
 
 % Checks and info printing
