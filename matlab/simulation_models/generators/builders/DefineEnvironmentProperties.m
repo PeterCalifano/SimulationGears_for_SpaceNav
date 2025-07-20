@@ -13,6 +13,8 @@ arguments
     kwargs.bAddNonSphericalGravityCoeffs (1,1) logical {islogical, isscalar} = false;
     kwargs.objDataset = SReferenceMissionDesign()
     kwargs.charSpherHarmCoeffInputFileName (1,:) string {mustBeA(kwargs.charSpherHarmCoeffInputFileName, ["string", "char"])} = ""
+    kwargs.cellAdditionalBodiesNames       (1,:) string {mustBeA(kwargs.cellAdditionalBodiesNames, ["string", "char"])} = string.empty(0, 1)
+    kwargs.bAdd3rdBodiesAttitude           (1,1) logical {islogical, isscalar} = true; % If true, attitude data will be added to str3rdBodyRefData
 end
 %% SIGNATURE
 % [strDynParams, strAdditionalData] = DefineEnvironmentProperties(dEphemeridesTimegrid, ...
@@ -53,9 +55,13 @@ end
 strDynParams = kwargs.strDynParams;
 str3rdBodyRefData = kwargs.str3rdBodyRefData;
 
-for idField = 1:length(fieldnames(strDynParams))
-    if not(isfield(strDynParams, "strSCdata"))
-        strDynParams.strSCdata = struct();
+if isempty(fieldnames(strDynParams))
+    strDynParams.strSCdata = struct();
+else
+    for idField = 1:length(fieldnames(strDynParams))
+        if not(isfield(strDynParams, "strSCdata"))
+            strDynParams.strSCdata = struct();
+        end
     end
 end
 
@@ -85,12 +91,28 @@ if kwargs.objDataset.bDefaultConstructed
                                                 charInertialFrame, 'none', charTargetName);
 
     % Get additional bodies data if provided (Sun not included)
-    ui32NumOfAdditionalBodies = length(kwargs.objDataset.cellAdditionalBodiesNames);
-    bAdd3rdBodiesAttitude = not(isempty(kwargs.objDataset.cellAdditionalBodiesDCM_TBfromW));
+    ui32NumOfAdditionalBodies = length(kwargs.cellAdditionalBodiesNames);
+    bAdd3rdBodiesAttitude = kwargs.bAdd3rdBodiesAttitude;
+    % TODO implement code to fetch from SPICE! --> additional bodies tags specified by kwargs.cellAdditionalBodiesNames
+    for idB = 1:ui32NumOfAdditionalBodies
+
+    end
+
+else
+    % Load ephemeris data from dataset
+    assert(length(dEphemeridesTimegrid) == length(kwargs.objDataset.dTimestamps), ...
+            "ERROR: objDataset timestamps do not match specified dEphemerisTimegrid.")
+
+    strMainBodyRefData.dDCM_INfromTB    = pagetranspose(kwargs.objDataset.dDCM_TBfromW);
+    strMainBodyRefData.dSunPosition_IN  = kwargs.objDataset.dSunPosition_W;
+
+    % Get additional bodies data if provided (Sun not included)
+    ui32NumOfAdditionalBodies = length(kwargs.objDataset.cellAdditionalBodiesTags);
+    bAdd3rdBodiesAttitude = not(isempty(kwargs.objDataset.cellAdditionalBodiesDCM_TBfromW)) && kwargs.bAdd3rdBodiesAttitude;
 
     for idB = 1:ui32NumOfAdditionalBodies
 
-        if isempty(kwargs.objDataset.cellAdditionalBodiesPos_W{idB})
+        if not(isempty(kwargs.objDataset.cellAdditionalBodiesPos_W{idB}))
             % Store data in struct for ephemerides factory
             str3rdBodyRefData(idB).strOrbitData.dPosition_W  = kwargs.objDataset.cellAdditionalBodiesPos_W{idB};
         end
@@ -100,7 +122,7 @@ if kwargs.objDataset.bDefaultConstructed
         end
 
         try
-            charTargetName = kwargs.objDataset.cellAdditionalBodiesNames{idB};
+            charTargetName = kwargs.objDataset.cellAdditionalBodiesTags{idB};
             fprintf('\nLoading additional body %s data from CScenarioGenerator database...', charTargetName);
             [charTargetName, charTargetFixedFrame, strDynParams_3rdBody] = CScenarioGenerator.LoadDefaultScenarioData(charTargetName);
 
@@ -115,15 +137,7 @@ if kwargs.objDataset.bDefaultConstructed
             strDynParams.strBody3rdData(idB+1).dRefRadius = 0.0;
         end
     end
-    
 
-else
-    % Load ephemeris data from dataset
-    assert(length(dEphemeridesTimegrid) == length(kwargs.objDataset.dTimestamps), ...
-            "ERROR: objDataset timestamps do not match specified dEphemerisTimegrid.")
-
-    strMainBodyRefData.dDCM_INfromTB    = pagetranspose(kwargs.objDataset.dDCM_TBfromW);
-    strMainBodyRefData.dSunPosition_IN  = kwargs.objDataset.dSunPosition_W;
 end
 
 
