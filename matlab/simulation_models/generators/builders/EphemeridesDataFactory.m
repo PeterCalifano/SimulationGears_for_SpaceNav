@@ -14,8 +14,10 @@ arguments
     str3rdBodyRefData = []
 end
 arguments
-    kwargs.bGroundTruthEphemerides (1,1) logical {isscalar, islogical} = true
-    kwargs.bEnableInterpValidation (1,1) logical {isscalar, islogical} = true
+    kwargs.bGroundTruthEphemerides  (1,1) logical {isscalar, islogical} = true
+    kwargs.bEnableInterpValidation  (1,1) logical {isscalar, islogical} = true
+    kwargs.bAdd3rdBodiesPosition    (1,1) logical {isscalar, islogical} = true
+    kwargs.bAdd3rdBodiesAttitude    (1,1) logical {isscalar, islogical} = false
 end
 % TODO
 %% SIGNATURE
@@ -102,7 +104,7 @@ strDynParams.strBody3rdData(1).strOrbitData.dTimeLowBound    = dDomainLB;
 strDynParams.strBody3rdData(1).strOrbitData.dTimeUpBound     = dDomainUB;
 
 %% Add 3rd bodies
-if not(isempty(str3rdBodyRefData)) && length(strDynParams.strBody3rdData) > 1
+if not(isempty(str3rdBodyRefData)) && length(strDynParams.strBody3rdData) > 1 && ( kwargs.bAdd3rdBodiesPosition || kwargs.bAdd3rdBodiesAttitude)
     for idB = 1:length(str3rdBodyRefData)
         % Get position data
         if isfield(str3rdBodyRefData, "strOrbitData")
@@ -131,7 +133,7 @@ if not(isempty(str3rdBodyRefData)) && length(strDynParams.strBody3rdData) > 1
             warning("EphemeridesDataFactory: No orbit data found for 3rd body %d. Skipping ephemeris fitting.", idB);
         end
 
-        if isfield(str3rdBodyRefData(idB), "strAttData")
+        if isfield(str3rdBodyRefData(idB), "strAttData") && kwargs.bAdd3rdBodiesAttitude
             try
                 % Fit attitude data (convert to quaternion scalar first)
                 dQuat_WfromTB = DCM2quatSeq(str3rdBodyRefData(idB).strAttData.dDCM_WfromTB , false);
