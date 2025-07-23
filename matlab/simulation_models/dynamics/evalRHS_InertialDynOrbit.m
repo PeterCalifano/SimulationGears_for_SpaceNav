@@ -84,7 +84,7 @@ end
 
 % Construct local indices
 dSunPos_IN = zeros(3,1);
-ui8N3rdBodies = uint8(size(dBodyEphemerides, 2)) - 1;
+ui8N3rdBodies = uint8(size(dBodyEphemerides, 1) / 3.0) - 1;
 d3rdBodiesPos_IN = zeros(3, length(ui8N3rdBodies));
 dMainBodyPos_IN = zeros(3,1);
 
@@ -120,7 +120,7 @@ dPosNorm2 = dPosNorm  * dPosNorm;
 dPosNorm3 = dPosNorm2 * dPosNorm;
 % dPosNorm4 = dPosNorm3 * dPosNorm;
 
-% Gravity Main acceleration
+%% Gravity Main acceleration
 dAccTot(1:3) = - (dMainGM/dPosNorm3) * dxState_IN(ui16posVelIdx(1:3));
 
 %% Spherical Harmonics acceleration
@@ -201,8 +201,8 @@ if ~isempty(dBodyEphemerides)
 
 end
 
-% Cannonball SRP acceleration
-if ~isempty(dBodyEphemerides) % TODO: need a way to disable this --> factory pattern for classes?
+%% Cannonball SRP acceleration
+if ~isempty(dBodyEphemerides) && not(strDynParams.bIsInEclipse)
     dAccCannonBallSRP = dCoeffSRP * dPosSunToSC./dSCdistToSun;
 else
     dAccCannonBallSRP = zeros(3,1);
