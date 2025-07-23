@@ -35,26 +35,26 @@ end
 % standalone usage. DefineEnvironmentProperties() should be called first.
 % -------------------------------------------------------------------------------------------------------------
 %% INPUT
-% in1 [dim] description
-% Name1                     []
-% Name2                     []
-% Name3                     []
+% dEphemTimegrid
+% ui32EphemerisPolyDeg
+% ui32AttitudePolyDeg
+% strDynParams
+% strMainBodyRefData
+% str3rdBodyRefData = []
+% kwargs.bGroundTruthEphemerides  (1,1) logical {isscalar, islogical} = true
+% kwargs.bEnableInterpValidation  (1,1) logical {isscalar, islogical} = true
+% kwargs.bAdd3rdBodiesPosition    (1,1) logical {isscalar, islogical} = true
+% kwargs.bAdd3rdBodiesAttitude    (1,1) logical {isscalar, islogical} = false
 % -------------------------------------------------------------------------------------------------------------
 %% OUTPUT
-% out1 [dim] description
-% Name1                     []
-% Name2                     []
-% Name3                     []
+% strDynParams
 % -------------------------------------------------------------------------------------------------------------
 %% CHANGELOG
 % 19-02-2025    Pietro Califano     First version copy-pasting previous implementation
-% 21-07-2025    Pietro Califano     Extend to support definition of 3rd body attitude and position
-%                                   ephemerides from input reference data
+% 22-07-2025    Pietro Califano     Extend to support definition of 3rd body attitude and position
+%                                   ephemerides from input reference data; minor updates
 % -------------------------------------------------------------------------------------------------------------
 %% DEPENDENCIES
-% [-]
-% -------------------------------------------------------------------------------------------------------------
-%% Future upgrades
 % [-]
 % -------------------------------------------------------------------------------------------------------------
 
@@ -84,13 +84,6 @@ strDynParams.strMainData.strAttData.dTimeUpBound         = dDomainUB;
 
 
 %% Sun position
-% ACHTUNG: Make sure that unit of measure for distance matches.
-dDistFromSunAU = mean(vecnorm(strMainBodyRefData.dSunPosition_IN, 2, 1), "all") /150e9; % Input distance in [m]
-strDynParams.strSRPdata.dP_SRP = 1367/physconst('lightspeed') * (1/(dDistFromSunAU)^2); % [N/m^2]
-
-% Printing of key value: Distance in AU from the SUN
-fprintf('\nAverage distance from the SUN in AU over ET_SPAN: %3.4f AU\n', dDistFromSunAU);
-
 [dTmpChbvCoeffs, ~, ~] = fitChbvPolynomials(ui32EphemerisPolyDeg, ...
                                          dInterpDomain, ...
                                          strMainBodyRefData.dSunPosition_IN, ...
