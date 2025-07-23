@@ -274,6 +274,7 @@ classdef CScenarioGenerator < CGeneralPropagator
             arguments
                 % TODO load from file if specified
                 kwargs.charSpherHarmCoeffInputFileName (1,:) string {mustBeA(kwargs.charSpherHarmCoeffInputFileName, ["string", "char"])} = ""
+                kwargs.bUseKilometersScale             (1,1) logical {isscalar, islogical} = false;
             end
             arguments
                 settings.bAddNonSphericalGravityCoeffs (1,1) logical {islogical, isscalar} = false;
@@ -286,6 +287,7 @@ classdef CScenarioGenerator < CGeneralPropagator
             % arguments
             %     % TODO load from file if specified
             %     kwargs.charSpherHarmCoeffInputFileName (1,:) string {mustBeA(kwargs.charSpherHarmCoeffInputFileName, ["string", "char"])} = ""
+            %     kwargs.bUseKilometersScale             (1,1) logical {isscalar, islogical} = false;
             % end
             % arguments
             %     settings.bAddNonSphericalGravityCoeffs (1,1) logical {islogical, isscalar} = false;
@@ -299,11 +301,17 @@ classdef CScenarioGenerator < CGeneralPropagator
             %% CHANGELOG
             % 14-03-2025    Pietro Califano     First version implemented from legacy codes
             % 15-06-2025    Pietro Califano     Fix incorrect measurement unit for Apophis radius
-            % 21-07-2025    Pietro Califano     Add new scenarios, updates to support future-nav simulations
+            % 22-07-2025    Pietro Califano     Add new scenarios, updates to support future-nav simulations
             % -------------------------------------------------------------------------------------------------------------
             %% DEPENDENCIES
             % [-]
             % -------------------------------------------------------------------------------------------------------------
+
+            if kwargs.bUseKilometersScale
+                dLengthUnitsScale = 1/1000;
+            else
+                dLengthUnitsScale = 1;
+            end
 
             % Define empty fields if not provided
             if isfield(strDynParams, 'strMainData')
@@ -327,12 +335,12 @@ classdef CScenarioGenerator < CGeneralPropagator
 
                     try
                         ui32ID = 2025143;
-                        dTargetReferenceRadius  = 1E+03 * mean(cspice_bodvrd(num2str(ui32ID),'RADII',3)); % [m] ACHTUNG: Value used for Gravity SH expansion!
-                        dTargetGravityParameter = 1E+09 * cspice_bodvrd(num2str(ui32ID),'GM',1);            % [m^3/(s^2)]
+                        dTargetReferenceRadius  = dLengthUnitsScale     * mean(cspice_bodvrd(num2str(ui32ID),'RADII',3)); % [m] ACHTUNG: Value used for Gravity SH expansion!
+                        dTargetGravityParameter = (dLengthUnitsScale)^3 * cspice_bodvrd(num2str(ui32ID),'GM',1);            % [m^3/(s^2)]
                     catch
                         warning('Fetch of Itokawa data from kernels failed. Fallback to hardcoded data...')
-                        dTargetGravityParameter = 2.36; % m^3/s^2
-                        dTargetReferenceRadius  = 1E+03 * 0.161915; % [m] ACHTUNG: Value used for Gravity SH expansion!
+                        dTargetGravityParameter = (dLengthUnitsScale^3) * 2.36; % m^3/s^2
+                        dTargetReferenceRadius  = dLengthUnitsScale * 0.161915; % [m] ACHTUNG: Value used for Gravity SH expansion!
                     end
 
                 case EnumScenarioName.Apophis
@@ -342,39 +350,39 @@ classdef CScenarioGenerator < CGeneralPropagator
 
                     try
                         ui32ID = 20099942;
-                        dTargetReferenceRadius  = 1E+03 * mean(cspice_bodvrd(num2str(ui32ID),'RADII',3)); % [m] ACHTUNG: Value used for Gravity SH expansion!
-                        dTargetGravityParameter = 1E+09 * cspice_bodvrd(num2str(ui32ID),'GM',1) ;         % [m^3/(s^2)]
+                        dTargetReferenceRadius  = dLengthUnitsScale     * mean(cspice_bodvrd(num2str(ui32ID),'RADII',3)); % [m] ACHTUNG: Value used for Gravity SH expansion!
+                        dTargetGravityParameter = (dLengthUnitsScale)^3 * cspice_bodvrd(num2str(ui32ID),'GM',1) ;         % [m^3/(s^2)]
                     catch
                         warning('Fetch of Apophis data from kernels failed. Fallback to hardcoded data...')
-                        dTargetReferenceRadius  = 1E+03 * 0.175930344; % [m] ACHTUNG: Value used for Gravity SH expansion!
-                        dTargetGravityParameter = 3.003435675;         % [m^3/(s^2)]
+                        dTargetReferenceRadius  = dLengthUnitsScale      * 0.175930344; % [m] ACHTUNG: Value used for Gravity SH expansion!
+                        dTargetGravityParameter = (dLengthUnitsScale)^3  * 3.003435675;         % [m^3/(s^2)]
                     end
 
                 case EnumScenarioName.Bennu
 
                     charTargetName = 'BENNU';
                     charTargetFixedFrame = 'IAU_BENNU'; % Check corresponding tf file
-                    dTargetGravityParameter = 4.892;
-                    dTargetReferenceRadius  = 245; % [m] ACHTUNG: Value used for Gravity SH expansion!
+                    dTargetReferenceRadius  = dLengthUnitsScale * 245; % [m] ACHTUNG: Value used for Gravity SH expansion!
+                    dTargetGravityParameter = (dLengthUnitsScale)^3 * 4.892;
 
                 case EnumScenarioName.Didymos
 
                     charTargetName = 'DIDYMOS';
                     charTargetFixedFrame = 'IAU_DIDYMOS'; 
-                    dTargetGravityParameter = 34.3;   % m^3/s^2 
-                    dTargetReferenceRadius = 355.15; % [m] 
+                    dTargetReferenceRadius = dLengthUnitsScale * 355.15; % [m]
+                    dTargetGravityParameter = (dLengthUnitsScale)^3 * 34.3;   % m^3/s^2 
 
                 case EnumScenarioName.Earth
                     charTargetName = 'EARTH';
                     charTargetFixedFrame = 'IAU_EARTH'; 
-                    dTargetGravityParameter = 3.986004418E+14; % [m^3/s^2]
-                    dTargetReferenceRadius  = 6371.0E+03; % [m] ACHTUNG: Value used for Gravity SH expansion!
+                    dTargetReferenceRadius  = dLengthUnitsScale * 6371.0E3; % [m] ACHTUNG: Value used for Gravity SH expansion!
+                    dTargetGravityParameter = (dLengthUnitsScale)^3 * 3.986004418E+14; % [m^3/s^2]
 
                 case EnumScenarioName.Moon
                     charTargetName = 'MOON';
                     charTargetFixedFrame = 'IAU_MOON'; 
-                    dTargetGravityParameter = 4.9048695E+12; % [m^3/s^2]
-                    dTargetReferenceRadius  = 1737.4E+03; % [m] ACHTUNG: Value used for Gravity SH expansion!
+                    dTargetReferenceRadius  = dLengthUnitsScale * 1737.4E+03; % [m] ACHTUNG: Value used for Gravity SH expansion!
+                    dTargetGravityParameter = (dLengthUnitsScale)^3 * 4.9048695E+12; % [m^3/s^2]
                 
                 otherwise
                     error('Invalid scenario name. See EnumScenarioName enum class for supported ones.')

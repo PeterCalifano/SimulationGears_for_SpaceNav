@@ -15,6 +15,7 @@ arguments
     kwargs.charSpherHarmCoeffInputFileName (1,:) string {mustBeA(kwargs.charSpherHarmCoeffInputFileName, ["string", "char"])} = ""
     kwargs.cellAdditionalBodiesNames       (1,:) string {mustBeA(kwargs.cellAdditionalBodiesNames, ["string", "char"])} = string.empty(0, 1)
     kwargs.bAdd3rdBodiesAttitude           (1,1) logical {islogical, isscalar} = true; % If true, attitude data will be added to str3rdBodyRefData
+    kwargs.bUseKilometersScale             (1,1) logical {isscalar, islogical} = false;
 end
 %% SIGNATURE
 % [strDynParams, strAdditionalData] = DefineEnvironmentProperties(dEphemeridesTimegrid, ...
@@ -74,8 +75,15 @@ end
 [charTargetName, charTargetFixedFrame, strDynParams] = CScenarioGenerator.LoadDefaultScenarioData(enumScenarioName, ...
                                                                                 strDynParams, ...
                                                                                 "bAddNonSphericalGravityCoeffs", kwargs.bAddNonSphericalGravityCoeffs, ...
-                                                                                "charSpherHarmCoeffInputFileName", kwargs.charSpherHarmCoeffInputFileName);
+                                                                                "charSpherHarmCoeffInputFileName", kwargs.charSpherHarmCoeffInputFileName, ...
+                                                                                "bUseKilometersScale", kwargs.bUseKilometersScale);
 
+
+if kwargs.bUseKilometersScale
+    dUnitsScaling = 1.0;
+else
+    dUnitsScaling = 1E3;
+end
 
 if kwargs.objDataset.bDefaultConstructed
 
@@ -87,7 +95,7 @@ if kwargs.objDataset.bDefaultConstructed
     strMainBodyRefData.dDCM_INfromTB = cspice_pxform(char(charTargetFixedFrame), char(charInertialFrame), dEphemeridesTimegrid);
 
     % Get Sun position in Inertial frame
-    strMainBodyRefData.dSunPosition_IN = 1000 * cspice_spkpos('SUN', dEphemeridesTimegrid, ...
+    strMainBodyRefData.dSunPosition_IN = dUnitsScaling * cspice_spkpos('SUN', dEphemeridesTimegrid, ...
                                                 charInertialFrame, 'none', charTargetName);
 
     % Get additional bodies data if provided (Sun not included)
@@ -124,7 +132,8 @@ else
         try
             charTargetName = kwargs.objDataset.cellAdditionalBodiesTags{idB};
             fprintf('\nLoading additional body %s data from CScenarioGenerator database...', charTargetName);
-            [charTargetName, charTargetFixedFrame, strDynParams_3rdBody] = CScenarioGenerator.LoadDefaultScenarioData(charTargetName);
+            [charTargetName, charTargetFixedFrame, strDynParams_3rdBody] = CScenarioGenerator.LoadDefaultScenarioData(charTargetName, ...
+                                                                                                    "bUseKilometersScale", kwargs.bUseKilometersScale);
 
             % Add GM information if available to scenario generator
             strDynParams.strBody3rdData(idB+1).dGM        = strDynParams_3rdBody.strMainData.dGM;
@@ -143,23 +152,23 @@ end
 
 %% Solar Radiation Pressure data
 % ACHTUNG: Make sure that unit of measure for distance matches.
-dDistFromSunAU = mean(vecnorm(strMainBodyRefData.dSunPosition_IN, 2, 1), "all") / 150e9; % Input distance in [m]
-strDynParams.strSRPdata.dP_SRP0 = 1367/299792458 * (1/(dDistFromSunAU)^2); % [N/m^2]
+dDistFromSunAU = mean(vecnorm(strMainBodyRefData.dSunPosition_IN, 2, 1), "all") / (150e6 * dUnitsScaling); % Input distance in [m]
+strDynParams.strSRPdata.dP_SRP0 = 1367/(299792.458 * dUnitsScaling) * (1/(dDistFromSunAU)^2); % [N/m^2]
 fprintf('\nAverage distance from the SUN in AU: %3.4f AU\n', dDistFromSunAU);
 
 % Add Sun gravity parameter
 try
-    strDynParams.strBody3rdData(1).dGM = cspice_bodvrd('SUN', 'GM', 1); % Output is in m^3/s^2
+    strDynParams.strBody3rdData(1).dGM = cspice_bodvrd('SUN', 'GM', 1) / (dUnitsScaling^3); % 
 catch ME
     warning('ERROR occurred while fetching Sun GM: %s. Setting to default value in m^3/s^2.', string(ME.message));
     % If not available, set to default value
-    strDynParams.strBody3rdData(1).dGM = 1E+09 * 1.32712440041279419 * 1E20; % [m^3/s^2] - JPL DE440
+    strDynParams.strBody3rdData(1).dGM = (dUnitsScaling^3) * 1.32712440041279419 * 1E11; % [km^3/s^2] or [m^3/s^2] - JPL DE440
 end
 
 %% Spacecraft data
 dDefaultReflCoeff = 1.29;  % Global CR
 dDefaultSCmass    = 14.8; % 12; % [kg]
-dDefaultA_SRP     = 0.5329; % [m^2]
+dDefaultA_SRP     = 0.5329E-6 * (dUnitsScaling^2); % [m^2]
 
 if isempty(strDynParams.strSCdata)
     warning('No spacecraft data provided in strDynParams.strSCdata. Default hardcoded values (RCS-1) will be used.')    
