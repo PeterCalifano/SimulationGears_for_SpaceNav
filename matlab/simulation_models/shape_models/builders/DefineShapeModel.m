@@ -52,7 +52,7 @@ end
 assert(isfolder(charDataRootPath), sprintf("ERROR: input data path %s not found", charDataRootPath));
 
 [~, charUsrName] = system("whoami"); % Get user
-assert(contains(charUsrName, "peterc") || contains(string(charUsrName(1:end-1)), "peterc-flip\pietr"), ...
+assert(contains(charUsrName, "peter") || contains(string(charUsrName(1:end-1)), "peterc-flip\pietr"), ...
     'ERROR: current implementation is only valid for peterc machines due to hardcoded paths.')
 
 charCallDir = pwd;
@@ -104,7 +104,7 @@ switch enumTargetName
                         options.bVertFacesOnly, char(enumTargetName), options.bLoadShapeModel);
 
         % Assign reference radius
-        objShapeModel.dObjectReferenceSize = 245; % [m]
+        objShapeModel.dObjectReferenceSize = 245.03; % [m]
         objShapeModel.charTargetUnitOutput = 'm';
 
     case "Moon"
