@@ -335,12 +335,12 @@ classdef CScenarioGenerator < CGeneralPropagator
 
                     try
                         ui32ID = 2025143;
-                        dTargetReferenceRadius  = dLengthUnitsScale     * mean(cspice_bodvrd(num2str(ui32ID),'RADII',3)); % [m] ACHTUNG: Value used for Gravity SH expansion!
-                        dTargetGravityParameter = (dLengthUnitsScale)^3 * cspice_bodvrd(num2str(ui32ID),'GM',1);            % [m^3/(s^2)]
+                        dTargetReferenceRadius  = dLengthUnitsScale     * mean(cspice_bodvrd(num2str(ui32ID),'RADII',3)) * 1E3; % [m] ACHTUNG: Value used for Gravity SH expansion!
+                        dTargetGravityParameter = (dLengthUnitsScale)^3 * cspice_bodvrd(num2str(ui32ID),'GM',1) * 1E9;            % [m^3/(s^2)]
                     catch
                         warning('Fetch of Itokawa data from kernels failed. Fallback to hardcoded data...')
+                        dTargetReferenceRadius  = dLengthUnitsScale * 0.161915 * 1E3; % [m] ACHTUNG: Value used for Gravity SH expansion!
                         dTargetGravityParameter = (dLengthUnitsScale^3) * 2.36; % m^3/s^2
-                        dTargetReferenceRadius  = dLengthUnitsScale * 0.161915; % [m] ACHTUNG: Value used for Gravity SH expansion!
                     end
 
                 case EnumScenarioName.Apophis
@@ -350,11 +350,11 @@ classdef CScenarioGenerator < CGeneralPropagator
 
                     try
                         ui32ID = 20099942;
-                        dTargetReferenceRadius  = dLengthUnitsScale     * mean(cspice_bodvrd(num2str(ui32ID),'RADII',3)); % [m] ACHTUNG: Value used for Gravity SH expansion!
-                        dTargetGravityParameter = (dLengthUnitsScale)^3 * cspice_bodvrd(num2str(ui32ID),'GM',1) ;         % [m^3/(s^2)]
+                        dTargetReferenceRadius  = dLengthUnitsScale     * mean(cspice_bodvrd(num2str(ui32ID),'RADII',3)) * 1E3; % [m] ACHTUNG: Value used for Gravity SH expansion!
+                        dTargetGravityParameter = (dLengthUnitsScale)^3 * cspice_bodvrd(num2str(ui32ID),'GM',1) * 1E9;         % [m^3/(s^2)]
                     catch
                         warning('Fetch of Apophis data from kernels failed. Fallback to hardcoded data...')
-                        dTargetReferenceRadius  = dLengthUnitsScale      * 0.175930344; % [m] ACHTUNG: Value used for Gravity SH expansion!
+                        dTargetReferenceRadius  = dLengthUnitsScale      * 0.175930344 * 1E3; % [m] ACHTUNG: Value used for Gravity SH expansion!
                         dTargetGravityParameter = (dLengthUnitsScale)^3  * 3.003435675;         % [m^3/(s^2)]
                     end
 
