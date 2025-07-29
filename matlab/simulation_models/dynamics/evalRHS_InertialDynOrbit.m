@@ -8,7 +8,8 @@ function [dPosVeldt, strAccelInfo] = evalRHS_InertialDynOrbit( dxState_IN, ...
                                                                 dMainCSlmCoeffCols, ...
                                                                 ui32MaxSHdegree, ...
                                                                 ui16StatesIdx, ...
-                                                                dResidualAccel) %#codegen
+                                                                dResidualAccel, ...
+                                                                bIsInEclipse) %#codegen
 arguments
     dxState_IN
     dDCMmainAtt_INfromTF
@@ -21,6 +22,7 @@ arguments
     ui32MaxSHdegree     uint32 = []
     ui16StatesIdx       uint16 = []
     dResidualAccel      double = zeros(3,1)
+    bIsInEclipse        logical = false
 end %#codegen
 %% PROTOTYPE
 % [dPosVeldt, strAccelInfo] = evalRHS_InertialDynOrbit( dxState_IN, ...
@@ -202,7 +204,7 @@ if ~isempty(dBodyEphemerides)
 end
 
 %% Cannonball SRP acceleration
-if ~isempty(dBodyEphemerides) && not(strDynParams.bIsInEclipse)
+if ~isempty(dBodyEphemerides) && not(bIsInEclipse)
     dAccCannonBallSRP = dCoeffSRP * dPosSunToSC./dSCdistToSun;
 else
     dAccCannonBallSRP = zeros(3,1);
