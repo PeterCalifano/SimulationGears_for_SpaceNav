@@ -383,7 +383,9 @@ classdef SReferenceMissionDesign < CBaseDatastructWithTimes
                 kwargs.bPlotPhaseAngles         (1,1) logical {islogical, isscalar} = true
                 kwargs.bPlotTargetAttitude      (1,1) logical {islogical, isscalar} = false
                 kwargs.bPlotSpacecraftAttitude  (1,1) logical {islogical, isscalar} = false
-                kwargs.dTargetAttitudeSet2      = [];
+                kwargs.dTargetAttitudeSet2          double {ismatrix} = [];
+                kwargs.charLblTargetAttitudeSet2    char {mustBeText} = '2nd attitude set';
+                kwargs.charTargetAttitudePlotTitle  char {mustBeText} = 'Target attitude quaternion states',
             end
             % DEVNOTE: basic version of method to plot visualizations of data contained in the dataset
             % object. May be expanded with many functionalities and options
@@ -432,7 +434,8 @@ classdef SReferenceMissionDesign < CBaseDatastructWithTimes
                 objTargetAttitudeFig = self.plotVectorData_(dDataVec1, ...
                                                          dDataVec2, ...
                                                         "bIsDataDCM", true, ...
-                                                        "cellSetNames", {'Reference target attitude', '2nd attitude set'});
+                                                        "cellSetNames", {'Reference', kwargs.charLblTargetAttitudeSet2}, ...
+                                                        "charFigTitle", kwargs.charTargetAttitudePlotTitle);
             else
                 objTargetAttitudeFig = [];
             end
@@ -464,6 +467,7 @@ classdef SReferenceMissionDesign < CBaseDatastructWithTimes
                 kwargs.cellStatesNames  {iscell} = {}
                 kwargs.bIsDataDCM       (1,1) logical = false
                 kwargs.ui32Decimation   (1,1) uint32 = 1
+                kwargs.charFigTitle     {mustBeText} = ""
             end
 
             % TODO improve robustness to incorrect sizes and inputs!
@@ -505,7 +509,9 @@ classdef SReferenceMissionDesign < CBaseDatastructWithTimes
                     
                 % Plot data set 1
                 cellObjPlots{1,1} = plot(dTimegrid(bDecimationMask), dDataVec1(ui32StateIdx, bDecimationMask), '.-', ...
-                                        'LineWidth', 1.2, ...
+                                        'LineWidth', 1.0, ...
+                                        'MarkerSize', 4, ...
+                                        'Marker', 'x', ...
                                         'DisplayName', string(kwargs.cellSetNames{1})); 
                 hold on;
 
@@ -513,6 +519,7 @@ classdef SReferenceMissionDesign < CBaseDatastructWithTimes
                     % Plot data set 2
                     cellObjPlots{1,2} = plot(dTimegrid(bDecimationMask),  dDataVec2(ui32StateIdx, bDecimationMask), ...
                                         '--',  'MarkerSize', 1, ...
+                                        'LineWidth', 1.3, ...
                                         'LineStyle', '--', ...
                                         'DisplayName', string(kwargs.cellSetNames{2}));
                 end
@@ -529,10 +536,14 @@ classdef SReferenceMissionDesign < CBaseDatastructWithTimes
                     set(gca,'XTickLabel',[]);
                 end
 
-                legend([cellObjPlots{:}], 'Location', 'best');
+                if ui32StateIdx == 1
+                    legend([cellObjPlots{:}], 'Location', 'best');
+                end
                 grid on;
 
             end
+
+            sgtitle(kwargs.charFigTitle)
         end
 
     end
