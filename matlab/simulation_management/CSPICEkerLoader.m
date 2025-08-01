@@ -86,8 +86,6 @@ classdef CSPICEkerLoader
                     charDirRoot = fileparts(which("InitializeEnv.m"));
                     rmpath( genpath(fullfile(charDirRoot, "functions")) );
                     rmpath( genpath(fullfile(charDirRoot, "KLTtest")) );
-                    rmpath( genpath(fullfile(charDirRoot, "KLTtest")) );
-                    addpath( genpath(fullfile("selfContainedTools/testCaseGenerator")) )
                     return
                 case EnumScenarioName.Moon
 
