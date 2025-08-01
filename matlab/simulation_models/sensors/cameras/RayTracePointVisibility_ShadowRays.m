@@ -167,7 +167,7 @@ bPointsVisibilityMask = false(i32NumOfPointsToTrace, 1); % Initialize visibility
 parfor idL = 1:i32NumOfPointsToTrace
     if bDEBUG_MODE == true 
         if mod(i32NumOfPointsToTrace/idL, 5)
-            fprintf("Processing point entry %05d\n", idL)
+            fprintf("Processing point entry %05d\n", idL);
         end
     end
 

@@ -3,22 +3,24 @@ close all
 clc
 
 %% Coder settings
-coder_config = coder.config('mex');
-coder_config.TargetLang = 'C++';
-coder_config.GenerateReport = true;
-coder_config.LaunchReport = false;
-coder_config.EnableJIT = false;
-coder_config.MATLABSourceComments = true;
+objCoderConfig = coder.config('mex');
+objCoderConfig.TargetLang = 'C++';
+objCoderConfig.GenerateReport = true;
+objCoderConfig.LaunchReport = false;
+objCoderConfig.EnableJIT = false;
+objCoderConfig.MATLABSourceComments = true;
 
-% IF PARALLEL REQUIRED
-coder_config.EnableAutoParallelization = true;
-coder_config.EnableOpenMP = true;
-coder_config.OptimizeReductions = true;
+objCoderConfig.EnableAutoParallelization = true;
+objCoderConfig.EnableOpenMP = true;
+objCoderConfig.OptimizeReductions = true;
+objCoderConfig.SIMDAcceleration = 'Full';
+objCoderConfig.NumberOfCpuThreads = 18;
 
 % Common settings
 ui32MaxNumPoints  = 1.2e5;
 ui32MaxNumTriangs = 2e5;
 
+% Flags for codegen calls to run
 bCodegen_RayTracePointVisibility_EllipsLocalPA              = true;
 bCodegen_RayTracePointVisibility_ShadowRays                 = true;
 bCodegen_RayTracePointVisibility_VectorizedShadowRays       = false;
@@ -69,20 +71,11 @@ if bCodegen_RayTracePointVisibility_EllipsLocalPA
     strFcnOptions.bENABLE_HEUR_GEOM_FEAS_CHECK = coder.typeof(false, [1,1]);
     strFcnOptions.bTwoSidedTest                = coder.typeof(false, [1,1]);
     strFcnOptions.bPointsAreMeshVertices       = coder.typeof(false, [1,1]);
-
-    
     strFcnOptions = orderfields(strFcnOptions);
 
     bDEBUG_MODE = coder.typeof(false, [1,1]);
-    % Function args
-    % ui32PointsIdx       (1,:) uint32
-    % dPointsPositions_TB (3,:) double
-    % strTargetBodyData   {isstruct}
-    % strCameraData       {isstruct}
-    % dSunDir_TB          (3,1) double
-    % strFcnOptions       {isstruct}
-    % bDEBUG_MODE         (1,1) logical {islogical} = false
 
+    % Input arguments
     args_cell{1,1} = ui32PointsIdx;
     args_cell{1,2} = dPointsPositions_TB;
     args_cell{1,3} = strTargetBodyData;
@@ -91,35 +84,15 @@ if bCodegen_RayTracePointVisibility_EllipsLocalPA
     args_cell{1,6} = strFcnOptions;
     args_cell{1,7} = bDEBUG_MODE;
 
-    % coder.getArgTypes % Function call to automatically specify input
-    % arguments. Note that this takes the specific sizes used in the function
-    % call
-
-    numOutputs = 2;
-    outputFileName = strcat(charTargetName, '_MEX');
-    % Defining structures
-    % struct1.fieldname1 = coder.typeof(0,[3 5],1);
-    % struct1.fieldname2 = magic(3);
-    % coder.typeof(struct1); % Defines
-
-    % Defining nested structures
-    % S = struct('fieldname1', double(0),'fieldname2',single(0)); % Inner structure
-    % SuperS.x = coder.typeof(S);
-    % SuperS.y = single(0);
-    % coder.typeof(SuperS) % Outer structure
-
-    % IMPORTANT: in recent MATLAB versions (>2021), arguments can be speficied
-    % directly in function --> no need to define them outside in -args
-    % arguments
-    %     u (1,4) double
-    %     v (1,1) double
+    ui32NumOutputs = 2;
+    charOutputFileName = strcat(charTargetName, '_MEX');
 
     %  CODEGEN CALL
     % Extract filename
     [charPath2target, charTargetName, charTargetExt] = fileparts(fullfile(charTargetName)); %#ok<ASGLU>
     % Execute code generation
-    codegen(strcat(charTargetName,'.m'), "-config", coder_config,...
-        "-args", args_cell, "-nargout", numOutputs, "-o", outputFileName)
+    codegen(strcat(charTargetName,'.m'), "-config", objCoderConfig,...
+        "-args", args_cell, "-nargout", ui32NumOutputs, "-o", charOutputFileName)
 
 end
 
@@ -141,8 +114,6 @@ if bCodegen_RayTracePointVisibility_ShadowRays
     % numOfInputs; % ADD ASSERT to size of args_cell from specification functions
 
     % ENTRY-POINT FUNCTION ARGUMENTS DEFINITION
-    % NOTE: third option argument variable_dimensions is an array of bools, one
-    % for each dimension of the array
     ui32PointsIdx       = coder.typeof(uint32(0), [1, ui32MaxNumPoints], [0, 1]);
     dPointsPositions_TB = coder.typeof(0,         [3, ui32MaxNumPoints], [0, 1]);
 
@@ -171,15 +142,7 @@ if bCodegen_RayTracePointVisibility_ShadowRays
     bPointsAreMeshVertices  = coder.typeof(false, [1,1]);
     bSkipIlluminationCheck  = coder.typeof(false, [1,1]);
 
-    % Function args
-    % ui32PointsIdx       (1,:) uint32
-    % dPointsPositions_TB (3,:) double
-    % strTargetBodyData   {isstruct}
-    % strCameraData       {isstruct}
-    % dSunDir_TB          (3,1) double
-    % bDEBUG_MODE         (1,1) logical {islogical} = false
-    % bTwoSidedTest         (1,1) logical {islogical} = false
-
+    % Input arguments
     args_cell{1,1} = ui32PointsIdx;
     args_cell{1,2} = dPointsPositions_TB;
     args_cell{1,3} = strTargetBodyData;
@@ -190,24 +153,20 @@ if bCodegen_RayTracePointVisibility_ShadowRays
     args_cell{1,8} = bPointsAreMeshVertices;
     args_cell{1,9} = bSkipIlluminationCheck;
 
-
-    % coder.getArgTypes % Function call to automatically specify input
-    % arguments. Note that this takes the specific sizes used in the function
-    % call
-
-    numOutputs = 2;
-    outputFileName = strcat(charTargetName, '_MEX');
+    ui32NumOutputs = 2;
+    charOutputFileName = strcat(charTargetName, '_MEX');
 
     %  CODEGEN CALL
     % Extract filename
     [charPath2target, charTargetName, charTargetExt] = fileparts(fullfile(charTargetName));
     % Execute code generation
-    codegen(strcat(charTargetName,'.m'), "-config", coder_config,...
-        "-args", args_cell, "-nargout", numOutputs, "-o", outputFileName)
+    codegen(strcat(charTargetName,'.m'), "-config", objCoderConfig,...
+        "-args", args_cell, "-nargout", ui32NumOutputs, "-o", charOutputFileName)
 end
 
-
-if bCodegen_RayTracePointVisibility_VectorizedShadowRays && 0
+return
+%%% DEPRECATED
+if bCodegen_RayTracePointVisibility_VectorizedShadowRays && 0 %#ok<UNRCH>
     % DEVNOTE: disabled. This function is not up to date.
 
     % [bAllPointsVisibilityMask_ParallelRTwithShadowRays, dProjectedPoints_UV] = ParallelRayTracePointVisibility_ShadowRays(uint32(ui32pointsIDs), ...
@@ -271,13 +230,13 @@ if bCodegen_RayTracePointVisibility_VectorizedShadowRays && 0
     % arguments. Note that this takes the specific sizes used in the function
     % call
 
-    numOutputs = 2;
-    outputFileName = strcat(charTargetName, '_MEX');
+    ui32NumOutputs = 2;
+    charOutputFileName = strcat(charTargetName, '_MEX');
 
     %  CODEGEN CALL
     % Extract filename
     [charPath2target, charTargetName, charTargetExt] = fileparts(fullfile(charTargetName));
     % Execute code generation
-    codegen(strcat(charTargetName,'.m'), "-config", coder_config,...
-        "-args", args_cell, "-nargout", numOutputs, "-o", outputFileName)
+    codegen(strcat(charTargetName,'.m'), "-config", objCoderConfig,...
+        "-args", args_cell, "-nargout", ui32NumOutputs, "-o", charOutputFileName)
 end
