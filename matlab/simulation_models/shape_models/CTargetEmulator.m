@@ -46,13 +46,17 @@ classdef CTargetEmulator < CSceneObject
         % CONSTRUCTORS
         function self = CTargetEmulator(objShapeModel, ui32NumOfPointsGT, objPose3_WorldFromPoseFrame)
             arguments
-                objShapeModel     (1,1) {mustBeA(objShapeModel, "CShapeModel")}
-                ui32NumOfPointsGT (1,1) uint32 = 0
+                objShapeModel     (1,1) {mustBeA(objShapeModel, "CShapeModel")} = CShapeModel()
+                ui32NumOfPointsGT (1,1) uint32 = 0 
                 objPose3_WorldFromPoseFrame (1,1) {mustBeA(objPose3_WorldFromPoseFrame, ["SPose3"])} = SPose3([0; 0; 0], eye(3,3)); %#ok<NBRAK2>
             end
 
             % Set ShapeModel object
             self.objShapeModel = objShapeModel;
+
+            if nargin < 1
+                return
+            end
 
             if ui32NumOfPointsGT == 0
                 % Assume number of points equal to CShapeModel number of vertices

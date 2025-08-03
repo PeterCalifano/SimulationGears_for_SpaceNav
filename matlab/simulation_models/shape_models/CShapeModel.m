@@ -42,7 +42,7 @@ classdef CShapeModel < CBaseDatastruct
     methods (Access = public)
         % CONSTRUCTOR 
         function self = CShapeModel(enumLoadingMethod, ...
-                                    inputData, ...
+                                    varInputData, ...
                                     charInputUnit, ...
                                     charTargetUnitOutput, ...
                                     bVertFacesOnly, ...
@@ -50,14 +50,19 @@ classdef CShapeModel < CBaseDatastruct
                                     bLoadShapeModel)
             arguments
                 enumLoadingMethod       (1,:) string {mustBeA(enumLoadingMethod, ["string", "char"]), ...
-                                                mustBeMember(enumLoadingMethod, ["mat", "cspice", "struct", "file_obj"])}
-                inputData               (1,:)
+                                                mustBeMember(enumLoadingMethod, ["mat", "cspice", "struct", "file_obj"])} = "file_obj"
+                varInputData            (1,:) = []
                 charInputUnit           (1,:) string {mustBeA(charInputUnit       , ["string", "char"]), ...
                                                     mustBeMember(charInputUnit, ["m", "km"])} = 'km'
                 charTargetUnitOutput    (1,:) string {mustBeA(charTargetUnitOutput, ["string", "char"]), mustBeMember(charTargetUnitOutput, ["m", "km"])} = 'm' % TODO add enumaration
                 bVertFacesOnly          (1,1) {islogical} = true;
                 charModelName           (1,:) char = ""
                 bLoadShapeModel         (1,1) {islogical} = true;
+            end
+
+            % For default (placeholder) construction
+            if nargin < 1
+                return
             end
 
             self.charTargetUnitOutput = charTargetUnitOutput;
@@ -82,16 +87,16 @@ classdef CShapeModel < CBaseDatastruct
                         warning("CSpice usually provides models' vertices in km, but 'meters' has been specified. Make sure this is correct.")
                     end
 
-                    [self] = self.LoadModelFromSPICE(inputData);
+                    [self] = self.LoadModelFromSPICE(varInputData);
 
                 elseif strcmpi(enumLoadingMethod, 'mat')
-                    [self] = self.LoadModelFromMat(inputData);
+                    [self] = self.LoadModelFromMat(varInputData);
 
                 elseif strcmpi(enumLoadingMethod, 'struct')
-                    [self] = self.LoadModelFromStruct(inputData);
+                    [self] = self.LoadModelFromStruct(varInputData);
 
                 elseif strcmpi(enumLoadingMethod, 'file_obj')
-                    [self] = self.LoadModelFromObj_(inputData, bVertFacesOnly);
+                    [self] = self.LoadModelFromObj_(varInputData, bVertFacesOnly);
 
                 end
             end

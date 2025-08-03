@@ -1,16 +1,16 @@
 function [strDynParams, strMainBodyRefData, str3rdBodyRefData] = DefineEnvironmentProperties(dEphemeridesTimegrid, ...
-                                                                          enumScenarioName, ...
-                                                                          charInertialFrame, ...
-                                                                          kwargs)
+                                                                                          enumScenarioName, ...
+                                                                                          charInertialFrame, ...
+                                                                                          kwargs)
 arguments
     dEphemeridesTimegrid  (1,:) double 
     enumScenarioName    EnumScenarioName {mustBeA(enumScenarioName, ["EnumScenarioName", "string", "char"])} = EnumScenarioName.Itokawa
     charInertialFrame   (1,:) char {mustBeA(charInertialFrame, ["string", "char"])} = "J2000"
 end
 arguments
-    kwargs.strDynParams (1,1) {isstruct} = struct()         % Initialization value
-    kwargs.str3rdBodyRefData (1,1) {isstruct} = struct()    % Initialization value
-    kwargs.bAddNonSphericalGravityCoeffs (1,1) logical {islogical, isscalar} = false;
+    kwargs.strDynParams                     (1,1) {isstruct} = struct()         % Initialization value
+    kwargs.str3rdBodyRefData                (1,1) {isstruct} = struct()    % Initialization value
+    kwargs.bAddNonSphericalGravityCoeffs    (1,1) logical {islogical, isscalar} = false;
     kwargs.objDataset = SReferenceMissionDesign()
     kwargs.charSpherHarmCoeffInputFileName (1,:) string {mustBeA(kwargs.charSpherHarmCoeffInputFileName, ["string", "char"])} = ""
     kwargs.cellAdditionalBodiesNames       (1,:) string {mustBeA(kwargs.cellAdditionalBodiesNames, ["string", "char"])} = string.empty(0, 1)
