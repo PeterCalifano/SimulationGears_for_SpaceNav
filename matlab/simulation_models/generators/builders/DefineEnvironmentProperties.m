@@ -153,7 +153,8 @@ end
 %% Solar Radiation Pressure data
 % ACHTUNG: Make sure that unit of measure for distance matches.
 dDistFromSunAU = mean(vecnorm(strMainBodyRefData.dSunPosition_IN, 2, 1), "all") / (150e6 * dUnitsScaling); % Input distance in [m]
-strDynParams.strSRPdata.dP_SRP0 = 1367/(299792.458 * dUnitsScaling) * (1/(dDistFromSunAU)^2); % [N/m^2]
+strDynParams.strSRPdata.dP_SRP0 = 1367 / (299792.458 * dUnitsScaling); % SRP Pressure value at 1 AU
+strDynParams.strSRPdata.dP_SRP = strDynParams.strSRPdata.dP_SRP0 * (1/(dDistFromSunAU)^2); % [N/m^2]
 fprintf('\nAverage distance from the SUN in AU: %3.4f AU\n', dDistFromSunAU);
 
 % Add Sun gravity parameter

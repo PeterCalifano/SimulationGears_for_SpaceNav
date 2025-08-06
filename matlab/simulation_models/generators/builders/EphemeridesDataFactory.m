@@ -18,8 +18,8 @@ arguments
     kwargs.bEnableInterpValidation  (1,1) logical {isscalar, islogical} = true
     kwargs.bAdd3rdBodiesPosition    (1,1) logical {isscalar, islogical} = true
     kwargs.bAdd3rdBodiesAttitude    (1,1) logical {isscalar, islogical} = false
+    kwargs.bUseInterpFcnFromRCS1    (1,1) logical {isscalar, islogical} = false
 end
-% TODO
 %% SIGNATURE
 % [strDynParams, strMainBodyRefData] = EphemeridesDataFactory(dEphemTimegrid, ...
 %                                                             ui32EphemerisPolyDeg,...
@@ -45,6 +45,7 @@ end
 % kwargs.bEnableInterpValidation  (1,1) logical {isscalar, islogical} = true
 % kwargs.bAdd3rdBodiesPosition    (1,1) logical {isscalar, islogical} = true
 % kwargs.bAdd3rdBodiesAttitude    (1,1) logical {isscalar, islogical} = false
+% kwargs.bUseInterpFcnFromRCS1    (1,1) logical {isscalar, islogical} = false 
 % -------------------------------------------------------------------------------------------------------------
 %% OUTPUT
 % strDynParams
@@ -66,35 +67,69 @@ dDomainUB = max(dInterpDomain);
 
 %% Target body attitude data
 % Convert attitude DCMs to quaternion
-dQuat_INfromTB = DCM2quatSeq(strMainBodyRefData.dDCM_INfromTB, false);
+dQuat_WfromTB = DCM2quatSeq(strMainBodyRefData.dDCM_INfromTB, false);
 
-[dTmpChbvCoeffs, ~, dTmpSwitchIntervals, ...
-    strTmpFitStats] = fitAttQuatChbvPolynmials(ui32AttitudePolyDeg, ...
-                                                dInterpDomain, ...
-                                                dQuat_INfromTB, ...
-                                                dDomainLB, ...
-                                                dDomainUB, ...
-                                                kwargs.bEnableInterpValidation); %#ok<ASGLU>
+if not(kwargs.bUseInterpFcnFromRCS1)
+    % Use nav-system implementation
+    [dTmpChbvCoeffs, ~, dTmpSwitchIntervals, ...
+            strTmpFitStats] = fitAttQuatChbvPolynmials(ui32AttitudePolyDeg, ...
+                                                        dInterpDomain, ...
+                                                        dQuat_WfromTB, ...
+                                                        dDomainLB, ...
+                                                        dDomainUB, ...
+                                                        kwargs.bEnableInterpValidation); %#ok<ASGLU>
 
-strDynParams.strMainData.strAttData.ui32PolyDeg          = ui32AttitudePolyDeg;
-strDynParams.strMainData.strAttData.dChbvPolycoeffs      = dTmpChbvCoeffs;
-strDynParams.strMainData.strAttData.dsignSwitchIntervals = dTmpSwitchIntervals;
-strDynParams.strMainData.strAttData.dTimeLowBound        = dDomainLB;
-strDynParams.strMainData.strAttData.dTimeUpBound         = dDomainUB;
+    strDynParams.strMainData.strAttData.ui32PolyDeg          = ui32AttitudePolyDeg;
+    strDynParams.strMainData.strAttData.dChbvPolycoeffs      = dTmpChbvCoeffs;
+    strDynParams.strMainData.strAttData.dsignSwitchIntervals = dTmpSwitchIntervals;
+    strDynParams.strMainData.strAttData.dTimeLowBound        = dDomainLB;
+    strDynParams.strMainData.strAttData.dTimeUpBound         = dDomainUB;
 
+else
+    % Use implementation for RCS-1
+    % DEVNOTE: interpolation time domain is assumed to be expressed in days (conversion is
+    % hardcoded inside the evaluation funtion!).
+
+    % Apply discontinuity fix
+
+    [dQuat_WfromTB, bIsSignSwitched, ui8howManySwitches, ...
+        bsignSwitchDetectionMask] = fixQuatSignDiscontinuity(dQuat_WfromTB'); %#ok<ASGLU>
+
+    strDynParams.strMainData.strAttData.d_gnc_eph_coeffs = EphCoeffsGeneration(dInterpDomain / 86400.0, ...
+                                                                                dQuat_WfromTB', ...
+                                                                                ui32AttitudePolyDeg);
+    
+    strDynParams.strMainData.strAttData.d_gnc_eph_time_bounds = [dInterpDomain(1), dInterpDomain(end)] / 86400.0;
+    strDynParams.strMainData.strAttData.ui32CoeffsSizePtr = size(strDynParams.strMainData.strAttData.d_gnc_eph_coeffs, 2);
+
+end
 
 %% Sun position
-[dTmpChbvCoeffs, ~, ~] = fitChbvPolynomials(ui32EphemerisPolyDeg, ...
-                                         dInterpDomain, ...
-                                         strMainBodyRefData.dSunPosition_IN, ...
-                                         dDomainLB, ...
-                                         dDomainUB, ...
-                                         kwargs.bEnableInterpValidation);
+if not(kwargs.bUseInterpFcnFromRCS1)
+    [dTmpChbvCoeffs, ~, ~] = fitChbvPolynomials(ui32EphemerisPolyDeg, ...
+                                                dInterpDomain, ...
+                                                strMainBodyRefData.dSunPosition_IN, ...
+                                                dDomainLB, ...
+                                                dDomainUB, ...
+                                                kwargs.bEnableInterpValidation);
 
-strDynParams.strBody3rdData(1).strOrbitData.ui32PolyDeg      = ui32EphemerisPolyDeg;
-strDynParams.strBody3rdData(1).strOrbitData.dChbvPolycoeffs  = dTmpChbvCoeffs;
-strDynParams.strBody3rdData(1).strOrbitData.dTimeLowBound    = dDomainLB;
-strDynParams.strBody3rdData(1).strOrbitData.dTimeUpBound     = dDomainUB;
+    strDynParams.strBody3rdData(1).strOrbitData.ui32PolyDeg      = ui32EphemerisPolyDeg;
+    strDynParams.strBody3rdData(1).strOrbitData.dChbvPolycoeffs  = dTmpChbvCoeffs;
+    strDynParams.strBody3rdData(1).strOrbitData.dTimeLowBound    = dDomainLB;
+    strDynParams.strBody3rdData(1).strOrbitData.dTimeUpBound     = dDomainUB;
+
+else
+    % Use implementation for RCS-1
+
+    % DEVNOTE: interpolation time domain is assumed to be expressed in days (conversion is
+    % hardcoded inside the evaluation funtion!).
+    strDynParams.strBody3rdData(1).d_gnc_eph_coeffs = EphCoeffsGeneration(dInterpDomain  / 86400.0, ...
+                                                                        strMainBodyRefData.dSunPosition_IN', ...
+                                                                        ui32EphemerisPolyDeg);
+
+    strDynParams.strBody3rdData(1).d_gnc_eph_time_bounds = [dInterpDomain(1), dInterpDomain(end)] / 86400.0;
+    strDynParams.strBody3rdData(1).ui32CoeffsSizePtr = size(strDynParams.strBody3rdData(1).d_gnc_eph_coeffs, 2);
+end
 
 %% Add 3rd bodies
 if not(isempty(str3rdBodyRefData)) && length(strDynParams.strBody3rdData) > 1 && ( kwargs.bAdd3rdBodiesPosition || kwargs.bAdd3rdBodiesAttitude)
@@ -103,24 +138,51 @@ if not(isempty(str3rdBodyRefData)) && length(strDynParams.strBody3rdData) > 1 &&
         if isfield(str3rdBodyRefData, "strOrbitData")
             try
                 dPosition_W = str3rdBodyRefData(idB).strOrbitData.dPosition_W;
-                [dChbvCoeffs, ~, ~] = fitChbvPolynomials(ui32EphemerisPolyDeg, ...
-                                                        dInterpDomain, ...
+
+                if not(kwargs.bUseInterpFcnFromRCS1)
+                    % Use nav-system implementation
+                    [dChbvCoeffs, ~, ~] = fitChbvPolynomials(ui32EphemerisPolyDeg, ...
+                                                            dInterpDomain, ...
                                                             dPosition_W, ...
                                                             dDomainLB, ...
                                                             dDomainUB, ...
                                                             kwargs.bEnableInterpValidation);
 
-                strDynParams.strBody3rdData(idB+1).strOrbitData.ui32PolyDeg      = ui32EphemerisPolyDeg;
-                strDynParams.strBody3rdData(idB+1).strOrbitData.dChbvPolycoeffs  = dChbvCoeffs;
-                strDynParams.strBody3rdData(idB+1).strOrbitData.dTimeLowBound    = dDomainLB;
-                strDynParams.strBody3rdData(idB+1).strOrbitData.dTimeUpBound     = dDomainUB;
+                    strDynParams.strBody3rdData(idB+1).strOrbitData.ui32PolyDeg      = ui32EphemerisPolyDeg;
+                    strDynParams.strBody3rdData(idB+1).strOrbitData.dChbvPolycoeffs  = dChbvCoeffs;
+                    strDynParams.strBody3rdData(idB+1).strOrbitData.dTimeLowBound    = dDomainLB;
+                    strDynParams.strBody3rdData(idB+1).strOrbitData.dTimeUpBound     = dDomainUB;
+
+
+                else
+                    % Use implementation for RCS-1
+
+                    % DEVNOTE: interpolation time domain is assumed to be expressed in days (conversion is
+                    % hardcoded inside the evaluation funtion!).
+
+                    strDynParams.strBody3rdData(idB+1).d_gnc_eph_coeffs = EphCoeffsGeneration(dInterpDomain  / 86400.0, ...
+                                                                                            dPosition_W', ...
+                                                                                            ui32EphemerisPolyDeg);
+                    strDynParams.strBody3rdData(idB+1).d_gnc_eph_time_bounds = [dInterpDomain(1), dInterpDomain(end)] / 86400.0;
+                    strDynParams.strBody3rdData(idB+1).ui32CoeffsSizePtr = size(strDynParams.strBody3rdData(idB+1).d_gnc_eph_coeffs, 2);
+                end
 
             catch ME
+
                 warning("EphemeridesDataFactory: Failed to fit orbit data for 3rd body %d due to error: %s. \nSkipping ephemeris fitting.", idB, string(ME.message));
-                strDynParams.strBody3rdData(idB+1).strOrbitData.ui32PolyDeg      = 0;
-                strDynParams.strBody3rdData(idB+1).strOrbitData.dChbvPolycoeffs  = [];
-                strDynParams.strBody3rdData(idB+1).strOrbitData.dTimeLowBound    = [];
-                strDynParams.strBody3rdData(idB+1).strOrbitData.dTimeUpBound     = [];
+                if not(kwargs.bUseInterpFcnFromRCS1)
+                    % Use nav-system implementation
+                    strDynParams.strBody3rdData(idB+1).strOrbitData.ui32PolyDeg      = 0;
+                    strDynParams.strBody3rdData(idB+1).strOrbitData.dChbvPolycoeffs  = [];
+                    strDynParams.strBody3rdData(idB+1).strOrbitData.dTimeLowBound    = [];
+                    strDynParams.strBody3rdData(idB+1).strOrbitData.dTimeUpBound     = [];
+
+                else
+                    % Use implementation for RCS-1
+                    strDynParams.strBody3rdData(idB+1).d_gnc_eph_coeffs = [];
+                    strDynParams.strBody3rdData(idB+1).d_gnc_eph_time_bounds = [];
+                    strDynParams.strBody3rdData(idB+1).ui32CoeffsSizePtr = [];
+                end
             end
         else
             warning("EphemeridesDataFactory: No orbit data found for 3rd body %d. Skipping ephemeris fitting.", idB);
@@ -131,20 +193,39 @@ if not(isempty(str3rdBodyRefData)) && length(strDynParams.strBody3rdData) > 1 &&
                 % Fit attitude data (convert to quaternion scalar first)
                 dQuat_WfromTB = DCM2quatSeq(str3rdBodyRefData(idB).strAttData.dDCM_WfromTB , false);
 
-                [dTmpChbvCoeffs, ~, dTmpSwitchIntervals, ...
-                    strTmpFitStats] = fitAttQuatChbvPolynmials(ui32AttitudePolyDeg, ...
-                                                                dInterpDomain, ...
-                                                                dQuat_WfromTB, ...
-                                                                dDomainLB, ...
-                                                                dDomainUB, ...
-                                                                kwargs.bEnableInterpValidation); %#ok<ASGLU>
+                if not(kwargs.bUseInterpFcnFromRCS1)
+                    % Use nav-system implementation
+                    [dTmpChbvCoeffs, ~, dTmpSwitchIntervals, ...
+                        strTmpFitStats] = fitAttQuatChbvPolynmials(ui32AttitudePolyDeg, ...
+                                                                    dInterpDomain, ...
+                                                                    dQuat_WfromTB, ...
+                                                                    dDomainLB, ...
+                                                                    dDomainUB, ...
+                                                                    kwargs.bEnableInterpValidation); %#ok<ASGLU>
 
-                strDynParams.strBody3rdData(idB+1).strAttData.ui32PolyDeg          = ui32AttitudePolyDeg;
-                strDynParams.strBody3rdData(idB+1).strAttData.dChbvPolycoeffs      = dTmpChbvCoeffs;
-                strDynParams.strBody3rdData(idB+1).strAttData.dsignSwitchIntervals = dTmpSwitchIntervals;
-                strDynParams.strBody3rdData(idB+1).strAttData.dTimeLowBound        = dDomainLB;
-                strDynParams.strBody3rdData(idB+1).strAttData.dTimeUpBound         = dDomainUB;
-            
+                    strDynParams.strBody3rdData(idB+1).strAttData.ui32PolyDeg          = ui32AttitudePolyDeg;
+                    strDynParams.strBody3rdData(idB+1).strAttData.dChbvPolycoeffs      = dTmpChbvCoeffs;
+                    strDynParams.strBody3rdData(idB+1).strAttData.dsignSwitchIntervals = dTmpSwitchIntervals;
+                    strDynParams.strBody3rdData(idB+1).strAttData.dTimeLowBound        = dDomainLB;
+                    strDynParams.strBody3rdData(idB+1).strAttData.dTimeUpBound         = dDomainUB;
+
+                else
+                    % Use implementation for RCS-1
+
+                    % DEVNOTE: interpolation time domain is assumed to be expressed in days (conversion is
+                    % hardcoded inside the evaluation funtion!).
+
+                    % Apply discontinuity fix
+                    [dQuat_WfromTB, bIsSignSwitched, ui8howManySwitches, ...
+                        bsignSwitchDetectionMask] = fixQuatSignDiscontinuity(dQuat_WfromTB'); %#ok<ASGLU>
+
+                    strDynParams.strBody3rdData(idB+1).strAttData.d_gnc_eph_coeffs = EphCoeffsGeneration(dInterpDomain / 86400.0, ...
+                                                                                                    dQuat_WfromTB', ...
+                                                                                                    ui32EphemerisPolyDeg);
+                    
+                    strDynParams.strBody3rdData(idB+1).strAttData.d_gnc_eph_time_bounds = [dInterpDomain(1), dInterpDomain(end)] / 86400.0;
+                    strDynParams.strBody3rdData(idB+1).strAttData.ui32CoeffsSizePtr = size(strDynParams.strBody3rdData(idB+1).strAttData.d_gnc_eph_coeffs, 2);
+                end
             catch ME
                 warning("EphemeridesDataFactory: Failed to fit attitude data for 3rd body %d due to error: %s. \nSkipping attitude fitting.", idB, string(ME.message));
                 strDynParams.strBody3rdData(idB+1).strAttData.ui32PolyDeg          = 0;
