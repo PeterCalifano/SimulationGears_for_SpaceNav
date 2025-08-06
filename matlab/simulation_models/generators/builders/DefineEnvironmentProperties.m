@@ -92,7 +92,9 @@ if kwargs.objDataset.bDefaultConstructed
     end
 
     % Get target fixed frame attitude wrt Inertial frame    
-    strMainBodyRefData.dDCM_INfromTB = cspice_pxform(char(charTargetFixedFrame), char(charInertialFrame), dEphemeridesTimegrid);
+    strMainBodyRefData.dDCM_INfromTB = cspice_pxform(char(charTargetFixedFrame), ...
+                                                    char(charInertialFrame), ...
+                                                    dEphemeridesTimegrid);
 
     % Get Sun position in Inertial frame
     strMainBodyRefData.dSunPosition_IN = dUnitsScaling * cspice_spkpos('SUN', dEphemeridesTimegrid, ...
@@ -159,7 +161,7 @@ fprintf('\nAverage distance from the SUN in AU: %3.4f AU\n', dDistFromSunAU);
 
 % Add Sun gravity parameter
 try
-    strDynParams.strBody3rdData(1).dGM = cspice_bodvrd('SUN', 'GM', 1) / (dUnitsScaling^3); % 
+    strDynParams.strBody3rdData(1).dGM = cspice_bodvrd('SUN', 'GM', 1) * (dUnitsScaling^3); 
 catch ME
     warning('ERROR occurred while fetching Sun GM: %s. Setting to default value in m^3/s^2.', string(ME.message));
     % If not available, set to default value

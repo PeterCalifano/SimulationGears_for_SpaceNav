@@ -86,7 +86,7 @@ classdef CScenarioGenerator < CGeneralPropagator
             self.enumGenerationMode = settings.enumGenerationMode;
             self.bProvideAccelerationData = settings.bProvideAccelerationData;
 
-            if length(self.dEphemerisTimegrid) == 1
+            if isscalar(self.dEphemerisTimegrid)
                 self.dEphemerisTimegrid = self.dRelativeTimegrid;
             end
 
