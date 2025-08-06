@@ -95,12 +95,12 @@ else
     [dQuat_WfromTB, bIsSignSwitched, ui8howManySwitches, ...
         bsignSwitchDetectionMask] = fixQuatSignDiscontinuity(dQuat_WfromTB'); %#ok<ASGLU>
 
-    strDynParams.strMainData.strAttData.d_gnc_eph_coeffs = EphCoeffsGeneration(dInterpDomain / 86400.0, ...
+    strDynParams.strMainData.d_gnc_eph_target_att_coeffs = EphCoeffsGeneration(dInterpDomain / 86400.0, ...
                                                                                 dQuat_WfromTB', ...
                                                                                 ui32AttitudePolyDeg);
     
-    strDynParams.strMainData.strAttData.d_gnc_eph_time_bounds = [dInterpDomain(1), dInterpDomain(end)] / 86400.0;
-    strDynParams.strMainData.strAttData.ui32CoeffsSizePtr = size(strDynParams.strMainData.strAttData.d_gnc_eph_coeffs, 2);
+    strDynParams.strMainData.d_gnc_eph_target_att_tbounds = [dInterpDomain(1), dInterpDomain(end)] / 86400.0;
+    strDynParams.strMainData.ui32CoeffsSizePtr = size(strDynParams.strMainData.d_gnc_eph_target_att_coeffs, 2);
 
 end
 
