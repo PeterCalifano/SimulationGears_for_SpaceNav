@@ -63,8 +63,8 @@ switch enumTargetName
         % DEVNOTE: currently assumes rcs-1 simulator loader
         bDO_NOT_INIT_RCS1_ENV = true;
         LoadUserConfig;
-        charBlenderModelPath                = fullfile(getenv("HOME"), "devDir/projects-DART/data/rcs-1/phase-B/blender/ApophisParticles.blend");
-        %charBlenderModelPath                = fullfile(getenv("HOME"), "devDir/projects-DART/data/rcs-1/phase-A/blender/Apophis_RGB_smoothed.blend1");
+        % charBlenderModelPath                = fullfile(getenv("HOME"), "devDir/projects-DART/data/rcs-1/phase-C/blender/ApophisParticles.blend");
+        charBlenderModelPath                = fullfile(getenv("HOME"), "devDir/projects-DART/data/rcs-1/phase-C/blender/Apophis_RGB.blend");
         
         % Define shape model object
         objShapeModel = CShapeModel('file_obj', fullfile(path_to_shape_models, "apophis_v233s7_vert2_new.mod.obj"), ...
