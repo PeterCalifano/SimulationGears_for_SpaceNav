@@ -391,7 +391,10 @@ if ui32CounterAddBodies > 0
     objReferenceMissionData.cellAdditionalBodiesTags        = cellTargetTags(1:ui32CounterAddBodies);
 
     objReferenceMissionData.cellAdditionalBodiesDCM_TBfromW = cellTargetDCM_TBfromW(1:ui32CounterAddBodies);
-    objReferenceMissionData.cellAdditionalTargetFrames      = kwargs.cellAdditionalTargetFrames(1:ui32CounterAddBodies);
+
+    if kwargs.bAdditionalBodiesRequireAttitude
+        objReferenceMissionData.cellAdditionalTargetFrames      = kwargs.cellAdditionalTargetFrames(1:ui32CounterAddBodies);
+    end
 end
 
 
