@@ -19,6 +19,7 @@ arguments
     kwargs.bAdd3rdBodiesPosition    (1,1) logical {isscalar, islogical} = true
     kwargs.bAdd3rdBodiesAttitude    (1,1) logical {isscalar, islogical} = false
     kwargs.bUseInterpFcnFromRCS1    (1,1) logical {isscalar, islogical} = false
+    kwargs.bScaleTimeToDays         (1,1) logical {isscalar, islogical} = false
 end
 %% SIGNATURE
 % [strDynParams, strMainBodyRefData] = EphemeridesDataFactory(dEphemTimegrid, ...
@@ -54,6 +55,7 @@ end
 % 19-02-2025    Pietro Califano     First version copy-pasting previous implementation
 % 22-07-2025    Pietro Califano     Extend to support definition of 3rd body attitude and position
 %                                   ephemerides from input reference data; minor updates
+% 18-08-2025    Pietro Califano     Update implementation to generalize RCS1 alternative code branch
 % -------------------------------------------------------------------------------------------------------------
 %% DEPENDENCIES
 % [-]
@@ -61,15 +63,32 @@ end
 
 %% Common data
 % Build interpolant timegrid
-dInterpDomain = dEphemTimegrid - dEphemTimegrid(1);
-dDomainLB = min(dInterpDomain);
-dDomainUB = max(dInterpDomain);
+if not(kwargs.bUseInterpFcnFromRCS1)
+    % nav-system implementation
+    dInterpDomain = dEphemTimegrid - dEphemTimegrid(1);
+    dDomainLB = min(dInterpDomain);
+    dDomainUB = max(dInterpDomain);
+
+else
+    % RCS-1 implementation
+    dInterpDomain = dEphemTimegrid;
+
+    if kwargs.bScaleTimeToDays
+        dInterpDomain = dInterpDomain / 86400.0;
+    end
+
+    dDomainLB = min(dInterpDomain);
+    dDomainUB = max(dInterpDomain);
+
+
+end
 
 %% Target body attitude data
 % Convert attitude DCMs to quaternion
 dQuat_WfromTB = DCM2quatSeq(strMainBodyRefData.dDCM_INfromTB, false);
 
 if not(kwargs.bUseInterpFcnFromRCS1)
+
     % Use nav-system implementation
     [dTmpChbvCoeffs, ~, dTmpSwitchIntervals, ...
             strTmpFitStats] = fitAttQuatChbvPolynmials(ui32AttitudePolyDeg, ...
@@ -91,15 +110,14 @@ else
     % hardcoded inside the evaluation funtion!).
 
     % Apply discontinuity fix
-
     [dQuat_WfromTB, bIsSignSwitched, ui8howManySwitches, ...
         bsignSwitchDetectionMask] = fixQuatSignDiscontinuity(dQuat_WfromTB'); %#ok<ASGLU>
 
-    strDynParams.strMainData.d_gnc_eph_target_att_coeffs = EphCoeffsGeneration(dInterpDomain / 86400.0, ...
+    strDynParams.strMainData.d_gnc_eph_target_att_coeffs = EphCoeffsGeneration(dInterpDomain, ...
                                                                                 dQuat_WfromTB', ...
                                                                                 ui32AttitudePolyDeg);
     
-    strDynParams.strMainData.d_gnc_eph_target_att_tbounds = [dInterpDomain(1), dInterpDomain(end)] / 86400.0;
+    strDynParams.strMainData.d_gnc_eph_target_att_tbounds = [dInterpDomain(1), dInterpDomain(end)];
     strDynParams.strMainData.ui32CoeffsSizePtr = size(strDynParams.strMainData.d_gnc_eph_target_att_coeffs, 2);
 
 end
@@ -123,11 +141,11 @@ else
 
     % DEVNOTE: interpolation time domain is assumed to be expressed in days (conversion is
     % hardcoded inside the evaluation funtion!).
-    strDynParams.strBody3rdData(1).d_gnc_eph_coeffs = EphCoeffsGeneration(dInterpDomain  / 86400.0, ...
+    strDynParams.strBody3rdData(1).d_gnc_eph_coeffs = EphCoeffsGeneration(dInterpDomain, ...
                                                                         strMainBodyRefData.dSunPosition_IN', ...
                                                                         ui32EphemerisPolyDeg);
 
-    strDynParams.strBody3rdData(1).d_gnc_eph_time_bounds = [dInterpDomain(1), dInterpDomain(end)] / 86400.0;
+    strDynParams.strBody3rdData(1).d_gnc_eph_time_bounds = [dInterpDomain(1), dInterpDomain(end)];
     strDynParams.strBody3rdData(1).ui32CoeffsSizePtr = size(strDynParams.strBody3rdData(1).d_gnc_eph_coeffs, 2);
 end
 
@@ -160,10 +178,10 @@ if not(isempty(str3rdBodyRefData)) && length(strDynParams.strBody3rdData) > 1 &&
                     % DEVNOTE: interpolation time domain is assumed to be expressed in days (conversion is
                     % hardcoded inside the evaluation funtion!).
 
-                    strDynParams.strBody3rdData(idB+1).d_gnc_eph_coeffs = EphCoeffsGeneration(dInterpDomain  / 86400.0, ...
+                    strDynParams.strBody3rdData(idB+1).d_gnc_eph_coeffs = EphCoeffsGeneration(dInterpDomain, ...
                                                                                             dPosition_W', ...
                                                                                             ui32EphemerisPolyDeg);
-                    strDynParams.strBody3rdData(idB+1).d_gnc_eph_time_bounds = [dInterpDomain(1), dInterpDomain(end)] / 86400.0;
+                    strDynParams.strBody3rdData(idB+1).d_gnc_eph_time_bounds = [dInterpDomain(1), dInterpDomain(end)] ;
                     strDynParams.strBody3rdData(idB+1).ui32CoeffsSizePtr = size(strDynParams.strBody3rdData(idB+1).d_gnc_eph_coeffs, 2);
                 end
 
@@ -219,11 +237,11 @@ if not(isempty(str3rdBodyRefData)) && length(strDynParams.strBody3rdData) > 1 &&
                     [dQuat_WfromTB, bIsSignSwitched, ui8howManySwitches, ...
                         bsignSwitchDetectionMask] = fixQuatSignDiscontinuity(dQuat_WfromTB'); %#ok<ASGLU>
 
-                    strDynParams.strBody3rdData(idB+1).strAttData.d_gnc_eph_coeffs = EphCoeffsGeneration(dInterpDomain / 86400.0, ...
+                    strDynParams.strBody3rdData(idB+1).strAttData.d_gnc_eph_coeffs = EphCoeffsGeneration(dInterpDomain, ...
                                                                                                     dQuat_WfromTB', ...
                                                                                                     ui32EphemerisPolyDeg);
                     
-                    strDynParams.strBody3rdData(idB+1).strAttData.d_gnc_eph_time_bounds = [dInterpDomain(1), dInterpDomain(end)] / 86400.0;
+                    strDynParams.strBody3rdData(idB+1).strAttData.d_gnc_eph_time_bounds = [dInterpDomain(1), dInterpDomain(end)] ;
                     strDynParams.strBody3rdData(idB+1).strAttData.ui32CoeffsSizePtr = size(strDynParams.strBody3rdData(idB+1).strAttData.d_gnc_eph_coeffs, 2);
                 end
             catch ME
