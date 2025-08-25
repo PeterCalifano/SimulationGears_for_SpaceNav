@@ -170,7 +170,7 @@ end
 
 %% Spacecraft data
 dDefaultReflCoeff = 1.29;  % Global CR
-dDefaultSCmass    = 14.8; % 12; % [kg]
+dDefaultSCmass    = 12.5; %14.8; % 12; % [kg]
 dDefaultA_SRP     = 0.5329E-6 * (dUnitsScaling^2); % [m^2]
 
 if isempty(strDynParams.strSCdata)
@@ -182,15 +182,15 @@ if isempty(strDynParams.strSCdata)
 else
     % Check for missing values and set defaults where needed
     if not(isfield(strDynParams.strSCdata, "dReflCoeff"))
-        warning('No spacecraft reflectivity coefficient provided in strDynParams.strSCdata.dReflCoeff. Default value of 1.29 will be used.')
+        warning('No spacecraft reflectivity coefficient provided in strDynParams.strSCdata.dReflCoeff. Default value of %4.4g will be used.', dDefaultReflCoeff)
         strDynParams.strSCdata.dReflCoeff = dDefaultReflCoeff;
     end
     if not(isfield(strDynParams.strSCdata, "dSCmass"))
-        warning('No spacecraft mass provided in strDynParams.strSCdata.dSCmass. Default value of 14.8 kg will be used.')
+        warning('No spacecraft mass provided in strDynParams.strSCdata.dSCmass. Default value of %4.4g kg will be used.', dDefaultSCmass)
         strDynParams.strSCdata.dSCmass = dDefaultSCmass;
     end
     if not(isfield(strDynParams.strSCdata, "dA_SRP"))
-        warning('No spacecraft area provided in strDynParams.strSCdata.dA_SRP. Default value of 0.5329 m^2 will be used.')
+        warning('No spacecraft area provided in strDynParams.strSCdata.dA_SRP. Default value of %4.4g m^2 will be used.', dDefaultA_SRP)
         strDynParams.strSCdata.dA_SRP = dDefaultA_SRP;
     end
 end
