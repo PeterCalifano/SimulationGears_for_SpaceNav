@@ -10,6 +10,9 @@ classdef (Abstract) CBaseDatastruct < handle & matlab.mixin.Copyable
     %                                   formats and recursively convert object to struct
     % 02-06-2025    Pietro Califano     Upgrade to remove empty fields when dumping to struct, json, yaml;
     %                                   fix yml dump pipeline, add warning suppression
+    % 25-08-2025    Pietro Califano     [MAJOR] Implement prototype methods "from" struct and yaml.
+    %                                   Development of release version still open.
+    % 27-08-2025    Pietro Califano     Minor improvement to avoid unnecessary warning.
     % -------------------------------------------------------------------------------------------------------------
     %% METHODS
     % [-]
@@ -172,7 +175,9 @@ classdef (Abstract) CBaseDatastruct < handle & matlab.mixin.Copyable
                 % We detect defaults from the current instance state (post-assignment).
                 for idp = 1:numel(cellPropNames)
                     charP = cellPropNames{idp};
-                    if ~isprop(self, charP); continue; end %#ok<ISPROP>
+                    if ~isprop(self, charP) 
+                        continue; 
+                    end 
                     % Heuristic: treat as missing if isempty and the input struct had no field for it
                     if ~isfield(strData, charP) && isempty(self.(charP))
                         error('fromStruct:MissingField','Missing required field %s for class %s.', charP, class(self));
@@ -191,7 +196,7 @@ classdef (Abstract) CBaseDatastruct < handle & matlab.mixin.Copyable
             arguments
                 self
                 charInputYaml {mustBeText}
-                bIsFile (1,1) logical {islogical} = []   % Auto-detect if empty
+                bIsFile  logical {islogical} = []   % Auto-detect if empty
                 bStrict (1,1) logical {islogical} = false
             end
 
@@ -287,10 +292,15 @@ classdef (Abstract) CBaseDatastruct < handle & matlab.mixin.Copyable
             % Object saving method
             fprintf("\nSaving datastruct to file %s in format %s...", charFilename, charFormat);
 
-            [charRootFolder, ~, charFileExt] = fileparts(charFilename);
+            [charRootFolder, charFilename_, charFileExt] = fileparts(charFilename);
 
             if not(exist(charRootFolder, "dir"))
                 mkdir(charRootFolder)
+            end
+
+            if strcmpi(charRootFolder, '')
+                charRootFolder = '.';
+                charFilename = fullfile( charRootFolder, strcat(charFilename_, charFileExt) );
             end
 
             % Determine name of saved object

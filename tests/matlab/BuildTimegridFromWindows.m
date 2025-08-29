@@ -26,7 +26,8 @@ arguments (Input)
     kwargs.charUserDefTimescale     (1,:) char {ischar, isstring, mustBeMember(kwargs.charUserDefTimescale, ...
                                                         ["TAI", "TDB", "TDT", "TT", "ET", "JDTDB", "JDTDT", "JED", "GPS"])} = "ET";
     kwargs.i32TargetLabelID         (1,1) int32  = -1
-    kwargs.dInitialRelTime          (1,1) double = 0.0 
+    kwargs.dInitialRelTime          (1,1) double = 0.0
+    kwargs.dInputTimeGrid           (1,:) double  {mustBeVector, mustBeNonnegative} = zeros(1,2);
 end
 arguments (Output)
     dTimeGrid           (1,:) double  {mustBeVector, mustBeNonnegative}
@@ -74,18 +75,25 @@ end
 dMinT = min(dBeginTstamps);
 dMaxT = max(dEndTstamps);
 
-dTStart = dMinT - double(kwargs.ui32NumStepsBefore) * dDeltaTime;
-dTEnd   = dMaxT + double(kwargs.ui32NumStepsAfter) * dDeltaTime;
+%%% Determine timegrid
 
-% Constrain maximum duration if max provided
-if kwargs.dMaxDuration > 0
-    dTEnd = dTStart + min(dTEnd-dTStart, kwargs.dMaxDuration);
-end
-
-%%% Build timegrid
-dTotalNumSteps = floor( (dTEnd - dTStart) / dDeltaTime) + 1;
 % dTimeGrid = dTStart + (0 : dTotalNumSteps - 1) * dDeltaTime;
-dTimeGrid = dTStart : dDeltaTime : dTEnd;
+if size(kwargs.dInputTimeGrid,2) > 2 && all(kwargs.dInputTimeGrid >= 0.0)
+    % Use input timegrid
+    dTimeGrid = kwargs.dInputTimeGrid;
+else
+    % Build timegrid from limits and steps
+    dTStart = dMinT - double(kwargs.ui32NumStepsBefore) * dDeltaTime;
+    dTEnd   = dMaxT + double(kwargs.ui32NumStepsAfter) * dDeltaTime;
+
+    % Constrain maximum duration if max provided
+    if kwargs.dMaxDuration > 0
+        dTEnd = dTStart + min(dTEnd-dTStart, kwargs.dMaxDuration);
+    end
+
+    dTotalNumSteps = floor( (dTEnd - dTStart) / dDeltaTime) + 1;
+    dTimeGrid = dTStart : dDeltaTime : dTEnd;
+end
 
 % Mask: true if inside timestamp is within any window
 bInsideWindowMask = false(1, length(dTimeGrid));
