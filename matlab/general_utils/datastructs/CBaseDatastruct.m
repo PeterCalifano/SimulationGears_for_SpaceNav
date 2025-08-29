@@ -122,7 +122,7 @@ classdef (Abstract) CBaseDatastruct < handle & matlab.mixin.Copyable
         end
         
         % Factory (instance) methods 
-        function self = fromStruct(self, strInput, bStrict)
+        function self = fromStruct(self, strInput, bStrictUnknown, bStrictMissing)
             %FROMSTRUCT Populate *this* instance from a struct produced by toStruct()/YAML/JSON
             % 1) If a wrapper like struct('obj<ClassName>', <payload>) is provided, unwrap.
             % 2) Validate provided fields vs class properties (public, non-hidden).
@@ -134,7 +134,8 @@ classdef (Abstract) CBaseDatastruct < handle & matlab.mixin.Copyable
             arguments
                 self     (1,1) {mustBeA(self, "CBaseDatastruct")}
                 strInput (1,1) struct {isstruct}
-                bStrict  (1,1) logical {islogical} = false
+                bStrictUnknown  (1,1) logical {islogical} = true
+                bStrictMissing  (1,1) logical {islogical} = false
             end
 
             % Unwrap wrapper if present: struct('obj<Class>', payload)
@@ -145,13 +146,14 @@ classdef (Abstract) CBaseDatastruct < handle & matlab.mixin.Copyable
             cellPropNamesAll = {objMeta.PropertyList.Name};
             % Keep only public, non-dependent, non-constant properties
             bKeep = arrayfun(@(p) strcmp(p.GetAccess,'public') && ~p.Constant && ~p.Dependent, objMeta.PropertyList);
+
             cellPropNames = cellPropNamesAll(bKeep);
             % Build a set for fast membership tests
             strProvided = strData; %#ok<NASGU>
             cellProvidedNames = fieldnames(strData);
 
             % Strictness checks: unknown fields
-            if bStrict
+            if bStrictUnknown
                 cellUnknown = setdiff(cellProvidedNames, cellPropNames);
                 if ~isempty(cellUnknown)
                     error('fromStruct:UnknownFields', 'Unknown fields for class %s: %s', class(self), strjoin(cellUnknown', ', '));
@@ -159,10 +161,11 @@ classdef (Abstract) CBaseDatastruct < handle & matlab.mixin.Copyable
             end
 
             % Assign known fields
-            for idf = 1:numel(cellProvidedNames)
-                charFld = cellProvidedNames{idf};
+            for idF = 1:numel(cellProvidedNames)
+                charFld = cellProvidedNames{idF};
+                
                 if ismember(charFld, cellPropNames)
-                    self = CBaseDatastruct.assignField_(self, charFld, strData.(charFld), bStrict);
+                    self = CBaseDatastruct.assignField_(self, charFld, strData.(charFld), bStrictUnknown);
                 else
                     % Ignore silently (or warn) if non-strict
                     % warning('fromStruct:IgnoringField','Ignoring unknown field %s for class %s.', charFld, class(self));
@@ -170,7 +173,7 @@ classdef (Abstract) CBaseDatastruct < handle & matlab.mixin.Copyable
             end
 
             % Strictness checks: missing fields (heuristic)
-            if bStrict
+            if bStrictMissing
                 % Consider a property missing if it has no value and no default.
                 % We detect defaults from the current instance state (post-assignment).
                 for idp = 1:numel(cellPropNames)
@@ -192,7 +195,12 @@ classdef (Abstract) CBaseDatastruct < handle & matlab.mixin.Copyable
         end
 
         function self = fromYaml(self, charInputYaml, bIsFile, bStrict)
-            %FROMYAML Populate *this* from YAML (string or file), leveraging yaml toolbox.
+            % FROMYAML Populate *this* from YAML (string or file), leveraging yaml toolbox.
+            % Known limitations: 
+            % 1) Cells containing vectors/matrices/arrays with rows/cols matching in size are converted to
+            % single vectors/matrixs/arrays. This is because the parser cannot distinguish whether they
+            % were dumped from a vector/matrix/array and loaded by yaml as cells of cells or not.
+
             arguments
                 self
                 charInputYaml {mustBeText}
@@ -207,7 +215,22 @@ classdef (Abstract) CBaseDatastruct < handle & matlab.mixin.Copyable
 
             % Auto-detect file vs string if not specified
             if isempty(bIsFile)
-                bIsFile = isfile(string(charInputYaml));
+                [~, ~, charExt] = fileparts(charInputYaml);
+
+                if strcmpi(charExt, '.yml') || strcmpi(charExt, '.yaml')
+                    bIsFile = true && isfile(string(charInputYaml));
+
+                    if not(bIsFile)
+                        error('Correct file extention, but MATLAB cannot find file. Please specify full path or add to path.')
+                    end
+
+                elseif isfile(string(charInputYaml))
+                    error('Invalid extension %s.', charExt);
+                end
+            end
+
+            if isempty(bIsFile)
+                error('Automatic deduction of bIsFile failed. Cannot determine if input variable is a path or YAML string. Please specify.');
             end
 
             if bIsFile
@@ -240,8 +263,11 @@ classdef (Abstract) CBaseDatastruct < handle & matlab.mixin.Copyable
                 error('fromYaml:ParseError','YAML parse did not yield a struct.');
             end
 
+            % Convert parsed to ensure no numeric vector/matrix field is a cell
+            strParsed = CBaseDatastruct.ConvertCellsToMatrices_(strParsed);
+
             % Call method to build data from yaml-parsed struct
-            self = self.fromStruct(strParsed, bStrict);
+            self = self.fromStruct(strParsed, true);
         end
 
         function self = fromJson(self, charInputJson, bIsFile, bStrict)
@@ -249,7 +275,7 @@ classdef (Abstract) CBaseDatastruct < handle & matlab.mixin.Copyable
             arguments
                 self
                 charInputJson {mustBeText}
-                bIsFile (1,1) logical {islogical} = []   % Auto-detect if empty
+                bIsFile {mustBeScalarOrEmpty} = []   % Auto-detect if empty
                 bStrict (1,1) logical {islogical} = false
             end
 
@@ -370,8 +396,63 @@ classdef (Abstract) CBaseDatastruct < handle & matlab.mixin.Copyable
 
     end
 
-
+    %% Static methods
     methods (Static, Access = public)
+
+        function strParsedNoCell = ConvertCellsToMatrices_(strParsed)
+            arguments
+                strParsed (1,1) {isstruct}
+            end
+
+            % Initialize output
+            strParsedNoCell = strParsed;
+
+            % Process struct
+            cellFieldnames = fieldnames(strParsed);
+
+            for idF = 1:length(cellFieldnames)
+                charFieldName = cellFieldnames{idF};
+
+                varFieldVal = strParsed.(charFieldName);
+
+                if isstruct(varFieldVal)
+                    % Recursive call for struct
+                    strParsedNoCell.(charFieldName) = CBaseDatastruct.ConvertCellsToMatrices_(varFieldVal);
+
+                elseif iscell(varFieldVal)
+                    % Handle cell field recursively
+                    % try
+                        % Attempt to convert to numeric value first
+                        % if all(cellfun(@(x) isnumeric(x) || islogical(x), varFieldVal(:)))
+                        %     % Flatten nested 1xN cells of numeric/logical into matrix if dimensions align
+                        %     % Example: {{1,2,3},{4,5,6}} → [1 2 3; 4 5 6]
+                        %     varTmpMat = cellfun(@(x) double(x), varFieldVal);
+                        % 
+                        %     if isvector(varTmpMat)
+                        %         % Assign and continue
+                        %         strParsedNoCell.(charFieldName) = varTmpMat;
+                        %         continue;
+                        %     end
+                        % 
+                        % elseif all(cellfun(@(x) iscell(x), varFieldVal))
+                        %     % Check aligning dimensions, if matching, build matrix
+                        %     cellTmpInternalProcessed = CBaseDatastruct.handleCellElement_(varFieldVal);
+                        % 
+                        % end
+
+                    % Recurse into each cell element, then try to collapse
+                    strParsedNoCell.(charFieldName) = CBaseDatastruct.handleCellElement_(varFieldVal);
+                    
+                    % catch
+                    %     % If conversion fails, keep original
+                    %     strParsedNoCell.(charFieldName) = varFieldVal;
+                    % end
+                else
+                    % Primitive: assign directly
+                    strParsedNoCell.(charFieldName) = varFieldVal;
+                end
+            end % Endfor on fields
+        end
 
         function outStruct = toStructStatic(objDatastruct)
             arguments
@@ -441,10 +522,7 @@ classdef (Abstract) CBaseDatastruct < handle & matlab.mixin.Copyable
         function [] = deserialize()
 
         end
-    end
-
-
-    methods (Static, Access = public)
+   
         function strOutputStruct = CleanAndSortStructFields(strInputStruct)
             %CLEANSORTSTRUCTFIELDS Recursively remove empty fields from a struct and sort fields
             %   strOutputStruct = CLEANSORTSTRUCTFIELDS(strInputStruct) takes a struct strInputStruct
@@ -503,7 +581,112 @@ classdef (Abstract) CBaseDatastruct < handle & matlab.mixin.Copyable
     end
 
     methods (Static, Access = private)
-        
+
+        function varOut = handleCellElement_(varIn)
+            arguments
+                varIn
+            end
+
+            %HANDLECELLELEMENT_ Helper for ConvertCellsToMatrices_
+            % Recursively normalize cells that come from YAML lists into
+            % numeric matrices/vectors/tensors when possible.
+            if isstruct(varIn)
+                varOut = CBaseDatastruct.ConvertCellsToMatrices_(varIn);
+                return;
+            end
+
+            if ~iscell(varIn)
+                % Base case: primitive / already-normalized value
+                varOut = varIn;
+                return;
+            end
+
+            % 1) Recurse element-wise first
+            cellRec = cellfun(@(y) CBaseDatastruct.handleCellElement_(y), varIn, 'UniformOutput', false);
+
+            % 2) Struct cells -> struct array if schema matches
+            if ~isempty(cellRec) && all(cellfun(@isstruct, cellRec(:)))
+                try
+                    varOut = reshape([cellRec{:}], size(cellRec));
+                    return;
+                catch
+                    % fall through and keep as cell if concatenation fails
+                end
+            end
+
+            % 3) All strings/chars -> string array
+            if ~isempty(cellRec) && all(cellfun(@(y) isstring(y) || ischar(y), cellRec(:)))
+                try
+                    varOut = string(cellRec);
+                    return;
+                catch
+                    % keep as cell if shapes disagree
+                end
+            end
+
+            % 4) All numeric/logical -> attempt dense conversions
+            isNumLike = @(y) (isnumeric(y) || islogical(y));
+            if ~isempty(cellRec) && all(cellfun(isNumLike, cellRec(:)))
+                % 4.a scalars -> cell2mat directly
+                if all(cellfun(@isscalar, cellRec(:)))
+                    try
+                        varOut = cell2mat(cellRec);
+                        varOut = reshape(varOut, size(cellRec));
+                        return;
+                    catch
+                        % Class mismatch: cast to double then cell2mat
+                        cellCast = cellfun(@double, cellRec, 'UniformOutput', false);
+                        varOut = cell2mat(cellCast);
+                        return;
+                    end
+                end
+
+                % 4.b vectors with identical length -> stack into 2-D
+                if all(cellfun(@isvector, cellRec(:)))
+                    ui32Lengths = cellfun(@numel, cellRec(:));
+                    if isscalar(unique(ui32Lengths))
+                        % Choose orientation based on first element
+                        varFirst = cellRec{1};
+
+                        if isrow(varFirst)
+                            % Row vectors -> rows stacked (M x N)
+                            varOut = vertcat(cellRec{:});
+                        else
+                            % Column vectors -> columns stacked (N x M)
+                            varOut = horzcat(cellRec{:});
+                        end
+                        return;
+                    end
+                end
+
+                % 4.c 2-D matrices with identical size -> 3-D tensor cat along 3rd dim
+                bIsMatrix2D = @(y) isnumeric(y) && ismatrix(y);
+                if all(cellfun(bIsMatrix2D, cellRec(:)))
+                    ui32Size1 = size(cellRec{1});
+                    bHasSameSize = all(cellfun(@(y) isequal(size(y), ui32Size1), cellRec(:)));
+                    
+                    if bHasSameSize
+                        try
+                            varOut = cat(3, cellRec{:});
+                            return;
+                        catch
+                            % As a fallback, preallocate then assign
+                            varOut = zeros([ui32Size1 numel(cellRec)], 'like', cellRec{1});
+                            for idk = 1:numel(cellRec)
+                                varOut(:,:,idk) = cellRec{idk};
+                            end
+                            return;
+                        end
+                    end
+                end
+
+            end
+
+            % 5) If none of the above patterns matched, keep as (normalized) cell
+            varOut = cellRec;
+        end
+
+
         function outValue = convertValue_(inVal)
             % Private helper function to recurse fields when converting objects
             if isobject(inVal) && not(isstring(inVal))
@@ -591,7 +774,8 @@ classdef (Abstract) CBaseDatastruct < handle & matlab.mixin.Copyable
             objMetaProperties = objMeta.PropertyList(idx);
 
             % Determine target class expectation from current value (default)
-            hasDefault = false; charDefaultClass = '';
+            hasDefault = false; 
+            charDefaultClass = '';
             try
                 currVal = self.(charField);
                 if ~isempty(currVal)
