@@ -38,6 +38,7 @@ end
 % 10-04-2025    Pietro Califano     Update of paths definition
 % 03-05-2025    Pietro Califano     Minor revision, add Moon setup
 % 25-08-2025    Pietro Califano     Extend function to work with km and meters based on input options
+% 31-08-2025    Pietro Califano     Define ellipsoidal model for all available bodies
 % -------------------------------------------------------------------------------------------------------------
 %% DEPENDENCIES
 % [-]
@@ -88,6 +89,10 @@ switch enumTargetName
         
         objShapeModel.charTargetUnitOutput = options.charOutputLengthUnits;
 
+        dEllipsoidABC = dLengthScaleCoeff * [0.19884391053956174, 0.15921442216621817, 0.14822745272788257]; % [m] or [km]
+        % DEVNOTE: From Paolo's fitting + conversion from Inertia Tensor with unitary density to semi-axes
+        objShapeModel.dTargetShapeMatrix_OF = diag([1/dEllipsoidABC(1)^2, 1/dEllipsoidABC(2)^2, 1/dEllipsoidABC(3)^2]); % Ellipsoid inverse shape matrix entries [1/a2, 1/b2, 1/c2];
+
     case "Itokawa"
 
         % Define blender model path
@@ -99,6 +104,9 @@ switch enumTargetName
                                 options.bVertFacesOnly, char(enumTargetName));
         objShapeModel.dObjectReferenceSize = dLengthScaleCoeff * 0.161915; % [m] or [km]
         objShapeModel.charTargetUnitOutput = options.charOutputLengthUnits;
+
+        dEllipsoidABC = dLengthScaleCoeff * 1E-3 * 0.5 * [535, 294, 209]; % [m] or [km]
+        objShapeModel.dTargetShapeMatrix_OF = diag([1/dEllipsoidABC(1)^2, 1/dEllipsoidABC(2)^2, 1/dEllipsoidABC(3)^2]); % Ellipsoid inverse shape matrix entries [1/a2, 1/b2, 1/c2];
 
     case "Bennu"
 
@@ -117,6 +125,11 @@ switch enumTargetName
         objShapeModel.dObjectReferenceSize = 245.03 / dInvLengthScaleCoeff; % [m]
         objShapeModel.charTargetUnitOutput = options.charOutputLengthUnits;
 
+        % Define shape matrix in principal TF
+        dEllipsoidABC = dLengthScaleCoeff * 1E-3 * [3395428, 3395428, 3377678]; % [m] or [km]
+        objShapeModel.dTargetShapeMatrix_OF = diag([1/dEllipsoidABC(1)^2, 1/dEllipsoidABC(2)^2, 1/dEllipsoidABC(3)^2]);
+
+
     case "Moon"
 
         % Define blender model path
@@ -131,6 +144,10 @@ switch enumTargetName
         objShapeModel.dObjectReferenceSize = dLengthScaleCoeff * 1737.42; % [m] or [km]
         objShapeModel.charTargetUnitOutput = options.charOutputLengthUnits;
 
+        % Define shape matrix in principal TF
+        dEllipsoidABC = objShapeModel.dObjectReferenceSize * ones(1,3); % [m] or [km]
+        objShapeModel.dTargetShapeMatrix_OF = diag([1/dEllipsoidABC(1)^2, 1/dEllipsoidABC(2)^2, 1/dEllipsoidABC(3)^2]);
+
     case "Mars"
 
         charObjModelFilePath = ""; % None for now
@@ -142,8 +159,8 @@ switch enumTargetName
         objShapeModel.charTargetUnitOutput = options.charOutputLengthUnits;
 
         % Define shape matrix in principal TF
-        dABC = dLengthScaleCoeff * 1E-3 * [3395428, 3395428, 3377678]; % [m] or [km]
-        objShapeModel.dTargetShapeMatrix_OF = diag([1/dABC(1)^2, 1/dABC(2)^2, 1/dABC(3)^2]);
+        dEllipsoidABC = dLengthScaleCoeff * 1E-3 * [3395428, 3395428, 3377678]; % [m] or [km]
+        objShapeModel.dTargetShapeMatrix_OF = diag([1/dEllipsoidABC(1)^2, 1/dEllipsoidABC(2)^2, 1/dEllipsoidABC(3)^2]);
 
         
     case "Ceres" 
@@ -156,8 +173,8 @@ switch enumTargetName
         objShapeModel.charTargetUnitOutput = options.charOutputLengthUnits;
             
         % Define shape matrix in principal TF
-        dABC = dLengthScaleCoeff * 1E-3 * [483.1, 481.0, 445.9]; % [m] or [km]
-        objShapeModel.dTargetShapeMatrix_OF = diag([1/dABC(1)^2, 1/dABC(2)^2, 1/dABC(3)^2]);
+        dEllipsoidABC = dLengthScaleCoeff * 1E-3 * [483.1, 481.0, 445.9]; % [m] or [km]
+        objShapeModel.dTargetShapeMatrix_OF = diag([1/dEllipsoidABC(1)^2, 1/dEllipsoidABC(2)^2, 1/dEllipsoidABC(3)^2]);
 
     case "Dydimos"
         error('Not implemented yet')
