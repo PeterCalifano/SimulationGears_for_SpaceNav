@@ -20,6 +20,7 @@ arguments
     kwargs.bAdd3rdBodiesAttitude    (1,1) logical {isscalar, islogical} = false
     kwargs.bUseInterpFcnFromRCS1    (1,1) logical {isscalar, islogical} = false
     kwargs.bScaleTimeToDays         (1,1) logical {isscalar, islogical} = false
+    kwargs.bUseAbsoluteTimegrid     (1,1) logical {isscalar, islogical} = false;
 end
 %% SIGNATURE
 % [strDynParams, strMainBodyRefData] = EphemeridesDataFactory(dEphemTimegrid, ...
@@ -63,14 +64,14 @@ end
 
 %% Common data
 % Build interpolant timegrid
-if not(kwargs.bUseInterpFcnFromRCS1)
-    % nav-system implementation
+if not(kwargs.bUseInterpFcnFromRCS1) && not(kwargs.bUseAbsoluteTimegrid)
+    % nav-system implementation (relative timestamps)
     dInterpDomain = dEphemTimegrid - dEphemTimegrid(1);
     dDomainLB = min(dInterpDomain);
     dDomainUB = max(dInterpDomain);
 
 else
-    % RCS-1 implementation
+    % RCS-1 implementation (absolute timestamps) or if kwargs.bUseAbsoluteTimegrid is true
     dInterpDomain = dEphemTimegrid;
 
     if kwargs.bScaleTimeToDays
