@@ -83,10 +83,11 @@ classdef CSPICEkerLoader
                     assert( not(isempty( which("InitializeEnv.m") ) ));
 
                     % Remove path to functions
-                    charDirRoot = fileparts(which("InitializeEnv.m"));
-                    rmpath( genpath(fullfile(charDirRoot, "functions")) );
-                    rmpath( genpath(fullfile(charDirRoot, "KLTtest")) );
+                    % charDirRoot = fileparts(which("InitializeEnv.m"));
+                    % rmpath( genpath(fullfile(charDirRoot, "functions")) );
+                    % rmpath( genpath(fullfile(charDirRoot, "KLTtest")) );
                     return
+
                 case EnumScenarioName.Moon
 
                     if strcmpi(charTargetFolderName, "")
