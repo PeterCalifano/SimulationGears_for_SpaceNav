@@ -65,13 +65,13 @@ classdef CAttitudePointingGenerator < handle
                                                                                         options)
             arguments (Input)
                 self
-                dCameraPosition_Frame (3, :) double = self.dCameraPosition_Frame
-                dTargetPosition_Frame (3, :) double = self.dTargetPosition_Frame
+                dCameraPosition_Frame (3,:) double = self.dCameraPosition_Frame
+                dTargetPosition_Frame (3,:) double = self.dTargetPosition_Frame
             end
             arguments (Input)
-                kwargs.dSunPosition_Frame   (3, :) double = self.dSunPosition_Frame;
-                kwargs.dVelocity_Frame      (3, :) double = self.dVelocity_Frame;
-                kwargs.dAuxiliaryAxis       (3, :) double = self.dAuxiliaryAxis;
+                kwargs.dSunPosition_Frame   (3,:) double = self.dSunPosition_Frame;
+                kwargs.dVelocity_Frame      (3,:) double = self.dVelocity_Frame;
+                kwargs.dAuxiliaryAxis       (3,:) double = self.dAuxiliaryAxis;
             end
             arguments (Input)
                 options.enumConstraintType              (1,:) string {mustBeMember(options.enumConstraintType, ["YorthogonalSun", "trackLVLH", "auxiliaryAxis"])} = "YorthogonalSun"
@@ -102,14 +102,34 @@ classdef CAttitudePointingGenerator < handle
 
             % Perform input checks (cosntraint specific)
             if options.enumConstraintType == "YorthogonalSun"
+                % YorthogonalSun constraint
                 assert(ui32NumOfEntries == size(kwargs.dSunPosition_Frame, 2) || size(kwargs.dSunPosition_Frame, 2) == 1)
-                assert( all(vecnorm(kwargs.dSunPosition_Frame, 2, 1) ~= 0 ), "Invalid input data: Sun position cannot be zero for YorthogonalSun contraint type.");
-            
-            elseif options.enumConstraintType == "trackLVLH"
-                assert(ui32NumOfEntries == size(kwargs.dVelocity_Frame, 2) || size(kwargs.dVelocity_Frame, 2) == 1)
-                assert( all(vecnorm(kwargs.dVelocity_Frame, 2, 1) ~= 0 ), "Invalid input data: velocity vectors cannot be zero for trackLVLH contraint type.");
+                assert( all(vecnorm(kwargs.dSunPosition_Frame, 2, 1) ~= 0 ), ...
+                    "Invalid input data: Sun position cannot be zero for YorthogonalSun contraint type.");
 
+                assert(any(vecnorm(kwargs.dSunPosition_Frame) ~= 1, "all"), ['ERROR: invalid Sun positions. ' ...
+                    'Must be provided either when constructing the class or when calling this method.']);
+
+            elseif options.enumConstraintType == "trackLVLH"
+                % trackLVLH constraint 
+                assert(ui32NumOfEntries == size(kwargs.dVelocity_Frame, 2) || size(kwargs.dVelocity_Frame, 2) == 1)
+                assert( all(vecnorm(kwargs.dVelocity_Frame, 2, 1) ~= 0 ), "ERROR: invalid input data: velocity vectors cannot be zero for trackLVLH contraint type.");
+
+            elseif options.enumConstraintType == "auxiliaryAxis"
+                % Normalize if not unit vectors
+                if any(abs(kwargs.dAuxiliaryAxis) > 1)
+                    kwargs.dAuxiliaryAxis = vecnorm(kwargs.dAuxiliaryAxis, 2,1);
+                end
+
+            else
+                % Invalid option
+                error('Invalid constraint type. Must be one of [auxiliaryAxis, trackLVLH, YorthogonalSun]. Got %s.', string(options.enumConstraintType) );
             end
+
+            % Assign temporary variables
+            dSunPosition_Frame_ = kwargs.dSunPosition_Frame;
+            dVelocity_Frame_ = kwargs.dVelocity_Frame;
+            dAuxiliaryAxis_ = kwargs.dAuxiliaryAxis;
 
             % Compute camera boresight from lookAt point
             dLookAtPointFromCam_Frame = dTargetPosition_Frame - dCameraPosition_Frame;
@@ -158,9 +178,9 @@ classdef CAttitudePointingGenerator < handle
             dCamDirY_Frame = self.DefineYaxisFromConstraint(dCameraPosition_Frame, ...
                                                             dCamBoresightZ_Frame, ...
                                                             "enumConstraintType", options.enumConstraintType, ...
-                                                            "dSunPosition_Frame", self.dSunPosition_Frame, ...
-                                                            "dVelocity_Frame", self.dVelocity_Frame, ...
-                                                            "dAuxiliaryAxis", self.dAuxiliaryAxis);
+                                                            "dSunPosition_Frame", dSunPosition_Frame_, ...
+                                                            "dVelocity_Frame", dVelocity_Frame_, ...
+                                                            "dAuxiliaryAxis", dAuxiliaryAxis_);
                                                                      
             if any(isnan(dCamDirY_Frame), 'all')
                 error('Detected "nan" in rotation matrices. Something may have gone wrong in constructing the Y axes. Please check inputs.')
