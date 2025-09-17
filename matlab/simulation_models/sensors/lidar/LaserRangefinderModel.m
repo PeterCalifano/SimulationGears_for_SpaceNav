@@ -91,6 +91,7 @@ dMeasDistance       = -1.0;
 bInsersectionFlag   = false;
 bValidityFlag       = false;
 dIntersectionPoint  = zeros(3,1);
+dMeasErr = 0.0;
 
 if bPointingCheckPassed
 
@@ -111,7 +112,6 @@ end
 % Noise models application
 % TODO (PC): implement noise models (have a look at Hera's model)
 bValidityFlag = true;
-dMeasErr = 0.0;
 
 if bEnableNoiseModels == true
     dMeasErr(:) = LaserRangefinderNoiseModel(dMeasWhiteNoiseSigma, dMeasDistance, dConstantBias);
