@@ -20,7 +20,7 @@ end
 % Function defining a general purpose shape model object from the specified target name as CShapeModel in 
 % SimulationGears repository (https://github.com/PeterCalifano/SimulationGears_for_SpaceNav). 
 % Paths to models for BlenderPyCommManager class are also defined (ACHTUNG: currently HARDCODED).
-% -------------------------------------------------------------------------------------------------------------
+% -----------------------------a--------------------------------------------------------------------------------
 %% INPUT
 % enumTargetName      (1,:) {mustBeA(enumTargetName, ["string", "char", "EnumScenarioName"]), ...
 %                            mustBeMember(enumTargetName, ["Apophis", "Itokawa", "Bennu", "Moon"])}
@@ -76,7 +76,10 @@ switch enumTargetName
         charBlenderModelPath                = fullfile(getenv("HOME"), "devDir/projects-DART/data/rcs-1/phase-C/blender/Apophis_RGB.blend");
         
         % Define shape model object
-        objShapeModel = CShapeModel('file_obj', fullfile(path_to_shape_models, "apophis_v233s7_vert2_new.mod.obj"), ...
+        % charShapeModelObjPath_ = fullfile(path_to_shape_models, "apophis_v233s7_vert2_new.mod.obj");
+        charShapeModelObjPath_ = fullfile(path_to_shape_models, "Apophis_RGB_Centered_Elongated_550m.obj");
+        
+        objShapeModel = CShapeModel('file_obj', charShapeModelObjPath_, ...
             'km', options.charOutputLengthUnits, options.bVertFacesOnly, char(enumTargetName), options.bLoadShapeModel);
 
         try
