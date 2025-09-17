@@ -73,8 +73,11 @@ switch enumTargetName
         bDO_NOT_INIT_RCS1_ENV = true;
         LoadUserConfig;
         % charBlenderModelPath                = fullfile(getenv("HOME"), "devDir/projects-DART/data/rcs-1/phase-C/blender/ApophisParticles.blend");
-        charBlenderModelPath                = fullfile(getenv("HOME"), "devDir/projects-DART/data/rcs-1/phase-C/blender/Apophis_RGB.blend");
-        
+        %charBlenderModelPath                = fullfile(getenv("HOME"), "devDir/projects-DART/data/rcs-1/phase-C/blender/Apophis_RGB.blend");
+        % charBlenderModelPath = fullfile(getenv("HOME"), "devDir/projects-DART/data/rcs-1/phase-C/blender/Apophis_RGB_Centered_Elongated_500m.blend");
+        charBlenderModelPath = fullfile(getenv("HOME"), "devDir/projects-DART/data/rcs-1/phase-C/blender/Apophis_RGB_Centered_Elongated_550m.blend");
+
+
         % Define shape model object
         % charShapeModelObjPath_ = fullfile(path_to_shape_models, "apophis_v233s7_vert2_new.mod.obj");
         charShapeModelObjPath_ = fullfile(path_to_shape_models, "Apophis_RGB_Centered_Elongated_550m.obj");
