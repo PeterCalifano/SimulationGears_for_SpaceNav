@@ -306,7 +306,7 @@ classdef (Abstract) CBaseDatastruct < handle & matlab.mixin.Copyable
 
         function [self] = saveDataToFile(self, charFilename, charFormat)
             arguments
-                self
+                self            (1,:) {mustBeA(self, "CBaseDatastruct")}
                 charFilename    (1,:) string {mustBeA(charFilename, ["string", "char"])} = fullfile('.', lower(string(class(self))));
                 charFormat      (1,:) string {mustBeA(charFormat, ["string", "char"]), mustBeMember(charFormat, ["json", "yaml", "mat", "struct", "yml"])} = "mat"
             end
@@ -319,6 +319,11 @@ classdef (Abstract) CBaseDatastruct < handle & matlab.mixin.Copyable
             fprintf("\nSaving datastruct to file %s in format %s...", charFilename, charFormat);
 
             [charRootFolder, charFilename_, charFileExt] = fileparts(charFilename);
+
+            % Handle arrays of objects
+            if length(self) > 1
+                error('Arrays of objects are currently not handled. Please call method on a single instance')
+            end
 
             if not(exist(charRootFolder, "dir"))
                 mkdir(charRootFolder)
