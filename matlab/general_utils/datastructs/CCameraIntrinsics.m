@@ -75,6 +75,46 @@ classdef CCameraIntrinsics < cameraIntrinsics
 
     methods (Static, Access = public)
 
+        function self = fromCameraIntrinsics(objCameraIntrinsics, ui32NumOfChannels)
+            % BuildFromParent  Create CCameraIntrinsics from cameraIntrinsics
+            % Inputs:
+            %   objCameraIntrinsics (1,1) cameraIntrinsics
+            %   ui32NumOfChannels   (1,1) uint32 = 1
+            arguments
+                objCameraIntrinsics (1,1) {mustBeA(objCameraIntrinsics, "cameraIntrinsics")}
+                ui32NumOfChannels   (1,1) uint32 = 1
+            end
+
+            % Normalize shapes to 1x2 row doubles
+            dFocalLength_uv    = reshape(double(objCameraIntrinsics.FocalLength),    1, 2);
+            dPrincipalPoint_uv = reshape(double(objCameraIntrinsics.PrincipalPoint), 1, 2);
+            dImageSizeHW       = reshape(double(objCameraIntrinsics.ImageSize),      1, 2);
+
+            % Construct derived object (FoV and IFOV computed in ctor)
+            self = CCameraIntrinsics(dFocalLength_uv, dPrincipalPoint_uv, dImageSizeHW, ui32NumOfChannels);
+
+            % Best-effort copy of optional calibration fields (if available)
+            % Safe if read-only in superclass; errors ignored by try blocks
+            if isprop(objCameraIntrinsics, 'RadialDistortion') && isprop(self, 'RadialDistortion')
+                try 
+                    self.RadialDistortion = objCameraIntrinsics.RadialDistortion; 
+                catch
+                end
+            end
+            if isprop(objCameraIntrinsics, 'TangentialDistortion') && isprop(self, 'TangentialDistortion')
+                try
+                    self.TangentialDistortion = objCameraIntrinsics.TangentialDistortion; 
+                catch
+                end
+            end
+            if isprop(objCameraIntrinsics, 'Skew') && isprop(self, 'Skew')
+                try
+                    self.Skew = objCameraIntrinsics.Skew; 
+                catch
+                end
+            end
+        end
+
         function [dFocalLengthInPix] = computeFocalLenghInPix(dFov, dSensorSize, enumInputUnit)
             arguments
                 dFov        (:,1) double

@@ -138,7 +138,38 @@ classdef CShapeModel < CBaseDatastruct
         end
         
         %% PUBLIC METHODS
-        % None for now
+        function [objFig] = visualizeMesh(self)
+            arguments
+                self
+            end
+
+            objFig = gobjects(1,1);
+            if self.bHasData_
+                objFig = figure;
+                hold on
+                scatter3(self.dVerticesPos(1,:), self.dVerticesPos(2,:), self.dVerticesPos(3,:), ...
+                        'black', 'filled');
+
+                % Options
+                objCurrentAx = gca();
+
+                objCurrentAx.XMinorTick = 'on';
+                objCurrentAx.YMinorTick = 'on';
+                objCurrentAx.LineWidth = 1.05;
+                objCurrentAx.LineWidth = 1.05;
+                ylim('tickaligned');
+                xlim('tight')
+
+                xlabel('X');
+                ylabel('Y');
+                zlabel('Z');
+                axis equal
+                
+            else
+                warning('Visualization method called without any loaded data. Nothing will be shown.')
+            end
+
+        end
     end
 
     methods (Access = protected)
