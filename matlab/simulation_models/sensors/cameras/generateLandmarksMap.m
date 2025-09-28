@@ -42,6 +42,8 @@ function o_dLMposMap = generateLandmarksMap(i_strShapeModel, i_dSamplingGrid)%#c
 assert(size(i_strShapeModel.dVerticesPos, 1) == 3, 'Input shape model point cloud must be [3xN].');
 
 if not(isscalar(i_dSamplingGrid))
+    
+    % DEVNOTE: ACHTUNG, this branch never tested sufficiently. Legacy function to avoid.
 
     assert(size(i_dSamplingGrid, 2) == 4, 'Input sampling grid must be [Mx4].');
 

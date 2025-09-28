@@ -2,6 +2,18 @@
 	"folders": [
 		{
 			"path": "."
+		},
+		{
+			"path": "../EstimationGears_for_SpaceNav"
+		},
+		{
+			"path": "../CommManagersIndex/CommManager4MATLAB"
+		},
+		{
+			"path": "../simulationUtils"
 		}
-	]
+	],
+	"settings": {
+		"fortran.fortls.disabled": true
+	}
 }

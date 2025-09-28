@@ -4,7 +4,9 @@ classdef EnumScenarioName
 % MATLAB simulation environment.
 % -------------------------------------------------------------------------------------------------------------
 %% CHANGELOG
-% 17-08-2024        Pietro Califano        Class definition.
+% 17-08-2024    Pietro Califano     Class definition.
+% 12-02-2025    Pietro Califano     Add Apophis for RCS1
+% 30-06-2025    Pietro Califano     Extend to support new version of generation programs.
 % -------------------------------------------------------------------------------------------------------------
 %% DEPENDENCIES
 % [-]
@@ -15,10 +17,18 @@ classdef EnumScenarioName
 %% Function code
 
 enumeration
-    Didymos_Hera
+    Didymos
     Itokawa
-    % Eros_NEAR
-    Bennu_OREx
+    ItokawaModified
+    Eros
+    Bennu
+    Apophis
+    ApophisElongated
+    Moon
+    Mars
+    Ceres
+    NotDefined
+    Earth
 end
 
 end

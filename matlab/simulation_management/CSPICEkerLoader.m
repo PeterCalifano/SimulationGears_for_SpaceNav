@@ -6,6 +6,7 @@ classdef CSPICEkerLoader
 % -------------------------------------------------------------------------------------------------------------
 %% CHANGELOG
 % 17-08-2024        Pietro Califano         Initial class definition with default values
+% 09-05-2025        Pietro Califano         Minor improvements for usability
 % -------------------------------------------------------------------------------------------------------------
 %% DEPENDENCIES
 % CSPICE mice
@@ -21,8 +22,8 @@ classdef CSPICEkerLoader
     end
 
     properties (Access = private)
-        defaultTargetNames = {'Didymos_Hera', 'Itokawa', 'Bennu_OREx'};
-        defaultTargetPaths = {"Milani_KERNELS", "Itokawa", "Bennu_OREx"};
+        defaultTargetNames = {'Didymos', 'Itokawa', 'Bennu', 'Apophis', 'Moon'};
+        defaultTargetPaths = {"Milani_KERNELS", "Itokawa", "Bennu_OREx", "", ""};
         defaultTargetsDict;
     end
 
@@ -30,11 +31,12 @@ classdef CSPICEkerLoader
     methods (Access = public)
 
         % CONSTRUCTOR
-        function self = CSPICEkerLoader(KERNELS_BASE_PATH, enumScenarioName, targetFolderName)
+        function self = CSPICEkerLoader(charKERNELS_BASE_PATH, enumScenarioName, bLoadCommonKernels, charTargetFolderName)
             arguments
-                KERNELS_BASE_PATH
-                enumScenarioName
-                targetFolderName (1,1) {isstring, ischar} = ""
+                charKERNELS_BASE_PATH
+                enumScenarioName     (1,:) string {mustBeA(enumScenarioName, ["EnumScenarioName", "string", "char"])}
+                bLoadCommonKernels   (1,1) logical {islogical} = false;
+                charTargetFolderName (1,1) {isstring, ischar} = "";
             end
                     
             % Define dictionary of (names, paths) to avoid it being shared
@@ -45,51 +47,73 @@ classdef CSPICEkerLoader
             % TODO
             
             % Store kernels base path
-            self.KERNELS_BASE_PATH_ = KERNELS_BASE_PATH;
-        
+            assert(isfolder(charKERNELS_BASE_PATH), 'ERROR: specified path is not a valid or existing folder');
+            self.KERNELS_BASE_PATH_ = charKERNELS_BASE_PATH;
+            
             % Clear all previously loaded kernels
             cspice_kclear();
 
-            % Load common kernels
-            cd(fullfile(self.KERNELS_BASE_PATH_, 'common/'));
-            cspice_furnsh('mkcommon.mk');
-                
             % Assign scenario specific data
             switch enumScenarioName
 
-                case EnumScenarioName.Didymos_Hera
+                case EnumScenarioName.Didymos
                     
-                    if strcmpi(targetFolderName, "")
-                        targetFolderName = self.defaultTargetsDict('Didymos_Hera');
+                    if strcmpi(charTargetFolderName, "")
+                        charTargetFolderName = self.defaultTargetsDict('Didymos');
                     end
 
                 case EnumScenarioName.Itokawa
 
-                    if strcmpi(targetFolderName, "")
-                        targetFolderName = self.defaultTargetsDict('Itokawa');
+                    if strcmpi(charTargetFolderName, "")
+                        charTargetFolderName = self.defaultTargetsDict('Itokawa');
                     end
 
-                case EnumScenarioName.Bennu_OREx
+                case EnumScenarioName.Bennu
 
-                    if strcmpi(targetFolderName, "")
-                        targetFolderName = self.defaultTargetsDict('Bennu_OREx');
+                    if strcmpi(charTargetFolderName, "")
+                        charTargetFolderName = self.defaultTargetsDict('Bennu');
                     end
                     
+                case EnumScenarioName.Apophis
+
+                    if strcmpi(charTargetFolderName, "")
+                        charTargetFolderName = self.defaultTargetsDict('Apophis');
+                    end
+                
+                    assert( not(isempty( which("InitializeEnv.m") ) ));
+
+                    % Remove path to functions
+                    % charDirRoot = fileparts(which("InitializeEnv.m"));
+                    % rmpath( genpath(fullfile(charDirRoot, "functions")) );
+                    % rmpath( genpath(fullfile(charDirRoot, "KLTtest")) );
+                    return
+
+                case EnumScenarioName.Moon
+
+                    if strcmpi(charTargetFolderName, "")
+                        charTargetFolderName = self.defaultTargetsDict('Moon');
+                    end
+                    return
+                    % error('Nots added yet')
                 otherwise
-                    error("enumScenarioName is not a valid scenario.")
+                    error("Scenario %s is not a valid scenario. Please make sure the name is capitalized but lower, like 'Itokawa'.", enumScenarioName)
             end
             
-            
             % Move to kernels base folder to load metakernel            
-            tmpMKpath = char(fullfile(self.KERNELS_BASE_PATH_, targetFolderName, 'mk'));
+            charTmpMKpath = char(fullfile(self.KERNELS_BASE_PATH_, charTargetFolderName, 'mk'));
      
-            cd(tmpMKpath);
+            cd(charTmpMKpath);
             cspice_furnsh('metakernel.mk'); % Load kernels
             cd(self.projectDir);
 
+            if bLoadCommonKernels == true
+                % Load common kernels
+                cd(fullfile(self.KERNELS_BASE_PATH_, 'common/'));
+                cspice_furnsh('mkcommon.mk');
+            end
+
             % Print number of loaded kernels
             fprintf("Total number of loaded kernels: %d\n", cspice_ktotal('all'))
-
             % TODO: add info to specify type of kernels loaded
         end    
     
