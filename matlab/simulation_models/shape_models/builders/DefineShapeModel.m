@@ -72,7 +72,7 @@ switch enumTargetName
     case "Apophis"
         % DEVNOTE: currently assumes rcs-1 simulator loader
         bDO_NOT_INIT_RCS1_ENV = true;
-        LoadUserConfig;
+        LoadUserConfig; % Required for some variables (may be removed)
         % charBlenderModelPath                = fullfile(getenv("HOME"), "devDir/projects-DART/data/rcs-1/phase-C/blender/ApophisParticles.blend");
         %charBlenderModelPath                = fullfile(getenv("HOME"), "devDir/projects-DART/data/rcs-1/phase-C/blender/Apophis_RGB.blend");
         % charBlenderModelPath = fullfile(getenv("HOME"), "devDir/projects-DART/data/rcs-1/phase-C/blender/Apophis_RGB_Centered_Elongated_500m.blend");
@@ -80,9 +80,15 @@ switch enumTargetName
 
 
         % Define shape model object
-        % charShapeModelObjPath_ = fullfile(path_to_shape_models, "apophis_v233s7_vert2_new.mod.obj");
-        charShapeModelObjPath_ = fullfile(path_to_shape_models, "Apophis_RGB_Centered_Elongated_550m.obj");
-        
+        if not(options.bLoadModifiedVariant)
+            charBlenderModelPath   = fullfile(getenv("HOME"), "devDir/projects-DART/data/rcs-1/phase-C/blender/Apophis_RGB_smoothed.blend");
+            charShapeModelObjPath_ = fullfile(getenv("HOME"), path_to_shape_models, "Apophis_RGB_Centered_MeanSize.obj");
+                        % charShapeModelObjPath_ = fullfile(path_to_shape_models, "apophis_v233s7_vert2_new.mod.obj");
+        else
+            charBlenderModelPath   = fullfile(getenv("HOME"), "devDir/projects-DART/data/rcs-1/phase-C/blender/Apophis_RGB_Centered_Elongated_550m.blend");
+            charShapeModelObjPath_ = fullfile(path_to_shape_models, "Apophis_RGB_Centered_Elongated_550m.obj");
+        end
+
         objShapeModel = CShapeModel('file_obj', charShapeModelObjPath_, ...
             'km', options.charOutputLengthUnits, options.bVertFacesOnly, char(enumTargetName), options.bLoadShapeModel);
 
