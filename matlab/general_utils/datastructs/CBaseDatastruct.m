@@ -13,17 +13,15 @@ classdef (Abstract) CBaseDatastruct < handle & matlab.mixin.Copyable
     % 25-08-2025    Pietro Califano     [MAJOR] Implement prototype methods "from" struct and yaml.
     %                                   Development of release version still open.
     % 27-08-2025    Pietro Califano     Minor improvement to avoid unnecessary warning.
+    % 28-09-2025    Pietro Califano     Extend functionalities to fully support static usage of the class
     % -------------------------------------------------------------------------------------------------------------
     %% METHODS
     % [-]
     % -------------------------------------------------------------------------------------------------------------
     %% PROPERTIES
-    % TODO
+    % See output of properties()
     % -------------------------------------------------------------------------------------------------------------
     %% DEPENDENCIES
-    % [-]
-    % -------------------------------------------------------------------------------------------------------------
-    %% Future upgrades
     % [-]
     % -------------------------------------------------------------------------------------------------------------
 
@@ -36,10 +34,8 @@ classdef (Abstract) CBaseDatastruct < handle & matlab.mixin.Copyable
     methods (Access = public)
         % CONSTRUCTOR
         function self = CBaseDatastruct()
-            arguments
-                
+            arguments  
             end
-        
         end
             
         % GETTERS
@@ -81,14 +77,17 @@ classdef (Abstract) CBaseDatastruct < handle & matlab.mixin.Copyable
         % METHODS
         % Dump "to" methods
         function strData = toStruct(self)
+            arguments
+                self {mustBeA(self, "CBaseDatastruct")}
+            end
             % Dump to data struct
             strData = CBaseDatastruct.toStructStatic(self);
         end
        
         function [charYamlString] = toYaml(self, bSaveAsWrapped)
             arguments
-                self
-                bSaveAsWrapped {islogical, isscalar} = false
+                self           {CBaseDatastruct.validateObjectOrStruct_(self), mustBeA(self, "CBaseDatastruct")}
+                bSaveAsWrapped {mustBeNumericOrLogical, mustBeScalarOrEmpty} = false
             end
             % Check yaml package is available
             if isempty( which('yaml.dumpFile') )
@@ -97,22 +96,17 @@ classdef (Abstract) CBaseDatastruct < handle & matlab.mixin.Copyable
 
             % Determine name of saved object
             charClassName = class(self);
-            charClassName = strcat("obj",charClassName);
+            charClassName = strcat("obj", charClassName);
 
-            if bSaveAsWrapped
-                % Recursively convert to strOut first
-                strTmp.(charClassName) = self.toStruct();
-            else
-                strTmp = self.toStruct();
-            end
-
-            % Emit a YAML string
-            charYamlString = yaml.dump(strTmp, "auto");
+            % Call static method implementation
+            [charYamlString] = CBaseDatastruct.toYamlStatic(self, bSaveAsWrapped, charClassName);
 
         end
 
         function [charJsonString] = toJson(self)
-
+            arguments
+                self {mustBeA(self, "CBaseDatastruct")}
+            end
             % Recursively convert to strOut first
             strData = self.toStruct();
 
@@ -202,7 +196,7 @@ classdef (Abstract) CBaseDatastruct < handle & matlab.mixin.Copyable
             % were dumped from a vector/matrix/array and loaded by yaml as cells of cells or not.
 
             arguments
-                self
+                self (1,1) {mustBeA(self, "CBaseDatastruct")}
                 charInputYaml {mustBeText}
                 bIsFile  logical {islogical} = []   % Auto-detect if empty
                 bStrict (1,1) logical {islogical} = false
@@ -273,12 +267,12 @@ classdef (Abstract) CBaseDatastruct < handle & matlab.mixin.Copyable
         function self = fromJson(self, charInputJson, bIsFile, bStrict)
             %FROMJSON Populate *this* from JSON (string or file)
             arguments
-                self
+                self (1,1) {mustBeA(self, "CBaseDatastruct")}
                 charInputJson {mustBeText}
                 bIsFile {mustBeScalarOrEmpty} = []   % Auto-detect if empty
                 bStrict (1,1) logical {islogical} = false
             end
-
+            % ACHTUNG: implementation not fully tested!
             if isempty(bIsFile)
                 bIsFile = isfile(string(charInputJson));
             end
@@ -304,11 +298,14 @@ classdef (Abstract) CBaseDatastruct < handle & matlab.mixin.Copyable
             self = self.fromStruct(strParsed, bStrict);
         end
 
-        function [self] = saveDataToFile(self, charFilename, charFormat)
+        function [self] = saveDataToFile(self, charFilename, charFormat, kwargs)
             arguments
                 self            (1,:) {mustBeA(self, "CBaseDatastruct")}
                 charFilename    (1,:) string {mustBeA(charFilename, ["string", "char"])} = fullfile('.', lower(string(class(self))));
                 charFormat      (1,:) string {mustBeA(charFormat, ["string", "char"]), mustBeMember(charFormat, ["json", "yaml", "mat", "struct", "yml"])} = "mat"
+            end
+            arguments
+                kwargs.bSaveAsWrapped (1,1) logical = false;
             end
 
             if charFormat == "yml"
@@ -371,7 +368,7 @@ classdef (Abstract) CBaseDatastruct < handle & matlab.mixin.Copyable
                         error('YAML toolbox not found. Please install Martin Koch''s yaml and add it to your MATLAB path.');
                     end
                     
-                    charYamlParsed = self.toYaml();
+                    charYamlParsed = self.toYaml(kwargs.bSaveAsWrapped);
                     
                     % Write file to disk
                     fileID = fopen(charFilename, 'w');
@@ -404,9 +401,10 @@ classdef (Abstract) CBaseDatastruct < handle & matlab.mixin.Copyable
     %% Static methods
     methods (Static, Access = public)
 
+        %%% Static methods implementations
         function strParsedNoCell = ConvertCellsToMatrices_(strParsed)
             arguments
-                strParsed (1,1) {isstruct}
+                strParsed (1,1) {CBaseDatastruct.validateObjectOrStruct_(strParsed)}
             end
 
             % Initialize output
@@ -461,7 +459,7 @@ classdef (Abstract) CBaseDatastruct < handle & matlab.mixin.Copyable
 
         function outStruct = toStructStatic(objDatastruct)
             arguments
-                objDatastruct (:,1)
+                objDatastruct (:,1) {CBaseDatastruct.validateObjectOrStruct_(objDatastruct)}
             end
 
             % Disable warning temporarily
@@ -489,45 +487,42 @@ classdef (Abstract) CBaseDatastruct < handle & matlab.mixin.Copyable
             % Remove empty fields and order struct
             outStruct = CBaseDatastruct.CleanAndSortStructFields(outStruct);
         end
-    
-
-        % TODO ------------------
-        function objDatastruct = fromStructStatic(strDatastruct, charTargetDatastruct) % TBC, better if abstract?
-            arguments (Input)
-                strDatastruct % either yaml string or path to yaml file
-                charTargetDatastruct % Specify name of target data struct
-            end
-            arguments (Output)
-                objDatastruct (1,1) {isa(objDatastruct, 'CBaseDatastruct')}
-            end
-
-            % Method to convert struct to class (with fields check)
-
-        end
-
-        function [] = fromYamlStatic(charInputFile)
-            arguments
-                charInputFile % either yaml string or path to yaml file
-            end
-            % TODO, requires yaml package. Re-use code from operative dataset generation
-        end
-
-        function [] = fromJsonStatic(charInputFile)
-            arguments
-                charInputFile % either json string or path to json file
-            end
-            % TODO, use JSON (MATLAB)
-        end
-
-        % TODO with protobuf or msgpack
-        function [] = serialize()
-
-        end
-
-        function [] = deserialize()
-
-        end
    
+        function [charYamlString] = toYamlStatic(objDatastruct, bSaveAsWrapped, charDataName)
+            arguments
+                objDatastruct  {CBaseDatastruct.validateObjectOrStruct_(objDatastruct)}
+                bSaveAsWrapped {mustBeNumericOrLogical, mustBeScalarOrEmpty} = false
+                charDataName   {mustBeText} = "varDatastruct";
+            end
+            % Check yaml package is available
+            if isempty( which('yaml.dumpFile') )
+                error('YAML toolbox not found. Please install Martin Koch''s yaml and add it to your MATLAB path.');
+            end
+
+            if bSaveAsWrapped
+                % Recursively convert to strOut first
+                strTmp.(charDataName) = CBaseDatastruct.toStructStatic(objDatastruct);
+            else
+                strTmp = CBaseDatastruct.toStructStatic(objDatastruct);
+            end
+
+            % Emit a YAML string
+            charYamlString = yaml.dump(strTmp, "auto");
+        end
+
+        function [charJsonString] = toJsonStatic(objDatastruct)
+            arguments
+                objDatastruct {CBaseDatastruct.validateObjectOrStruct_(objDatastruct)}
+            end
+
+            % Recursively convert to strOut first
+            strData = CBaseDatastruct.toStructStatic(objDatastruct);
+
+            % Parse to JSON
+            charJsonString = jsonencode(strData, "PrettyPrint", true);
+        end
+
+        %%% Struct handling functionalities
         function strOutputStruct = CleanAndSortStructFields(strInputStruct)
             %CLEANSORTSTRUCTFIELDS Recursively remove empty fields from a struct and sort fields
             %   strOutputStruct = CLEANSORTSTRUCTFIELDS(strInputStruct) takes a struct strInputStruct
@@ -535,7 +530,7 @@ classdef (Abstract) CBaseDatastruct < handle & matlab.mixin.Copyable
             %   All nested structs are cleaned recursively, and their fields are sorted alphabetically.
 
             arguments
-                strInputStruct (1,1) struct   % Input struct to clean and sort
+                strInputStruct (1,1) {CBaseDatastruct.validateObjectOrStruct_(strInputStruct)}   % Input struct to clean and sort
             end
 
             % Initialize output as a copy of the input
@@ -583,6 +578,142 @@ classdef (Abstract) CBaseDatastruct < handle & matlab.mixin.Copyable
             end
         end
 
+        %%% Static method to save data (from input object or struct) TODO
+        function [objDatastruct] = saveDataToFileStatic(objDatastruct, charFilename, charFormat, charClassName, kwargs)
+            arguments
+                objDatastruct   (1,:) {CBaseDatastruct.validateObjectOrStruct_(objDatastruct)}
+                charFilename    (1,:) string {mustBeA(charFilename, ["string", "char"])} = fullfile('.', lower(string(class(objDatastruct))));
+                charFormat      (1,:) string {mustBeA(charFormat, ["string", "char"]), mustBeMember(charFormat, ["json", "yaml", "mat", "struct", "yml"])} = "mat"
+                charClassName   (1,:) char {mustBeText} = "varDatastruct"
+            end
+            arguments
+                kwargs.bSaveAsWrapped (1,1) logical = false;
+            end
+
+            if charFormat == "yml"
+                charFormat = "yaml"; % To allow both formats
+            end
+
+            % Ensure name is a valid matlab name
+            charClassName = matlab.lang.makeValidName(charClassName);
+
+            % Object saving method
+            fprintf("\nSaving datastruct to file %s in format %s...", charFilename, charFormat);
+
+            [charRootFolder, charFilename_, charFileExt] = fileparts(charFilename);
+
+            % Handle arrays of objects
+            if length(objDatastruct) > 1
+                error('Arrays of objects are currently not handled. Please call method on a single instance')
+            end
+
+            if not(isfolder(charRootFolder))
+                mkdir(charRootFolder)
+            end
+
+            if strcmpi(charRootFolder, '')
+                charRootFolder = '.';
+                charFilename = fullfile( charRootFolder, strcat(charFilename_, charFileExt) );
+            end
+
+            % Save according to requested format
+            switch charFormat
+
+                case "mat"
+                    if isempty(charFileExt) || strcmpi(charFileExt, "")
+                        charFilename = strcat(charFilename, '.mat');
+                    end
+
+                    strTmp.(charClassName) = self;
+                    save(charFilename, "-struct", "strTmp"); % Save content of strTmp
+
+                case "struct"
+                    if isempty(charFileExt) || strcmpi(charFileExt, "")
+                        charFilename = strcat(charFilename, '.mat');
+                    end
+                    warning(['This may be a lossy saving, as all properties that contain objects may be lost ' ...
+                        'if cannot be converted to struct. Prefer using .mat format directly if possible.'])
+
+                    strData = CBaseDatastruct.toStructStatic(objDatastruct);
+
+                    strTmp.(charClassName) = strData;
+                    save(charFilename, "-struct", "strTmp"); % Save content of strTmp
+
+                case "yaml"
+                    if isempty(charFileExt) || strcmpi(charFileExt, "")
+                        charFilename = strcat(charFilename, '.yml');
+                    end
+
+                    % Check yaml package is available
+                    if isempty( which('yaml.dumpFile') )
+                        error('YAML toolbox not found. Please install Martin Koch''s yaml and add it to your MATLAB path.');
+                    end
+
+                    charYamlParsed = CBaseDatastruct.toYamlStatic(objDatastruct, kwargs.bSaveAsWrapped, charClassName);
+
+                    % Write file to disk
+                    fileID = fopen(charFilename, 'w');
+                    fwrite(fileID, charYamlParsed, 'char');
+                    fclose(fileID);
+
+                case "json"
+                    if isempty(charFileExt) || strcmpi(charFileExt, "")
+                        charFilename = strcat(charFilename, '.json');
+                    end
+
+                    charJsonParsed = CBaseDatastruct.toJsonStatic(objDatastruct);
+
+                    % Write to file
+                    fileID = fopen(charFilename, 'w');
+                    fprintf(fileID, charJsonParsed, 'char');
+                    fclose(fileID);
+
+                otherwise
+                    error('Invalid selected format.')
+
+            end
+
+            fprintf(" DONE.\n");
+
+        end
+      
+        % TODO ------------------
+        function objDatastruct = fromStructStatic(strDatastruct, charTargetDatastruct) % TBC, better if abstract?
+            arguments (Input)
+                strDatastruct % either yaml string or path to yaml file
+                charTargetDatastruct % Specify name of target data struct
+            end
+            arguments (Output)
+                objDatastruct (1,1) {isa(objDatastruct, 'CBaseDatastruct')}
+            end
+
+            % Method to convert struct to class (with fields check)
+
+        end
+
+        function [] = fromYamlStatic(charInputFile)
+            arguments
+                charInputFile % either yaml string or path to yaml file
+            end
+            % TODO, requires yaml package. Re-use code from operative dataset generation
+        end
+
+        function [] = fromJsonStatic(charInputFile)
+            arguments
+                charInputFile % either json string or path to json file
+            end
+            % TODO, use JSON (MATLAB)
+        end
+
+        % TODO with protobuf or msgpack
+        function [] = serialize()
+
+        end
+
+        function [] = deserialize()
+
+        end
+   
     end
 
     methods (Static, Access = private)
@@ -690,7 +821,6 @@ classdef (Abstract) CBaseDatastruct < handle & matlab.mixin.Copyable
             % 5) If none of the above patterns matched, keep as (normalized) cell
             varOut = cellRec;
         end
-
 
         function outValue = convertValue_(inVal)
             % Private helper function to recurse fields when converting objects
@@ -893,7 +1023,12 @@ classdef (Abstract) CBaseDatastruct < handle & matlab.mixin.Copyable
             % Default: assign verbatim
             self.(charField) = varValueIn;
         end
+    
+        function [bIsObject] = validateObjectOrStruct_(objDatastruct)
+            bIsObject = isobject(objDatastruct) || isstruct(objDatastruct) || isa(objDatastruct, "CBaseDatastruct");
+        end
     end
+
 
 end
 

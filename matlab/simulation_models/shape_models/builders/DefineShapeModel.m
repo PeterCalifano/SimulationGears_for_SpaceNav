@@ -21,10 +21,10 @@ end
 % Function defining a general purpose shape model object from the specified target name as CShapeModel in 
 % SimulationGears repository (https://github.com/PeterCalifano/SimulationGears_for_SpaceNav). 
 % Paths to models for BlenderPyCommManager class are also defined (ACHTUNG: currently HARDCODED).
-% -----------------------------a--------------------------------------------------------------------------------
+% -------------------------------------------------------------------------------------------------------------
 %% INPUT
-% enumTargetName      (1,:) {mustBeA(enumTargetName, ["string", "char", "EnumScenarioName"]), ...
-%                            mustBeMember(enumTargetName, ["Apophis", "Itokawa", "Bennu", "Moon"])}
+% enumTargetName                    (1,:) {mustBeA(enumTargetName, ["string", "char", "EnumScenarioName"]), ...
+%                                          mustBeMember(enumTargetName, ["Apophis", "Itokawa", "Bennu", "Moon"])}
 % charDataRootPath                  (1,:) string = fullfile(getenv("HOME"), "devDir/nav-backend/simulationCodes/data/SPICE_kernels")
 % charBpyRootPath                   (1,:) string = fullfile(getenv("HOME"), "devDir/rendering-sw/corto_PeterCdev")
 % options.bVertFacesOnly            (1,1) {islogical} = true;
@@ -47,6 +47,7 @@ end
 %% Future upgrades
 % TODO: remove hardcoded path (add as input root of all data!)
 % -------------------------------------------------------------------------------------------------------------
+
 %% Function code
 
 % Assert path existent
@@ -68,7 +69,6 @@ elseif strcmpi(options.charOutputLengthUnits, "m")
 end
 
 switch enumTargetName
-
     case "Apophis"
         % DEVNOTE: currently assumes rcs-1 simulator loader
         bDO_NOT_INIT_RCS1_ENV = true;
@@ -76,8 +76,6 @@ switch enumTargetName
         % charBlenderModelPath                = fullfile(getenv("HOME"), "devDir/projects-DART/data/rcs-1/phase-C/blender/ApophisParticles.blend");
         %charBlenderModelPath                = fullfile(getenv("HOME"), "devDir/projects-DART/data/rcs-1/phase-C/blender/Apophis_RGB.blend");
         % charBlenderModelPath = fullfile(getenv("HOME"), "devDir/projects-DART/data/rcs-1/phase-C/blender/Apophis_RGB_Centered_Elongated_500m.blend");
-        charBlenderModelPath = fullfile(getenv("HOME"), "devDir/projects-DART/data/rcs-1/phase-C/blender/Apophis_RGB_Centered_Elongated_550m.blend");
-
 
         % Define shape model object
         if not(options.bLoadModifiedVariant)

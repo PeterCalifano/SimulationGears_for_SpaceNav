@@ -19,9 +19,11 @@ classdef EnumScenarioName
 enumeration
     Didymos
     Itokawa
+    ItokawaModified
     Eros
     Bennu
     Apophis
+    ApophisElongated
     Moon
     Mars
     Ceres
