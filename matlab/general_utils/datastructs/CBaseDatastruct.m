@@ -400,6 +400,26 @@ classdef (Abstract) CBaseDatastruct < handle & matlab.mixin.Copyable
 
     %% Static methods
     methods (Static, Access = public)
+        function strOutputData = FlattenArrayInStruct(strInputData)
+            arguments
+                strInputData (1,1) struct
+            end
+            % FlattenArrayInStruct
+            % Flatten arrays in a struct recursively.
+            % - Non-vectors -> flattened in column-major order, returned as row.
+            % - Column vectors -> returned as row.
+            % - Row vectors -> unchanged.
+            % - Scalars -> unchanged shape (1x1).
+            % - Applies to numeric, logical, char, string, datetime, duration, categorical.
+            % - Recurse into structs and cells. Leaves tables/timetables unchanged.
+
+            % Flatten all fields
+            strOutputData = strInputData; % Initialize struct fields
+
+            % TODO handle recursion
+            strOutputData = FlattenValue_(strOutputData);
+
+        end
 
         %%% Static methods implementations
         function strParsedNoCell = ConvertCellsToMatrices_(strParsed)
@@ -717,6 +737,60 @@ classdef (Abstract) CBaseDatastruct < handle & matlab.mixin.Copyable
     end
 
     methods (Static, Access = private)
+
+        function varOut = FlattenValue_(varInput)
+            arguments
+                varInput
+            end
+            % Local helper function for flattening of arrays
+            if isstruct(varInput)
+                % Handle struct arrays elementwise
+                varOut = varInput;
+
+                for idK = 1:numel(varInput)
+                    cellFields = fieldnames(varInput(idK));
+
+                    for idF = 1:numel(cellFields)
+                        charField_ = cellFields{idF};
+                        varOut(idK).(charField_) = FlattenValue_(varInput(idK).(charField_));
+                    end
+                end
+
+                return
+
+            elseif iscell(varInput)
+                % Handle cell object
+                varOut = cell(size(varInput));
+
+                for idK = 1:numel(varInput)
+                    varOut{idK} = FlattenValue_(varInput{idK});
+                end
+
+                return
+
+            elseif istable(varInput) || isa(varInput,'timetable') || isa(varInput,'containers.Map') || isobject(varInput)
+                % Leave tables/timetables/containers.Map and objects as-is
+                varOut = varInput;
+                return
+
+
+            elseif isnumeric(varInput) || islogical(varInput) || ischar(varInput) || isstring(varInput) || isdatetime(varInput) || isduration(varInput) || iscategorical(varInput)
+                % Arrays to flatten: numeric, logical, char, string, datetime, duration, categorical
+                % MATLAB linear indexing is column-major; reshape(1,[]) preserves that order and yields a row.
+                try
+                    varOut = reshape(varInput, 1, []);
+                catch
+                    % Fallback for edge cases (e.g., empty size handling on some types)
+                    varOut = transpose(varInput(:));
+                end
+                return
+
+            end
+
+            % Default: pass through
+            varOut = varInput;
+
+        end
 
         function varOut = handleCellElement_(varIn)
             arguments
