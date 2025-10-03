@@ -12,6 +12,7 @@ arguments
     options.bVertFacesOnly          (1,1) {islogical} = true;
     options.bLoadShapeModel         (1,1) {islogical} = true;
     options.charOutputLengthUnits   (1,:) char {mustBeMember(options.charOutputLengthUnits, ["km", "m"])} = "m"
+    options.bLoadModifiedVariant    (1,1) logical = false;
 end
 %% SIGNATURE
 % [objShapeModel, strBpyCommManagerPaths] = DefineShapeModel(enumTargetName, charDataRootPath, options)
@@ -22,8 +23,8 @@ end
 % Paths to models for BlenderPyCommManager class are also defined (ACHTUNG: currently HARDCODED).
 % -------------------------------------------------------------------------------------------------------------
 %% INPUT
-% enumTargetName      (1,:) {mustBeA(enumTargetName, ["string", "char", "EnumScenarioName"]), ...
-%                            mustBeMember(enumTargetName, ["Apophis", "Itokawa", "Bennu", "Moon"])}
+% enumTargetName                    (1,:) {mustBeA(enumTargetName, ["string", "char", "EnumScenarioName"]), ...
+%                                          mustBeMember(enumTargetName, ["Apophis", "Itokawa", "Bennu", "Moon"])}
 % charDataRootPath                  (1,:) string = fullfile(getenv("HOME"), "devDir/nav-backend/simulationCodes/data/SPICE_kernels")
 % charBpyRootPath                   (1,:) string = fullfile(getenv("HOME"), "devDir/rendering-sw/corto_PeterCdev")
 % options.bVertFacesOnly            (1,1) {islogical} = true;
@@ -46,6 +47,7 @@ end
 %% Future upgrades
 % TODO: remove hardcoded path (add as input root of all data!)
 % -------------------------------------------------------------------------------------------------------------
+
 %% Function code
 
 % Assert path existent
@@ -67,16 +69,26 @@ elseif strcmpi(options.charOutputLengthUnits, "m")
 end
 
 switch enumTargetName
-
     case "Apophis"
         % DEVNOTE: currently assumes rcs-1 simulator loader
         bDO_NOT_INIT_RCS1_ENV = true;
-        LoadUserConfig;
+        LoadUserConfig; % Required for some variables (may be removed)
         % charBlenderModelPath                = fullfile(getenv("HOME"), "devDir/projects-DART/data/rcs-1/phase-C/blender/ApophisParticles.blend");
-        charBlenderModelPath                = fullfile(getenv("HOME"), "devDir/projects-DART/data/rcs-1/phase-C/blender/Apophis_RGB.blend");
-        
+        %charBlenderModelPath                = fullfile(getenv("HOME"), "devDir/projects-DART/data/rcs-1/phase-C/blender/Apophis_RGB.blend");
+        % charBlenderModelPath = fullfile(getenv("HOME"), "devDir/projects-DART/data/rcs-1/phase-C/blender/Apophis_RGB_Centered_Elongated_500m.blend");
+
         % Define shape model object
-        objShapeModel = CShapeModel('file_obj', fullfile(path_to_shape_models, "apophis_v233s7_vert2_new.mod.obj"), ...
+        if not(options.bLoadModifiedVariant)
+            % charBlenderModelPath   = fullfile(getenv("HOME"), "devDir/projects-DART/data/rcs-1/phase-C/blender/Apophis_RGB_smoothed.blend");
+            % charShapeModelObjPath_ = fullfile(path_to_shape_models, "apophis_v233s7_vert2_new.mod.obj");
+            charBlenderModelPath   = fullfile(getenv("HOME"), "devDir/projects-DART/data/rcs-1/phase-C/blender/Apophis_RGB_Centered_MeanSize.blend");
+            charShapeModelObjPath_ = fullfile(path_to_shape_models, "Apophis_RGB_Centered_MeanSize.obj");
+        else
+            charBlenderModelPath   = fullfile(getenv("HOME"), "devDir/projects-DART/data/rcs-1/phase-C/blender/Apophis_RGB_Centered_Elongated_550m.blend");
+            charShapeModelObjPath_ = fullfile(path_to_shape_models, "Apophis_RGB_Centered_Elongated_550m.obj");
+        end
+
+        objShapeModel = CShapeModel('file_obj', charShapeModelObjPath_, ...
             'km', options.charOutputLengthUnits, options.bVertFacesOnly, char(enumTargetName), options.bLoadShapeModel);
 
         try
@@ -96,12 +108,29 @@ switch enumTargetName
     case "Itokawa"
 
         % Define blender model path
-        charBlenderModelPath                = fullfile(charBpyRootPath, "data/scenarios/S2_Itokawa/S2_Itokawa.blend");
-        % Define shape model object
-        charKernelname = fullfile(charDataRootPath, 'Itokawa/dsk/hay_a_amica_5_itokawashape_v1_0_64q.bds');
+        if not(options.bLoadModifiedVariant)
 
-        objShapeModel = CShapeModel('cspice', charKernelname, 'km', options.charOutputLengthUnits, ...
-                                options.bVertFacesOnly, char(enumTargetName));
+            charBlenderModelPath                = fullfile(charBpyRootPath, "data/scenarios/S2_Itokawa/S2_Itokawa.blend");
+
+            % Define shape model object
+            charKernelname = fullfile(charDataRootPath, 'Itokawa/dsk/hay_a_amica_5_itokawashape_v1_0_64q.bds');
+
+            objShapeModel = CShapeModel('cspice', charKernelname, 'km', options.charOutputLengthUnits, ...
+                options.bVertFacesOnly, char(enumTargetName));
+        else
+            % Variant model
+            charBlenderModelPath                = fullfile(charBpyRootPath, "data/scenarios/S2_Itokawa/S2_Itokawa_modified.blend");
+
+            % Define shape model object
+            objShapeModel = CShapeModel('file_obj', fullfile(charBpyRootPath, "data/scenarios/S2_Itokawa/S2_Itokawa_modified.obj"), ...
+                                         'km', ...
+                                         options.charOutputLengthUnits, ...
+                                         options.bVertFacesOnly, ...
+                                         char(enumTargetName), ...
+                                         false);
+        end
+
+
         objShapeModel.dObjectReferenceSize = dLengthScaleCoeff * 0.161915; % [m] or [km]
         objShapeModel.charTargetUnitOutput = options.charOutputLengthUnits;
 
