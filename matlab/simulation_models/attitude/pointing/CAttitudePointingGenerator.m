@@ -31,9 +31,9 @@ classdef CAttitudePointingGenerator < handle
         %% CONSTRUCTOR
         function self = CAttitudePointingGenerator(dCameraPosition_Frame, dTargetPosition_Frame, dSunPosition_Frame, options)
             arguments
-                dCameraPosition_Frame {ismatrix, mustBeNumeric} = -ones(3,1); % Defaults to placeholder value
-                dTargetPosition_Frame {ismatrix, mustBeNumeric} = -ones(3,1); 
-                dSunPosition_Frame    {ismatrix, mustBeNumeric}    = -ones(3,1); 
+                dCameraPosition_Frame {mustBeNumeric} = -ones(3,1); % Defaults to placeholder value
+                dTargetPosition_Frame {mustBeNumeric} = -ones(3,1); 
+                dSunPosition_Frame    {mustBeNumeric} = -ones(3,1); 
             end
 
             arguments
