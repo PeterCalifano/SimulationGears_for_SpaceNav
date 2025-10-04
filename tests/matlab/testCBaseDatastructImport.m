@@ -1,5 +1,5 @@
-classdef testCBaseDatastruct < matlab.unittest.TestCase
-    %testCBaseDatastruct
+classdef testCBaseDatastructImport < matlab.unittest.TestCase
+    %testCBaseDatastructImport
     % Covers:
     %  - YAML parsing producing cells/cells-of-cells
     %  - ConvertCellsToMatrices_ normalization (vectors/matrices/tensors)
@@ -25,7 +25,6 @@ classdef testCBaseDatastruct < matlab.unittest.TestCase
 
             self.objSampleHelper.saveDataToFile(self.objSampleHelperPath, 'yaml');
             self.objSampleHelper.saveDataToFile(self.objSampleHelperPath, 'struct');
-
         end
     end
 
