@@ -12,7 +12,7 @@ classdef testCBaseDatastructExport < matlab.unittest.TestCase
 
     methods (Test)
         function testToStructRemovesEmptyFields(testCase)
-            obj = StubDatastruct();
+            obj = CBaseDatastructTestHelper();
             s = obj.toStruct();
             testCase.verifyTrue(isstruct(s));
             testCase.verifyFalse(isfield(s, 'EmptyField'));
@@ -21,7 +21,7 @@ classdef testCBaseDatastructExport < matlab.unittest.TestCase
         end
 
         function testToJsonRoundTrip(testCase)
-            obj = StubDatastruct();
+            obj = CBaseDatastructTestHelper();
             jsonStr = obj.toJson();
             parsed = jsondecode(jsonStr);
             testCase.verifyEqual(parsed.Value, obj.Value);
@@ -29,32 +29,32 @@ classdef testCBaseDatastructExport < matlab.unittest.TestCase
         end
 
         function testToYamlIncludesFields(testCase)
-            obj = StubDatastruct();
+            obj = CBaseDatastructTestHelper();
             yamlStr = obj.toYaml();
             testCase.verifyTrue(contains(string(yamlStr), "Value"));
             testCase.verifyTrue(contains(string(yamlStr), "Name"));
         end
 
         function testStaticStructMatchesInstance(testCase)
-            obj = StubDatastruct();
+            obj = CBaseDatastructTestHelper();
             testCase.verifyEqual(CBaseDatastruct.toStructStatic(obj), obj.toStruct());
         end
 
         function testStaticJsonMatchesInstance(testCase)
-            obj = StubDatastruct();
+            obj = CBaseDatastructTestHelper();
             jsonStr = CBaseDatastruct.toJsonStatic(obj);
             parsed = jsondecode(jsonStr);
             testCase.verifyEqual(parsed.Value, obj.Value);
         end
 
         function testStaticYamlWrapperFlag(testCase)
-            obj = StubDatastruct();
+            obj = CBaseDatastructTestHelper();
             yamlStr = CBaseDatastruct.toYamlStatic(obj, true, false, "stubPayload");
             testCase.verifyTrue(contains(string(yamlStr), "stubPayload"));
         end
 
         function testSaveDataToFileJson(testCase)
-            obj = StubDatastruct();
+            obj = CBaseDatastructTestHelper();
             fixture = testCase.applyFixture(matlab.unittest.fixtures.TemporaryFolderFixture);
             basePath = fullfile(string(fixture.Folder), "json_export");
             obj.saveDataToFile(basePath, "json");
@@ -65,7 +65,7 @@ classdef testCBaseDatastructExport < matlab.unittest.TestCase
         end
 
         function testSaveDataToFileYaml(testCase)
-            obj = StubDatastruct();
+            obj = CBaseDatastructTestHelper();
             fixture = testCase.applyFixture(matlab.unittest.fixtures.TemporaryFolderFixture);
             basePath = fullfile(string(fixture.Folder), "yaml_export");
             obj.saveDataToFile(basePath, "yaml");
@@ -77,7 +77,7 @@ classdef testCBaseDatastructExport < matlab.unittest.TestCase
         end
 
         function testSaveDataToFileStaticJson(testCase)
-            obj = StubDatastruct();
+            obj = CBaseDatastructTestHelper();
             fixture = testCase.applyFixture(matlab.unittest.fixtures.TemporaryFolderFixture);
             jsonPath = fullfile(string(fixture.Folder), "static.json");
             CBaseDatastruct.saveDataToFileStatic(obj, jsonPath, "json", class(obj));
