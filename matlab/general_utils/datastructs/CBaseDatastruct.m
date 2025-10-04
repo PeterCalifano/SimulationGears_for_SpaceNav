@@ -312,6 +312,7 @@ classdef (Abstract) CBaseDatastruct < handle & matlab.mixin.Copyable
             arguments
                 kwargs.bSaveAsWrapped       (1,1) logical = false;
                 kwargs.bFlattenBeforeSave   (1,1) logical = false;
+                kwargs.bJsonPrettyPrint     (1,1) logical = true;
             end
 
             % Call static implementation
@@ -321,7 +322,8 @@ classdef (Abstract) CBaseDatastruct < handle & matlab.mixin.Copyable
                                             charFormat, ...
                                             charClassName, ...
                                             "bFlattenBeforeSave", kwargs.bFlattenBeforeSave, ...
-                                            "bSaveAsWrapped",  kwargs.bSaveAsWrapped);
+                                            "bSaveAsWrapped",  kwargs.bSaveAsWrapped, ...
+                                            "bJsonPrettyPrint", kwargs.bJsonPrettyPrint);
         end
 
     end
@@ -486,17 +488,18 @@ classdef (Abstract) CBaseDatastruct < handle & matlab.mixin.Copyable
             charYamlString = yaml.dump(strTmp, "auto");
         end
 
-        function [charJsonString] = toJsonStatic(objDatastruct, bFlattenArrays)
+        function [charJsonString] = toJsonStatic(objDatastruct, bFlattenArrays, bPrettyPrint)
             arguments
                 objDatastruct {CBaseDatastruct.validateObjectOrStruct_(objDatastruct)}
                 bFlattenArrays (1,1) logical = false;
+                bPrettyPrint   (1,1) logical = true;
             end
 
             % Recursively convert to strOut first
             strData = CBaseDatastruct.toStructStatic(objDatastruct, bFlattenArrays);
 
             % Parse to JSON
-            charJsonString = jsonencode(strData, "PrettyPrint", true);
+            charJsonString = jsonencode(strData, "PrettyPrint", bPrettyPrint);
         end
 
         %%% Struct handling functionalities
@@ -507,7 +510,7 @@ classdef (Abstract) CBaseDatastruct < handle & matlab.mixin.Copyable
             %   All nested structs are cleaned recursively, and their fields are sorted alphabetically.
 
             arguments
-                strInputStruct (1,1) {CBaseDatastruct.validateObjectOrStruct_(strInputStruct)}   % Input struct to clean and sort
+                strInputStruct (1,:) {CBaseDatastruct.validateObjectOrStruct_(strInputStruct)}   % Input struct to clean and sort
             end
 
             % Initialize output as a copy of the input
@@ -519,22 +522,38 @@ classdef (Abstract) CBaseDatastruct < handle & matlab.mixin.Copyable
             % Loop through each field using a index
             for dIdx = 1:numel(cellFieldNames)
                 charFieldName = cellFieldNames{dIdx};
-                varTmpFieldValue   = strInputStruct.(charFieldName);
+                bEmpty = false(1, numel(strInputStruct));  % Track empties for this field
 
-                if isstruct(varTmpFieldValue)
-                    % Recursive cleaning for nested struct
-                    strCleanedStruct = CBaseDatastruct.CleanAndSortStructFields(varTmpFieldValue);
-                    % Remove field if nested struct is empty
-                    if isempty(fieldnames(strCleanedStruct))
-                        strOutputStruct = rmfield(strOutputStruct, charFieldName);
-                    else
-                        strOutputStruct.(charFieldName) = strCleanedStruct;
+                % Generalized struct array handling
+                for idS = 1:numel(strInputStruct)
+                    varTmpFieldValue   = strInputStruct(idS).(charFieldName);
+
+                    if isstruct(varTmpFieldValue)
+                        % Recursive cleaning for nested struct
+                        strCleanedStruct = CBaseDatastruct.CleanAndSortStructFields(varTmpFieldValue);
+
+                        % Remove field if nested struct is empty
+                        if isempty(fieldnames(strCleanedStruct))
+                            % Keep struct schema, mark empty
+                            strOutputStruct(idS).(charFieldName) = [];
+                            bEmpty(idS) = true;
+                        else
+                            strOutputStruct(idS).(charFieldName) = strCleanedStruct;
+                        end
+
+                    elseif isempty(varTmpFieldValue)
+                        % Remove field if its value is empty
+                        strOutputStruct(idS).(charFieldName) = [];
+                        bEmpty(idS) = true;
                     end
+                    
+                end
 
-                elseif isempty(varTmpFieldValue)
-                    % Remove field if its value is empty
+                % If ALL elements are empty for this field, remove it once, uniformly
+                if all(bEmpty)
                     strOutputStruct = rmfield(strOutputStruct, charFieldName);
                 end
+
             end
 
             % After cleaning, sort remaining fields alphabetically
@@ -566,6 +585,7 @@ classdef (Abstract) CBaseDatastruct < handle & matlab.mixin.Copyable
             arguments
                 kwargs.bSaveAsWrapped       (1,1) logical = false;
                 kwargs.bFlattenBeforeSave   (1,1) logical = false;
+                kwargs.bJsonPrettyPrint     (1,1) logical = true;
             end
 
             if charFormat == "yml"
@@ -638,7 +658,7 @@ classdef (Abstract) CBaseDatastruct < handle & matlab.mixin.Copyable
                         charFilename = strcat(charFilename, '.json');
                     end
 
-                    charJsonParsed = CBaseDatastruct.toJsonStatic(objDatastruct, kwargs.bFlattenBeforeSave);
+                    charJsonParsed = CBaseDatastruct.toJsonStatic(objDatastruct, kwargs.bFlattenBeforeSave, kwargs.bJsonPrettyPrint);
 
                     % Write to file
                     fileID = fopen(charFilename, 'w');
@@ -893,7 +913,14 @@ classdef (Abstract) CBaseDatastruct < handle & matlab.mixin.Copyable
 
                 for idj = 1:numel(subflds)
                     charFieldName = subflds{idj};
-                    inVal.(charFieldName) = CBaseDatastruct.convertValue_(inVal.(charFieldName));
+
+                    if isscalar(inVal)
+                        inVal.(charFieldName) = CBaseDatastruct.convertValue_(inVal.(charFieldName));
+                    else
+                        for idS = 1:numel(inVal)
+                            inVal(idS).(charFieldName) = CBaseDatastruct.convertValue_(inVal(idS).(charFieldName));
+                        end
+                    end
                 end
 
                 outValue = inVal;
