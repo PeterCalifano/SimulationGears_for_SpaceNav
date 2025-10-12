@@ -624,7 +624,7 @@ classdef (Abstract) CBaseDatastruct < handle & matlab.mixin.Copyable
                         charFilename = strcat(charFilename, '.mat');
                     end
 
-                    strTmp.(charClassName) = self;
+                    strTmp.(charClassName) = objDatastruct;
                     save(charFilename, "-struct", "strTmp"); % Save content of strTmp
 
                 case "struct"
