@@ -82,7 +82,8 @@ switch enumTargetName
             % charBlenderModelPath   = fullfile(getenv("HOME"), "devDir/projects-DART/data/rcs-1/phase-C/blender/Apophis_RGB_smoothed.blend");
             % charShapeModelObjPath_ = fullfile(path_to_shape_models, "apophis_v233s7_vert2_new.mod.obj");
             charBlenderModelPath   = fullfile(getenv("HOME"), "devDir/projects-DART/data/rcs-1/phase-C/blender/Apophis_RGB_Centered_MeanSize.blend");
-            charShapeModelObjPath_ = fullfile(path_to_shape_models, "Apophis_RGB_Centered_MeanSize.obj");
+            % charShapeModelObjPath_ = fullfile(path_to_shape_models, "Apophis_RGB_Centered_MeanSize.obj");
+            charShapeModelObjPath_ = fullfile(path_to_shape_models, "Apophis_RGB_Centered_MeanSize_NoTexture.obj");
         else
             charBlenderModelPath   = fullfile(getenv("HOME"), "devDir/projects-DART/data/rcs-1/phase-C/blender/Apophis_RGB_Centered_Elongated_550m.blend");
             charShapeModelObjPath_ = fullfile(path_to_shape_models, "Apophis_RGB_Centered_Elongated_550m.obj");
