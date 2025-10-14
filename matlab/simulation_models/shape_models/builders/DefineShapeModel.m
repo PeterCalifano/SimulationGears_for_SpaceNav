@@ -73,9 +73,6 @@ switch enumTargetName
         % DEVNOTE: currently assumes rcs-1 simulator loader
         bDO_NOT_INIT_RCS1_ENV = true;
         LoadUserConfig; % Required for some variables (may be removed)
-        % charBlenderModelPath                = fullfile(getenv("HOME"), "devDir/projects-DART/data/rcs-1/phase-C/blender/ApophisParticles.blend");
-        %charBlenderModelPath                = fullfile(getenv("HOME"), "devDir/projects-DART/data/rcs-1/phase-C/blender/Apophis_RGB.blend");
-        % charBlenderModelPath = fullfile(getenv("HOME"), "devDir/projects-DART/data/rcs-1/phase-C/blender/Apophis_RGB_Centered_Elongated_500m.blend");
 
         % Define shape model object
         if not(options.bLoadModifiedVariant)
@@ -84,9 +81,11 @@ switch enumTargetName
             charBlenderModelPath   = fullfile(getenv("HOME"), "devDir/projects-DART/data/rcs-1/phase-C/blender/Apophis_RGB_Centered_MeanSize.blend");
             % charShapeModelObjPath_ = fullfile(path_to_shape_models, "Apophis_RGB_Centered_MeanSize.obj");
             charShapeModelObjPath_ = fullfile(path_to_shape_models, "Apophis_RGB_Centered_MeanSize_NoTexture.obj");
+            dObjectReferenceSize_  = dLengthScaleCoeff * 0.16011;
         else
             charBlenderModelPath   = fullfile(getenv("HOME"), "devDir/projects-DART/data/rcs-1/phase-C/blender/Apophis_RGB_Centered_Elongated_550m.blend");
             charShapeModelObjPath_ = fullfile(path_to_shape_models, "Apophis_RGB_Centered_Elongated_550m.obj");
+            dObjectReferenceSize_  = dLengthScaleCoeff * 0.175930344;
         end
 
         objShapeModel = CShapeModel('file_obj', charShapeModelObjPath_, ...
@@ -97,9 +96,11 @@ switch enumTargetName
             objShapeModel.dObjectReferenceSize  = dLengthScaleCoeff * mean(cspice_bodvrd(num2str(ui32ID),'RADII',3)); % [m] ACHTUNG: Value used for Gravity SH expansion!
         catch
             warning('Fetch of Apophis data from kernels failed. Fallback to hardcoded data...')
-            objShapeModel.dObjectReferenceSize  = dLengthScaleCoeff * 0.175930344; % [m] ACHTUNG: Value used for Gravity SH expansion!
+            objShapeModel.dObjectReferenceSize  = dObjectReferenceSize_; 
         end
         
+
+
         objShapeModel.charTargetUnitOutput = options.charOutputLengthUnits;
 
         dEllipsoidABC = dLengthScaleCoeff * [0.19884391053956174, 0.15921442216621817, 0.14822745272788257]; % [m] or [km]
