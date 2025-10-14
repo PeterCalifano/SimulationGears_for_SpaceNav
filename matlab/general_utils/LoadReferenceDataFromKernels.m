@@ -212,8 +212,9 @@ else
 end
 
 % Print monitoring information
-fprintf('Using %s timegrid with relative bounds from ET0: [%8.0f, %8.0f].\nData spans a total of %s.\n', ...
-    upper(charGridType), dRelativeTimegridVect(1), dRelativeTimegridVect(end), FormatElapsedTime_(dETtimegridVect(end) - dETtimegridVect(1)));
+fprintf('Using %s timegrid [%10.1f, %10.1f], with relative bounds from ET0: [%8.0f, %8.0f].\nData spans a total of %s.\n', ...
+    upper(charGridType), dAbsTimegrid_ET(1), dAbsTimegrid_ET(2), ...
+    dRelativeTimegridVect(1), dRelativeTimegridVect(end), FormatElapsedTime_(dETtimegridVect(end) - dETtimegridVect(1)));
 
 % Check that last entry of timegrid is within allowed bounds
 assert(dAbsTimegrid_ET(end) <= dETf, "ERROR: last time instant specified in absolute timegrid is outside allowed ET bounds! %6.2g < %6.2g\n", dETf, dETtimegridVect(end));
@@ -281,7 +282,16 @@ if ~isempty(kwargs.cellAdditionalTargetsID)
     cellTargetDCM_TBfromW   = cell(1, ui32NumAdditionalBodies);
 
     if isempty(kwargs.bAdditionalBodiesRequireAttitude)
+        % Assume false if empty
         kwargs.bAdditionalBodiesRequireAttitude = false(1, ui32NumAdditionalBodies);
+
+    elseif length(kwargs.bAdditionalBodiesRequireAttitude) == 1 && ui32NumAdditionalBodies > 1
+        % Broadcast to size
+        kwargs.bAdditionalBodiesRequireAttitude = logical(kwargs.bAdditionalBodiesRequireAttitude * true(1, ui32NumAdditionalBodies));
+    else
+        % Assert validity
+        assert(length(kwargs.bAdditionalBodiesRequireAttitude) == ui32NumAdditionalBodies, ['ERROR: invalid size of bool array. ' ...
+            'Must be either scalar (broadcasted) or of ui32NumAdditionalBodies length.'])
     end
 
     ui32AllocIdx = uint32(1);
