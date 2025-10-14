@@ -86,8 +86,13 @@ end
 
 % Construct local indices
 dSunPos_IN = zeros(3,1);
-ui8N3rdBodies = uint8(size(dBodyEphemerides, 1) / 3.0) - 1;
-d3rdBodiesPos_IN = zeros(3, length(ui8N3rdBodies));
+ui8N3rdBodies = uint8(0);
+
+if size(dBodyEphemerides, 1) > 3
+    ui8N3rdBodies = uint8(size(dBodyEphemerides, 1) / 3.0) - 1;
+end
+
+d3rdBodiesPos_IN = zeros(3, ui8N3rdBodies);
 dMainBodyPos_IN = zeros(3,1);
 
 if ~isempty(dBodyEphemerides)
