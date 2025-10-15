@@ -9,10 +9,14 @@ arguments
     charBpyRootPath     (1,:) string = fullfile(getenv("HOME"), "devDir/rendering-sw/corto_PeterCdev")
 end
 arguments
-    options.bVertFacesOnly          (1,1) {islogical} = true;
-    options.bLoadShapeModel         (1,1) {islogical} = true;
-    options.charOutputLengthUnits   (1,:) char {mustBeMember(options.charOutputLengthUnits, ["km", "m"])} = "m"
-    options.bLoadModifiedVariant    (1,1) logical = false;
+    options.bVertFacesOnly              (1,1) logical = true;
+    options.bLoadShapeModel             (1,1) logical = true;
+    options.charOutputLengthUnits       (1,:) char {mustBeMember(options.charOutputLengthUnits, ["km", "m"])} = "m"
+    options.bLoadModifiedVariant        (1,1) logical = false;
+    options.charBlenderModelPath        (1,:) string {mustBeText} = ""
+    options.charShapeModelObjPath       (1,:) string {mustBeText} = ""
+    options.dObjectReferenceSizeInKm    (1,1) double = -1.0
+    options.dTargetShapeMatrix_OF       (3,3) double = zeros(3,3);
 end
 %% SIGNATURE
 % [objShapeModel, strBpyCommManagerPaths] = DefineShapeModel(enumTargetName, charDataRootPath, options)
@@ -68,6 +72,16 @@ elseif strcmpi(options.charOutputLengthUnits, "m")
     dInvLengthScaleCoeff     = 1/1000.0;
 end
 
+% Override paths to model, shape and reference size if provided
+if not(strcmpi(options.charBlenderModelPath, ""))
+options.charBlenderModelPath;
+end
+
+if not(strcmpi(options.charShapeModelObjPath, ""))
+options.charShapeModelObjPath;
+end
+
+
 switch enumTargetName
     case "Apophis"
         % DEVNOTE: currently assumes rcs-1 simulator loader
@@ -88,6 +102,17 @@ switch enumTargetName
             dObjectReferenceSize_  = dLengthScaleCoeff * 0.175930344;
         end
 
+        % Override paths to model, shape and reference size if provided
+        if not(strcmpi(options.charBlenderModelPath, ""))
+            mustBeFile(options.charBlenderModelPath)
+            charBlenderModelPath = options.charBlenderModelPath;
+        end
+
+        if not(strcmpi(options.charShapeModelObjPath, ""))
+            mustBeFile(options.charShapeModelObjPath)
+            charShapeModelObjPath_ = options.charShapeModelObjPath;
+        end
+
         objShapeModel = CShapeModel('file_obj', charShapeModelObjPath_, ...
             'km', options.charOutputLengthUnits, options.bVertFacesOnly, char(enumTargetName), options.bLoadShapeModel);
 
@@ -99,8 +124,6 @@ switch enumTargetName
             objShapeModel.dObjectReferenceSize  = dObjectReferenceSize_; 
         end
         
-
-
         objShapeModel.charTargetUnitOutput = options.charOutputLengthUnits;
 
         dEllipsoidABC = dLengthScaleCoeff * [0.19884391053956174, 0.15921442216621817, 0.14822745272788257]; % [m] or [km]
@@ -119,12 +142,25 @@ switch enumTargetName
 
             objShapeModel = CShapeModel('cspice', charKernelname, 'km', options.charOutputLengthUnits, ...
                 options.bVertFacesOnly, char(enumTargetName));
+
         else
             % Variant model
-            charBlenderModelPath                = fullfile(charBpyRootPath, "data/scenarios/S2_Itokawa/S2_Itokawa_modified.blend");
+            charBlenderModelPath   = fullfile(charBpyRootPath, "data/scenarios/S2_Itokawa/S2_Itokawa_modified.blend");
+            charShapeModelObjPath_ = fullfile(charBpyRootPath, "data/scenarios/S2_Itokawa/S2_Itokawa_modified.obj");
+
+            % Override paths to model, shape and reference size if provided
+            if not(strcmpi(options.charBlenderModelPath, ""))
+                mustBeFile(options.charBlenderModelPath)
+                charBlenderModelPath = options.charBlenderModelPath;
+            end
+
+            if not(strcmpi(options.charShapeModelObjPath, ""))
+                mustBeFile(options.charShapeModelObjPath)
+                charShapeModelObjPath_ = options.charShapeModelObjPath;
+            end
 
             % Define shape model object
-            objShapeModel = CShapeModel('file_obj', fullfile(charBpyRootPath, "data/scenarios/S2_Itokawa/S2_Itokawa_modified.obj"), ...
+            objShapeModel = CShapeModel('file_obj', charShapeModelObjPath_, ...
                                          'km', ...
                                          options.charOutputLengthUnits, ...
                                          options.bVertFacesOnly, ...
@@ -142,7 +178,19 @@ switch enumTargetName
     case "Bennu"
 
         % Define blender model path
-        charBlenderModelPath                = fullfile(charBpyRootPath, "data/scenarios/S4_Bennu/S4_Bennu.blend");
+        charBlenderModelPath = fullfile(charBpyRootPath, "data/scenarios/S4_Bennu/S4_Bennu.blend");
+        % charShapeModelObjPath_ = fullfile(charBpyRootPath, "data/scenarios/S2_Itokawa/S2_Itokawa_modified.obj");
+
+        % Override paths to model, shape and reference size if provided
+        if not(strcmpi(options.charBlenderModelPath, ""))
+            mustBeFile(options.charBlenderModelPath)
+            charBlenderModelPath = options.charBlenderModelPath;
+        end
+
+        % if not(strcmpi(options.charShapeModelObjPath, ""))
+        %     mustBeFile(options.charShapeModelObjPath)
+        %     charShapeModelObjPath_ = options.charShapeModelObjPath;
+        % end
 
         % Define shape model object
         % charKernelname = fullfile(charDataRootPath, 'Bennu_OREx/dsk/bennu_l_00050mm_alt_ptm_5595n04217_v021.bds'); %  Too large!
@@ -167,9 +215,19 @@ switch enumTargetName
         charBlenderModelPath                = fullfile(charBpyRootPath, "data/scenarios/S6_Moon/S6_Moon.blend");
 
         % Define shape model object
-        charObjModelFilePath = fullfile(charBpyRootPath, "data/scenarios/S6_Moon/Moon.obj");
+        charShapeModelObjPath_ = fullfile(charBpyRootPath, "data/scenarios/S6_Moon/Moon.obj");
 
-        objShapeModel = CShapeModel('file_obj', charObjModelFilePath, 'km', options.charOutputLengthUnits, ...
+        % Override paths to model, shape and reference size if provided
+        if not(strcmpi(options.charBlenderModelPath, ""))
+            mustBeFile(options.charBlenderModelPath)
+            charBlenderModelPath = options.charBlenderModelPath;
+        end
+        if not(strcmpi(options.charShapeModelObjPath, ""))
+            mustBeFile(options.charShapeModelObjPath)
+            charShapeModelObjPath_ = options.charShapeModelObjPath;
+        end
+
+        objShapeModel = CShapeModel('file_obj', charShapeModelObjPath_, 'km', options.charOutputLengthUnits, ...
                                 options.bVertFacesOnly, char(enumTargetName), options.bLoadShapeModel);
 
         objShapeModel.dObjectReferenceSize = dLengthScaleCoeff * 1737.42; % [m] or [km]
@@ -181,9 +239,13 @@ switch enumTargetName
 
     case "Mars"
 
-        charObjModelFilePath = ""; % None for now
+        charShapeModelObjPath_ = ""; % None for now
+        if not(strcmpi(options.charShapeModelObjPath, ""))
+            mustBeFile(options.charShapeModelObjPath)
+            charShapeModelObjPath_ = options.charShapeModelObjPath;
+        end
 
-        objShapeModel = CShapeModel('file_obj', charObjModelFilePath, 'km', options.charOutputLengthUnits, ...
+        objShapeModel = CShapeModel('file_obj', charShapeModelObjPath_, 'km', options.charOutputLengthUnits, ...
                             options.bVertFacesOnly, char(enumTargetName), options.bLoadShapeModel);
 
         objShapeModel.dObjectReferenceSize = dLengthScaleCoeff * 3386.2; % [m] or [km]
@@ -195,9 +257,13 @@ switch enumTargetName
 
         
     case "Ceres" 
-        charObjModelFilePath = ""; % None for now
-
-        objShapeModel = CShapeModel('file_obj', charObjModelFilePath, 'km', options.charOutputLengthUnits, ...
+        charShapeModelObjPath_ = ""; % None for now
+        if not(strcmpi(options.charShapeModelObjPath, ""))
+            mustBeFile(options.charShapeModelObjPath)
+            charShapeModelObjPath_ = options.charShapeModelObjPath;
+        end
+        
+        objShapeModel = CShapeModel('file_obj', charShapeModelObjPath_, 'km', options.charOutputLengthUnits, ...
                                 options.bVertFacesOnly, char(enumTargetName), options.bLoadShapeModel);
 
         objShapeModel.dObjectReferenceSize = dLengthScaleCoeff * 939.0/2; % [m] or [km]
@@ -232,6 +298,16 @@ switch enumTargetName
         end
 end
 
+% Override shape and reference size if provided
+if options.dObjectReferenceSizeInKm > 0.0
+    objShapeModel.dObjectReferenceSize = dLengthScaleCoeff * options.dObjectReferenceSizeInKm;
+end
+
+if any(options.dTargetShapeMatrix_OF > 0, 'all')
+    objShapeModel.dTargetShapeMatrix_OF = options.dTargetShapeMatrix_OF;
+end
+
+% Set paths to scripts
 charBlenderPyInterfacePath          = fullfile(charBpyRootPath, "server_api/BlenderPy_UDP_TCP_interface_withCaching.py" );
 charStartBlenderServerScriptPath    = fullfile(charBpyRootPath, "server_api/StartBlenderServer.sh");
 
