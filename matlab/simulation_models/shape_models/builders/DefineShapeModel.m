@@ -201,11 +201,11 @@ switch enumTargetName
                         options.bVertFacesOnly, char(enumTargetName), options.bLoadShapeModel);
 
         % Assign reference radius
-        objShapeModel.dObjectReferenceSize = 245.03 / dInvLengthScaleCoeff; % [m]
+        objShapeModel.dObjectReferenceSize = dLengthScaleCoeff * 1E-3 * 245.03 ; % [m]
         objShapeModel.charTargetUnitOutput = options.charOutputLengthUnits;
 
         % Define shape matrix in principal TF
-        dEllipsoidABC = dLengthScaleCoeff * 1E-3 * [3395428, 3395428, 3377678]; % [m] or [km]
+        dEllipsoidABC = dLengthScaleCoeff * [0.25278, 0.24620, 0.22869]; % [m] or [km]
         objShapeModel.dTargetShapeMatrix_OF = diag([1/dEllipsoidABC(1)^2, 1/dEllipsoidABC(2)^2, 1/dEllipsoidABC(3)^2]);
 
 
