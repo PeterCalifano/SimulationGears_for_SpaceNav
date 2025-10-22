@@ -110,11 +110,21 @@ if kwargs.objDataset.bDefaultConstructed
 
 else
     % Load ephemeris data from dataset
-    assert(length(dEphemeridesTimegrid) == length(kwargs.objDataset.dTimestamps), ...
-            "ERROR: objDataset timestamps do not match specified dEphemerisTimegrid.")
+    % assert(length(dEphemeridesTimegrid) == length(kwargs.objDataset.dTimestamps), ...
+    %         "ERROR: objDataset timestamps do not match specified dEphemerisTimegrid.")
 
-    strMainBodyRefData.dDCM_INfromTB    = pagetranspose(kwargs.objDataset.dDCM_TBfromW);
-    strMainBodyRefData.dSunPosition_IN  = kwargs.objDataset.dSunPosition_W;
+    % Build extraction index grid (dataset indices for each ephemeris time)
+    dEphTimegrid  = dEphemeridesTimegrid(:);
+
+    assert(all(diff(kwargs.objDataset.dTimestamps(:)) > 0), 'objDataset.dTimestamps must be strictly increasing.');
+    assert(all(diff(dEphTimegrid)  >= 0), 'dEphemeridesTimegrid must be non-decreasing.');
+
+    ui32NumEntriesInDataset = numel(kwargs.objDataset.dTimestamps(:));
+    ui32EphemeridesExtractIdx = interp1(kwargs.objDataset.dTimestamps(:), 1:ui32NumEntriesInDataset, dEphTimegrid, 'nearest', 'extrap'); % Nearest index for each ephemeris time
+    ui32EphemeridesExtractIdx = uint32(max(1, min(ui32NumEntriesInDataset, round(ui32EphemeridesExtractIdx)))); % Clamp to [1, N]
+
+    strMainBodyRefData.dDCM_INfromTB    = pagetranspose(kwargs.objDataset.dDCM_TBfromW(:,:,ui32EphemeridesExtractIdx));
+    strMainBodyRefData.dSunPosition_IN  = kwargs.objDataset.dSunPosition_W(:,ui32EphemeridesExtractIdx);
 
     % Get additional bodies data if provided (Sun not included)
     ui32NumOfAdditionalBodies = length(kwargs.objDataset.cellAdditionalBodiesTags);
@@ -124,11 +134,11 @@ else
 
         if not(isempty(kwargs.objDataset.cellAdditionalBodiesPos_W{idB}))
             % Store data in struct for ephemerides factory
-            str3rdBodyRefData(idB).strOrbitData.dPosition_W  = kwargs.objDataset.cellAdditionalBodiesPos_W{idB};
+            str3rdBodyRefData(idB).strOrbitData.dPosition_W  = kwargs.objDataset.cellAdditionalBodiesPos_W{idB}(:,ui32EphemeridesExtractIdx);
         end
         
         if bAdd3rdBodiesAttitude && not(isempty(kwargs.objDataset.cellAdditionalBodiesDCM_TBfromW{idB}))
-            str3rdBodyRefData(idB).strAttData.dDCM_WfromTB = pagetranspose(kwargs.objDataset.cellAdditionalBodiesDCM_TBfromW{idB});
+            str3rdBodyRefData(idB).strAttData.dDCM_WfromTB = pagetranspose(kwargs.objDataset.cellAdditionalBodiesDCM_TBfromW{idB}(:,:,ui32EphemeridesExtractIdx));
         end
 
         try
