@@ -14,13 +14,13 @@ arguments
     str3rdBodyRefData = []
 end
 arguments
-    kwargs.bGroundTruthEphemerides  (1,1) logical {isscalar, islogical} = true
-    kwargs.bEnableInterpValidation  (1,1) logical {isscalar, islogical} = true
-    kwargs.bAdd3rdBodiesPosition    (1,1) logical {isscalar, islogical} = true
-    kwargs.bAdd3rdBodiesAttitude    (1,1) logical {isscalar, islogical} = false
-    kwargs.bUseInterpFcnFromRCS1    (1,1) logical {isscalar, islogical} = false
-    kwargs.bScaleTimeToDays         (1,1) logical {isscalar, islogical} = false
-    kwargs.bUseAbsoluteTimegrid     (1,1) logical {isscalar, islogical} = false;
+    kwargs.bGroundTruthEphemerides  (1,1) logical = true
+    kwargs.bEnableInterpValidation  (1,1) logical = true
+    kwargs.bAdd3rdBodiesPosition    (1,1) logical = true
+    kwargs.bAdd3rdBodiesAttitude    (1,1) logical = false
+    kwargs.bUseInterpFcnFromRCS1    (1,1) logical = false
+    kwargs.bScaleTimeToDays         (1,1) logical = false
+    kwargs.bUseAbsoluteTimegrid     (1,1) logical = false;
 end
 %% SIGNATURE
 % [strDynParams, strMainBodyRefData] = EphemeridesDataFactory(dEphemTimegrid, ...
@@ -125,7 +125,7 @@ end
 
 %% Sun position
 if not(kwargs.bUseInterpFcnFromRCS1)
-    [dTmpChbvCoeffs, ~, ~] = fitChbvPolynomials(ui32EphemerisPolyDeg, ...
+    [dTmpChbvCoeffs, ~] = fitChbvPolynomials(ui32EphemerisPolyDeg, ...
                                                 dInterpDomain, ...
                                                 strMainBodyRefData.dSunPosition_IN, ...
                                                 dDomainLB, ...
