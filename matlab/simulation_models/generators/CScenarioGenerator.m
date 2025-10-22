@@ -382,7 +382,7 @@ classdef CScenarioGenerator < CGeneralPropagator
                     charTargetName = 'MOON';
                     charTargetFixedFrame = 'IAU_MOON'; 
                     dTargetReferenceRadius  = dLengthUnitsScale * 1737.4E+03; % [m] ACHTUNG: Value used for Gravity SH expansion!
-                    dTargetGravityParameter = (dLengthUnitsScale)^3 * 4.9048695E+12; % [m^3/s^2]
+                    dTargetGravityParameter = (dLengthUnitsScale)^3 * 4.9028695E+12; % [m^3/s^2]
                 
                 otherwise
                     error('Invalid scenario name. See EnumScenarioName enum class for supported ones.')
