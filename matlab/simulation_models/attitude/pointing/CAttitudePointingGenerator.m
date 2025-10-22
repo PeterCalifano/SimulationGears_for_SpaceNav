@@ -74,6 +74,7 @@ classdef CAttitudePointingGenerator < handle
                 kwargs.dAuxiliaryAxis       (3,:) double = self.dAuxiliaryAxis;
             end
             arguments (Input)
+                options.bInputIsTargetDirectionFromCam  (1,1) logical = false
                 options.enumConstraintType              (1,:) string {mustBeMember(options.enumConstraintType, ["YorthogonalSun", "trackLVLH", "auxiliaryAxis"])} = "YorthogonalSun"
                 options.enumOutRot3Param                (1,1) EnumRotParams {isa(options.enumOutRot3Param, 'EnumRotParams')} = EnumRotParams.DCM
                 options.dDCM_displacedPoseFromPose      (3,3,:) double {mustBeNumeric} = zeros(3,3) % Custom rotation to apply to the rotation
@@ -132,7 +133,13 @@ classdef CAttitudePointingGenerator < handle
             dAuxiliaryAxis_ = kwargs.dAuxiliaryAxis;
 
             % Compute camera boresight from lookAt point
-            dLookAtPointFromCam_Frame = dTargetPosition_Frame - dCameraPosition_Frame;
+            if options.bInputIsTargetDirectionFromCam
+                dLookAtPointFromCam_Frame = dTargetPosition_Frame;
+            else
+                dLookAtPointFromCam_Frame = dTargetPosition_Frame - dCameraPosition_Frame;
+            end
+
+
             dCamBoresightZ_Frame = dLookAtPointFromCam_Frame./vecnorm(dLookAtPointFromCam_Frame, 2, 1);
             % Is3dPointOn3dLine(dTargetPosition_Frame(:,1), dCameraPosition_Frame(:,1), dCamBoresightZ_Frame(:,1), 1E-6);
 
