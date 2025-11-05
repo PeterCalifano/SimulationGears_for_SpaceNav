@@ -114,7 +114,6 @@ end
 objCurrentAx.XMinorTick = 'on';
 objCurrentAx.YMinorTick = 'on';
 objCurrentAx.LineWidth = 1.05;
-objCurrentAx.LineWidth = 1.05;
 ylim('tickaligned');
 xlim('tight')
 
