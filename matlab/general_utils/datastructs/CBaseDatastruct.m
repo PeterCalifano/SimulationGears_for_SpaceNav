@@ -28,7 +28,7 @@ classdef (Abstract) CBaseDatastruct < handle & matlab.mixin.Copyable
     % -------------------------------------------------------------------------------------------------------------
 
     properties (SetAccess = public, GetAccess = public)
-        bDefaultConstructed {islogical, isscalar} = true;
+        bDefaultConstructed (1,1) logical = true;
         charDataHash;
         charInstanceName;
     end
@@ -596,7 +596,7 @@ classdef (Abstract) CBaseDatastruct < handle & matlab.mixin.Copyable
             charClassName = matlab.lang.makeValidName(charClassName);
 
             % Object saving method
-            fprintf("\nSaving datastruct to file %s in format %s...", charFilename, charFormat);
+            fprintf("\nSaving datastruct to file %s in format %s...\n", charFilename, charFormat);
 
             [charRootFolder, charFilename_, charFileExt] = fileparts(charFilename);
 

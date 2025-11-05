@@ -5,7 +5,7 @@ function [objShapeModel, strBpyCommManagerPaths] = DefineShapeModel(enumTargetNa
 arguments
     enumTargetName      (1,:) {mustBeA(enumTargetName, ["string", "char", "EnumScenarioName"]), ...
         mustBeMember(enumTargetName, ["Apophis", "Itokawa", "Bennu", "Moon", "Mars", "Ceres", "Dydimos", "Eros", "NotDefined"])}
-    charDataRootPath    (1,:) string = fullfile(getenv("HOME"), "devDir/nav-backend/simulationCodes/data/SPICE_kernels")
+    charDataRootPath    (1,:) string = fullfile(getenv("HOME"), "devDir/nav-backend/data/SPICE_kernels")
     charBpyRootPath     (1,:) string = fullfile(getenv("HOME"), "devDir/rendering-sw/corto_PeterCdev")
 end
 arguments
