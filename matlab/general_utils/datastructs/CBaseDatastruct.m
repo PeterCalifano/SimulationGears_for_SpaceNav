@@ -201,10 +201,10 @@ classdef (Abstract) CBaseDatastruct < handle & matlab.mixin.Copyable
             % were dumped from a vector/matrix/array and loaded by yaml as cells of cells or not.
 
             arguments
-                self (1,1) {mustBeA(self, "CBaseDatastruct")}
-                charInputYaml {mustBeText}
-                bIsFile  logical {islogical} = []   % Auto-detect if empty
-                bStrict (1,1) logical {islogical} = false
+                self            (1,1) {mustBeA(self, "CBaseDatastruct")}
+                charInputYaml   {mustBeText}
+                bIsFile         logical = []   % Auto-detect if empty
+                bStrict         (1,1) logical = false
             end
 
             % Check yaml package is available
@@ -898,9 +898,15 @@ classdef (Abstract) CBaseDatastruct < handle & matlab.mixin.Copyable
                     % If object has method "toStruct" (base is this class, call it)
                     outValue = inVal.toStruct();
 
+                elseif isenum(inVal)
+                    % Handle enumeration classes by convertion to strings
+                    outValue = string(inVal);
                 else
                     % Else, fallback to casting
                     outValue = struct(inVal);
+                    if isempty(outValue) && not(isempty(inVal))
+                        warning('Fallback method "cast using struct()" on type %s returned empty. Field will be lost.', class(inVal));
+                    end
                 end
 
             elseif iscell(inVal)
