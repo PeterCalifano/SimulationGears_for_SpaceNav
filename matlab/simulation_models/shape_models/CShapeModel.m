@@ -8,17 +8,16 @@ classdef CShapeModel < CBaseDatastruct
     % 05-10-2024    Pietro Califano     First implementation completed.
     % 13-02-2025    Pietro Califano     Update implementation to inherit from CBaseDatastruct (handle)
     % 03-05-2025    Pietro Califano     Add implementation to support loading from and writing to obj file
+    % 10-11-2025    Pietro Califano     Minor bug fixes
     % -------------------------------------------------------------------------------------------------------------
     %% DEPENDENCIES
     % [-]
     % -------------------------------------------------------------------------------------------------------------
-    %% Future upgrades
-    % [-]
-    % -------------------------------------------------------------------------------------------------------------
+
 
     properties (SetAccess = public, GetAccess = public)
-        dTargetShapeMatrix_OF {ismatrix, isnumeric} = zeros(0,0,'double')
-        dObjectReferenceSize {isscalar, isnumeric}  = zeros(0,0)
+        dTargetShapeMatrix_OF (3,3) {mustBeMatrix}          = zeros(3,3,'double')
+        dObjectReferenceSize  (1,1) double {mustBeNumeric}  = zeros(1,1)
         charTargetUnitOutput = 'm';
     end
 
@@ -66,6 +65,7 @@ classdef CShapeModel < CBaseDatastruct
             end
 
             self.charTargetUnitOutput = charTargetUnitOutput;
+            self.bDefaultConstructed  = false;
 
             % Determine scaling to match length unit
             if (strcmpi(charInputUnit, 'm') && strcmpi(self.charTargetUnitOutput, 'm')) || ...
