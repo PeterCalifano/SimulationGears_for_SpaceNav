@@ -16,7 +16,7 @@ classdef CShapeModel < CBaseDatastruct
 
 
     properties (SetAccess = public, GetAccess = public)
-        dTargetShapeMatrix_OF (3,3) {mustBeMatrix}          = zeros(3,3,'double')
+        dTargetShapeMatrix_OF (3,3) double {mustBeNumeric} = zeros(3,3,'double')
         dObjectReferenceSize  (1,1) double {mustBeNumeric}  = zeros(1,1)
         charTargetUnitOutput = 'm';
     end
