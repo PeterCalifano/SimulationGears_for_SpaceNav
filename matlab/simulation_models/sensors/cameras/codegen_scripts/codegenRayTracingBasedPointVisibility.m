@@ -2,23 +2,27 @@ clear
 close all
 clc
 
+charThisScriptPath = fileparts(mfilename('fullpath'));
+addpath(genpath(fullfile(charThisScriptPath, "..", "..")));
+cd(charThisScriptPath);
+
 %% Coder settings
 objCoderConfig = coder.config('mex');
 objCoderConfig.TargetLang = 'C++';
 objCoderConfig.GenerateReport = true;
 objCoderConfig.LaunchReport = false;
-objCoderConfig.EnableJIT = false;
+objCoderConfig.EnableJIT = true;
 objCoderConfig.MATLABSourceComments = true;
 
 objCoderConfig.EnableAutoParallelization = true;
 objCoderConfig.EnableOpenMP = true;
 objCoderConfig.OptimizeReductions = true;
 objCoderConfig.SIMDAcceleration = 'Full';
-objCoderConfig.NumberOfCpuThreads = 18;
+objCoderConfig.NumberOfCpuThreads = 12;
 
 % Common settings
-ui32MaxNumPoints  = 1.2e5;
-ui32MaxNumTriangs = 2e5;
+ui32MaxNumPoints  = 2e6;
+ui32MaxNumTriangs = 5e6;
 
 % Flags for codegen calls to run
 bCodegen_RayTracePointVisibility_EllipsLocalPA              = true;
