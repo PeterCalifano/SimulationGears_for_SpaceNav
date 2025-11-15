@@ -535,7 +535,7 @@ classdef CAttitudePointingGenerator < handle
             % arguments
             %     settings.enumDisplacementMode               (1,1) string {mustBeMember(settings.enumDisplacementMode, ["lookAtPoint", "rotate3d"])} = "lookAtPoint";
             %     settings.dDisplaceSigma                     (1,1) double {mustBeGreaterThanOrEqual(settings.dDisplaceSigma, 0)} = 0;
-            %     settings.bDisplaceOrthogonalToRefAxisPlane  (1,1) logical {islogical, isscalar} = false
+            %     settings.bDisplaceOrthogonalToRefAxisPlane  (1,1) logical = false
             %     settings.enumDisplaceDistribution           (1,:) string {mustBeMember(settings.enumDisplaceDistribution, ["uniform", "gaussian"])} = "gaussian";
             % end
             % -------------------------------------------------------------------------------------------------------------
@@ -643,12 +643,12 @@ classdef CAttitudePointingGenerator < handle
 
         end
 
-        function [dNewLookAtPoint, dLookAtPointUnitVec] = ComputeDisplacedBoresight_LookAtPoint_(dLookAtPoint, dReferenceAxis, dDisplacementNorms, options)
+        function [dNewLookAtPoint, dLookAtPointUnitVec] = ComputeDisplacedBoresight_LookAtPoint_(dLookAtPoint, dRotReferenceAxis, dDisplacementNorms, options)
             arguments
                 dLookAtPoint        (3,:) double {mustBeNumeric}
-                dReferenceAxis      (3,:) double {mustBeNumeric}
+                dRotReferenceAxis      (3,:) double {mustBeNumeric}
                 dDisplacementNorms  (1,:) double {mustBeNumeric} 
-                options.bDisplaceOrthogonalToRefAxisPlane (1,1) logical {islogical, isscalar} = false
+                options.bDisplaceOrthogonalToRefAxisPlane (1,1) logical = false
             end
             
             % Compute directions from dLookAtPoint
@@ -661,14 +661,14 @@ classdef CAttitudePointingGenerator < handle
             if options.bDisplaceOrthogonalToRefAxisPlane
                 %% Displace in-plane toward reference axis direction
 
-                % Compute component of dReferenceAxis orthogonal to dLookAtPointUnitVec, in plane
-                dDisplaceUnitVec(:,:) = dReferenceAxis - dot(dLookAtPointUnitVec, dReferenceAxis, 1) * dLookAtPointUnitVec; 
+                % Compute component of dRotReferenceAxis orthogonal to dLookAtPointUnitVec, in plane
+                dDisplaceUnitVec(:,:) = dRotReferenceAxis - dot(dLookAtPointUnitVec, dRotReferenceAxis, 1) * dLookAtPointUnitVec; 
 
             else
                 %% Displace orthogonal to plane of reference axis and lookAtPoint
 
-                % Compute component of dReferenceAxis orthogonal to dLookAtPointUnitVec, orthogonal to plane
-                dDisplaceUnitVec(:,:) = cross(dReferenceAxis, dLookAtPointUnitVec, 1);
+                % Compute component of dRotReferenceAxis orthogonal to dLookAtPointUnitVec, orthogonal to plane
+                dDisplaceUnitVec(:,:) = cross(dRotReferenceAxis, dLookAtPointUnitVec, 1);
 
             end
         
@@ -684,12 +684,15 @@ classdef CAttitudePointingGenerator < handle
 
         end
 
-        function [dBoresightUnitVec_Frame] = ComputeDisplacedBoresight_Rotate3D_(dBoresightVector, dReferenceAxis, dRotDisplaceAngle, options)
+        function [dBoresightUnitVec_Frame] = ComputeDisplacedBoresight_Rotate3D_(dBoresightVector, 
+            dReferenceAxis, 
+            dRotDisplaceAngle, 
+            options)
             arguments
                 dBoresightVector                            (3,:) double {mustBeNumeric}
                 dReferenceAxis                              (3,:) double {mustBeNumeric}
                 dRotDisplaceAngle                           (1,:) double {mustBeNumeric}
-                options.bDisplaceOrthogonalToRefAxisPlane   (1,1) logical {islogical, isscalar} = false
+                options.bDisplaceOrthogonalToRefAxisPlane   (1,1) logical = false
             end
 
             % Compute directions from dLookAtPoint
