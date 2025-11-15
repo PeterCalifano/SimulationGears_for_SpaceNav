@@ -277,7 +277,7 @@ classdef CShapeModel < CBaseDatastruct
                 ui32TrianglesTexIndex, dNormals, ui32TrianglesNormalsIndex] = LoadModelFromObj(charObjFilePath, bVertFacesOnly) %#codegen
             arguments
                 charObjFilePath (1,1) string {mustBeA(charObjFilePath, ["string", "char"])}
-                bVertFacesOnly  (1,1) {islogical} = true;
+                bVertFacesOnly  (1,1) logical = true;
             end
             %% SIGNATURE
             % [ui32TrianglesIndex, dVerticesCoords, dTexCoords, ...
@@ -299,9 +299,7 @@ classdef CShapeModel < CBaseDatastruct
             %% DEPENDENCIES
             % [-]
             % -------------------------------------------------------------------------------------------------------------
-            %% Future upgrades
-            % [-]
-            % -------------------------------------------------------------------------------------------------------------
+
             %% Function code
             
             tic
@@ -347,7 +345,6 @@ classdef CShapeModel < CBaseDatastruct
             vnPattern = '^vn\s+([\-\d\.eE\+]+)\s+([\-\d\.eE\+]+)\s+([\-\d\.eE\+]+)';
             vnLines = regexp(charFileText, vnPattern, 'tokens', 'lineanchors');
 
-            
             if ~isempty(vnLines) && not(bVertFacesOnly)
                 vnTokens = vertcat(vnLines{:});
                 dNormals = str2double(vnTokens);

@@ -646,7 +646,7 @@ classdef CAttitudePointingGenerator < handle
         function [dNewLookAtPoint, dLookAtPointUnitVec] = ComputeDisplacedBoresight_LookAtPoint_(dLookAtPoint, dRotReferenceAxis, dDisplacementNorms, options)
             arguments
                 dLookAtPoint        (3,:) double {mustBeNumeric}
-                dRotReferenceAxis      (3,:) double {mustBeNumeric}
+                dRotReferenceAxis   (3,:) double {mustBeNumeric}
                 dDisplacementNorms  (1,:) double {mustBeNumeric} 
                 options.bDisplaceOrthogonalToRefAxisPlane (1,1) logical = false
             end
@@ -684,13 +684,13 @@ classdef CAttitudePointingGenerator < handle
 
         end
 
-        function [dBoresightUnitVec_Frame] = ComputeDisplacedBoresight_Rotate3D_(dBoresightVector, 
-            dReferenceAxis, 
-            dRotDisplaceAngle, 
-            options)
+        function [dBoresightUnitVec_Frame] = ComputeDisplacedBoresight_Rotate3D_(dBoresightVector, ...
+                                                                                dRotReferenceAxis, ...
+                                                                                dRotDisplaceAngle, ...
+                                                                                options)
             arguments
                 dBoresightVector                            (3,:) double {mustBeNumeric}
-                dReferenceAxis                              (3,:) double {mustBeNumeric}
+                dRotReferenceAxis                           (3,:) double {mustBeNumeric}
                 dRotDisplaceAngle                           (1,:) double {mustBeNumeric}
                 options.bDisplaceOrthogonalToRefAxisPlane   (1,1) logical = false
             end
@@ -705,13 +705,13 @@ classdef CAttitudePointingGenerator < handle
             if options.bDisplaceOrthogonalToRefAxisPlane
                 %% Displace in-plane toward reference axis direction
                 % Rotation axis is orthogonal to plane containing reference axis and dBoresightUnitVec_Frame
-                dRotationAxisUnitVec(1:3, :) = cross(dReferenceAxis, dBoresightUnitVec_Frame, 1);
+                dRotationAxisUnitVec(1:3, :) = cross(dRotReferenceAxis, dBoresightUnitVec_Frame, 1);
                     
             else
                 %% Displace orthogonal to plane of reference axis and lookAtPoint
                 % Rotation axis is orthogonal component of dReferenceAxis (automatically used by rotation
                 % function based on Rodrigues' formula)
-                dRotationAxisUnitVec(1:3, :) = dReferenceAxis;
+                dRotationAxisUnitVec(1:3, :) = dRotReferenceAxis;
             end
 
             % Normalize to unit vector

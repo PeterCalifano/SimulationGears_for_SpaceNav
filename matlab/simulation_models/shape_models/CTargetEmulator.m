@@ -4,11 +4,12 @@ classdef CTargetEmulator < CSceneObject
     % What the class represent
     % -------------------------------------------------------------------------------------------------------------
     %% CHANGELOG
-    % 13-08-2024        Pietro Califano         Class created from previous script code.
-    % 05-10-2024        Pietro Califano         Implementation v1.0 completed with all relevant functionalities.
-    % 10-10-2024        Pietro Califano         Minor changes of code for bug fixes; verification completed.
-    % 09-11-2024        Pietro Califano         Improved design and robustness of points generation and
-    %                                           retrieval methods.
+    % 13-08-2024        Pietro Califano     Class created from previous script code.
+    % 05-10-2024        Pietro Califano     Implementation v1.0 completed with all relevant functionalities.
+    % 10-10-2024        Pietro Califano     Minor changes of code for bug fixes; verification completed.
+    % 09-11-2024        Pietro Califano     Improved design and robustness of points generation and
+    %                                       retrieval methods.
+    % 15-11-2025        Pietro Califano     Minor revision of constructor
     % -------------------------------------------------------------------------------------------------------------
     %% DEPENDENCIES
     % [-]
@@ -44,11 +45,14 @@ classdef CTargetEmulator < CSceneObject
 
     methods (Access = public)
         % CONSTRUCTORS
-        function self = CTargetEmulator(objShapeModel, ui32NumOfPointsGT, objPose3_WorldFromPoseFrame)
+        function self = CTargetEmulator(objShapeModel, ui32NumOfPointsGT, objPose3_WorldFromPoseFrame, kwargs)
             arguments
                 objShapeModel     (1,1) {mustBeA(objShapeModel, "CShapeModel")} = CShapeModel()
                 ui32NumOfPointsGT (1,1) uint32 = 0 
                 objPose3_WorldFromPoseFrame (1,1) {mustBeA(objPose3_WorldFromPoseFrame, ["SPose3"])} = SPose3([0; 0; 0], eye(3,3)); %#ok<NBRAK2>
+            end
+            arguments
+                kwargs.enumPointGTsamplingMethod (1,1) EnumPointGTsamplingMethod = EnumPointGTsamplingMethod.PICK_UNIFORM_RANDOM_ID
             end
 
             % Set ShapeModel object
@@ -58,32 +62,35 @@ classdef CTargetEmulator < CSceneObject
                 return
             end
 
-            if ui32NumOfPointsGT == 0
-                % Assume number of points equal to CShapeModel number of vertices
-                self.ui32NumOfPointsGT        = objShapeModel.getNumOfVertices();
-            else
-                self.ui32NumOfPointsGT        = ui32NumOfPointsGT;
-            end
-            
             if self.objShapeModel.hasData() == true
                 self.bHasModel_ = true;
             end
 
-            % Allocate memory for landmarks if required
+            % Assign default value
+            self.ui32NumOfPointsGT        = objShapeModel.getNumOfVertices();
+
+            % Allocate memory for landmarks
             self.dPointsPositionsGT_TB = zeros(3, ui32NumOfPointsGT, 'double');
             self.i32LandmarksID        = zeros(1, ui32NumOfPointsGT, 'int32');
 
             % Store pose3 object
             self.objPose3_WorldFromPoseFrame = objPose3_WorldFromPoseFrame;
             
+            if ui32NumOfPointsGT > 0
+                self.ui32NumOfPointsGT = ui32NumOfPointsGT;
+
+                % Perform sampling of model
+                self = self.GenerateSimulatedPoints_TB(kwargs.enumPointGTsamplingMethod);
+            end
+            
         end
         
         % GETTERS
         function bool = hasLandmarks(self)
+            
+            bool = false;
             if self.enumPointGTsamplingMethod ~= -1
                 bool = true;
-            else
-                bool = false;
             end
         end
 
@@ -140,8 +147,8 @@ classdef CTargetEmulator < CSceneObject
         function [dPointsPositionsGT_TB, ui32PointsIDs] = GetPointsInTargetFrame(self, i32PointsIndices, bUseIndicesAsPtrs)
             arguments
                 self (1,1)
-                i32PointsIndices (1,:) int32 = 0
-                bUseIndicesAsPtrs (1,1) logical {isscalar} = false
+                i32PointsIndices  (1,:) int32 = 0
+                bUseIndicesAsPtrs (1,1) logical = false
             end
             
             assert(self.enumPointGTsamplingMethod ~= -1, 'No simulated GT points found. Did you forget to call "SampleMeshPoints" method first?') % Assert if points have been generated
