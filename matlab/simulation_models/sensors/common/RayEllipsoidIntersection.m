@@ -6,14 +6,15 @@ function [bIntersectFlag, dIntersectDistance, bFailureFlag, dIntersectPoint, ...
                                                                                                              dDCM_TFfromFrame, ...
                                                                                                              dDCM_EstTFfromFrame, ...
                                                                                                              bEvaluateJacobians) %#codegen
+% TODO review using GPT 5 Codex
 arguments (Input)
-    dRayOrigin_Frame                    (3,1) double {isvector, isnumeric}
-    dRayDirection_Frame                 (3,1) double {isvector, isnumeric}
-    dEllipsoidCentre_Frame              (3,1) double {ismatrix, isnumeric}
-    dEllipsoidInvDiagShapeCoeffs        (:,1) double {ismatrix, isnumeric} % [1/a^2; 1/b^2; 1/c^2]
-    dDCM_TFfromFrame                    (3,3) double {ismatrix, isnumeric} = eye(3)           % Required for jacobians
-    dDCM_EstTFfromFrame                 (3,3) double {ismatrix, isnumeric} = dDCM_TFfromFrame % Rotation including attitude error estimate
-    bEvaluateJacobians                  (1,2) {islogical, isscalar} = [true, true]; 
+    dRayOrigin_Frame                    (3,1) double {mustBeNumeric}
+    dRayDirection_Frame                 (3,1) double {mustBeNumeric}
+    dEllipsoidCentre_Frame              (3,1) double {mustBeNumeric}
+    dEllipsoidInvDiagShapeCoeffs        (:,1) double {mustBeNumeric} % [1/a^2; 1/b^2; 1/c^2]
+    dDCM_TFfromFrame                    (3,3) double {mustBeNumeric} = eye(3)           % Required for jacobians
+    dDCM_EstTFfromFrame                 (3,3) double {mustBeNumeric} = dDCM_TFfromFrame % Rotation including attitude error estimate
+    bEvaluateJacobians                  (1,2) logical = [true, true]; 
 end
 arguments (Output)
     bIntersectFlag
