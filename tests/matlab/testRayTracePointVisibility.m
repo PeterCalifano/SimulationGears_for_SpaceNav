@@ -3,18 +3,24 @@ charThisScriptPath = fileparts(mfilename('fullpath'));
 addpath(genpath(fullfile(charThisScriptPath, "..", "..")));
 cd(charThisScriptPath);
 
-profile on -history
-charShapeModelPath = fullfile(getenv('HOME'), "devDir", "rendering-sw", ...
-                            "corto_PeterCdev", "data/scenarios/S2_Itokawa/Shape", "25143_Itokawa_512ICQ.obj");
+% profile on
+%%% Itokawa models
+% charShapeModelPath = fullfile(getenv('HOME'), "devDir", "rendering-sw", ...
+%                             "corto_PeterCdev", "data/scenarios/S2_Itokawa/Shape", "25143_Itokawa_512ICQ.obj");
 
+charShapeModelPath = fullfile(getenv('HOME'), "devDir", "rendering-sw", ...
+                            "data", "asteroids", "Itokawa", "Itokawa_Hayabusa_50k_poly.obj");
+
+%%% Apophis models
 % charShapeModelPath = fullfile(getenv('HOME'), "devDir", "projects-DART", "data", "rcs1", "phase-C", "shape_models);
 
+%%% Load shape model and target emulator
 objShapeModel = CShapeModel("file_obj", charShapeModelPath, "km", "m", true);
 
 ui32MaxNumPoints = 5000;
 objTargetEmulator = CTargetEmulator(objShapeModel, ui32MaxNumPoints);
 
-profile viewer
+% profile viewer
 
 % [dPointsPositionsGT_TB_check, ui32pointsIDs_check] = objTargetEmulator.GetPointsInTargetFrame(ui32pointsIDs, false);
 [dPosVector_W, dRot3_WfromTB] = objTargetEmulator.GetPose();
@@ -79,6 +85,61 @@ strFcnOptions.bTwoSidedTest = true;
 strFcnOptions.bPointsAreMeshVertices = true;
 
 strTargetBody = objTargetEmulator.getTargetStruct();
+
+
+%% test_CRadiometricRGB_RT
+addpath(genpath("/home/peterc/devDir/rendering-sw/radiometric-rgb-raytracer/matlab"));
+addpath("/home/peterc/devDir/rendering-sw/radiometric-rgb-raytracer/build/wrap/radiometric_cpu_raytracer/");
+addpath("/home/peterc/devDir/rendering-sw/radiometric-rgb-raytracer/build/wrap/radiometric_cpu_raytracer_mex/");
+
+charSceneConfigFilePath = fullfile('/home/peterc/devDir/rendering-sw/radiometric-rgb-raytracer', 'tests', 'test_data', 'scene_configs', 'scene.yml');
+
+% Check if available
+charRTlibPath = which("radiometric_rgb_rt.CRadiometricRGB_RT");
+
+if not(isempty(charRTlibPath))
+    % Initialize raytracer
+    objRayTracer = radiometric_rgb_rt.CRadiometricRGB_RT();
+    objRayTracer.configureFromYamlFile(charSceneConfigFilePath, false)
+
+    % Add mesh
+    objRayTracer.addTriaMeshToScene(objShapeModel.dVerticesPos, double(objShapeModel.ui32triangVertexPtr));
+
+    dTestPointsDir_TB = dPointsPositionsGT_TB - dCameraPosition_TB;
+    dTestPointsDir_TB = dTestPointsDir_TB ./vecnorm(dTestPointsDir_TB, 2, 1);
+
+
+
+    tic
+    dIntersectPoints = objRayTracer.rayTraceDirections(dSunPosition_TB, ...
+                                                    dCameraPosition_TB, ...
+                                                    dDCM_TBfromCAM, ...
+                                                    dTestPointsDir_TB);
+    toc
+
+    objAxes = PlotMeshWithRays(objShapeModel.dVerticesPos, ...
+                                objShapeModel.ui32triangVertexPtr, ...
+                                dCameraPosition_TB, ...
+                                dPointsPositionsGT_TB);
+
+    % Compute depth of intersection points
+    bIntersectDistance = vecnorm(dIntersectPoints, 2, 1);
+    bValidPoints = bIntersectDistance > eps('double');
+    fprintf('Found %d intersections / %d total test points.\n', sum(bValidPoints), size(dTestPointsDir_TB, 2));
+    
+    dValidIntersectPoints = dIntersectPoints(:,bValidPoints);
+
+    % Plot scatter of depths
+    figure;
+    hold on
+    scatter3(dValidIntersectPoints(1,:), dValidIntersectPoints(2,:), dValidIntersectPoints(3,:), 8);
+
+    xlabel('X [m]')
+    ylabel('Y [m]')
+    zlabel('Z [m]')
+    objFig = DefaultPlotOpts(gcf, "bEnableGrid", false, "bUseBlackBackground", true);
+
+end
 
 %% test_RayTracePointVisibilityLocalPA_MEX
 
