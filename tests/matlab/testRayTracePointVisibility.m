@@ -106,17 +106,20 @@ if bHasExternalRaytracer
     % Add mesh
     objRayTracer.addTriaMeshToScene(objShapeModel.dVerticesPos, double(objShapeModel.ui32triangVertexPtr));
 
-    dTestPointsDir_TB = dPointsPositionsGT_TB - dCameraPosition_TB;
-    dTestPointsDir_TB = dTestPointsDir_TB ./vecnorm(dTestPointsDir_TB, 2, 1);
+    dTestPointsPos_TB = dPointsPositionsGT_TB - dCameraPosition_TB;
+    dTestPointsDir_TB = dTestPointsPos_TB ./vecnorm(dTestPointsPos_TB, 2, 1);
 
 
-
-    tic
     dIntersectPoints = objRayTracer.rayTraceDirections(dSunPosition_TB, ...
                                                     dCameraPosition_TB, ...
                                                     dDCM_TBfromCAM, ...
                                                     dTestPointsDir_TB);
-    toc
+
+    % Test visibility using dedicated method
+    bVisibilityMask = logical(objRayTracer.rayTracePointsVisibility(dSunPosition_TB, ...
+                                                        dCameraPosition_TB, ...
+                                                        dDCM_TBfromCAM, ...
+                                                        dPointsPositionsGT_TB));
 
     % objAxes = PlotMeshWithRays(objShapeModel.dVerticesPos, ...
     %                             objShapeModel.ui32triangVertexPtr, ...
@@ -127,8 +130,16 @@ if bHasExternalRaytracer
     bIntersectDistance = vecnorm(dIntersectPoints, 2, 1);
     bValidPoints = bIntersectDistance > eps('double');
     fprintf('Found %d intersections / %d total test points.\n', sum(bValidPoints), size(dTestPointsDir_TB, 2));
+    fprintf('Direct visibility check returned %d visible points / %d total test points.\n', sum(bVisibilityMask), size(dTestPointsDir_TB, 2));
+
+    % Reconstruct mask for visibility
+    dIntersectPointsFromCam = dIntersectPoints - dCameraPosition_TB;
+    dSquaredDistIntersect = vecnorm(dIntersectPointsFromCam, 2, 1);
+    bIsPointVisibleAndInFront = bValidPoints & ( dSquaredDistIntersect - vecnorm(dTestPointsPos_TB, 2, 1) > 0 ...
+                                                   & dSquaredDistIntersect - vecnorm(dTestPointsPos_TB, 2, 1) > eps('single') );
     
-    dValidIntersectPoints = dIntersectPoints(:,bValidPoints);
+    dValidIntersectPoints = dIntersectPoints(:, bValidPoints);
+    dValidVisiblePoints = dPointsPositionsGT_TB(:, bVisibilityMask);
 end
 
 %% test_RayTracePointVisibilityLocalPA_MEX
@@ -293,11 +304,11 @@ hold off;
 %%%%%%%%%%%%%%%%%
 if bHasExternalRaytracer
 
-
     % Plot scatter3 of points from two raytracing with shadow rays
     figure;
     hold on
-    scatter3(dValidIntersectPoints(1,:), dValidIntersectPoints(2,:), dValidIntersectPoints(3,:), 8, 'red', 'DisplayName', 'RGB-RT');
+    % scatter3(dValidIntersectPoints(1,:), dValidIntersectPoints(2,:), dValidIntersectPoints(3,:), 8, 'red', 'DisplayName', 'RGB-RT');
+    scatter3(dValidVisiblePoints(1,:), dValidVisiblePoints(2,:), dValidVisiblePoints(3,:), 8, 'green', 'DisplayName', 'RGB-RT visibility');
     scatter3(dPointsPositionsGT_RTwithShadowRays(1,:), dPointsPositionsGT_RTwithShadowRays(2,:), ...
         dPointsPositionsGT_RTwithShadowRays(3,:), 8, 'blue', 'DisplayName', 'MATLAB impl.');
 
@@ -306,7 +317,6 @@ if bHasExternalRaytracer
     zlabel('Z [m]')
     objFig = DefaultPlotOpts(gcf, "bEnableGrid", false, "bUseBlackBackground", true);
     axis equal
-
 
 end
 
