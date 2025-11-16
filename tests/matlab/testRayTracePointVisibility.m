@@ -96,8 +96,9 @@ charSceneConfigFilePath = fullfile('/home/peterc/devDir/rendering-sw/radiometric
 
 % Check if available
 charRTlibPath = which("radiometric_rgb_rt.CRadiometricRGB_RT");
+bHasExternalRaytracer = not(isempty(charRTlibPath));
 
-if not(isempty(charRTlibPath))
+if bHasExternalRaytracer
     % Initialize raytracer
     objRayTracer = radiometric_rgb_rt.CRadiometricRGB_RT();
     objRayTracer.configureFromYamlFile(charSceneConfigFilePath, false)
@@ -117,10 +118,10 @@ if not(isempty(charRTlibPath))
                                                     dTestPointsDir_TB);
     toc
 
-    objAxes = PlotMeshWithRays(objShapeModel.dVerticesPos, ...
-                                objShapeModel.ui32triangVertexPtr, ...
-                                dCameraPosition_TB, ...
-                                dPointsPositionsGT_TB);
+    % objAxes = PlotMeshWithRays(objShapeModel.dVerticesPos, ...
+    %                             objShapeModel.ui32triangVertexPtr, ...
+    %                             dCameraPosition_TB, ...
+    %                             dPointsPositionsGT_TB);
 
     % Compute depth of intersection points
     bIntersectDistance = vecnorm(dIntersectPoints, 2, 1);
@@ -128,17 +129,6 @@ if not(isempty(charRTlibPath))
     fprintf('Found %d intersections / %d total test points.\n', sum(bValidPoints), size(dTestPointsDir_TB, 2));
     
     dValidIntersectPoints = dIntersectPoints(:,bValidPoints);
-
-    % Plot scatter of depths
-    figure;
-    hold on
-    scatter3(dValidIntersectPoints(1,:), dValidIntersectPoints(2,:), dValidIntersectPoints(3,:), 8);
-
-    xlabel('X [m]')
-    ylabel('Y [m]')
-    zlabel('Z [m]')
-    objFig = DefaultPlotOpts(gcf, "bEnableGrid", false, "bUseBlackBackground", true);
-
 end
 
 %% test_RayTracePointVisibilityLocalPA_MEX
@@ -280,7 +270,7 @@ hold on;
 % Local phase angle check (ellipsoid assumption)
 dPointsPositionsGT_RTwithEllipsLocalPA = dPointsPositionsGT_TB(:, bAllPointsVisibilityMask_legacyEllipsLocalPA);
 objPointCloud_RTwithEllipsLocalPA = plot3(dPointsPositionsGT_RTwithEllipsLocalPA(1, :), dPointsPositionsGT_RTwithEllipsLocalPA(2, :), ...
-                dPointsPositionsGT_RTwithEllipsLocalPA(3,:), 'bxo', 'MarkerSize', 4, 'DisplayName', 'RT + Ellips. Local PA');
+                dPointsPositionsGT_RTwithEllipsLocalPA(3,:), 'bx', 'MarkerSize', 4, 'DisplayName', 'RT + Ellips. Local PA');
 
 dPointsPositionsGT_RTwithShadowRays = dPointsPositionsGT_TB(:, bAllPointsVisibilityMask_RTwithShadowRays);
 objPointCloud_RTwithShadowRays = plot3(dPointsPositionsGT_RTwithShadowRays(1, :), dPointsPositionsGT_RTwithShadowRays(2, :), ...
@@ -300,6 +290,25 @@ legend([objPatchModel, objPointCloud_GT, objDirToSun, ...
     objPointCloud_RTwithEllipsLocalPA, objPointCloud_RTwithShadowRays], 'TextColor', charTextColor);
 hold off;
 
+%%%%%%%%%%%%%%%%%
+if bHasExternalRaytracer
+
+
+    % Plot scatter3 of points from two raytracing with shadow rays
+    figure;
+    hold on
+    scatter3(dValidIntersectPoints(1,:), dValidIntersectPoints(2,:), dValidIntersectPoints(3,:), 8, 'red', 'DisplayName', 'RGB-RT');
+    scatter3(dPointsPositionsGT_RTwithShadowRays(1,:), dPointsPositionsGT_RTwithShadowRays(2,:), ...
+        dPointsPositionsGT_RTwithShadowRays(3,:), 8, 'blue', 'DisplayName', 'MATLAB impl.');
+
+    xlabel('X [m]')
+    ylabel('Y [m]')
+    zlabel('Z [m]')
+    objFig = DefaultPlotOpts(gcf, "bEnableGrid", false, "bUseBlackBackground", true);
+    axis equal
+
+
+end
 
 
 %%%%%%%%%%%%%%%%%
