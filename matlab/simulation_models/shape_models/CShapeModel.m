@@ -324,7 +324,7 @@ classdef CShapeModel < CBaseDatastruct
 
             if ~isempty(vMatch)
                 charVBlock = sprintf('%s\n', vMatch{:});           % Single big char array
-                dVerticesCoords = sscanf(charVBlock, 'v %f %f %f\n', [3, Inf]).';
+                dVerticesCoords = sscanf(charVBlock, 'v %f %f %f\n', [3, Inf]);
             else
                 dVerticesCoords = zeros(0,3);
             end
@@ -334,7 +334,7 @@ classdef CShapeModel < CBaseDatastruct
 
             if ~isempty(vtMatch) && ~bVertFacesOnly
                 charVTBlock = sprintf('%s\n', vtMatch{:});
-                dTexCoords = sscanf(charVTBlock, 'vt %f %f\n', [2, Inf]).';
+                dTexCoords = sscanf(charVTBlock, 'vt %f %f\n', [2, Inf]);
             else
                 dTexCoords = zeros(0,2);
             end
@@ -344,7 +344,7 @@ classdef CShapeModel < CBaseDatastruct
 
             if ~isempty(vnMatch) && ~bVertFacesOnly
                 charVNBlock = sprintf('%s\n', vnMatch{:});
-                dNormals = sscanf(charVNBlock, 'vn %f %f %f\n', [3, Inf]).';
+                dNormals = sscanf(charVNBlock, 'vn %f %f %f\n', [3, Inf]);
             else
                 dNormals = zeros(0,3);
             end
@@ -366,9 +366,9 @@ classdef CShapeModel < CBaseDatastruct
                     charFBlock = sprintf('%s\n', fMatch{:});
                     ui32AllFaceLines = sscanf(charFBlock, 'f %u/%u/%u %u/%u/%u %u/%u/%u\n', [9, Inf]);
                     ui32AllFaceLines = uint32(ui32AllFaceLines);              % 9-by-N
-                    ui32TrianglesIndex        = transpose(ui32AllFaceLines(1:3:end, :));
-                    ui32TrianglesTexIndex     = transpose(ui32AllFaceLines(2:3:end, :));
-                    ui32TrianglesNormalsIndex = transpose(ui32AllFaceLines(3:3:end, :));
+                    ui32TrianglesIndex        = ui32AllFaceLines(1:3:end, :);
+                    ui32TrianglesTexIndex     = ui32AllFaceLines(2:3:end, :);
+                    ui32TrianglesNormalsIndex = ui32AllFaceLines(3:3:end, :);
                 end
 
             elseif bHasVT && not(bVertFacesOnly)
@@ -378,8 +378,8 @@ classdef CShapeModel < CBaseDatastruct
                     charFBlock = sprintf('%s\n', fMatch{:});
                     ui32AllFaceLines = sscanf(charFBlock, 'f %u/%u %u/%u %u/%u\n', [6, Inf]);
                     ui32AllFaceLines = uint32(ui32AllFaceLines);
-                    ui32TrianglesIndex    = transpose(ui32AllFaceLines(1:2:end, :));
-                    ui32TrianglesTexIndex = transpose(ui32AllFaceLines(2:2:end, :));
+                    ui32TrianglesIndex    = ui32AllFaceLines(1:2:end, :);
+                    ui32TrianglesTexIndex = ui32AllFaceLines(2:2:end, :);
                 end
 
             elseif bHasVN && not(bVertFacesOnly)
@@ -389,8 +389,8 @@ classdef CShapeModel < CBaseDatastruct
                     charFBlock = sprintf('%s\n', fMatch{:});
                     ui32AllFaceLines = sscanf(charFBlock, 'f %u//%u %u//%u %u//%u', [6, Inf]);
                     ui32AllFaceLines = uint32(ui32AllFaceLines);
-                    ui32TrianglesIndex        = transpose(ui32AllFaceLines(1:2:end, :));
-                    ui32TrianglesNormalsIndex = transpose(ui32AllFaceLines(2:2:end, :));
+                    ui32TrianglesIndex        = ui32AllFaceLines(1:2:end, :);
+                    ui32TrianglesNormalsIndex = ui32AllFaceLines(2:2:end, :);
                 end
             
             else
@@ -399,7 +399,7 @@ classdef CShapeModel < CBaseDatastruct
                 if ~isempty(fMatch)
                     charFBlock = sprintf('%s\n', fMatch{:});
                     ui32AllFaceLines = sscanf(charFBlock, 'f %u %u %u\n', [3, Inf]);
-                    ui32TrianglesIndex = transpose(uint32(ui32AllFaceLines));
+                    ui32TrianglesIndex = uint32(ui32AllFaceLines);
                 end
             end
 

@@ -1,4 +1,4 @@
-function o_dLMposMap = generateLandmarksMap(i_strShapeModel, i_dSamplingGrid)%#codegen
+function dLMposMap = generateLandmarksMap(strShapeModel, dSamplingGrid)%#codegen
 %% PROTOTYPE
 % o_dLMposMap = generateLandmarksMap(strShapeModel.dVerticesPos, i_dSamplingGrid)
 % -------------------------------------------------------------------------------------------------------------
@@ -39,32 +39,32 @@ function o_dLMposMap = generateLandmarksMap(i_strShapeModel, i_dSamplingGrid)%#c
 % i_strShapeModel.ui32triangVertexPtr = trianglesVertices;
 % i_strShapeModel.dVerticesPos =  modelVertices;
 
-assert(size(i_strShapeModel.dVerticesPos, 1) == 3, 'Input shape model point cloud must be [3xN].');
+assert(size(strShapeModel.dVerticesPos, 1) == 3, 'Input shape model point cloud must be [3xN].');
 
-if not(isscalar(i_dSamplingGrid))
+if not(isscalar(dSamplingGrid))
     
     % DEVNOTE: ACHTUNG, this branch never tested sufficiently. Legacy function to avoid.
 
-    assert(size(i_dSamplingGrid, 2) == 4, 'Input sampling grid must be [Mx4].');
+    assert(size(dSamplingGrid, 2) == 4, 'Input sampling grid must be [Mx4].');
 
     % Get size of sampling grid
-    NPoints = size(i_dSamplingGrid, 1);
+    NPoints = size(dSamplingGrid, 1);
 
     % Normalize shape model 3D cloud
-    unitDirsTo3DPoints = i_strShapeModel.dVerticesPos./vernorm(i_strShapeModel.dVerticesPos, 2, 2);
+    unitDirsTo3DPoints = strShapeModel.dVerticesPos./vernorm(strShapeModel.dVerticesPos, 2, 2);
     
-    o_dLMposMap = coder.nullcopy(zeros(NPoints, 4));
+    dLMposMap = coder.nullcopy(zeros(NPoints, 4));
 
     for idLM = 1:NPoints
 
         % Compute unit vector to ith sampling point
-        unitDirToSamplPoint = transpose(i_dSamplingGrid(idLM, 2:4));
+        unitDirToSamplPoint = transpose(dSamplingGrid(idLM, 2:4));
         
         % Compute dot product = cosine of "in-between" angle
-        cosAngleDistMatrix = zeros(size(i_strShapeModel.dVerticesPos, 1), 2);
+        cosAngleDistMatrix = zeros(size(strShapeModel.dVerticesPos, 1), 2);
 
-        cosAngleDistMatrix(:, 1) = dot( repmat(unitDirsTo3DPoints, 1, size(i_strShapeModel.dVerticesPos, 1) ), unitDirToSamplPoint);
-        cosAngleDistMatrix(:, 2) = 1:size(i_strShapeModel.dVerticesPos, 1);
+        cosAngleDistMatrix(:, 1) = dot( repmat(unitDirsTo3DPoints, 1, size(strShapeModel.dVerticesPos, 1) ), unitDirToSamplPoint);
+        cosAngleDistMatrix(:, 2) = 1:size(strShapeModel.dVerticesPos, 1);
 
         % Find first two closest unit vectors in reduced 3D points cloud 
         sortedDistMatrix = sort( cosAngleDistMatrix( cosAngleDistMatrix(:, 1) >= 0, :), 1, "ascend");
@@ -81,8 +81,8 @@ if not(isscalar(i_dSamplingGrid))
             idP1 = sortedDistMatrix(1, 2);
             idP3 = sortedDistMatrix(3, 2);
 
-            dist1 = norm(i_strShapeModel.dVerticesPos(idP1, :));
-            dist3 = norm(i_strShapeModel.dVerticesPos(idP3, :));
+            dist1 = norm(strShapeModel.dVerticesPos(idP1, :));
+            dist3 = norm(strShapeModel.dVerticesPos(idP3, :));
 
             if dist1 >= dist3
                 idP = idP1;
@@ -95,22 +95,22 @@ if not(isscalar(i_dSamplingGrid))
         end
 
         % Store in LM map
-        o_dLMposMap(idLM, 1) = idLM;
-        o_dLMposMap(idLM, 2:4) = i_strShapeModel.dVerticesPos(:, sortedDistMatrix(idP, 2) );
+        dLMposMap(idLM, 1) = idLM;
+        dLMposMap(idLM, 2:4) = strShapeModel.dVerticesPos(:, sortedDistMatrix(idP, 2) );
 
     end
 
-elseif isscalar(i_dSamplingGrid)
+elseif isscalar(dSamplingGrid)
     % RANDOM SAMPLING
 
     % Generate random ID for extraction
     
 %     samplingIDs = randi(size(i_strShapeModel.dVerticesPos, 2), i_dSamplingGrid, 1);
-    samplingIDs = datasample(1:size(i_strShapeModel.dVerticesPos, 2), ...
-        i_dSamplingGrid, 'Replace', false); % Required to avoid repetition
+    samplingIDs = datasample(1:size(strShapeModel.dVerticesPos, 2), ...
+        dSamplingGrid, 'Replace', false); % Required to avoid repetition
 
     % Extract points from input point cloud
-    o_dLMposMap = [ samplingIDs; i_strShapeModel.dVerticesPos(:, samplingIDs)];
+    dLMposMap = [ samplingIDs; strShapeModel.dVerticesPos(:, samplingIDs)];
 
 end
 

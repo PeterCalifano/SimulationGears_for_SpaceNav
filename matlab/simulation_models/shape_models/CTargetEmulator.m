@@ -259,7 +259,8 @@ classdef CTargetEmulator < CSceneObject
                 % Generate landmarks in target fixed frame
 
                 strShapeStruct = self.objShapeModel.getShapeStruct();
-                [dAllPointsPositionsGT_TB] = generateLandmarksMap(strShapeStruct, min(self.ui32NumOfPointsGT, size(strShapeStruct.dVerticesPos, 2)) );
+                [dAllPointsPositionsGT_TB] = generateLandmarksMap(strShapeStruct, ...
+                    min(self.ui32NumOfPointsGT, size(strShapeStruct.dVerticesPos, 2)) );
 
                 self.dPointsPositionsGT_TB = dAllPointsPositionsGT_TB(2:4, :);
                 self.i32LandmarksID = int32(dAllPointsPositionsGT_TB(1, :));
