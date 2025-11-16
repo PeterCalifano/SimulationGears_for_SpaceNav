@@ -688,11 +688,28 @@ classdef (Abstract) CBaseDatastruct < handle & matlab.mixin.Copyable
 
         end
 
-        function [] = fromYamlStatic(charInputFile)
+        function varOut = fromYamlStatic(charInputFile, charClassName)
             arguments
-                charInputFile % either yaml string or path to yaml file
+                charInputFile (1,:) char {mustBeFile} % either yaml string or path to yaml file
+                charClassName (1,:) char {mustBeText} = ""
             end
             % TODO, requires yaml package. Re-use code from operative dataset generation
+
+            % Create class required by user if specified and build it if possible
+            if not(isempty(which()))
+                try
+                    varOut = feval(charClassName);
+                catch ME
+
+                end
+
+            else
+                % Load yaml and output as struct
+                varOut
+            end
+
+
+
         end
 
         function [] = fromJsonStatic(charInputFile)
