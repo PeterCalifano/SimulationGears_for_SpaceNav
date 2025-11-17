@@ -5,8 +5,8 @@ function [objShapeModel, strBpyCommManagerPaths] = DefineShapeModel(enumTargetNa
 arguments
     enumTargetName      (1,:) {mustBeA(enumTargetName, ["string", "char", "EnumScenarioName"]), ...
         mustBeMember(enumTargetName, ["Apophis", "Itokawa", "Bennu", "Moon", "Mars", "Ceres", "Dydimos", "Eros", "NotDefined"])}
-    charDataRootPath    (1,:) string = fullfile(getenv("HOME"), "devDir/nav-backend/data/SPICE_kernels")
-    charBpyRootPath     (1,:) string = fullfile(getenv("HOME"), "devDir/rendering-sw/corto_PeterCdev")
+    charDataRootPath    (1,:) string = fullfile(getenv("WS_NAVSYS"), "nav-backend/data/SPICE_kernels")
+    charBpyRootPath     (1,:) string = fullfile(getenv("WS_NAVSYS"), "rendering-sw/corto_PeterCdev")
 end
 arguments
     options.bVertFacesOnly              (1,1) logical = true;
@@ -57,9 +57,9 @@ end
 % Assert path existent
 assert(isfolder(charDataRootPath), sprintf("ERROR: input data path %s not found", charDataRootPath));
 
-[~, charUsrName] = system("whoami"); % Get user
-assert(contains(charUsrName, "peter") || contains(string(charUsrName(1:end-1)), "peterc-flip\pietr"), ...
-    'ERROR: current implementation is only valid for peterc machines due to hardcoded paths.')
+% [~, charUsrName] = system("whoami"); % Get user
+% assert(contains(charUsrName, "peter") || contains(string(charUsrName(1:end-1)), "peterc-flip\pietr"), ...
+%     'ERROR: current implementation is only valid for peterc machines due to hardcoded paths.')
 
 charCallDir = pwd;
 
