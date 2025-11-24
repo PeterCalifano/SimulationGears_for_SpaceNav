@@ -77,7 +77,7 @@ end
 
 objCurrentAx = gca;
 % Apply options
-ApplyOptions(objFig, objCurrentAx, kwargs.charRenderer, charTextColor, charBackGroundColor);
+ApplyOptions(objFig, objCurrentAx, kwargs.charRenderer, charTextColor, charBackGroundColor, kwargs.bEnableGrid);
 
 
 end
