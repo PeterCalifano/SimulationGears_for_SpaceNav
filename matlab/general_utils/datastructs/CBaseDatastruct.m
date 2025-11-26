@@ -11,7 +11,6 @@ classdef (Abstract) CBaseDatastruct < handle & matlab.mixin.Copyable
     % 02-06-2025    Pietro Califano     Upgrade to remove empty fields when dumping to struct, json, yaml;
     %                                   fix yml dump pipeline, add warning suppression
     % 25-08-2025    Pietro Califano     [MAJOR] Implement prototype methods "from" struct and yaml.
-    %                                   Development of release version still open.
     % 27-08-2025    Pietro Califano     Minor improvement to avoid unnecessary warning.
     % 28-09-2025    Pietro Califano     Extend functionalities to fully support static usage of the class
     % 04-10-2025    Pietro Califano     [MAJOR] Extend functionalities to support input objects and struct
@@ -132,9 +131,9 @@ classdef (Abstract) CBaseDatastruct < handle & matlab.mixin.Copyable
             % 5) Return the populated instance.
             arguments
                 self     (1,1) {mustBeA(self, "CBaseDatastruct")}
-                strInput (1,1) struct {isstruct}
-                bStrictUnknown  (1,1) logical {islogical} = true
-                bStrictMissing  (1,1) logical {islogical} = false
+                strInput (1,1) struct
+                bStrictUnknown  (1,1) logical = true
+                bStrictMissing  (1,1) logical = false
             end
 
             % Unwrap wrapper if present: struct('obj<Class>', payload)
@@ -275,7 +274,7 @@ classdef (Abstract) CBaseDatastruct < handle & matlab.mixin.Copyable
                 self (1,1) {mustBeA(self, "CBaseDatastruct")}
                 charInputJson {mustBeText}
                 bIsFile {mustBeScalarOrEmpty} = []   % Auto-detect if empty
-                bStrict (1,1) logical {islogical} = false
+                bStrict (1,1) logical = false
             end
             % ACHTUNG: implementation not fully tested!
             if isempty(bIsFile)
@@ -700,7 +699,7 @@ classdef (Abstract) CBaseDatastruct < handle & matlab.mixin.Copyable
                 charTargetDatastruct % Specify name of target data struct
             end
             arguments (Output)
-                objDatastruct (1,1) {isa(objDatastruct, 'CBaseDatastruct')}
+                objDatastruct (1,1) {mustBeA(objDatastruct, 'CBaseDatastruct')}
             end
 
             % Method to convert struct to class (with fields check)
