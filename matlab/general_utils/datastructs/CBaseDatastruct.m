@@ -484,8 +484,27 @@ classdef (Abstract) CBaseDatastruct < handle & matlab.mixin.Copyable
                 strTmp = CBaseDatastruct.toStructStatic(objDatastruct, bFlattenArrays);
             end
 
+            % Ensure to get the snakeyaml jar
+            CBaseDatastruct.loadSnakeYaml();
+
             % Emit a YAML string
             charYamlString = yaml.dump(strTmp, "auto");
+        end
+
+        function [charSnakeYamlFilePath] = loadSnakeYaml()
+
+            charYamlLibPath = which("yaml.dump");
+            assert(not(isempty(charYamlLibPath)), 'ERROR: yaml package not found. Please install it from community packages.');
+            charYamlLibPath = fileparts(charYamlLibPath);
+            mustBeFolder(charYamlLibPath);
+
+            charSnakeYamlFilePath = fullfile(charYamlLibPath, 'snakeyaml', 'snakeyaml-1.30.jar');
+
+            if ~ismember(charSnakeYamlFilePath, javaclasspath('-dynamic'))
+                javaaddpath(charSnakeYamlFilePath);
+            end
+
+            import org.yaml.snakeyaml.*;
         end
 
         function [charJsonString] = toJsonStatic(objDatastruct, bFlattenArrays, bPrettyPrint)

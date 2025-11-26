@@ -67,9 +67,6 @@ end %#codegen
 %% DEPENDENCIES
 % [-]
 % -------------------------------------------------------------------------------------------------------------
-%% Future upgrades
-% [-]
-% -------------------------------------------------------------------------------------------------------------
 
 %% INPUT MANAGEMENT
 if coder.target('MATLAB') || coder.target('MEX')
@@ -164,6 +161,10 @@ if ~isempty(dBodyEphemerides)
                 dPos3rdBodiesToSC = zeros(3, 1); % TODO modify this for static sizing
                 dPos3rdBodiesToSC(:) = dxState_IN(ui16posVelIdx(1:3)) - d3rdBodiesPos_IN(1:3, idB);
 
+                if coder.target('MATLAB') || coder.target('MEX')
+                    assert(any(abs(dPos3rdBodiesToSC) > eps('single')), 'ERROR: distance to 3rd body cannot be near zero!')
+                end
+
                 % Compute 3rd body acceleration
                 d3rdBodyPosFromMain_IN = d3rdBodiesPos_IN(:, idB) - dMainBodyPos_IN;
 
@@ -181,7 +182,9 @@ if ~isempty(dBodyEphemerides)
         dSCdistToSun(:) = norm(dPosSunToSC);
 
         if coder.target('MATLAB') || coder.target('MEX')
-            assert(abs(dSCdistToSun) > eps, 'ERROR: distance to the Sun cannot be zero!')
+            assert(any(abs(dSunPos_IN) > eps('single')), 'ERROR: Sun position cannot be near zero!')
+            assert(any(abs(dSCdistToSun) > eps('single')), 'ERROR: distance to the Sun cannot be zero!')
+            assert(any(abs(dPosSunFromMain_IN) > eps('single')), 'ERROR: distance from main body to the Sun cannot be near zero!')
         end
 
         % DEVNOTE: replace with more accurate formula to handle it in double precision

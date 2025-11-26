@@ -6,7 +6,8 @@ clc
 includeDirectories();
 
 %% TEST: CSPICEkerLoader
-charKernelsPATH = '/home/peterc/devDir/nav-backend/simulationCodes/data/SPICE_kernels';
+charWorkDir = getenv("WS_NAVSYS");
+charKernelsPATH = fullfile(charWorkDir, 'nav-backend/data/SPICE_kernels');
 CSPICEkerLoader(charKernelsPATH, EnumScenarioName.Itokawa);
 
 %% TEST: CShapeModel
