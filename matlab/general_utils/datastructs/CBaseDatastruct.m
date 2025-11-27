@@ -672,7 +672,7 @@ classdef (Abstract) CBaseDatastruct < handle & matlab.mixin.Copyable
                     fclose(fileID);
 
                 case "json"
-                    if isempty(charFileExt) || strcmpi(charFileExt, "")
+                    if isempty(charFileExt) || strcmpi(charFileExt, "") || strcmpi(charFileExt, ".cfg")
                         charFilename = strcat(charFilename, '.json');
                     end
 
