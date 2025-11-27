@@ -81,7 +81,6 @@ if not(strcmpi(options.charShapeModelObjPath, ""))
 options.charShapeModelObjPath;
 end
 
-
 switch enumTargetName
     case "Apophis"
         % DEVNOTE: currently assumes rcs-1 simulator loader
@@ -116,7 +115,7 @@ switch enumTargetName
 
         objShapeModel = CShapeModel('file_obj', charShapeModelObjPath_, ...
             'km', options.charOutputLengthUnits, options.bVertFacesOnly, char(enumTargetName), options.bLoadShapeModel);
-        objShapeModel.charModelName = "Apophis";
+        % objShapeModel.charModelName = "Apophis";
 
         try
             ui32ID = 20099942;
@@ -169,7 +168,7 @@ switch enumTargetName
                                          char(enumTargetName), ...
                                          false);
 
-            objShapeModel.charModelName = "Itokawa";
+            % objShapeModel.charModelName = "Itokawa";
         end
 
 
@@ -211,7 +210,7 @@ switch enumTargetName
         % Define shape matrix in principal TF
         dEllipsoidABC = dLengthScaleCoeff * [0.25278, 0.24620, 0.22869]; % [m] or [km]
         objShapeModel.dTargetShapeMatrix_OF = diag([1/dEllipsoidABC(1)^2, 1/dEllipsoidABC(2)^2, 1/dEllipsoidABC(3)^2]);
-        objShapeModel.charModelName = "Bennu";
+        % objShapeModel.charModelName = "Bennu";
 
 
     case "Moon"
@@ -241,7 +240,7 @@ switch enumTargetName
         % Define shape matrix in principal TF
         dEllipsoidABC = objShapeModel.dObjectReferenceSize * ones(1,3); % [m] or [km]
         objShapeModel.dTargetShapeMatrix_OF = diag([1/dEllipsoidABC(1)^2, 1/dEllipsoidABC(2)^2, 1/dEllipsoidABC(3)^2]);
-        objShapeModel.charModelName = "Moon";
+        % objShapeModel.charModelName = ;
 
     case "Mars"
 
@@ -260,7 +259,7 @@ switch enumTargetName
         % Define shape matrix in principal TF
         dEllipsoidABC = dLengthScaleCoeff * 1E-3 * [3395428, 3395428, 3377678]; % [m] or [km]
         objShapeModel.dTargetShapeMatrix_OF = diag([1/dEllipsoidABC(1)^2, 1/dEllipsoidABC(2)^2, 1/dEllipsoidABC(3)^2]);
-        objShapeModel.charModelName = "Mars";
+        % objShapeModel.charModelName = "Mars";
         
     case "Ceres" 
         charShapeModelObjPath_ = ""; % None for now
@@ -278,7 +277,7 @@ switch enumTargetName
         % Define shape matrix in principal TF
         dEllipsoidABC = dLengthScaleCoeff * 1E-3 * [483.1, 481.0, 445.9]; % [m] or [km]
         objShapeModel.dTargetShapeMatrix_OF = diag([1/dEllipsoidABC(1)^2, 1/dEllipsoidABC(2)^2, 1/dEllipsoidABC(3)^2]);
-        objShapeModel.charModelName = "Ceres";
+        % objShapeModel.charModelName = "Ceres";
 
     case "Dydimos"
         error('Not implemented yet')
