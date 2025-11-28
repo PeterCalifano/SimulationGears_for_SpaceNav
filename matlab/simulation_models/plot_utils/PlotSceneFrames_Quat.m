@@ -4,20 +4,20 @@ function [objFig, cellFramesAxesGlobal] = PlotSceneFrames_Quat(dSceneEntityOrigi
                                                             dCameraQuat_RenderFrameFromCam, ...
                                                             kwargs)
 arguments
-    dSceneEntityOriginArray_RenderFrame     (3,:) double {ismatrix, isnumeric}
-    dSceneEntityQuatArray_RenderFrameFromTF (4,:) double {ismatrix, isnumeric}
-    dCameraOrigin_RenderFrame               (3,1) double {ismatrix, isnumeric}
-    dCameraQuat_RenderFrameFromCam          (4,1) double {ismatrix, isnumeric} 
+    dSceneEntityOriginArray_RenderFrame     (3,:) double {mustBeNumeric}
+    dSceneEntityQuatArray_RenderFrameFromTF (4,:) double {mustBeNumeric}
+    dCameraOrigin_RenderFrame               (3,1) double {mustBeNumeric}
+    dCameraQuat_RenderFrameFromCam          (4,1) double {mustBeNumeric}
 end
 arguments
     kwargs.cellPlotColors       (1,:) cell = {};
     kwargs.cellPlotNames        (1,:) cell = {};
     kwargs.charFigTitle         (1,:) string {mustBeA(kwargs.charFigTitle, ["string", "char"])} = "Reference frames visualization"
     kwargs.objFig               (1,1) {isscalar, mustBeA(kwargs.objFig, ["double", "matlab.ui.Figure"])} = 0;
-    kwargs.bUseBlackBackground  (1,1) logical {islogical, isscalar} = false;
-    kwargs.bEnableLegend        (1,1) logical {isscalar, islogical} = true;
-    kwargs.dAxisScale           (1,1) double {isscalar, isnumeric} = 1.0     
-    kwargs.bUsePhysicalPosition (1,1) logical {islogical, isscalar} = false;
+    kwargs.bUseBlackBackground  (1,1) logical = false;
+    kwargs.bEnableLegend        (1,1) logical = true;
+    kwargs.dAxisScale           (1,1) double {mustBeNumeric} = 1.0     
+    kwargs.bUsePhysicalPosition (1,1) logical = false;
 end
 %% SIGNATURE
 % [objFig] = PlotSceneFrames_Quat(dSceneEntityOriginArray_RenderFrame, ...
@@ -41,19 +41,20 @@ end
 % -------------------------------------------------------------------------------------------------------------
 %% INPUT
 % arguments
-%     dSceneEntityOriginArray_RenderFrame     (3,:) double {ismatrix, isnumeric}
-%     dSceneEntityQuatArray_RenderFrameFromTF (4,:) double {ismatrix, isnumeric}
-%     dCameraOrigin_RenderFrame               (3,1) double {ismatrix, isnumeric}
-%     dCameraQuat_RenderFrameFromCam          (4,1) double {ismatrix, isnumeric} 
+%     dSceneEntityOriginArray_RenderFrame     (3,:) double {mustBeNumeric}
+%     dSceneEntityQuatArray_RenderFrameFromTF (4,:) double {mustBeNumeric}
+%     dCameraOrigin_RenderFrame               (3,1) double {mustBeNumeric}
+%     dCameraQuat_RenderFrameFromCam          (4,1) double {mustBeNumeric}
 % end
 % arguments
 %     kwargs.cellPlotColors       (1,:) cell = {};
 %     kwargs.cellPlotNames        (1,:) cell = {};
 %     kwargs.charFigTitle         (1,:) string {mustBeA(kwargs.charFigTitle, ["string", "char"])} = "Reference frames visualization"
 %     kwargs.objFig               (1,1) {isscalar, mustBeA(kwargs.objFig, ["double", "matlab.ui.Figure"])} = 0;
-%     kwargs.bUseBlackBackground  (1,1) logical {islogical, isscalar} = false;
-%     kwargs.bEnableLegend        (1,1) logical {isscalar, islogical} = true;
-%     kwargs.dAxisScale           (1,1) double {isscalar, isnumeric} = 1.0          
+%     kwargs.bUseBlackBackground  (1,1) logical = false;
+%     kwargs.bEnableLegend        (1,1) logical = true;
+%     kwargs.dAxisScale           (1,1) double {mustBeNumeric} = 1.0     
+%     kwargs.bUsePhysicalPosition (1,1) logical = false;
 % end
 % -------------------------------------------------------------------------------------------------------------
 %% OUTPUT
@@ -65,9 +66,7 @@ end
 %% DEPENDENCIES
 % [-]
 % -------------------------------------------------------------------------------------------------------------
-%% Future upgrades
-% [-]
-% -------------------------------------------------------------------------------------------------------------
+
 %% Function code
 % TODO: add optional plot of the camera using computer vision toolbox: 
 % https://www.mathworks.com/help/vision/ref/plotcamera.html
