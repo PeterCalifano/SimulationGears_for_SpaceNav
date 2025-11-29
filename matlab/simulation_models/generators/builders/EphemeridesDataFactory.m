@@ -43,11 +43,11 @@ end
 % strDynParams
 % strMainBodyRefData
 % str3rdBodyRefData = []
-% kwargs.bGroundTruthEphemerides  (1,1) logical {isscalar, islogical} = true
-% kwargs.bEnableInterpValidation  (1,1) logical {isscalar, islogical} = true
-% kwargs.bAdd3rdBodiesPosition    (1,1) logical {isscalar, islogical} = true
-% kwargs.bAdd3rdBodiesAttitude    (1,1) logical {isscalar, islogical} = false
-% kwargs.bUseInterpFcnFromRCS1    (1,1) logical {isscalar, islogical} = false 
+% kwargs.bGroundTruthEphemerides  (1,1) logical = true
+% kwargs.bEnableInterpValidation  (1,1) logical = true
+% kwargs.bAdd3rdBodiesPosition    (1,1) logical = true
+% kwargs.bAdd3rdBodiesAttitude    (1,1) logical = false
+% kwargs.bUseInterpFcnFromRCS1    (1,1) logical = false 
 % -------------------------------------------------------------------------------------------------------------
 %% OUTPUT
 % strDynParams
