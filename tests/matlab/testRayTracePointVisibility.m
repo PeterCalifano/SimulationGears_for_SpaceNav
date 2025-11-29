@@ -317,6 +317,7 @@ if bHasExternalRaytracer
     zlabel('Z [m]')
     objFig = DefaultPlotOpts(gcf, "bEnableGrid", false, "bUseBlackBackground", true);
     axis equal
+    legend("Color", "w")
 
 end
 
