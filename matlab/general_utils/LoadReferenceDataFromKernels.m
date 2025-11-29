@@ -15,22 +15,22 @@ arguments (Input)
 end
 arguments (Input)
     kwargs.bIsTimeGridRelative      (1,1) logical {mustBeScalarOrEmpty} = true
-    kwargs.charTrajKernelFolderPath (1,:) char {mustBeFolder} = '.'
+    kwargs.charTrajKernelFolderPath (1,:) char {mustBeFolder, mustBeText} = '.'
     kwargs.dDeltaTimeStep           (1,1) double {mustBeNumeric} = 60.0
     kwargs.dEphTimes0toFinal        (2,1) double {mustBeNumeric} = [0;0]
     kwargs.bLoadManoeuvres          (1,1) logical = true;
-    kwargs.charKernelLengthUnits    (1,:) char {ischar, isstring, mustBeMember(kwargs.charKernelLengthUnits, ["km", "m"])} = "km";
-    kwargs.charOutputLengthUnits    (1,:) char {ischar, isstring, mustBeMember(kwargs.charOutputLengthUnits, ["km", "m"])} = "km";
-    kwargs.varTargetBodyID          {mustBeA(kwargs.varTargetBodyID, ["string", "char", "double", "int32", "uint32", "single"])} = varReferenceCentre % Defaults to reference centre in most cases
-    kwargs.cellAdditionalTargetsID     {mustBeA(kwargs.cellAdditionalTargetsID   , "cell")} = {};
-    kwargs.cellAdditionalTargetFrames  {mustBeA(kwargs.cellAdditionalTargetFrames, "cell")} = {};
-    kwargs.cellAdditionalTargetNames   {mustBeA(kwargs.cellAdditionalTargetNames , "cell")} = {};
+    kwargs.charKernelLengthUnits    (1,:) char {mustBeText, mustBeMember(kwargs.charKernelLengthUnits, ["km", "m"])} = "km";
+    kwargs.charOutputLengthUnits    (1,:) char {mustBeText, mustBeMember(kwargs.charOutputLengthUnits, ["km", "m"])} = "km";
+    kwargs.varTargetBodyID                 {mustBeA(kwargs.varTargetBodyID, ["string", "char", "double", "int32", "uint32", "single"])} = varReferenceCentre % Defaults to reference centre in most cases
+    kwargs.cellAdditionalTargetsID         {mustBeA(kwargs.cellAdditionalTargetsID   , "cell")} = {};
+    kwargs.cellAdditionalTargetFrames      {mustBeA(kwargs.cellAdditionalTargetFrames, "cell")} = {};
+    kwargs.cellAdditionalTargetNames       {mustBeA(kwargs.cellAdditionalTargetNames , "cell")} = {};
     kwargs.bAdditionalBodiesRequireAttitude (1,:) logical = false(0,0);
-    kwargs.charKernelTimescale       (1,:) char {mustBeMember(kwargs.charKernelTimescale, ...
+    kwargs.charKernelTimescale          (1,:) char {mustBeText, mustBeMember(kwargs.charKernelTimescale, ...
                                                         ["TAI", "TDB", "TDT", "TT", "ET", "JDTDB", "JDTDT", "JED", "GPS"])} = "ET";
-    kwargs.charUserDefTimescale     (1,:) char {mustBeMember(kwargs.charUserDefTimescale, ...
+    kwargs.charUserDefTimescale         (1,:) char {mustBeText, mustBeMember(kwargs.charUserDefTimescale, ...
                                                         ["TAI", "TDB", "TDT", "TT", "ET", "JDTDB", "JDTDT", "JED", "GPS"])} = "ET";
-    kwargs.bUseKernelInitialTimestamp (1,1) logical {mustBeScalarOrEmpty} = false
+    kwargs.bUseKernelInitialTimestamp   (1,1) logical {mustBeScalarOrEmpty} = false
 end
 arguments (Output)
     objReferenceMissionData     (1,1) SReferenceImagesDataset

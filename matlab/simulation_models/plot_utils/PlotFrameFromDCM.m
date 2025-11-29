@@ -5,47 +5,48 @@ function [cellFrameAxes, dZaxisVec, dXaxisVec, dYaxisVec] = PlotFrameFromDCM(dEn
                                                                              objFig, ...
                                                                              kwargs)
 arguments (Input)
-    dEntityOrigin_RenderFrame       (3,1) double {isvector, isnumeric}
-    dEntityDCM_RenderFrameFromTF    (3,3) double {ismatrix, isnumeric}
+    dEntityOrigin_RenderFrame       (3,1) double {mustBeNumeric}
+    dEntityDCM_RenderFrameFromTF    (3,3) double {mustBeNumeric}
     cellPlotColors                  (3,1) cell    
     cellPlotNames                   (3,1) cell 
-    objFig                          (1,1) {isscalar, mustBeA(objFig, ["double", "matlab.ui.Figure"])} = 0;
+    objFig                          (1,1) {mustBeA(objFig, ["double", "matlab.ui.Figure"])} = 0;
 end
 arguments (Input)
-    kwargs.dAxisScale       (1,1) double {isscalar, isnumeric} = 1;
-    kwargs.bShowArrowHead   (1,1) logical {islogical, isscalar} = true;
+    kwargs.dAxisScale       (1,1) double {mustBeNumeric} = 1;
+    kwargs.bShowArrowHead   (1,1) logical = true;
 end
 arguments (Output)
     cellFrameAxes (1,3) cell
-    dZaxisVec     (3,1) double {isvector, isnumeric}
-    dXaxisVec     (3,1) double {isvector, isnumeric}
-    dYaxisVec     (3,1) double {isvector, isnumeric}
+    dZaxisVec     (3,1) double {mustBeNumeric}
+    dXaxisVec     (3,1) double {mustBeNumeric}
+    dYaxisVec     (3,1) double {mustBeNumeric}
 end
 %% SIGNATURE
 % [cellFrameAxes, dZaxisVec, dXaxisVec, dYaxisVec] = PlotFrameFromDCM(dEntityOrigin_RenderFrame, ...
-%                                                                              dEntityDCM_RenderFrameFromTF, ...
-%                                                                              cellPlotColors, ...
-%                                                                              cellPlotNames, ...
-%                                                                              objFig, ...
-%                                                                              kwargs)
+%                                                                     dEntityDCM_RenderFrameFromTF, ...
+%                                                                     cellPlotColors, ...
+%                                                                     cellPlotNames, ...
+%                                                                     objFig, ...
+%                                                                     kwargs)
 % -------------------------------------------------------------------------------------------------------------
 %% DESCRIPTION
 % Function plotting axes of a orthonormal reference frame using quiver3 given its origin and attitude
 % matrix. A new figure gets created if none is passed as input.
 % -------------------------------------------------------------------------------------------------------------
 %% INPUT
-% dEntityOrigin_RenderFrame       (3,1) double {isvector, isnumeric}
-% dEntityDCM_RenderFrameFromTF    (3,3) double {ismatrix, isnumeric}
-% cellPlotColors                  (3,1) cell
-% cellPlotNames                   (3,1) cell
-% objFig                          (1,1) {isscalar, mustBeA(objFig, ["double", "matlab.ui.Figure"])} = 0;
-% kwargs.dAxisScale (1,1) double {isscalar, isnumeric} = 1;
+% dEntityOrigin_RenderFrame       (3,1) double {mustBeNumeric}
+% dEntityDCM_RenderFrameFromTF    (3,3) double {mustBeNumeric}
+% cellPlotColors                  (3,1) cell    
+% cellPlotNames                   (3,1) cell 
+% objFig                          (1,1) {mustBeA(objFig, ["double", "matlab.ui.Figure"])} = 0;
+% kwargs.dAxisScale       (1,1) double {mustBeNumeric} = 1;
+% kwargs.bShowArrowHead   (1,1) logical = true;
 % -------------------------------------------------------------------------------------------------------------
 %% OUTPUT
 % cellFrameAxes (1,3) cell
-% dZaxisVec     (3,1) double {isvector, isnumeric}
-% dXaxisVec     (3,1) double {isvector, isnumeric}
-% dYaxisVec     (3,1) double {isvector, isnumeric}
+% dZaxisVec     (3,1) double {mustBeNumeric}
+% dXaxisVec     (3,1) double {mustBeNumeric}
+% dYaxisVec     (3,1) double {mustBeNumeric}
 % -------------------------------------------------------------------------------------------------------------
 %% CHANGELOG
 % 08-02-2025    Pietro Califano     First implementation.
@@ -53,9 +54,8 @@ end
 %% DEPENDENCIES
 % [-]
 % -------------------------------------------------------------------------------------------------------------
-%% Future upgrades
-% [-]
-% -------------------------------------------------------------------------------------------------------------
+
+
 %% Function code
 
 % Get axis from attitude matrix
