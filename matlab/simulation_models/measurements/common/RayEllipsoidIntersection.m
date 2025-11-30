@@ -1,12 +1,11 @@
 function [bIntersectFlag, dIntersectDistance, bFailureFlag, dIntersectPoint, ...
-    dJacIntersectDistance_RayOrigin, dJacIntersectDistance_TargetAttErr] = RayEllipsoidIntersection(dRayOrigin_Frame, ...
-    dRayDirection_Frame, ...
-    dEllipsoidCentre_Frame, ...
-    dEllipsoidInvDiagShapeCoeffs, ...
-    dDCM_TFfromFrame, ...
-    dDCM_EstTFfromFrame, ...
-    bEvaluateJacobians) %#codegen
-% TODO review using GPT 5 Codex
+            dJacIntersectDistance_RayOrigin, dJacIntersectDistance_TargetAttErr] = RayEllipsoidIntersection(dRayOrigin_Frame, ...
+                                                                                                             dRayDirection_Frame, ...
+                                                                                                             dEllipsoidCentre_Frame, ...
+                                                                                                             dEllipsoidInvDiagShapeCoeffs, ...
+                                                                                                             dDCM_TFfromFrame, ...
+                                                                                                             dDCM_EstTFfromFrame, ...
+                                                                                                             bEvaluateJacobians) %#codegen
 arguments (Input)
     dRayOrigin_Frame                    (3,1) double {mustBeNumeric}
     dRayDirection_Frame                 (3,1) double {mustBeNumeric}
@@ -56,8 +55,9 @@ end
 % -------------------------------------------------------------------------------------------------------------
 %% CHANGELOG
 % 02-03-2025        Pietro Califano         First version of intersection test implemented.
-% 04-03-2025        Pietro Califano         Implement jacobian evaluation wrt ray origin and target attitude
-% 14-05-2025        Pietro Califano         Add flag to require/skip evaluation of jacobians
+% 04-03-2025        Pietro Califano         Implement jacobian evaluation wrt ray origin and target attitude.
+% 14-05-2025        Pietro Califano         Add flag to require/skip evaluation of jacobians.
+% 30-11-2025        Pietro Califano         Improve checks for numerical robustness.
 % -------------------------------------------------------------------------------------------------------------
 %% DEPENDENCIES
 % [-]
@@ -190,10 +190,12 @@ if nargout > 4 && bEvaluateJacobians(1)
         dSign = 1.0;
     elseif dSignSelector == 2
         dSign = -1.0;
-    end
-    
-    if coder.target('MATLAB') || coder.target('MEX')
-        assert(abs(dSign) > 0, 'ERROR: dSign variable cannot be zero.')
+    else
+        if coder.target('MATLAB') || coder.target('MEX')
+            assert(abs(dSign) > 0, 'ERROR: dSign variable cannot be zero.')
+        end
+        bFailureFlag = true;
+        return
     end
     
     % Compute jacobian of intersection distance wrt ray origin in input Frame
