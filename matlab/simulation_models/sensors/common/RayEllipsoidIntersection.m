@@ -1,11 +1,11 @@
 function [bIntersectFlag, dIntersectDistance, bFailureFlag, dIntersectPoint, ...
-            dJacIntersectDistance_RayOrigin, dJacIntersectDistance_TargetAttErr] = RayEllipsoidIntersection(dRayOrigin_Frame, ...
-                                                                                                             dRayDirection_Frame, ...
-                                                                                                             dEllipsoidCentre_Frame, ...
-                                                                                                             dEllipsoidInvDiagShapeCoeffs, ...
-                                                                                                             dDCM_TFfromFrame, ...
-                                                                                                             dDCM_EstTFfromFrame, ...
-                                                                                                             bEvaluateJacobians) %#codegen
+    dJacIntersectDistance_RayOrigin, dJacIntersectDistance_TargetAttErr] = RayEllipsoidIntersection(dRayOrigin_Frame, ...
+    dRayDirection_Frame, ...
+    dEllipsoidCentre_Frame, ...
+    dEllipsoidInvDiagShapeCoeffs, ...
+    dDCM_TFfromFrame, ...
+    dDCM_EstTFfromFrame, ...
+    bEvaluateJacobians) %#codegen
 % TODO review using GPT 5 Codex
 arguments (Input)
     dRayOrigin_Frame                    (3,1) double {mustBeNumeric}
@@ -14,7 +14,7 @@ arguments (Input)
     dEllipsoidInvDiagShapeCoeffs        (3,1) double {mustBeNumeric, mustBeFinite, mustBePositive} % [1/a^2; 1/b^2; 1/c^2]
     dDCM_TFfromFrame                    (3,3) double {mustBeNumeric} = eye(3)           % Required for jacobians
     dDCM_EstTFfromFrame                 (3,3) double {mustBeNumeric} = dDCM_TFfromFrame % Rotation including attitude error estimate
-    bEvaluateJacobians                  (1,2) logical = [true, true]; 
+    bEvaluateJacobians                  (1,2) logical = [true, true];
 end
 arguments (Output)
     bIntersectFlag
@@ -93,7 +93,7 @@ dJacIntersectDistance_RayOrigin     = zeros(1, 3);
 dJacIntersectDistance_TargetAttErr  = zeros(1, 3);
 
 % Compute 2nd order intersection equation
-% Equation: at^2 + 2bt + c = 0. Note that the b computed here is twice the B coefficient of a generic 
+% Equation: at^2 + 2bt + c = 0. Note that the b computed here is twice the B coefficient of a generic
 % quadratic equation. This is why the Delta and the solution looks slightly strange.
 
 dRayOriginFromEllipsCentre = dRayOrigin_Frame - dEllipsoidCentre_Frame; % In Target fixed
@@ -115,7 +115,7 @@ elseif dDirectionNorm > 1.0 + eps || dDirectionNorm < 1.0 - eps
     return
 end
 
-% Compute a coefficient 
+% Compute a coefficient
 % DEVNOTE: this can be avoided in case of a sphere and set to 1, replacing the 1 with r^2 in C)
 daCoeff = dAuxMatrix0 * dRayDirection_Frame;
 % Compute b coefficient
@@ -154,12 +154,12 @@ dInvAcoeff = 1 / daCoeff;
 dSqrtDelta = sqrt(dDelta);
 
 dtParam0 = dInvAcoeff * ( - dbCoeff + dSqrtDelta );
-dtParam1 = dInvAcoeff * ( - dbCoeff - dSqrtDelta ); 
+dtParam1 = dInvAcoeff * ( - dbCoeff - dSqrtDelta );
 
 % Get the smallest positive intersection distance
 if dtParam0 >= eps && dtParam1 >= eps
     [dIntersectDistance(:), dSignSelector] = min([dtParam0, dtParam1]);
-
+    
     % Check for negative intersection distance
     if dIntersectDistance < 0
         dIntersectDistance = 0.0;
@@ -167,7 +167,7 @@ if dtParam0 >= eps && dtParam1 >= eps
         bFailureFlag = true;
         return
     end
-
+    
 else
     bIntersectFlag = false;
     bFailureFlag = true;
@@ -182,6 +182,7 @@ dIntersectPoint(:) = dRayOrigin_Frame + dRayDirection_Frame * dIntersectDistance
 if nargout > 4 && bEvaluateJacobians(1)
     % Pre-compute shared quantities
     dInvSqrtDelta   = 1/dSqrtDelta;
+    dJac_bCoeff_RayOriginInTF = dRayDirection_Frame' * dEllipsoidMatrix;
     dJac_cCoeff_RayOriginInTF = dRayOriginFromEllipsCentre' * ( dEllipsoidMatrix + transpose(dEllipsoidMatrix) ); % * eye(3);
     
     dSign = 0.0;
@@ -190,37 +191,42 @@ if nargout > 4 && bEvaluateJacobians(1)
     elseif dSignSelector == 2
         dSign = -1.0;
     end
-
+    
     if coder.target('MATLAB') || coder.target('MEX')
         assert(abs(dSign) > 0, 'ERROR: dSign variable cannot be zero.')
     end
     
-    % Compute jacobian of intersection distance wrt ray origin in input Frame 
-    dJacIntersectDist_RayOriginInTF = - dRayDirection_Frame' * dEllipsoidMatrix + ...
-             (-dSign * dInvSqrtDelta * (2 * dbCoeff * dRayDirection_Frame' * dEllipsoidMatrix - daCoeff * dJac_cCoeff_RayOriginInTF) );
+    % Compute jacobian of intersection distance wrt ray origin in input Frame
+    % dJacIntersectDist_RayOriginInTF = - dJac_bCoeff_RayOriginInTF + ...
+    %                         (-dSign * dInvSqrtDelta * (2 * dbCoeff * dJac_bCoeff_RayOriginInTF ...
+    %                             - daCoeff * dJac_cCoeff_RayOriginInTF) );
+    
+    dJacIntersectDist_RayOriginInTF = dInvAcoeff * ( - dJac_bCoeff_RayOriginInTF + ...
+                                    dSign * dInvSqrtDelta * ( dbCoeff * dJac_bCoeff_RayOriginInTF ...
+                                                                - 0.5 * daCoeff * dJac_cCoeff_RayOriginInTF ) );
 
-    dJacIntersectDistance_RayOrigin(:,:) = dInvAcoeff * dJacIntersectDist_RayOriginInTF * dDCM_EstTFfromFrame;
-
+    dJacIntersectDistance_RayOrigin(:,:) = dJacIntersectDist_RayOriginInTF * dDCM_EstTFfromFrame;
+    
     if nargout > 5 && bEvaluateJacobians(2)
         % Compute auxiliary quantities
         dCameraPosFromCentre_FramePreConv = dDCM_TFfromFrame * (dEllipsoidCentre_FramePreConv);
-
+        
         % Derivative of a coefficient wrt target attitude error
-        dJac_aCoeff_AttErr = transpose(dRayDirection_Frame) * ( dEllipsoidMatrix + transpose(dEllipsoidMatrix) ) * skewSymm(dRayDirection_RefTF); 
+        dJac_aCoeff_AttErr = transpose(dRayDirection_Frame) * ( dEllipsoidMatrix + transpose(dEllipsoidMatrix) ) * skewSymm(dRayDirection_RefTF);
         
         % Derivative of b coefficient wrt target attitude error
         % FIXME, first entry is likely wrong (become scalar!), while second cannot be multiplied
         dJac_bCoeff_AttErr = transpose( transpose( skewSymm(dRayDirection_RefTF) ) * (dEllipsoidMatrix * dCameraPosFromCentre_FramePreConv) )...
-                              + transpose(dRayDirection_Frame) * dEllipsoidMatrix * (- skewSymm(dCameraPosFromCentre_FramePreConv) );
-
+            + transpose(dRayDirection_Frame) * dEllipsoidMatrix * (- skewSymm(dCameraPosFromCentre_FramePreConv) );
+        
         % Derivative of c coefficient wrt target attitude error
         dJac_cCoeff_AttErr = dJac_cCoeff_RayOriginInTF * (- skewSymm(dCameraPosFromCentre_FramePreConv) );
-
+        
         % Compute jacobian of intersection distance wrt small target attitude error
         dAuxJac0 = - dInvAcoeff^2 * dJac_aCoeff_AttErr * (dbCoeff + dSign * dSqrtDelta);
         dAuxJac1 = dInvAcoeff * (- dJac_bCoeff_AttErr + (dSign * dInvSqrtDelta * ...
-                        (2*dbCoeff * dJac_bCoeff_AttErr  - (dJac_aCoeff_AttErr * dcCoeff + daCoeff * dJac_cCoeff_AttErr) )) );
-
+            (2*dbCoeff * dJac_bCoeff_AttErr  - (dJac_aCoeff_AttErr * dcCoeff + daCoeff * dJac_cCoeff_AttErr) )) );
+        
         dJacIntersectDistance_TargetAttErr(:,:) = dAuxJac0 + dAuxJac1;
     end
 end
