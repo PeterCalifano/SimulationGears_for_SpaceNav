@@ -13,7 +13,7 @@ arguments (Input)
     dEllipsoidInvDiagShapeCoeffs        (3,1) double {mustBeNumeric, mustBeFinite, mustBePositive} % [1/a^2; 1/b^2; 1/c^2]
     dDCM_TFfromFrame                    (3,3) double {mustBeNumeric} = eye(3)           % Required for jacobians
     dDCM_EstTFfromFrame                 (3,3) double {mustBeNumeric} = dDCM_TFfromFrame % Rotation including attitude error estimate
-    bEvaluateJacobians                  (1,2) logical = [true, true];
+    bEvaluateJacobians                  (1,2) logical = [true, true]; 
 end
 arguments (Output)
     bIntersectFlag
@@ -93,7 +93,7 @@ dJacIntersectDistance_RayOrigin     = zeros(1, 3);
 dJacIntersectDistance_TargetAttErr  = zeros(1, 3);
 
 % Compute 2nd order intersection equation
-% Equation: at^2 + 2bt + c = 0. Note that the b computed here is twice the B coefficient of a generic
+% Equation: at^2 + 2bt + c = 0. Note that the b computed here is twice the B coefficient of a generic 
 % quadratic equation. This is why the Delta and the solution looks slightly strange.
 
 dRayOriginFromEllipsCentre = dRayOrigin_Frame - dEllipsoidCentre_Frame; % In Target fixed
@@ -115,7 +115,7 @@ elseif dDirectionNorm > 1.0 + eps || dDirectionNorm < 1.0 - eps
     return
 end
 
-% Compute a coefficient
+% Compute a coefficient 
 % DEVNOTE: this can be avoided in case of a sphere and set to 1, replacing the 1 with r^2 in C)
 daCoeff = dAuxMatrix0 * dRayDirection_Frame;
 % Compute b coefficient
@@ -154,13 +154,12 @@ dInvAcoeff = 1 / daCoeff;
 dSqrtDelta = sqrt(dDelta);
 
 dtParam0 = dInvAcoeff * ( - dbCoeff + dSqrtDelta );
-dtParam1 = dInvAcoeff * ( - dbCoeff - dSqrtDelta );
+dtParam1 = dInvAcoeff * ( - dbCoeff - dSqrtDelta ); 
 
 % Get the smallest positive intersection distance
 if dtParam0 >= eps && dtParam1 >= eps
     % Both positive --> exterior intersect
     [dIntersectDistance(:), dSignSelector] = min([dtParam0, dtParam1]);
-<<<<<<< HEAD
 
 elseif dtParam0 >= eps || dtParam1 >= eps
     % One root positive, one negative --> interior intersect
@@ -172,17 +171,8 @@ elseif dtParam0 >= eps || dtParam1 >= eps
     else
         dIntersectDistance(:) = dtParam1;
         dSignSelector = 2.0;
-=======
-    
-    % Check for negative intersection distance
-    if dIntersectDistance < 0
-        dIntersectDistance = 0.0;
-        bIntersectFlag = false;
-        bFailureFlag = true;
-        return
->>>>>>> a41fb748d75af2b57a3be11f2b60e98bd8876f89
     end
-    
+
 else
     bIntersectFlag = false;
     bFailureFlag = false;
