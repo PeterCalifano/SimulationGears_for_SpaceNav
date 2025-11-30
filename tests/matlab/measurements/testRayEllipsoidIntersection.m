@@ -92,32 +92,35 @@ end
 function testJacobiansAgainstFiniteDiff(testCase)
 
 % Build test case
-dOrigin = [4; -1; 0.5];
-dDirection = NormalizeVec_([-1; 0.2; -0.1]);
-dCentre = [0.5; -0.25; 0.2];
-dInvDiag = [1/9; 1/4; 1/1.44];
-
+dOrigin_TB = [4; -1; 0.5];
+dDirection_TB = NormalizeVec_([-1; 0.2; -0.1]);
+dCentre_TB = [0.5; -0.25; 0.2];
 dRtrue_TBfromW = RotFromAxis_([0; 0; 1], deg2rad(25));
 
+dInvDiag_TB = [1/9; 1/4; 1/1.44];
+
 % Intersect
-[bHit, dIntersectDist, bFailure, ~, dJacOrigin, dJacAtt] = RayEllipsoidIntersection(dOrigin, dDirection, ...
-                                                                                    dCentre, dInvDiag, ...
-                                                                                    dRtrue_TBfromW, dRtrue_TBfromW);
+[bHit, dIntersectDist, bFailure, ~, dJacOrigin, dJacAtt] = RayEllipsoidIntersection(dRtrue_TBfromW' * dOrigin_TB, ...
+                                                                                    dRtrue_TBfromW' * dDirection_TB, ...
+                                                                                    dRtrue_TBfromW' * dCentre_TB, ...
+                                                                                    dInvDiag_TB, ...
+                                                                                    dRtrue_TBfromW, ...
+                                                                                    dRtrue_TBfromW);
 
 % Checks
 testCase.verifyTrue(bHit);
 testCase.verifyFalse(bFailure);
 testCase.verifyGreaterThan(dIntersectDist, 0);
 
-dFdmJacOrigin = dFiniteDiff(@(origin) EvalDistanceWithOrigin_(origin, dDirection, dCentre, ...
-                                                              dInvDiag, dRtrue_TBfromW), dOrigin, 1e-6);
-
-dFiniteDiffJac_ = ComputeFiniteDiffJacobian(@(origin) EvalDistanceWithOrigin_(origin, dDirection, dCentre, ...
-                                                              dInvDiag, dRtrue_TBfromW), dOrigin, 1e-6);
+dFdmJacOrigin = dFiniteDiff(@(origin) EvalDistanceWithOrigin_(origin, ...
+                                                              dRtrue_TBfromW' * dDirection_TB, ...
+                                                              dRtrue_TBfromW' * dCentre_TB, ...
+                                                              dInvDiag_TB, dRtrue_TBfromW), dRtrue_TBfromW' * dOrigin_TB, 1e-6);
 
 testCase.verifyEqual(dJacOrigin, dFdmJacOrigin, 'AbsTol', 5e-6);
 
-dFdmJacAtt = dFiniteDiff(@(theta) EvalDistanceWithAttErr_(theta, dOrigin, dDirection, dCentre, dInvDiag, dRtrue_TBfromW), zeros(3,1), 1e-6);
+% TODO fix jacobian wrt attitude!
+dFdmJacAtt = dFiniteDiff(@(theta) EvalDistanceWithAttErr_(theta, dOrigin_TB, dDirection_TB, dCentre_TB, dInvDiag_TB, dRtrue_TBfromW), zeros(3,1), 1e-6);
 testCase.verifyEqual(dJacAtt, dFdmJacAtt, 'AbsTol', 5e-6);
 
 end
