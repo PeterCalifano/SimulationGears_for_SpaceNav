@@ -57,7 +57,7 @@ end
 % 02-03-2025        Pietro Califano         First version of intersection test implemented.
 % 04-03-2025        Pietro Califano         Implement jacobian evaluation wrt ray origin and target attitude.
 % 14-05-2025        Pietro Califano         Add flag to require/skip evaluation of jacobians.
-% 30-11-2025        Pietro Califano         Improve checks for numerical robustness.
+% 30-11-2025        Pietro Califano         Improve checks for numerical robustness; debug of jacobians
 % -------------------------------------------------------------------------------------------------------------
 %% DEPENDENCIES
 % [-]
@@ -71,7 +71,7 @@ if nargout > 4 % Jacobians required
     dEllipsoidCentre_FramePreConv = dRayOrigin_Frame - dEllipsoidCentre_Frame;
 end
 
-if not(all(dDCM_EstTFfromFrame == eye(3)))
+if not(all(dDCM_EstTFfromFrame == eye(3), 'all'))
     % Convert IN-PLACE ray origin, direction and target position to target fixed frame
     dRayOrigin_Frame          = dDCM_EstTFfromFrame * dRayOrigin_Frame;
     dRayDirection_Frame       = dDCM_EstTFfromFrame * dRayDirection_Frame;
@@ -204,10 +204,6 @@ if nargout > 4 && bEvaluateJacobians(1)
     end
     
     % Compute jacobian of intersection distance wrt ray origin in input Frame
-    % dJacIntersectDist_RayOriginInTF = - dJac_bCoeff_RayOriginInTF + ...
-    %                         (-dSign * dInvSqrtDelta * (2 * dbCoeff * dJac_bCoeff_RayOriginInTF ...
-    %                             - daCoeff * dJac_cCoeff_RayOriginInTF) );
-    
     dJacIntersectDist_RayOriginInTF = dInvAcoeff * ( - dJac_bCoeff_RayOriginInTF + ...
                                     dSign * dInvSqrtDelta * ( dbCoeff * dJac_bCoeff_RayOriginInTF ...
                                                                 - 0.5 * daCoeff * dJac_cCoeff_RayOriginInTF ) );
