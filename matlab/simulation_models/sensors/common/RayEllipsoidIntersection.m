@@ -11,7 +11,7 @@ arguments (Input)
     dRayOrigin_Frame                    (3,1) double {mustBeNumeric}
     dRayDirection_Frame                 (3,1) double {mustBeNumeric}
     dEllipsoidCentre_Frame              (3,1) double {mustBeNumeric}
-    dEllipsoidInvDiagShapeCoeffs        (:,1) double {mustBeNumeric} % [1/a^2; 1/b^2; 1/c^2]
+    dEllipsoidInvDiagShapeCoeffs        (3,1) double {mustBeNumeric, mustBeFinite, mustBePositive} % [1/a^2; 1/b^2; 1/c^2]
     dDCM_TFfromFrame                    (3,3) double {mustBeNumeric} = eye(3)           % Required for jacobians
     dDCM_EstTFfromFrame                 (3,3) double {mustBeNumeric} = dDCM_TFfromFrame % Rotation including attitude error estimate
     bEvaluateJacobians                  (1,2) logical = [true, true]; 
@@ -66,7 +66,7 @@ end
 
 %% Function code
 % Data pre-processing
-if nargout > 4
+if nargout > 4 % Jacobians required
     dRayDirection_RefTF = dDCM_TFfromFrame * dRayDirection_Frame;
     dEllipsoidCentre_FramePreConv = dRayOrigin_Frame - dEllipsoidCentre_Frame;
 end
@@ -98,9 +98,25 @@ dJacIntersectDistance_TargetAttErr  = zeros(1, 3);
 
 dRayOriginFromEllipsCentre = dRayOrigin_Frame - dEllipsoidCentre_Frame; % In Target fixed
 dAuxMatrix0 = dRayDirection_Frame' * dEllipsoidMatrix;
+dDirectionNorm = norm(dRayDirection_Frame);
+
+% Guard against degenerate direction or singular ellipsoid parameters
+if dDirectionNorm < eps
+    bFailureFlag = true;
+    if coder.target('MATLAB') || coder.target('MEX')
+        warning('Ray direction norm is zero at machine precision. Invalid input.');
+    end
+    return
+elseif dDirectionNorm > 1.0 + eps || dDirectionNorm < 1.0 - eps
+    bFailureFlag = true;
+    if coder.target('MATLAB') || coder.target('MEX')
+        warning('Ray direction is not incorrect or not normalized. Invalid input.');
+    end
+    return
+end
 
 % Compute a coefficient 
-% NOTE: this can be avoided in case of a sphere and set to 1, replacing the 1 with r^2 in C)
+% DEVNOTE: this can be avoided in case of a sphere and set to 1, replacing the 1 with r^2 in C)
 daCoeff = dAuxMatrix0 * dRayDirection_Frame;
 % Compute b coefficient
 dbCoeff = dAuxMatrix0 * dRayOriginFromEllipsCentre;
@@ -110,20 +126,48 @@ dcCoeff = dRayOriginFromEllipsCentre' * dEllipsoidMatrix * dRayOriginFromEllipsC
 % Intersection equation discriminant
 dDelta = dbCoeff^2 - daCoeff*dcCoeff;
 
+% Parallel/degenerate configuration
+if abs(daCoeff) < eps || ~isfinite(dDelta)
+    bFailureFlag = true;
+    return
+end
+
 % Evaluate intersection test
-if dDelta < 0
+if dDelta < -eps
     return
 end
 
 bIntersectFlag = true;
-dInvAcoeff = 1 / daCoeff; 
-dSqrtDelta = sqrt(dDelta); 
+dDelta = max(dDelta, 0); % Clamp tiny negative values due to numerical noise
+
+% Near-tangency leads to ill-conditioned jacobians; keep distance/point but skip jacobians.
+if dDelta <= coder.const(sqrt(eps))
+    bIntersectFlag = false;
+    bFailureFlag = true;
+    if coder.target('MATLAB') || coder.target('MEX')
+        warning('Intersection is near-tangent; jacobians are ill-conditioned and will not be computed.');
+    end
+    return
+end
+
+dInvAcoeff = 1 / daCoeff;
+dSqrtDelta = sqrt(dDelta);
 
 dtParam0 = dInvAcoeff * ( - dbCoeff + dSqrtDelta );
 dtParam1 = dInvAcoeff * ( - dbCoeff - dSqrtDelta ); 
 
+% Get the smallest positive intersection distance
 if dtParam0 >= eps && dtParam1 >= eps
     [dIntersectDistance(:), dSignSelector] = min([dtParam0, dtParam1]);
+
+    % Check for negative intersection distance
+    if dIntersectDistance < 0
+        dIntersectDistance = 0.0;
+        bIntersectFlag = false;
+        bFailureFlag = true;
+        return
+    end
+
 else
     bIntersectFlag = false;
     bFailureFlag = true;
@@ -132,7 +176,6 @@ end
 
 % Compute intersection point from ray equation if required
 dIntersectPoint(:) = dRayOrigin_Frame + dRayDirection_Frame * dIntersectDistance;
-
 
 %% Jacobian evaluation
 % DEVNOTE TODO: can be optimized both in terms of memory and computations
