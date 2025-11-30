@@ -6,7 +6,6 @@ function [bIntersectFlag, dIntersectDistance, bFailureFlag, dIntersectPoint, ...
                                                                                                              dDCM_TFfromFrame, ...
                                                                                                              dDCM_EstTFfromFrame, ...
                                                                                                              bEvaluateJacobians) %#codegen
-% TODO review using GPT 5 Codex
 arguments (Input)
     dRayOrigin_Frame                    (3,1) double {mustBeNumeric}
     dRayDirection_Frame                 (3,1) double {mustBeNumeric}
@@ -56,8 +55,9 @@ end
 % -------------------------------------------------------------------------------------------------------------
 %% CHANGELOG
 % 02-03-2025        Pietro Califano         First version of intersection test implemented.
-% 04-03-2025        Pietro Califano         Implement jacobian evaluation wrt ray origin and target attitude
-% 14-05-2025        Pietro Califano         Add flag to require/skip evaluation of jacobians
+% 04-03-2025        Pietro Califano         Implement jacobian evaluation wrt ray origin and target attitude.
+% 14-05-2025        Pietro Califano         Add flag to require/skip evaluation of jacobians.
+% 30-11-2025        Pietro Califano         Improve checks for numerical robustness.
 % -------------------------------------------------------------------------------------------------------------
 %% DEPENDENCIES
 % [-]
@@ -133,7 +133,6 @@ end
 % Compute intersection point from ray equation if required
 dIntersectPoint(:) = dRayOrigin_Frame + dRayDirection_Frame * dIntersectDistance;
 
-
 %% Jacobian evaluation
 % DEVNOTE TODO: can be optimized both in terms of memory and computations
 if nargout > 4 && bEvaluateJacobians(1)
@@ -146,12 +145,14 @@ if nargout > 4 && bEvaluateJacobians(1)
         dSign = 1.0;
     elseif dSignSelector == 2
         dSign = -1.0;
+    else
+        if coder.target('MATLAB') || coder.target('MEX')
+            assert(abs(dSign) > 0, 'ERROR: dSign variable cannot be zero.')
+        end
+        bFailureFlag = true;
+        return
     end
 
-    if coder.target('MATLAB') || coder.target('MEX')
-        assert(abs(dSign) > 0, 'ERROR: dSign variable cannot be zero.')
-    end
-    
     % Compute jacobian of intersection distance wrt ray origin in input Frame 
     dJacIntersectDist_RayOriginInTF = - dRayDirection_Frame' * dEllipsoidMatrix + ...
              (-dSign * dInvSqrtDelta * (2 * dbCoeff * dRayDirection_Frame' * dEllipsoidMatrix - daCoeff * dJac_cCoeff_RayOriginInTF) );
