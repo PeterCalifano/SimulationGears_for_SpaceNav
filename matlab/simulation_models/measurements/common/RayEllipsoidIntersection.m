@@ -37,13 +37,13 @@ end
 % required by the user and flag is set to true.
 % -------------------------------------------------------------------------------------------------------------
 %% INPUT
-% dRayOrigin_Frame                    (3,1) double {isvector, isnumeric}
-% dRayDirection_Frame                 (3,1) double {isvector, isnumeric}
-% dEllipsoidCentre_Frame              (3,1) double {ismatrix, isnumeric}
-% dEllipsoidInvDiagShapeCoeffs        (:,1) double {ismatrix, isnumeric} % [1/a^2; 1/b^2; 1/c^2]
-% dDCM_TFfromFrame                    (3,3) double {ismatrix, isnumeric} = eye(3)           % Required for jacobians
-% dDCM_EstTFfromFrame                 (3,3) double {ismatrix, isnumeric} = dDCM_TFfromFrame % Rotation including attitude error estimate
-% bEvaluateJacobians                  (1,2) {islogical, isscalar} = [true, true];
+% dRayOrigin_Frame                    (3,1) double {mustBeNumeric}
+% dRayDirection_Frame                 (3,1) double {mustBeNumeric}
+% dEllipsoidCentre_Frame              (3,1) double {mustBeNumeric}
+% dEllipsoidInvDiagShapeCoeffs        (3,1) double {mustBeNumeric, mustBeFinite, mustBePositive} % [1/a^2; 1/b^2; 1/c^2]
+% dDCM_TFfromFrame                    (3,3) double {mustBeNumeric} = eye(3)           % Required for jacobians
+% dDCM_EstTFfromFrame                 (3,3) double {mustBeNumeric} = dDCM_TFfromFrame % Rotation including attitude error estimate
+% bEvaluateJacobians                  (1,2) logical = [true, true];
 % -------------------------------------------------------------------------------------------------------------
 %% OUTPUT
 % bIntersectFlag
@@ -158,20 +158,25 @@ dtParam1 = dInvAcoeff * ( - dbCoeff - dSqrtDelta );
 
 % Get the smallest positive intersection distance
 if dtParam0 >= eps && dtParam1 >= eps
+    % Both positive --> exterior intersect
     [dIntersectDistance(:), dSignSelector] = min([dtParam0, dtParam1]);
 
-    % Check for negative intersection distance
-    if dIntersectDistance < 0
-        dIntersectDistance = 0.0;
-        bIntersectFlag = false;
-        bFailureFlag = true;
-        return
+elseif dtParam0 >= eps || dtParam1 >= eps
+    % One root positive, one negative --> interior intersect
+    
+    % Select the positive intersect
+    if dtParam0 >= eps
+        dIntersectDistance(:) = dtParam0;
+        dSignSelector = 1.0;
+    else
+        dIntersectDistance(:) = dtParam1;
+        dSignSelector = 2.0;
     end
 
 else
     bIntersectFlag = false;
-    bFailureFlag = true;
-    return % Test failure
+    bFailureFlag = false;
+    return % Missed intersection (not a failure)
 end
 
 % Compute intersection point from ray equation if required
