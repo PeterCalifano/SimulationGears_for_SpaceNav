@@ -5,106 +5,135 @@ tests = functiontests(localfunctions);
 end
 
 function setupOnce(~)
-repoRoot = fileparts(fileparts(fileparts(fileparts(mfilename('fullpath')))));
-addpath(repoRoot);
+charRepoRoot = fileparts(fileparts(fileparts(fileparts(mfilename('fullpath')))));
+addpath(charRepoRoot);
+addpath(fullfile(charRepoRoot, "..", ".."))
 SetupPaths_EstimationGears;
 end
 
 function testSphereFromOutside(testCase)
-origin = [0; 0; 3];
-direction = [0; 0; -1];
-centre = zeros(3,1);
-invDiag = ones(3,1);
 
-[hit, dist, failure, point] = RayEllipsoidIntersection(origin, direction, centre, invDiag);
-testCase.verifyTrue(hit);
-testCase.verifyFalse(failure);
-testCase.verifyEqual(dist, 2, 'AbsTol', 1e-12);
-testCase.verifyEqual(point, [0; 0; 1], 'AbsTol', 1e-12);
+dOrigin = [0; 0; 3];
+dDirection = [0; 0; -1];
+
+dCentre = zeros(3,1);
+dInvDiag = ones(3,1); % Radius = 1
+
+[bHit, dIntersectDist, bFailure, dIntersectPoint] = RayEllipsoidIntersection(dOrigin, dDirection, dCentre, dInvDiag);
+
+testCase.verifyTrue(bHit);
+testCase.verifyFalse(bFailure);
+testCase.verifyEqual(dIntersectDist, 2, 'AbsTol', 1e-12);
+testCase.verifyEqual(dIntersectPoint, [0; 0; 1], 'AbsTol', 1e-12);
+
 end
 
 function testSphereFromInside(testCase)
-origin = [0; 0; 0];
-direction = [1; 0; 0];
-centre = zeros(3,1);
-invDiag = ones(3,1);
 
-[hit, dist, failure] = RayEllipsoidIntersection(origin, direction, centre, invDiag);
-testCase.verifyTrue(hit);
-testCase.verifyFalse(failure);
-testCase.verifyEqual(dist, 1, 'AbsTol', 1e-12);
+dOrigin = [0; 0; 0];
+dDirection = [1; 0; 0];
+dCentre = zeros(3,1);
+dInvDiag = ones(3,1);
+
+[bHit, dIntersectDist, bFailure] = RayEllipsoidIntersection(dOrigin, dDirection, dCentre, dInvDiag);
+
+testCase.verifyTrue(bHit);
+testCase.verifyFalse(bFailure);
+testCase.verifyEqual(dIntersectDist, 1, 'AbsTol', 1e-12);
 end
 
 function testMissedIntersection(testCase)
-origin = [0; 0; 3];
-direction = [0; 0; 1]; % Pointing away from sphere
-centre = zeros(3,1);
-invDiag = ones(3,1);
 
-[hit, dist, failure] = RayEllipsoidIntersection(origin, direction, centre, invDiag);
-testCase.verifyFalse(hit);
-testCase.verifyFalse(failure);
-testCase.verifyEqual(dist, 0, 'AbsTol', 1e-12);
+dOrigin = [0; 0; 3];
+dDirection = [0; 0; 1]; % Pointing away from sphere
+dCentre = zeros(3,1);
+dInvDiag = ones(3,1);
+
+[bHit, dIntersectDist, bFailure] = RayEllipsoidIntersection(dOrigin, dDirection, dCentre, dInvDiag);
+
+testCase.verifyFalse(bHit);
+testCase.verifyFalse(bFailure);
+testCase.verifyEqual(dIntersectDist, 0, 'AbsTol', 1e-12);
 end
 
 function testTangentialContactSetsFailure(testCase)
-origin = [1; 0; 0];
-direction = [0; 1; 0]; % Tangent on unit sphere
-centre = zeros(3,1);
-invDiag = ones(3,1);
 
-[hit, dist, failure] = RayEllipsoidIntersection(origin, direction, centre, invDiag);
-testCase.verifyTrue(hit);
-testCase.verifyTrue(failure); % Tangency -> ill-conditioned jacobians
-testCase.verifyEqual(dist, 0, 'AbsTol', 1e-12);
+dOrigin = [1; 0; 0];
+dDirection = [0; 1; 0]; % Tangent on unit sphere
+dCentre = zeros(3,1);
+dInvDiag = ones(3,1);
+
+[bHit, dIntersectDist, bFailure] = RayEllipsoidIntersection(dOrigin, dDirection, dCentre, dInvDiag);
+
+testCase.verifyFalse(bHit); % Consider tangency as invalid
+testCase.verifyTrue(bFailure); % Tangency -> ill-conditioned jacobians
+testCase.verifyEqual(dIntersectDist, 0, 'AbsTol', 1e-12);
 end
 
 function testRotatedEllipsoidMatchesAnalytic(testCase)
-origin = [2; -0.5; 1.2];
-direction = normalizeVec([-1; 0.1; -0.2]);
-centre = [0.3; -0.1; 0.2];
-invDiag = [1/9; 1/4; 1/2.25];
-R = rotFromAxis([0; 0; 1], deg2rad(20)) * rotFromAxis([0; 1; 0], deg2rad(15));
 
-[hit, dist, failure, point] = RayEllipsoidIntersection(origin, direction, centre, invDiag, R, R);
-testCase.verifyTrue(hit);
-testCase.verifyFalse(failure);
+dOrigin = [2; -0.5; 1.2];
+dDirection = NormalizeVec_([-1; 0.1; -0.2]);
+dCentre = [0.3; -0.1; 0.2];
+dInvDiag = [1/9; 1/4; 1/2.25];
 
-expectedDist = solveRayEllipsoidDistance(R * origin, R * direction, R * centre, invDiag);
-testCase.verifyEqual(dist, expectedDist, 'AbsTol', 1e-10);
-testCase.verifyEqual(point, origin + direction * dist, 'AbsTol', 1e-10);
+dR = RotFromAxis_([0; 0; 1], deg2rad(20)) * RotFromAxis_([0; 1; 0], deg2rad(15));
+
+[bHit, dIntersectDist, bFailure, dIntersecPoint] = RayEllipsoidIntersection(dOrigin, dDirection, dCentre, dInvDiag, dR, dR);
+testCase.verifyTrue(bHit);
+testCase.verifyFalse(bFailure);
+
+dExpectedDist = SolveRayEllipsoidDistance_(dR * dOrigin, dR * dDirection, dR * dCentre, dInvDiag);
+
+testCase.verifyEqual(dIntersectDist, dExpectedDist, 'AbsTol', 1e-10);
+testCase.verifyEqual(dIntersecPoint, dR * (dOrigin + dDirection * dIntersectDist), 'AbsTol', 1e-10);
 end
 
 function testJacobiansAgainstFiniteDiff(testCase)
-origin = [4; -1; 0.5];
-direction = normalizeVec([-1; 0.2; -0.1]);
-centre = [0.5; -0.25; 0.2];
-invDiag = [1/9; 1/4; 1/1.44];
-Rtrue = rotFromAxis([0; 0; 1], deg2rad(25));
 
-[hit, dist, failure, ~, jacOrigin, jacAtt] = RayEllipsoidIntersection(origin, direction, centre, invDiag, Rtrue, Rtrue);
-testCase.verifyTrue(hit);
-testCase.verifyFalse(failure);
-testCase.verifyGreaterThan(dist, 0);
+% Build test case
+dOrigin = [4; -1; 0.5];
+dDirection = NormalizeVec_([-1; 0.2; -0.1]);
+dCentre = [0.5; -0.25; 0.2];
+dInvDiag = [1/9; 1/4; 1/1.44];
 
-fdJacOrigin = finiteDiff(@(o) evalDistanceWithOrigin(o, direction, centre, invDiag, Rtrue), origin, 1e-6);
-testCase.verifyEqual(jacOrigin, fdJacOrigin, 'AbsTol', 5e-6);
+dRtrue_TBfromW = RotFromAxis_([0; 0; 1], deg2rad(25));
 
-fdJacAtt = finiteDiff(@(theta) evalDistanceWithAttErr(theta, origin, direction, centre, invDiag, Rtrue), zeros(3,1), 1e-6);
-testCase.verifyEqual(jacAtt, fdJacAtt, 'AbsTol', 5e-6);
+% Intersect
+[bHit, dIntersectDist, bFailure, ~, dJacOrigin, dJacAtt] = RayEllipsoidIntersection(dOrigin, dDirection, ...
+                                                                                    dCentre, dInvDiag, ...
+                                                                                    dRtrue_TBfromW, dRtrue_TBfromW);
+
+% Checks
+testCase.verifyTrue(bHit);
+testCase.verifyFalse(bFailure);
+testCase.verifyGreaterThan(dIntersectDist, 0);
+
+dFdmJacOrigin = dFiniteDiff(@(origin) EvalDistanceWithOrigin_(origin, dDirection, dCentre, ...
+                                                              dInvDiag, dRtrue_TBfromW), dOrigin, 1e-6);
+
+dFiniteDiffJac_ = ComputeFiniteDiffJacobian(@(origin) EvalDistanceWithOrigin_(origin, dDirection, dCentre, ...
+                                                              dInvDiag, dRtrue_TBfromW), dOrigin, 1e-6);
+
+testCase.verifyEqual(dJacOrigin, dFdmJacOrigin, 'AbsTol', 5e-6);
+
+dFdmJacAtt = dFiniteDiff(@(theta) EvalDistanceWithAttErr_(theta, dOrigin, dDirection, dCentre, dInvDiag, dRtrue_TBfromW), zeros(3,1), 1e-6);
+testCase.verifyEqual(dJacAtt, dFdmJacAtt, 'AbsTol', 5e-6);
+
 end
 
 %% Helpers
-function dist = solveRayEllipsoidDistance(origin, direction, centre, invDiag)
-M = diag(invDiag);
-o = origin - centre;
-a = direction' * M * direction;
-b = direction' * M * o;
+function dIntersectDist = SolveRayEllipsoidDistance_(dOrigin, dDirection, dCentre, dInvDiag)
+% Regenerated by GPT 5.1 Codex for comparison
+M = diag(dInvDiag);
+o = dOrigin - dCentre;
+a = dDirection' * M * dDirection;
+b = dDirection' * M * o;
 c = o' * M * o - 1;
 delta = b^2 - a * c;
 
 if delta < -eps || abs(a) < eps
-    dist = NaN;
+    dIntersectDist = NaN;
     return
 end
 
@@ -112,31 +141,34 @@ t0 = (-b + sqrt(max(delta, 0))) / a;
 t1 = (-b - sqrt(max(delta, 0))) / a;
 vals = [t0, t1];
 vals = vals(vals >= -sqrt(eps));
+
 if isempty(vals)
-    dist = NaN;
+    dIntersectDist = NaN;
 else
-    dist = min(vals);
-    if dist < 0
-        dist = 0;
+    dIntersectDist = min(vals);
+    if dIntersectDist < 0
+        dIntersectDist = 0;
     end
 end
 end
 
-function v = normalizeVec(v)
-v = v / norm(v);
+function dVec = NormalizeVec_(dVec)
+dVec = dVec / norm(dVec);
 end
 
-function R = rotFromAxis(axis, angle)
-ax = normalizeVec(axis);
+function R = RotFromAxis_(axis, angle)
+ax = NormalizeVec_(axis);
 K = [  0,   -ax(3),  ax(2);
       ax(3),   0,   -ax(1);
      -ax(2), ax(1),   0  ];
 R = eye(3) + sin(angle) * K + (1 - cos(angle)) * (K * K);
 end
 
-function jac = finiteDiff(funHandle, x0, step)
+function jac = dFiniteDiff(funHandle, x0, step)
+
 n = numel(x0);
 jac = zeros(1, n);
+
 for idx = 1:n
     dx = zeros(size(x0));
     dx(idx) = step;
@@ -146,25 +178,25 @@ for idx = 1:n
 end
 end
 
-function dist = evalDistanceWithOrigin(origin, direction, centre, invDiag, R)
-[hit, d] = RayEllipsoidIntersection(origin, direction, centre, invDiag, R, R, [false, false]);
-assert(hit, 'Finite-diff origin perturbation lost intersection.');
-dist = d;
+function dIntersectDist = EvalDistanceWithOrigin_(dOrigin, dDirection, dCentre, dInvDiag, R)
+[bHit, d] = RayEllipsoidIntersection(dOrigin, dDirection, dCentre, dInvDiag, R, R, [false, false]);
+assert(bHit, 'Finite-diff dOrigin perturbation lost intersection.');
+dIntersectDist = d;
 end
 
-function dist = evalDistanceWithAttErr(theta, origin, direction, centre, invDiag, Rtrue)
-Rpert = smallRotation(theta) * Rtrue;
-[hit, d] = RayEllipsoidIntersection(origin, direction, centre, invDiag, Rtrue, Rpert, [false, false]);
-assert(hit, 'Finite-diff attitude perturbation lost intersection.');
-dist = d;
+function dIntersectDist = EvalDistanceWithAttErr_(theta, dOrigin, dDirection, dCentre, dInvDiag, Rtrue)
+Rpert = ComputeSmallRotationMatrix_(theta) * Rtrue;
+[bHit, d] = RayEllipsoidIntersection(dOrigin, dDirection, dCentre, dInvDiag, Rtrue, Rpert, [false, false]);
+assert(bHit, 'Finite-diff attitude perturbation lost intersection.');
+dIntersectDist = d;
 end
 
-function R = smallRotation(theta)
+function R = ComputeSmallRotationMatrix_(theta)
 angle = norm(theta);
 if angle < eps
     R = eye(3);
     return
 end
 axis = theta / angle;
-R = rotFromAxis(axis, angle);
+R = RotFromAxis_(axis, angle);
 end
