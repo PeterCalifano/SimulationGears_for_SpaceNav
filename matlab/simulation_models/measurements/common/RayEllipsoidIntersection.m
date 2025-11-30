@@ -184,7 +184,7 @@ dIntersectPoint(:) = dRayOrigin_Frame + dRayDirection_Frame * dIntersectDistance
 
 %% Jacobian evaluation
 % DEVNOTE TODO: can be optimized both in terms of memory and computations
-if nargout > 4 && bEvaluateJacobians(1)
+if coder.const(nargout > 4) && bEvaluateJacobians(1)
     % Pre-compute shared quantities
     dInvSqrtDelta   = 1/dSqrtDelta;
     dJac_bCoeff_RayOriginInTF = dRayDirection_Frame' * dEllipsoidMatrix;
@@ -210,7 +210,7 @@ if nargout > 4 && bEvaluateJacobians(1)
 
     dJacIntersectDistance_RayOrigin(:,:) = dJacIntersectDist_RayOriginInTF * dDCM_EstTFfromFrame;
     
-    if nargout > 5 && bEvaluateJacobians(2)
+    if coder.const(nargout > 5) && bEvaluateJacobians(2)
         % Compute auxiliary quantities
         dCameraPosFromCentre_FramePreConv = dDCM_TFfromFrame * (dEllipsoidCentre_FramePreConv);
         
