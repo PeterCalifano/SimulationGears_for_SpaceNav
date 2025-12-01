@@ -101,18 +101,26 @@ dAuxMatrix0 = dRayDirection_Frame' * dEllipsoidMatrix;
 dDirectionNorm = norm(dRayDirection_Frame);
 
 % Guard against degenerate direction or singular ellipsoid parameters
-if dDirectionNorm < eps
+if dDirectionNorm < eps('single')
     bFailureFlag = true;
     if coder.target('MATLAB') || coder.target('MEX')
         warning('Ray direction norm is zero at machine precision. Invalid input.');
     end
     return
-elseif dDirectionNorm > 1.0 + eps || dDirectionNorm < 1.0 - eps
-    bFailureFlag = true;
-    if coder.target('MATLAB') || coder.target('MEX')
-        warning('Ray direction is not incorrect or not normalized. Invalid input.');
+elseif dDirectionNorm > 1.0 + 10 * eps('single') || dDirectionNorm < 1.0 - eps('single')
+
+    if abs(dDirectionNorm - 1.0) < 10 * eps('single')
+        % Acceptable numerical error, normalize
+        dRayDirection_Frame = dRayDirection_Frame ./ dDirectionNorm;
+    else
+        % Call failure
+        bFailureFlag = true;
+        if coder.target('MATLAB') || coder.target('MEX')
+            warning('Ray direction is not incorrect or not normalized. Invalid input.');
+        end
+        return
     end
-    return
+
 end
 
 % Compute a coefficient 
