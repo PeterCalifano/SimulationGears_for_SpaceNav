@@ -29,17 +29,17 @@ end
 % and rotation matrices.
 % -------------------------------------------------------------------------------------------------------------
 %% INPUT
-% arguments
-%     dEphemeridesTimegrid  (1,:) double 
-%     enumScenarioName    EnumScenarioName {mustBeA(enumScenarioName, ["EnumScenarioName", "string", "char"])} = EnumScenarioName.Itokawa
-%     charInertialFrame   (1,:) char {mustBeA(charInertialFrame, ["string", "char"])} = "J2000"
-% end
-% arguments
-%     kwargs.strDynParams (1,1) {isstruct} = struct() % To provide input struct
-%     kwargs.bAddNonSphericalGravityCoeffs (1,1) logical {islogical, isscalar} = false;
-%     kwargs.objDataset = SReferenceMissionDesign()
-%     kwargs.charSpherHarmCoeffInputFileName (1,:) string {mustBeA(kwargs.charSpherHarmCoeffInputFileName, ["string", "char"])} = ""
-% end
+% dEphemeridesTimegrid  (1,:) double
+% enumScenarioName    EnumScenarioName {mustBeA(enumScenarioName, ["EnumScenarioName", "string", "char"])} = EnumScenarioName.Itokawa
+% charInertialFrame   (1,:) char {mustBeA(charInertialFrame, ["string", "char"])} = "J2000"
+% kwargs.strDynParams                     (1,1) struct = struct()         % Initialization value
+% kwargs.str3rdBodyRefData                (1,1) struct = struct()    % Initialization value
+% kwargs.bAddNonSphericalGravityCoeffs    (1,1) logical = false;
+% kwargs.objDataset = SReferenceMissionDesign()
+% kwargs.charSpherHarmCoeffInputFileName (1,:) string {mustBeA(kwargs.charSpherHarmCoeffInputFileName, ["string", "char"])} = ""
+% kwargs.cellAdditionalBodiesNames       (1,:) string {mustBeA(kwargs.cellAdditionalBodiesNames, ["string", "char"])} = string.empty(0, 1)
+% kwargs.bAdd3rdBodiesAttitude           (1,1) logical = true; % If true, attitude data will be added to str3rdBodyRefData
+% kwargs.bUseKilometersScale             (1,1) logical = false;
 % -------------------------------------------------------------------------------------------------------------
 %% OUTPUT
 % strDynParams
@@ -49,6 +49,7 @@ end
 % 19-02-2025    Pietro Califano     First version copy-pasting previous implementation
 % 14-03-2025    Pietro Califano     Move code to CScenarioGenerator static method for standardization
 % 21-07-2025    Pietro Califano     Add support for 3rd body reference data and generalize implementation
+% -------------------------------------------------------------------------------------------------------------
 %% DEPENDENCIES
 % [-]
 % -------------------------------------------------------------------------------------------------------------
@@ -85,10 +86,11 @@ else
     dUnitsScaling = 1E3;
 end
 
-if kwargs.objDataset.bDefaultConstructed
+if kwargs.objDataset.bDefaultConstructed % Try to use SPICE kernels
 
-    if max(dEphemeridesTimegrid) < 1e8
-        warning('Minimum time in ephemeris timegrid < 1e6. This is being used to query CSPICE but seems to small. Make sure it is as intended!')
+    if max(abs(dEphemeridesTimegrid)) < 365 * 86400
+        warning(['Minimum (absolute) time in ephemeris timegrid < 365 * 86400 [s]. ' ...
+            'This is being used to query CSPICE but seems too small. Make sure it is as intended!'])
     end
 
     % Get target fixed frame attitude wrt Inertial frame    

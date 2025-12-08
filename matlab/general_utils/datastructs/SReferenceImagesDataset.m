@@ -28,7 +28,7 @@ classdef SReferenceImagesDataset < SReferenceMissionDesign % TODO the name of th
 
     properties (SetAccess = public, GetAccess = public)
         objCamera {mustBeA(objCamera, ["CCameraIntrinsics", "cameraIntrinsics", "CProjectiveCamera"])} = CCameraIntrinsics();
-        bImageAcquisitionMask (1,:) {islogical, isvector} = false(0,0); % Mask for images acquisition
+        bImageAcquisitionMask (1,:) logical = false(0,0); % Mask for images acquisition
     end
 
 
@@ -47,21 +47,21 @@ classdef SReferenceImagesDataset < SReferenceMissionDesign % TODO the name of th
                 % Reference definition
                 objCamera                    (1,1)     {mustBeA(objCamera, ["CCameraIntrinsics", "cameraIntrinsics", "CProjectiveCamera"])} = CCameraIntrinsics();
                 enumWorldFrame               (1,1)     {mustBeA(enumWorldFrame, ["SEnumFrameName", "string", "char"])} = EnumFrameName.IN  % Enumeration class indicating the W frame to which the data are attached
-                dTimestamps                  (1,:)      {isnumeric, isvector} = [];
-                dStateSC_W                   (6, :)     {isnumeric, ismatrix} = [];
-                dDCM_TBfromW                 (3, 3, :)  {isnumeric, ismatrix} = [];
-                dTargetPosition_W            (3, :)     {isnumeric, ismatrix} = [];
-                dSunPosition_W               (3, :)     {isnumeric, ismatrix} = [];
-                dEarthPosition_W             (3, :)     {isnumeric, ismatrix} = [];
+                dTimestamps                  (1,:)     {mustBeNumeric} = [];
+                dStateSC_W                   (6,:)    {mustBeNumeric} = [];
+                dDCM_TBfromW                 (3,3,:) {mustBeNumeric} = [];
+                dTargetPosition_W            (3,:)    {mustBeNumeric} = [];
+                dSunPosition_W               (3,:)    {mustBeNumeric} = [];
+                dEarthPosition_W             (3,:)    {mustBeNumeric} = [];
             end
             arguments
-                optional.dPrimaryPointingWhileMan_W   (3, :, :)  double {isnumeric, ismatrix} = [] % TBC, primary pointing axis during manoeuvres
-                optional.dSecondPointingWhileMan_W    (3, :, :)  double {isnumeric, ismatrix} = [] % TBC, secondary axis during manoeuvres
-                optional.dManoeuvresTimegrids         (3, :)     double {isnumeric, ismatrix} = [];
-                optional.dManoeuvresStartTimestamps   (1, :)     double {isnumeric, isvector} = [];
-                optional.dManoeuvresDeltaV_SC         (3, :)     double {isnumeric, ismatrix} = [];
-                optional.dRelativeTimestamps          (1, :)     double {isnumeric, ismatrix} = [];   
-                optional.dDCM_SCfromW                 (3, 3, :)  double {isnumeric, ismatrix} = []
+                optional.dPrimaryPointingWhileMan_W   (3,:,:)  double {mustBeNumeric} = [] % TBC, primary pointing axis during manoeuvres
+                optional.dSecondPointingWhileMan_W    (3,:,:)  double {mustBeNumeric} = [] % TBC, secondary axis during manoeuvres
+                optional.dManoeuvresTimegrids         (3,:)    double {mustBeNumeric} = [];
+                optional.dManoeuvresStartTimestamps   (1,:)    double {mustBeNumeric} = [];
+                optional.dManoeuvresDeltaV_SC         (3,:)    double {mustBeNumeric} = [];
+                optional.dRelativeTimestamps          (1,:)    double {mustBeNumeric} = [];   
+                optional.dDCM_SCfromW                 (3,3,:)  double {mustBeNumeric} = []
                 optional.charLengthUnits            char {mustBeA(optional.charLengthUnits, ["string", "char"])} = '';
             end
 
@@ -99,7 +99,7 @@ classdef SReferenceImagesDataset < SReferenceMissionDesign % TODO the name of th
             arguments (Input)
                 self            (1,1) SPoses3PointCloudImagesDataset
                 charRootFolder  (1,:) char {mustBeA(charRootFolder, ["string", "char"])}
-                bSaveAllToDisk  {islogical, isscalar}
+                bSaveAllToDisk  (1,1) logical
             end
             arguments (Output)
                 objImagesDatasetFormatESA (1,1)  {mustBeA(objImagesDatasetFormatESA, "SImagesDatasetFormatESA")}
