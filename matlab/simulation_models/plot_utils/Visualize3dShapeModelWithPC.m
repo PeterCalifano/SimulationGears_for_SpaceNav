@@ -87,6 +87,9 @@ else
     % Get axes
     assert(isvalid(objFig), 'ERROR: figure handle is invalid!')
     objSceneAx = get(objFig, "CurrentAxes");
+    if isa(objSceneAx, "matlab.graphics.GraphicsPlaceholder")
+        objSceneAx = axes(objFig);
+    end
 end
 
 % Assert handle validity
