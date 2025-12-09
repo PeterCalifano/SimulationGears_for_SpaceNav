@@ -11,11 +11,11 @@ arguments
     kwargs.strDynParams                     (1,1) struct = struct()         % Initialization value
     kwargs.str3rdBodyRefData                (1,1) struct = struct()    % Initialization value
     kwargs.bAddNonSphericalGravityCoeffs    (1,1) logical = false;
-    kwargs.objDataset = SReferenceMissionDesign()
-    kwargs.charSpherHarmCoeffInputFileName (1,:) string {mustBeA(kwargs.charSpherHarmCoeffInputFileName, ["string", "char"])} = ""
-    kwargs.cellAdditionalBodiesNames       (1,:) string {mustBeA(kwargs.cellAdditionalBodiesNames, ["string", "char"])} = string.empty(0, 1)
-    kwargs.bAdd3rdBodiesAttitude           (1,1) logical = true; % If true, attitude data will be added to str3rdBodyRefData
-    kwargs.bUseKilometersScale             (1,1) logical = false;
+    kwargs.objDataset                       (1,1) {mustBeA(kwargs.objDataset, "SReferenceMissionDesign")} = SReferenceMissionDesign()
+    kwargs.charSpherHarmCoeffInputFileName  (1,:) string {mustBeA(kwargs.charSpherHarmCoeffInputFileName, ["string", "char"])} = ""
+    kwargs.cellAdditionalBodiesNames        (1,:) string {mustBeA(kwargs.cellAdditionalBodiesNames, ["string", "char"])} = string.empty(0, 1)
+    kwargs.bAdd3rdBodiesAttitude            (1,1) logical = true; % If true, attitude data will be added to str3rdBodyRefData
+    kwargs.bUseKilometersScale              (1,1) logical = false;
 end
 %% SIGNATURE
 % [strDynParams, strAdditionalData] = DefineEnvironmentProperties(dEphemeridesTimegrid, ...
@@ -35,7 +35,7 @@ end
 % kwargs.strDynParams                     (1,1) struct = struct()         % Initialization value
 % kwargs.str3rdBodyRefData                (1,1) struct = struct()    % Initialization value
 % kwargs.bAddNonSphericalGravityCoeffs    (1,1) logical = false;
-% kwargs.objDataset = SReferenceMissionDesign()
+% kwargs.objDataset                       (1,1) {mustBeA(kwargs.objDataset, "SReferenceMissionDesign")} = SReferenceMissionDesign()
 % kwargs.charSpherHarmCoeffInputFileName (1,:) string {mustBeA(kwargs.charSpherHarmCoeffInputFileName, ["string", "char"])} = ""
 % kwargs.cellAdditionalBodiesNames       (1,:) string {mustBeA(kwargs.cellAdditionalBodiesNames, ["string", "char"])} = string.empty(0, 1)
 % kwargs.bAdd3rdBodiesAttitude           (1,1) logical = true; % If true, attitude data will be added to str3rdBodyRefData
