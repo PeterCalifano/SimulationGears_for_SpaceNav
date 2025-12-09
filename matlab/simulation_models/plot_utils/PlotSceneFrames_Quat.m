@@ -13,7 +13,9 @@ arguments
     kwargs.cellPlotColors       (1,:) cell = {};
     kwargs.cellPlotNames        (1,:) cell = {};
     kwargs.charFigTitle         (1,:) string {mustBeA(kwargs.charFigTitle, ["string", "char"])} = "Reference frames visualization"
-    kwargs.objFig               (1,1) {isscalar, mustBeA(kwargs.objFig, ["double", "matlab.ui.Figure"])} = 0;
+    kwargs.objFig               (1,1) {mustBeA(kwargs.objFig, ["double", "matlab.ui.Figure"])} = 0;
+    kwargs.charFigureRenderer   (1,:) string  {mustBeA(kwargs.charFigureRenderer, ["string", "char"]), ...
+                                            mustBeMember(kwargs.charFigureRenderer, ["opengl", "painters"])} = "opengl"
     kwargs.bUseBlackBackground  (1,1) logical = false;
     kwargs.bEnableLegend        (1,1) logical = true;
     kwargs.dAxisScale           (1,1) double {mustBeNumeric} = 1.0     
@@ -50,7 +52,7 @@ end
 %     kwargs.cellPlotColors       (1,:) cell = {};
 %     kwargs.cellPlotNames        (1,:) cell = {};
 %     kwargs.charFigTitle         (1,:) string {mustBeA(kwargs.charFigTitle, ["string", "char"])} = "Reference frames visualization"
-%     kwargs.objFig               (1,1) {isscalar, mustBeA(kwargs.objFig, ["double", "matlab.ui.Figure"])} = 0;
+%     kwargs.objFig               (1,1) {mustBeA(kwargs.objFig, ["double", "matlab.ui.Figure"])} = 0;
 %     kwargs.bUseBlackBackground  (1,1) logical = false;
 %     kwargs.bEnableLegend        (1,1) logical = true;
 %     kwargs.dAxisScale           (1,1) double {mustBeNumeric} = 1.0     
@@ -62,6 +64,7 @@ end
 % -------------------------------------------------------------------------------------------------------------
 %% CHANGELOG
 % 08-02-2025    Pietro Califano     First version implemented adapting RCS-1 PlotPairPQ1 (major upgrade)
+% 09-12-2025    Pietro Califano     Upgrade to use figure and axes handles
 % -------------------------------------------------------------------------------------------------------------
 %% DEPENDENCIES
 % [-]
@@ -76,7 +79,7 @@ dScaleCoeff = 2 * kwargs.dAxisScale;
 
 % Ensure quaternions are normalized
 dSceneEntityQuatArray_RenderFrameFromTF = dSceneEntityQuatArray_RenderFrameFromTF./norm(dSceneEntityQuatArray_RenderFrameFromTF);
-dCameraQuat_RenderFrameFromCam = dCameraQuat_RenderFrameFromCam./norm(dCameraQuat_RenderFrameFromCam);
+dCameraQuat_RenderFrameFromCam          = dCameraQuat_RenderFrameFromCam./norm(dCameraQuat_RenderFrameFromCam);
 
 % Normalize scale for visualization
 if not(all(dSceneEntityOriginArray_RenderFrame == 0)) % Normalize positions of bodies to unity
@@ -103,8 +106,8 @@ if isempty(kwargs.cellPlotNames)
     for idE = 1:dNumOfEntities
 
         kwargs.cellPlotNames(ui32EntityPtr:ui32EntityPtr+2) = { sprintf("X obj. %d", ui32EntryNum),...
-            sprintf("Y obj. %d", ui32EntryNum), ...
-            sprintf("Z obj. %d", ui32EntryNum)};
+                                                                sprintf("Y obj. %d", ui32EntryNum), ...
+                                                                sprintf("Z obj. %d", ui32EntryNum) };
 
         ui32EntityPtr = ui32EntityPtr + 3;
         
@@ -124,8 +127,8 @@ if isempty(kwargs.cellPlotColors)
 
     % Generate colors using HSV color space for better distinction
     % Generates a colormap with `ui32NumOfEntities` distinct randomized colors
-    dEntities_colors = hsv(1e4*dNumOfEntities);
-    dEntities_colors = dEntities_colors(randperm(size(dEntities_colors, 1), 3*dNumOfEntities), :);
+    dEntitiesColors = hsv(1e4*dNumOfEntities);
+    dEntitiesColors = dEntitiesColors(randperm(size(dEntitiesColors, 1), 3*dNumOfEntities), :);
 
     % Default names for entries
     ui32EntityPtr = 4;
@@ -133,9 +136,9 @@ if isempty(kwargs.cellPlotColors)
 
     for idE = 1:dNumOfEntities
 
-        kwargs.cellPlotColors(ui32EntityPtr:ui32EntityPtr+2) = {(dEntities_colors(ui32EntryNum, :)), ...
-                                                                (dEntities_colors(ui32EntryNum + 1, :)), ...
-                                                                (dEntities_colors(ui32EntryNum + 2, :))}; 
+        kwargs.cellPlotColors(ui32EntityPtr:ui32EntityPtr+2) = {(dEntitiesColors(ui32EntryNum, :)), ...
+                                                                (dEntitiesColors(ui32EntryNum + 1, :)), ...
+                                                                (dEntitiesColors(ui32EntryNum + 2, :))}; 
         ui32EntityPtr = ui32EntityPtr + 3;
         if mod(idE, 3) == 0
             ui32EntryNum = ui32EntryNum + 1;
@@ -144,19 +147,29 @@ if isempty(kwargs.cellPlotColors)
 
 end
 
-
 % Get figure and properties
 if kwargs.objFig == 0
-    objFig = figure('Renderer', 'opengl');
+    objFig = figure();
     kwargs.bEnforcePlotOpts = true; % No figure provided, enable plot opts
-    [~, charTextColor, ~] = DefaultPlotOpts(objFig, "charRenderer", "opengl", "bUseBlackBackground", kwargs.bUseBlackBackground);
+    [~, charTextColor, ~] = DefaultPlotOpts(objFig, ...
+                                        "charRenderer", kwargs.charFigureRenderer, ...
+                                        "bUseBlackBackground", kwargs.bUseBlackBackground);
+    % Create new axis
+    objSceneAx = axes(objFig);
+
 else
     objFig = kwargs.objFig;
     charTextColor = objFig.Color;
+    objFig = kwargs.objFig;
+
+    % Get axes
+    assert(isvalid(objFig), 'ERROR: figure handle is invalid!')
+    objSceneAx = get(objFig, "CurrentAxes");
 end
 
+
 % Plot camera frame
-dCamDCM_RenderFrameFromCam          = quat2rotm(dCameraQuat_RenderFrameFromCam');
+dCamDCM_RenderFrameFromCam = quat2rotm(dCameraQuat_RenderFrameFromCam');
 
 [cellCameraAxes, dCamBoresightaxisVec] = PlotFrameFromDCM(dCameraOrigin_RenderFrame, ...
                                                            dCamDCM_RenderFrameFromCam, ...
@@ -166,7 +179,7 @@ dCamDCM_RenderFrameFromCam          = quat2rotm(dCameraQuat_RenderFrameFromCam')
                                                            "dAxisScale", kwargs.dAxisScale);
 
 % Set view along camera boresight
-view(-[dCamBoresightaxisVec(1), dCamBoresightaxisVec(2), dCamBoresightaxisVec(3)]);
+view(objSceneAx, -[dCamBoresightaxisVec(1), dCamBoresightaxisVec(2), dCamBoresightaxisVec(3)]);
 
 % Define cell of plot objects for legend
 if kwargs.bEnableLegend
@@ -215,17 +228,17 @@ cellFramesAxesGlobal = [cellPrevLegendObjEntries(:)', cellFramesAxesGlobal(:)'];
 
 if not(isempty(cellFramesAxesGlobal)) && kwargs.bEnableLegend
     % Add legend if not empty
-    legend([cellFramesAxesGlobal{:}], 'TextColor', charTextColor);
+    legend(objSceneAx, [cellFramesAxesGlobal{:}], 'TextColor', charTextColor);
 end
 
 if kwargs.objFig == 0
-    xlabel('X [-]');
-    ylabel('Y [-]');
-    zlabel('Z [-]');
+    xlabel(objSceneAx, 'X [-]');
+    ylabel(objSceneAx, 'Y [-]');
+    zlabel(objSceneAx, 'Z [-]');
 
-    title(kwargs.charFigTitle);
-    hold off;
-    pause(0.05);
+    title(objSceneAx, kwargs.charFigTitle);
+    hold(objSceneAx, "off");
+    drawnow;
 end
 
 end

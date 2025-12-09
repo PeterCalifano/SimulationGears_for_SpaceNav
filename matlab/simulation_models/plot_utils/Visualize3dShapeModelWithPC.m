@@ -11,19 +11,21 @@ arguments (Input) % Positional
 end
 arguments (Input)
     kwargs.objFig           = 0
-    kwargs.bUseBlackBackground          (1,1) logical {islogical, mustBeScalarOrEmpty} = false;
+    kwargs.bUseBlackBackground          (1,1) logical {mustBeScalarOrEmpty} = false;
     kwargs.dPointsPositions_NavFrame    (3,:) double  {mustBeNumeric} = [];
+    kwargs.charFigureRenderer           (1,:) string  {mustBeA(kwargs.charFigureRenderer, ["string", "char"]), ...
+                                                  mustBeMember(kwargs.charFigureRenderer, ["opengl", "painters"])} = "opengl"
     kwargs.charPointsDisplayName        (1,:) string  {mustBeA(kwargs.charPointsDisplayName, ["string", "char"])} = "Points"
     kwargs.charPointsDisplayColor       (1,:) string  {mustBeA(kwargs.charPointsDisplayColor, ["string", "char"])} = "#FFDC00"
     kwargs.charDistanceUnit             (1,:) string  {mustBeA(kwargs.charDistanceUnit, ["string", "char"])} = "m"
-    kwargs.bEnforcePlotOpts             (1,1) logical {mustBeScalarOrEmpty, islogical} = false
-    kwargs.bUsePerspectiveView          (1,1) logical {mustBeScalarOrEmpty, islogical} = false;
-    kwargs.bEnableLegend                (1,1) logical {mustBeScalarOrEmpty, islogical} = true;
-    kwargs.dFaceAlpha                   (1,1) double  {isscalar} = 1.0;
+    kwargs.bEnforcePlotOpts             (1,1) logical {mustBeScalarOrEmpty} = false
+    kwargs.bUsePerspectiveView          (1,1) logical {mustBeScalarOrEmpty} = false;
+    kwargs.bEnableLegend                (1,1) logical {mustBeScalarOrEmpty} = true;
+    kwargs.dFaceAlpha                   (1,1) double = 1.0;
     kwargs.charPathDisplayName          (1,:) string  {mustBeA(kwargs.charPathDisplayName, ["string", "char"])} = '3D mesh model';
-    kwargs.charPatchFaceColor           (1,:)  {isvector} = "#A9A9A9";
-    kwargs.bShowAsWireframe             (1,1) logical {islogical} = true;
-    kwargs.bShowMeshModel               (1,1) logical {islogical} = true;
+    kwargs.charPatchFaceColor           (1,:) = "#A9A9A9";
+    kwargs.bShowAsWireframe             (1,1) logical = true;
+    kwargs.bShowMeshModel               (1,1) logical = true;
 end
 %% SIGNATURE
 % [objFig, cellPlotObjs] = Visualize3dShapeModelWithPC(strShapeModel, ...
@@ -38,55 +40,58 @@ end
 % inputs (kwargs).
 % -------------------------------------------------------------------------------------------------------------
 %% INPUT
-% arguments (Input) % Positional
-%     strShapeModel
-%     dCameraPosition_NavFrame  = [0;0;0]
-%     dSunPosition_NavFrame     = [0;0;0]
-%     dBodyDCM_NavFrameFromOF   = eye(3);
-% end
-% arguments (Input)
-%     kwargs.objFig           = 0
-%     kwargs.bUseBlackBackground       (1,1) logical {islogical, isscalar} = false;
-%     kwargs.dPointsPositions_NavFrame (3, :) double = [];
-%     kwargs.charDistanceUnit          (1,:) string {mustBeA(kwargs.charDistanceUnit, ["string", "char"])} = "m"
-%     kwargs.bEnforcePlotOpts          (1,1) logical {isscalar, islogical} = false
-%     kwargs.bUsePerspectiveView       (1,1) logical {isscalar, islogical} = false;
-%     kwargs.bEnableLegend             (1,1) logical {isscalar, islogical} = true;
-% end
+% strShapeModel
+% dCameraPosition_NavFrame  = [0;0;0]
+% dSunPosition_NavFrame     = [0;0;0]
+% dBodyDCM_NavFrameFromOF   = eye(3);
+% kwargs.objFig           = 0
+% kwargs.bUseBlackBackground       (1,1) logical = false;
+% kwargs.dPointsPositions_NavFrame (3, :) double = [];
+% kwargs.charDistanceUnit          (1,:) string {mustBeA(kwargs.charDistanceUnit, ["string", "char"])} = "m"
+% kwargs.bEnforcePlotOpts          (1,1) logical = false
+% kwargs.bUsePerspectiveView       (1,1) logical = false;
+% kwargs.bEnableLegend             (1,1) logical = true;
 % -------------------------------------------------------------------------------------------------------------
 %% OUTPUT
 % objFig
 % cellPlotObjs
 % -------------------------------------------------------------------------------------------------------------
 %% CHANGELOG
-% 10-02-2025        Pietro Califano         First implementation from script code.
-% 11-02-2025        Pietro Califano         Complete release version.
-% 12-02-2025        Pietro Califano         Minor update to allow usage without camera position input.
+% 10-02-2025    Pietro Califano     First implementation from script code.
+% 11-02-2025    Pietro Califano     Complete release version.
+% 12-02-2025    Pietro Califano     Minor update to allow usage without camera position input.
+% 09-12-2025    Pietro Califano     Upgrade to use figure and axes handles
 % -------------------------------------------------------------------------------------------------------------
 %% DEPENDENCIES
 % [-]
 % -------------------------------------------------------------------------------------------------------------
-%% Future upgrades
-% DefaultPlotOpts()
-% -------------------------------------------------------------------------------------------------------------
-%% Function code
 
+%% Function code
 
 % Get figure and properties
 if kwargs.objFig == 0
-    objFig = figure('Renderer', 'opengl');
+    objFig = figure();
     kwargs.bEnforcePlotOpts = true; % No figure provided, enable plot opts
-    [~, charTextColor, ~] = DefaultPlotOpts(objFig, "charRenderer", "opengl", "bUseBlackBackground", kwargs.bUseBlackBackground);
+    [~, charTextColor, ~] = DefaultPlotOpts(objFig, ...
+                            "charRenderer", kwargs.charFigureRenderer, ...
+                            "bUseBlackBackground", kwargs.bUseBlackBackground);
+    % Create new axis
+    objSceneAx = axes(objFig);
 else
     objFig = kwargs.objFig;
-    % charTextColor = objFig.Color; % TODO, does not seems to work ok, not sure where to get the right color
-    % Therefore, manually set for now.
     if kwargs.bUseBlackBackground
         charTextColor = "k";
     else
         charTextColor = "w"; 
     end
+    % Get axes
+    assert(isvalid(objFig), 'ERROR: figure handle is invalid!')
+    objSceneAx = get(objFig, "CurrentAxes");
 end
+
+% Assert handle validity
+assert(isvalid(objSceneAx) && isa(objSceneAx, "matlab.graphics.axis.Axes"), ...
+    'ERROR: axes handle is invalid or is not a matlab.graphics.axis.Axes!')
 
 
 % Handle default case for shape only
@@ -123,8 +128,7 @@ else
 end
 
 % Plot the mesh using patch
-figure(objFig)
-hold on;
+hold(objSceneAx, "on");
 
 if kwargs.bShowMeshModel
     if kwargs.bShowAsWireframe
@@ -145,24 +149,25 @@ if kwargs.bShowMeshModel
         ui32SubSampledTriangleFaces = strShapeModel.ui32triangVertexPtr';
     end
 
-    objShadedMeshPlot = patch('Vertices', dVerticesPos, ...
-        'Faces', ui32SubSampledTriangleFaces, ...
-        'FaceColor', kwargs.charPatchFaceColor, ...
-        'EdgeColor', charEdgeColor, ...
-        'FaceAlpha', kwargs.dFaceAlpha, ...
-        'DisplayName', kwargs.charPathDisplayName, ...
-        "LineWidth", 0.1, "LineStyle", "-.");
+    objShadedMeshPlot = patch(objSceneAx, 'Vertices', dVerticesPos, ...
+                                'Faces', ui32SubSampledTriangleFaces, ...
+                                'FaceColor', kwargs.charPatchFaceColor, ...
+                                'EdgeColor', charEdgeColor, ...
+                                'FaceAlpha', kwargs.dFaceAlpha, ...
+                                'DisplayName', kwargs.charPathDisplayName, ...
+                                "LineWidth", 0.1, "LineStyle", "-.");
 
-    hold on
-    lighting gouraud;
-    camlight('headlight', "local");
+    hold(objSceneAx, "on")
+    lighting(objSceneAx, "gouraud");
+    camlight(objSceneAx, "headlight", "local");
     % Append object to cell
     cellPlotObjs = [cellPlotObjs(:)', {objShadedMeshPlot}];
 end
 
 if not(isempty(kwargs.dPointsPositions_NavFrame))
 
-    objPointCloudPlot = plot3(kwargs.dPointsPositions_NavFrame(1, :), ...
+    objPointCloudPlot = plot3(objSceneAx, ...
+                              kwargs.dPointsPositions_NavFrame(1, :), ...
                               kwargs.dPointsPositions_NavFrame(2, :), ...
                               kwargs.dPointsPositions_NavFrame(3,:), ...
                               '.', 'MarkerSize', 7, ...
@@ -177,51 +182,55 @@ end
 
 if kwargs.bEnforcePlotOpts
 
-    [~, charTextColor, ~] = DefaultPlotOpts(objFig, "charRenderer", "opengl", "bUseBlackBackground", kwargs.bUseBlackBackground);
+    [~, charTextColor, ~] = DefaultPlotOpts(objFig, ...
+                        "charRenderer", kwargs.charFigureRenderer, ...
+                        "bUseBlackBackground", kwargs.bUseBlackBackground);
 
-    axis equal
+    axis(objSceneAx, "equal");
 
     if nargin < 2 && kwargs.objFig == 0 % Keep axis limits if there is an input figure!
-        xlim([-dAxisLim, dAxisLim])
-        ylim([-dAxisLim, dAxisLim])
-        zlim([-dAxisLim, dAxisLim])
+        xlim(objSceneAx, [-dAxisLim, dAxisLim])
+        ylim(objSceneAx, [-dAxisLim, dAxisLim])
+        zlim(objSceneAx, [-dAxisLim, dAxisLim])
     end
 
     % DEVNOTE: these are already in default plot opts if used
-    xlabel(sprintf('X [%s]', kwargs.charDistanceUnit), 'Color', charTextColor)
-    ylabel(sprintf('Y [%s]', kwargs.charDistanceUnit), 'Color', charTextColor)
-    zlabel(sprintf('Z [%s]', kwargs.charDistanceUnit), 'Color', charTextColor)
-    set(gca, 'XColor', charTextColor, 'YColor', charTextColor, 'ZColor', charTextColor);
+    xlabel(objSceneAx, sprintf('X [%s]', kwargs.charDistanceUnit), 'Color', charTextColor)
+    ylabel(objSceneAx, sprintf('Y [%s]', kwargs.charDistanceUnit), 'Color', charTextColor)
+    zlabel(objSceneAx, sprintf('Z [%s]', kwargs.charDistanceUnit), 'Color', charTextColor)
+    set(objSceneAx, 'XColor', charTextColor, 'YColor', charTextColor, 'ZColor', charTextColor);
 
-    campos(dCameraPosition_NavFrame'); % Set camera to camera position
+    campos(objSceneAx, dCameraPosition_NavFrame'); % Set camera to camera position
 
     if not(kwargs.bUsePerspectiveView)
-        view(-dCameraPosition_NavFrame); % Camera direction % TODO (PC) use this when showing plots of emulator!
+        view(objSceneAx, -dCameraPosition_NavFrame); % Camera direction % TODO (PC) use this when showing plots of emulator!
     else
         % TODO: clarify what is this visualization and if useful
-        camproj('perspective'); % Use perspective projection
-        camtarget(-dCameraPosition_NavFrame')
+        camproj(objSceneAx, 'perspective'); % Use perspective projection
+        camtarget(objSceneAx, - transpose(dCameraPosition_NavFrame));
     end
 end
 
 % Plot sun direction if provided
 if any(dSunPosition_NavFrame > 0)
 
+    hold(objSceneAx, "on");
     % If Sun specified, move light there
-    objLight = light("Style", "Infinite", "Position", dSunPosition_NavFrame);
+    objLight = light(objSceneAx, "Style", "Infinite", "Position", dSunPosition_NavFrame);
     camlight(objLight);
 
     % Normalize position to avoid unreadable plots
     dScaleDistanceSun = norm(dCameraPosition_NavFrame);
     dSunPosition_NavFrame = dScaleDistanceSun * dSunPosition_NavFrame./norm(dSunPosition_NavFrame);
 
-    hold on;
+    
     dLineScale = 1.2;
-    objSunDirPlot = plot3([0, dLineScale * dSunPosition_NavFrame(1)], ...
-                    [0, dLineScale * dSunPosition_NavFrame(2)], ...
-                    [0, dLineScale * dSunPosition_NavFrame(3)], ...
-                    '-', 'Color', '#f48037', 'LineWidth', 2, 'DisplayName', 'To Sun');
-    axis equal
+    objSunDirPlot = plot3(objSceneAx, [0, dLineScale * dSunPosition_NavFrame(1)], ...
+                                    [0, dLineScale * dSunPosition_NavFrame(2)], ...
+                                    [0, dLineScale * dSunPosition_NavFrame(3)], ...
+                                    '-', 'Color', '#f48037', 'LineWidth', 2, 'DisplayName', 'To Sun');
+    axis(objSceneAx, "equal");
+
     % Append object to cell
     objSunDirPlot = {objSunDirPlot};
     cellPlotObjs = [cellPlotObjs(:)', objSunDirPlot(:)];
@@ -231,7 +240,7 @@ end
 
 if not(isempty(cellPlotObjs)) && kwargs.bEnableLegend
     % Add legend if not empty
-    legend([cellPlotObjs{:}], ...
+    legend(objSceneAx, [cellPlotObjs{:}], ...
             'TextColor', charTextColor);
 elseif isempty(cellPlotObjs) && kwargs.bEnableLegend
     warning('%s status: No object to show in figure.', char(mfilename) );
