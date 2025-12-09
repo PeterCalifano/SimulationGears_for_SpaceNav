@@ -1,15 +1,15 @@
 function [objFig, charTextColor, charBackGroundColor] = DefaultPlotOpts(objFig, kwargs)
 arguments
-    objFig = ""
+    objFig {mustBeA(objFig, ["matlab.ui.Figure", "double"])} = []
 end
 arguments
-    kwargs.bUseBlackBackground  (1,1) logical {islogical, isscalar} = false;
+    kwargs.bUseBlackBackground  (1,1) logical = false;
     kwargs.charRenderer         (1,:) string {mustBeA(kwargs.charRenderer, ["string", "char"])} = 'painters'; % 'opengl'
     kwargs.bEnableGrid          (1,1) logical = true
 end
-% TODO: move this function to SimulationGears_for_SpaceNav!
+% TODO: move this function to EvalAndVisualization toolbox
 %% PROTOTYPE
-% DefaultPlotOpts(fig_in) 
+% DefaultPlotOpts(objFig) 
 % -------------------------------------------------------------------------
 %% DESCRIPTION
 % "Void" function applying default plot options for axis width, ticks and 
@@ -18,7 +18,7 @@ end
 % specifically when multiple figure objects are handles automatically.
 % -------------------------------------------------------------------------
 % INPUT
-% fig_in: [fig object] Optional input. Figure object to which the options
+% objFig: [fig object] Optional input. Figure object to which the options
 %         are applied. It may be different from the currently active figure. 
 % -------------------------------------------------------------------------
 % OUTPUT
@@ -31,15 +31,12 @@ end
 % DEPENDENCIES
 % [-]
 % -------------------------------------------------------------------------
-% Future upgrades
-% 1) Check to get currently set options and avoid overwriting
-% -------------------------------------------------------------------------
 
 %% Function code
 
 if nargin == 0
     % Get figure and axis handles
-    objFig = gcf;
+    objFig = gcf();
 else
     % Assert input type
     mustBeA(objFig, "matlab.ui.Figure");
@@ -65,17 +62,17 @@ elseif kwargs.bUseBlackBackground == true
 elseif kwargs.bUseBlackBackground == false
 
     set(gca, 'Color', 'w'); % White background
-    set(gcf, 'Color', 'w');
+    set(objFig, 'Color', 'w');
     
     charTextColor       = 'k'; % Black text
     charBackGroundColor = 'w';
 
     set(gca, 'Color', 'w'); % White background
-    set(gcf, 'Color', 'w');
+    set(objFig, 'Color', 'w');
 
 end
 
-objCurrentAx = gca;
+objCurrentAx = gca();
 % Apply options
 ApplyOptions(objFig, objCurrentAx, kwargs.charRenderer, charTextColor, charBackGroundColor, kwargs.bEnableGrid);
 
@@ -93,16 +90,13 @@ arguments
     bEnableGrid (1,1) logical = true;
 end
 
-% Recall figure
-figure(objFig);
-
 % Set renderer
 set(objFig, 'Renderer', charRenderer);
 
 % Apply plot options
 if bEnableGrid
-    grid minor
-    axis auto;
+    grid(objCurrentAx, "minor")
+    axis(objCurrentAx, "auto");
 end
 
 objCurrentAx.XAxisLocation = 'bottom';
@@ -114,12 +108,12 @@ end
 objCurrentAx.XMinorTick = 'on';
 objCurrentAx.YMinorTick = 'on';
 objCurrentAx.LineWidth = 1.05;
-ylim('tickaligned');
-xlim('tight')
+ylim(objCurrentAx, 'tickaligned');
+xlim(objCurrentAx, 'tight')
 
 % Set background and text colours
 set(objCurrentAx, 'Color', charBackGroundColor); % White background
-set(gcf, 'Color', charBackGroundColor);
+set(objFig, 'Color', charBackGroundColor);
 
 % Set axis colours
 objLabelHandle = objCurrentAx.XLabel;
