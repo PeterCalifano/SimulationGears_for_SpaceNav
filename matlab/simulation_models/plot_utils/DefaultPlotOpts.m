@@ -44,7 +44,6 @@ end
 
 % Set background color based on flag
 if nargin == 1 && kwargs.bUseBlackBackground == false
-
     charBackGroundColor = objFig.Color;
 
     if all(charBackGroundColor == 0)
@@ -61,21 +60,20 @@ elseif kwargs.bUseBlackBackground == true
     
 elseif kwargs.bUseBlackBackground == false
 
-    set(gca, 'Color', 'w'); % White background
-    set(objFig, 'Color', 'w');
-    
     charTextColor       = 'k'; % Black text
     charBackGroundColor = 'w';
 
-    set(gca, 'Color', 'w'); % White background
-    set(objFig, 'Color', 'w');
-
 end
 
-objCurrentAx = gca();
-% Apply options
-ApplyOptions(objFig, objCurrentAx, kwargs.charRenderer, charTextColor, charBackGroundColor, kwargs.bEnableGrid);
+objCurrentAxes = findall(objFig, 'Type', 'axes');
 
+for objAx = transpose(objCurrentAxes)
+    set(objAx, 'Color', charBackGroundColor); % White background
+    set(objFig, 'Color', charBackGroundColor);
+
+    % Apply options
+    ApplyOptions(objFig, objAx, kwargs.charRenderer, charTextColor, charBackGroundColor, kwargs.bEnableGrid);
+end
 
 end
 
