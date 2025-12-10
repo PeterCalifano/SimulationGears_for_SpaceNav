@@ -4,7 +4,7 @@ function [objFig, objSceneAx, ...
                                                               bUseBlackBackground, ...
                                                               ui32FigureSeedID)
 arguments
-    objFig              {mustBeA(objFig, ["double", "matlab.ui.Figure"])} = 0;
+    objFig              {mustBeA(objFig, ["double", "matlab.ui.Figure", "matlab.graphics.GraphicsPlaceholder"])} = 0;
     charFigureRenderer  (1,:) string  {mustBeA(charFigureRenderer, ["string", "char"]), ...
                                     mustBeMember(charFigureRenderer, ["opengl", "painters"])} = "opengl"
     bUseBlackBackground (1,1) logical = false;
@@ -38,7 +38,8 @@ bValidFig = not(isempty(objFig)) && not(objFig == 0);
 
 if bValidFig
     % Check validity
-    bValidFig = isvalid(objFig) && isa(objFig, "matlab.ui.Figure");
+    bValidFig = isvalid(objFig) && isa(objFig, "matlab.ui.Figure") && ...
+                        not(isa(objFig, "matlab.graphics.GraphicsPlaceholder"));
 end
 
 % Construct or handle figure
@@ -54,6 +55,7 @@ if not(bValidFig)
 
     % Create new axis
     objSceneAx = axes(objFig);
+    
 else
 
     if bUseBlackBackground
