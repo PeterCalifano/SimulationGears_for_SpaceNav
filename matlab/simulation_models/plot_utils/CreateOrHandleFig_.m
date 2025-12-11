@@ -39,7 +39,8 @@ bValidFig = not(isempty(objFig)) && not(objFig == 0);
 if bValidFig
     % Check validity
     bValidFig = isvalid(objFig) && isa(objFig, "matlab.ui.Figure") && ...
-                        not(isa(objFig, "matlab.graphics.GraphicsPlaceholder"));
+        not(isa(objFig, "matlab.graphics.GraphicsPlaceholder")) && ...
+        (objFig.Number == ui32FigureSeedID || ui32FigureSeedID == 0);
 end
 
 % Construct or handle figure
