@@ -10,27 +10,27 @@ end
 % TODO: move this function to EvalAndVisualization toolbox
 %% PROTOTYPE
 % DefaultPlotOpts(objFig) 
-% -------------------------------------------------------------------------
+% ---------------------------------------------------------------------------------------------------------
 %% DESCRIPTION
-% "Void" function applying default plot options for axis width, ticks and 
-% grid to the currently active figure if no input is given. The options are
-% applied to the figure given as input if nargin > 0. This is useful
-% specifically when multiple figure objects are handles automatically.
-% -------------------------------------------------------------------------
+% "Void" function applying default plot options for axis width, ticks and grid to the currently active 
+% figure if no input is given. The options are applied to the figure given as input if nargin > 0. 
+% This is useful specifically when multiple figure objects are handles automatically.
+% ---------------------------------------------------------------------------------------------------------
 % INPUT
 % objFig: [fig object] Optional input. Figure object to which the options
 %         are applied. It may be different from the currently active figure. 
-% -------------------------------------------------------------------------
+% ---------------------------------------------------------------------------------------------------------
 % OUTPUT
 % [-]
-% -------------------------------------------------------------------------
+% ---------------------------------------------------------------------------------------------------------
 % CHANGELOG
-%    18-04-2023     Pietro Califano     Coded and tested
-%    11-07-2025     Pietro Califano     Upgrade for usage in Gears frameworks
-% -------------------------------------------------------------------------
+% 18-04-2023    Pietro Califano     Coded and tested
+% 11-07-2025    Pietro Califano     Upgrade for usage in Gears frameworks
+% 11-12-2025    Pietro Califano     Upgrade to support usage of target axes from handles
+% ---------------------------------------------------------------------------------------------------------
 % DEPENDENCIES
 % [-]
-% -------------------------------------------------------------------------
+% ---------------------------------------------------------------------------------------------------------
 
 %% Function code
 
@@ -112,6 +112,18 @@ xlim(objCurrentAx, 'tight')
 % Set background and text colours
 set(objCurrentAx, 'Color', charBackGroundColor); % White background
 set(objFig, 'Color', charBackGroundColor);
+
+% Set legend color to required one
+objLegends = findobj(objFig, 'Type', 'Legend');
+
+if ~isempty(objLegends)
+
+    for idL = 1:numel(objLegends)
+        objLegends(idL).Color     = charBackGroundColor;
+        objLegends(idL).EdgeColor = charBackGroundColor;
+        objLegends(idL).TextColor = charTextColor;
+    end
+end
 
 % Set axis colours
 objLabelHandle = objCurrentAx.XLabel;

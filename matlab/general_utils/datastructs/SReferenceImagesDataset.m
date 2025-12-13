@@ -22,9 +22,7 @@ classdef SReferenceImagesDataset < SReferenceMissionDesign % TODO the name of th
     %% DEPENDENCIES
     % [-]
     % -------------------------------------------------------------------------------------------------------------
-    %% Future upgrades
-    % [-]
-    % -------------------------------------------------------------------------------------------------------------
+
 
     properties (SetAccess = public, GetAccess = public)
         objCamera {mustBeA(objCamera, ["CCameraIntrinsics", "cameraIntrinsics", "CProjectiveCamera"])} = CCameraIntrinsics();
