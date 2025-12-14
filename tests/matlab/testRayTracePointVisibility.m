@@ -305,3 +305,103 @@ testCase.verifyClass(bAllPointsVisibilityMask_RTwithShadowRays, "logical");
 testCase.verifyTrue(any(bAllPointsVisibilityMask_RTwithShadowRays), ...
     "Shadow ray tracing reported zero visible points.");
 end
+
+%%
+function test_CRadiometricRGB_RT_vs_ShadowRays(testCase)
+% Cross-validate external raytracer output with shadow rays MEX using same inputs
+charRootDirRadiometricRGB_RT = testCase.TestData.charRootDirRadiometricRGB_RT;
+charSceneConfigFilePath = fullfile(charRootDirRadiometricRGB_RT, 'tests', 'test_data', 'scene_configs', 'scene.yml');
+
+if isfolder(charRootDirRadiometricRGB_RT)
+    charRayTracerMatlabPath = fullfile(charRootDirRadiometricRGB_RT, "matlab");
+    charRayTracerLibPath = fullfile(charRootDirRadiometricRGB_RT, "build", "wrap", "radiometric_cpu_raytracer");
+    charRayTracerMexPath = fullfile(charRootDirRadiometricRGB_RT, "build", "wrap", "radiometric_cpu_raytracer_mex");
+
+    if isfolder(charRayTracerMatlabPath)
+        testCase.applyFixture(matlab.unittest.fixtures.PathFixture(charRayTracerMatlabPath, "IncludeSubfolders", true));
+    end
+    if isfolder(charRayTracerLibPath)
+        testCase.applyFixture(matlab.unittest.fixtures.PathFixture(charRayTracerLibPath));
+    end
+    if isfolder(charRayTracerMexPath)
+        testCase.applyFixture(matlab.unittest.fixtures.PathFixture(charRayTracerMexPath));
+    end
+end
+
+charRTlibPath = which("radiometric_rgb_rt.CRadiometricRGB_RT");
+bHasExternalRaytracer = not(isempty(charRTlibPath));
+
+testCase.assumeTrue(bHasExternalRaytracer, ...
+    "External radiometric RGB raytracer is unavailable, skipping test.");
+testCase.assumeTrue(isfile(charSceneConfigFilePath), ...
+    "Scene configuration file for radiometric raytracer is missing, skipping test.");
+testCase.assumeTrue(exist("RayTracePointVisibility_ShadowRays_MEX", "file") > 0, ...
+    "RayTracePointVisibility_ShadowRays_MEX is unavailable, skipping cross-validation test.");
+
+objShapeModel = testCase.TestData.objShapeModel;
+ui32VerticesIDs = testCase.TestData.ui32VerticesIDs;
+dPointsPositionsGT_TB = testCase.TestData.dPointsPositionsGT_TB;
+dCameraPosition_TB = testCase.TestData.dCameraPosition_TB;
+dSunPosition_TB = testCase.TestData.dSunPosition_TB;
+dDCM_TBfromCAM = testCase.TestData.dDCM_TBfromCAM;
+strTargetBodyData = orderfields(testCase.TestData.strTargetBodyData);
+strCameraData = orderfields(testCase.TestData.strCameraData);
+bDEBUG_MODE = testCase.TestData.bDEBUG_MODE;
+
+bTwoSidedTest = true;
+bPointsAreMeshVertices = true;
+bSkipIlluminationCheck = false;
+
+%%% External raytracer visibility check
+% Configure instance
+objRayTracer = radiometric_rgb_rt.CRadiometricRGB_RT();
+objRayTracer.configureFromYamlFile(char(charSceneConfigFilePath), false);
+objRayTracer.setCameraGeomParams(strCameraData.dResX, ...
+                                 strCameraData.dResY, ...
+                                 strCameraData.dKcam(1,1), ...
+                                 strCameraData.dKcam(2,2), ...
+                                 strCameraData.dKcam(1,3), ...
+                                 strCameraData.dKcam(2,3), ...
+                                 1, 0);
+objRayTracer.addTriaMeshToScene(objShapeModel.dVerticesPos, ...
+                                double(objShapeModel.ui32triangVertexPtr));
+
+bVisibilityMask_visibilityMethod = logical(objRayTracer.rayTracePointsVisibility(dSunPosition_TB, ...
+                                                    dCameraPosition_TB, ...
+                                                    dDCM_TBfromCAM, ...
+                                                    dPointsPositionsGT_TB));
+bVisibilityMask_visibilityMethod = bVisibilityMask_visibilityMethod(:);
+
+% Shadow rays MEX visibility
+[bAllPointsVisibilityMask_RTwithShadowRays, ~] = RayTracePointVisibility_ShadowRays_MEX(uint32(ui32VerticesIDs), ...
+                                                                                         dPointsPositionsGT_TB, ...
+                                                                                         strTargetBodyData, ...
+                                                                                         strCameraData, ...
+                                                                                         dSunPosition_TB, ...
+                                                                                         bDEBUG_MODE, ...
+                                                                                         bTwoSidedTest, ...
+                                                                                         bPointsAreMeshVertices, ...
+                                                                                         bSkipIlluminationCheck); 
+
+bAllPointsVisibilityMask_RTwithShadowRays = bAllPointsVisibilityMask_RTwithShadowRays(:);
+
+ui32NumPoints = size(dPointsPositionsGT_TB, 2);
+testCase.verifySize(bVisibilityMask_visibilityMethod, [ui32NumPoints, 1]);
+testCase.verifySize(bAllPointsVisibilityMask_RTwithShadowRays, [ui32NumPoints, 1]);
+
+testCase.verifyTrue(any(bVisibilityMask_visibilityMethod), ...
+    "External raytracer reported zero visible points.");
+testCase.verifyTrue(any(bAllPointsVisibilityMask_RTwithShadowRays), ...
+    "Shadow rays MEX reported zero visible points.");
+
+ui32NumAgree = nnz(bVisibilityMask_visibilityMethod & bAllPointsVisibilityMask_RTwithShadowRays);
+ui32NumUnion = nnz(bVisibilityMask_visibilityMethod | bAllPointsVisibilityMask_RTwithShadowRays);
+
+testCase.verifyGreaterThan(ui32NumAgree, 0, ...
+    "No overlap between external raytracer and shadow ray visibility masks.");
+
+% Require reasonable agreement between the two methods
+dAgreementRatio = double(ui32NumAgree) / double(ui32NumUnion);
+testCase.verifyGreaterThan(dAgreementRatio, 0.90, ...
+    "Visibility masks between external raytracer and shadow rays MEX disagree significantly.");
+end
