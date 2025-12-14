@@ -13,6 +13,7 @@ classdef SReferenceMissionDesign < CBaseDatastructWithTimes
     % 25-06-2025    Pietro Califano     Add new attributes to store additional bodies position data
     % 16-07-2025    Pietro Califano     Update class with new conveniency methods to produce plots and 
     %                                   attitude data directly from dataset
+    % 14-12-2025    Pietro Califano     Implement conversion methods to/from simulation states arrays
     % -------------------------------------------------------------------------------------------------------------
     %% METHODS
     % [-]
@@ -30,35 +31,35 @@ classdef SReferenceMissionDesign < CBaseDatastructWithTimes
         enumWorldFrame                  (1,1) {mustBeA(enumWorldFrame, ["SEnumFrameName", "string", "char"])} = "IN"  % Enumeration class indicating the W frame to which the data are attached
 
         % Orbit and attitude data
-        dPosSC_W                        (3, :) double {isnumeric, ismatrix} = zeros(3,0);
-        dVelSC_W                        (3, :) double {isnumeric, ismatrix} = zeros(3,0);
-        dDCM_SCfromW                    (3, 3, :) double {isnumeric, ismatrix} = zeros(3,3,0)
+        dPosSC_W                        (3, :) double {mustBeNumeric} = zeros(3,0);
+        dVelSC_W                        (3, :) double {mustBeNumeric} = zeros(3,0);
+        dDCM_SCfromW                    (3, 3, :) double {mustBeNumeric} = zeros(3,3,0)
         strAccelInfoData                {isstruct} = struct() % Structure containing acceleration data           
 
         % Target body data 
-        dDCM_TBfromW                    (3, 3, :) double {isnumeric, ismatrix} = []
-        dTargetPosition_W               (3, :) double {isnumeric, ismatrix} = []
+        dDCM_TBfromW                    (3, 3, :) double {mustBeNumeric} = []
+        dTargetPosition_W               (3, :) double {mustBeNumeric} = []
 
         % Manoeuvres plan data
-        dPrimaryPointingWhileMan_W      (3, :, :) double {isnumeric, ismatrix} = [] % TBC, primary pointing axis during manoeuvres
-        dSecondPointingWhileMan_W       (3, :, :) double {isnumeric, ismatrix} = [] % TBC, secondary axis during manoeuvres
+        dPrimaryPointingWhileMan_W      (3, :, :) double {mustBeNumeric} = [] % TBC, primary pointing axis during manoeuvres
+        dSecondPointingWhileMan_W       (3, :, :) double {mustBeNumeric} = [] % TBC, secondary axis during manoeuvres
 
-        dManoeuvresTimegrids            (3, :) double {isnumeric, ismatrix} = [];    % TODO clarify what this is         
-        dManoeuvresStartTimestamps      (1, :) double {isnumeric, isvector} = [];
-        dManoeuvresDeltaV_SC            (3, :) double {isnumeric, ismatrix} = [];
+        dManoeuvresTimegrids            (3, :) double {mustBeNumeric} = [];    % TODO clarify what this is         
+        dManoeuvresStartTimestamps      (1, :) double {mustBeNumeric} = [];
+        dManoeuvresDeltaV_SC            (3, :) double {mustBeNumeric} = [];
 
         % Additional data 
-        dSunPosition_W                  (3, :) double {isnumeric, ismatrix} = [];
-        dEarthPosition_W                (3, :) double {isnumeric, ismatrix} = [];
-        dRelativeTimestamps             (1, :) double {isnumeric, ismatrix} = [];
-        enumTimeScale                   (1, :) char {ischar, isstring, mustBeMember(enumTimeScale, ...
+        dSunPosition_W                  (3, :) double {mustBeNumeric} = [];
+        dEarthPosition_W                (3, :) double {mustBeNumeric} = [];
+        dRelativeTimestamps             (1, :) double {mustBeNumeric} = [];
+        enumTimeScale                   (1, :) char {mustBeText, mustBeMember(enumTimeScale, ...
                                                      ["TAI", "TDB", "TDT", "TT", "ET", "JDTDB", "JDTDT", "JED", "GPS", "N/D"])} = "N/D";
         
         ui32TargetPointingID              (1,:) uint32 {isnumeric} = []
-        cellAdditionalBodiesPos_W         {iscell} = {};
-        cellAdditionalBodiesDCM_TBfromW   {iscell} = {};
-        cellAdditionalTargetFrames        {iscell} = {};
-        cellAdditionalBodiesTags          {iscell} = {};
+        cellAdditionalBodiesPos_W         {mustBeA(cellAdditionalBodiesPos_W      , "cell")} = {};
+        cellAdditionalBodiesDCM_TBfromW   {mustBeA(cellAdditionalBodiesDCM_TBfromW, "cell")} = {};
+        cellAdditionalTargetFrames        {mustBeA(cellAdditionalTargetFrames     , "cell")} = {};
+        cellAdditionalBodiesTags          {mustBeA(cellAdditionalBodiesTags       , "cell")} = {};
 
         charLengthUnits char {mustBeA(charLengthUnits, ["string", "char"])} = '';
     end
@@ -77,20 +78,20 @@ classdef SReferenceMissionDesign < CBaseDatastructWithTimes
                 % Reference definition
                 enumWorldFrame               (1,1)     {mustBeA(enumWorldFrame, ["SEnumFrameName", "string", "char"])} = EnumFrameName.IN  % Enumeration class indicating the W frame to which the data are attached
                 dTimestamps                  (1, :)     {isnumeric, isvector} = [];
-                dStateSC_W                   (6, :)     {isnumeric, ismatrix} = [];
-                dDCM_TBfromW                 (3, 3, :)  {isnumeric, ismatrix} = [];
-                dTargetPosition_W            (3, :)     {isnumeric, ismatrix} = [];
-                dSunPosition_W               (3, :)     {isnumeric, ismatrix} = [];
-                dEarthPosition_W             (3, :)     {isnumeric, ismatrix} = [];
+                dStateSC_W                   (6, :)     {mustBeNumeric} = [];
+                dDCM_TBfromW                 (3, 3, :)  {mustBeNumeric} = [];
+                dTargetPosition_W            (3, :)     {mustBeNumeric} = [];
+                dSunPosition_W               (3, :)     {mustBeNumeric} = [];
+                dEarthPosition_W             (3, :)     {mustBeNumeric} = [];
             end
             arguments
-                optional.dPrimaryPointingWhileMan_W   (3, :, :)  double {isnumeric, ismatrix} = [] % TBC, primary pointing axis during manoeuvres
-                optional.dSecondPointingWhileMan_W    (3, :, :)  double {isnumeric, ismatrix} = [] % TBC, secondary axis during manoeuvres
-                optional.dManoeuvresTimegrids         (3, :)     double {isnumeric, ismatrix} = [];
+                optional.dPrimaryPointingWhileMan_W   (3, :, :)  double {mustBeNumeric} = [] % TBC, primary pointing axis during manoeuvres
+                optional.dSecondPointingWhileMan_W    (3, :, :)  double {mustBeNumeric} = [] % TBC, secondary axis during manoeuvres
+                optional.dManoeuvresTimegrids         (3, :)     double {mustBeNumeric} = [];
                 optional.dManoeuvresStartTimestamps   (1, :)     double {isnumeric, isvector} = [];
-                optional.dManoeuvresDeltaV_SC         (3, :)     double {isnumeric, ismatrix} = [];
-                optional.dRelativeTimestamps          (1, :)     double {isnumeric, ismatrix} = [];   
-                optional.dDCM_SCfromW                 (3, 3, :)  double {isnumeric, ismatrix} = [];
+                optional.dManoeuvresDeltaV_SC         (3, :)     double {mustBeNumeric} = [];
+                optional.dRelativeTimestamps          (1, :)     double {mustBeNumeric} = [];   
+                optional.dDCM_SCfromW                 (3, 3, :)  double {mustBeNumeric} = [];
             end
             
             % TODO (PC)
@@ -141,7 +142,7 @@ classdef SReferenceMissionDesign < CBaseDatastructWithTimes
         function self = scaleLengthUnits(self, dScaleFactor)
             arguments
                 self
-                dScaleFactor (1,1) double {isnumeric, isscalar}
+                dScaleFactor (1,1) double {mustBeNumeric}
             end
             
             self.dPosSC_W             = dScaleFactor * self.dPosSC_W;
@@ -166,7 +167,7 @@ classdef SReferenceMissionDesign < CBaseDatastructWithTimes
         function [dStateSC_W, self] = dStateSC_W(self, dStateSC_W)
             arguments
                 self
-                dStateSC_W {ismatrix, isnumeric} = [];
+                dStateSC_W {mustBeNumeric} = [];
             end
 
             if not(isempty(dStateSC_W))
@@ -549,6 +550,282 @@ classdef SReferenceMissionDesign < CBaseDatastructWithTimes
     end
 
     methods (Access = public, Static)
+        function [objDataset] = fromSimulationStates(objSimStatesArray, kwargs)
+            arguments
+                objSimStatesArray (1,:) {mustBeA(objSimStatesArray, "CSimulationState")}
+            end
+            arguments
+                kwargs.enumWorldFrame               = []
+                kwargs.dManoeuvresTimegrids         (3,:) double {mustBeNumeric} = []
+                kwargs.dManoeuvresStartTimestamps   (1,:) double {mustBeNumeric} = []
+                kwargs.dManoeuvresDeltaV_W          (3,:) double {mustBeNumeric} = []
+                kwargs.dEarthPosition_W                   double {mustBeNumeric} = []
+                kwargs.dRelativeTimestamps          (1,:) double {mustBeNumeric} = []
+                kwargs.cellAdditionalBodiesTags         cell = {}
+                kwargs.cellAdditionalTargetFrames       cell = {}
+                kwargs.charLengthUnits              char {mustBeA(kwargs.charLengthUnits, ["string", "char"])} = ""
+            end
+            % Method to convert from simulation states array to dataset object
+
+            %%% Function code
+            ui32NumStates = numel(objSimStatesArray);
+            assert(ui32NumStates > 0, 'ERROR: fromSimulationStates called with empty input array.');
+
+            % Initialize variables
+            dPosSC_W            = zeros(3, ui32NumStates);
+            dVelSC_W            = zeros(3, ui32NumStates);
+            dDCM_SCfromW        = zeros(3,3, ui32NumStates);
+            dTargetPosition_W   = zeros(3, ui32NumStates);
+            dDCM_TBfromW        = zeros(3,3, ui32NumStates);
+            dSunPosition_W      = zeros(3, ui32NumStates);
+            dTimestamps         = zeros(1, ui32NumStates);
+            dRelativeTimestamps = zeros(1, ui32NumStates);
+
+            cellAdditionalBodiesPos_W       = {};
+            cellAdditionalBodiesDCM_TBfromW = {};
+
+            % Loop over simulation states to fetch data at each time ID
+            bHasVelocity = isprop(objSimStatesArray(1).objCameraPose_W, 'dVelocity_Frame');
+
+            for idT = 1:ui32NumStates
+                
+                % Get ith state
+                objState = objSimStatesArray(idT);
+
+                % Get time data
+                dTimestamps(idT) = objState.dTimestamp;
+                dRelativeTimestamps(idT) = objState.dRelativeTimestamp;
+
+                % Get scene data (geometric)
+                % Camera data
+                dPosSC_W(:, idT) = objState.objCameraPose_W.translation();
+
+                if bHasVelocity
+                    dVelSC_W(:, idT) = objState.objCameraPose_W.dVelocity_Frame;
+                end
+
+                dRotCam_WfromSC = objState.objCameraPose_W.rotation();
+
+                if isempty(dRotCam_WfromSC)
+                    dRotCam_WfromSC = eye(3);
+                end
+
+                dDCM_SCfromW(:,:, idT) = transpose(dRotCam_WfromSC);
+
+                % Target data
+                dTargetPosition_W(:, idT) = objState.objTargetPose_W.translation();
+                dRotTarget_WfromOF = objState.objTargetPose_W.rotation();
+
+                if isempty(dRotTarget_WfromOF)
+                    dRotTarget_WfromOF = eye(3);
+                end
+
+                dDCM_TBfromW(:,:, idT) = transpose(dRotTarget_WfromOF);
+
+                % Sun position in World frame
+                if not(isempty(objState.dSunPosition_W))
+                    dSunPosition_W(:, idT) = objState.dSunPosition_W;
+                end
+
+                % Handle additional bodies if present
+                if objState.ui32Num3rdBodies > 0
+
+                    % Define cells for storage
+                    if isempty(cellAdditionalBodiesPos_W)
+                        cellAdditionalBodiesPos_W       = cell(1, objState.ui32Num3rdBodies);
+                        cellAdditionalBodiesDCM_TBfromW = cell(1, objState.ui32Num3rdBodies);
+                    end
+
+                    % Get data
+                    for idB = 1:objState.ui32Num3rdBodies
+
+                        % Initialize storage
+                        if isempty(cellAdditionalBodiesPos_W{idB})
+                            cellAdditionalBodiesPos_W{idB} = zeros(3, ui32NumStates); %#ok<AGROW>
+                        end
+
+                        cellAdditionalBodiesPos_W{idB}(:, idT) = objState.obj3rdTargetPose_W(idB).translation(); %#ok<AGROW>
+                        
+                        dRot3rd_WfromOF = objState.obj3rdTargetPose_W(idB).rotation();
+
+                        if not(isempty(dRot3rd_WfromOF))
+                            % Store attitude
+                            if isempty(cellAdditionalBodiesDCM_TBfromW{idB})
+                                cellAdditionalBodiesDCM_TBfromW{idB} = zeros(3, 3, ui32NumStates); %#ok<AGROW>
+                            end
+                            cellAdditionalBodiesDCM_TBfromW{idB}(:, :, idT) = transpose(dRot3rd_WfromOF); %#ok<AGROW>
+                        end
+                    end
+                end
+
+            end
+
+            % Additional information
+            if isempty(kwargs.dRelativeTimestamps)
+                dRelativeTimestampsOut = dRelativeTimestamps;
+                
+                if all(dRelativeTimestampsOut == 0)
+                    dRelativeTimestampsOut = dTimestamps - dTimestamps(1);
+                end
+            
+            else
+                dRelativeTimestampsOut = kwargs.dRelativeTimestamps;
+            end
+
+            if isempty(kwargs.enumWorldFrame)
+                enumWorldFrame = objSimStatesArray(1).enumWorldFrame;
+                if isempty(enumWorldFrame)
+                    enumWorldFrame = EnumFrameName.IN;
+                end
+            else
+                enumWorldFrame = kwargs.enumWorldFrame;
+            end
+
+            if isempty(kwargs.dEarthPosition_W)
+                dEarthPosition_W = zeros(3, ui32NumStates);
+            else
+                dEarthPosition_W = kwargs.dEarthPosition_W;
+            end
+
+            % Assemble instance of object
+            objDataset = SReferenceMissionDesign(enumWorldFrame, ...
+                                                dTimestamps, ...
+                                                [dPosSC_W; dVelSC_W], ...
+                                                dDCM_TBfromW, ...
+                                                dTargetPosition_W, ...
+                                                dSunPosition_W, ...
+                                                dEarthPosition_W, ...
+                                                "dManoeuvresTimegrids", kwargs.dManoeuvresTimegrids, ...
+                                                "dManoeuvresStartTimestamps", kwargs.dManoeuvresStartTimestamps, ...
+                                                "dManoeuvresDeltaV_SC", kwargs.dManoeuvresDeltaV_W, ...
+                                                "dRelativeTimestamps", dRelativeTimestampsOut, ...
+                                                "dDCM_SCfromW", dDCM_SCfromW);
+
+            % Assign data
+            objDataset.cellAdditionalBodiesPos_W       = cellAdditionalBodiesPos_W;
+            objDataset.cellAdditionalBodiesDCM_TBfromW = cellAdditionalBodiesDCM_TBfromW;
+
+            if isempty(kwargs.cellAdditionalBodiesTags) && not(isempty(cellAdditionalBodiesPos_W))
+                objDataset.cellAdditionalBodiesTags = arrayfun(@(idB) sprintf("Body%d", idB), 1:length(cellAdditionalBodiesPos_W), 'UniformOutput', false);
+            else
+                objDataset.cellAdditionalBodiesTags = kwargs.cellAdditionalBodiesTags;
+            end
+
+            objDataset.cellAdditionalTargetFrames = kwargs.cellAdditionalTargetFrames;
+            objDataset.charLengthUnits            = kwargs.charLengthUnits;
+        end
+
+        function [objSimStatesArray, dManoeuvresStartTimestamps, dManoeuvresDeltaV_W, dManoeuvresTimegrids] = toSimulationStates(objDataset)
+            arguments
+                objDataset (1,1) {mustBeA(objDataset, "SReferenceMissionDesign")}
+            end
+            % Method to convert from dataset object to simulation states array
+
+            if isempty(which('CSimulationState'))
+                error('SReferenceMissionDesign:MissingDependency', 'CSimulationState is not on the MATLAB path. Add nav-backend/matlab/src/datastructs to use this conversion.');
+            end
+            if isempty(which('SNavState'))
+                error('SReferenceMissionDesign:MissingDependency', 'SNavState is not on the MATLAB path. Add nav-backend/matlab/src/datastructs to use this conversion.');
+            end
+
+            % Get number of states
+            ui32NumStates = length(objDataset.dTimestamps);
+
+            % Get manoeuvres information
+            if ui32NumStates == 0
+                objSimStatesArray = CSimulationState.empty(1,0);
+                dManoeuvresStartTimestamps = objDataset.dManoeuvresStartTimestamps;
+                dManoeuvresDeltaV_W       = objDataset.dManoeuvresDeltaV_SC;
+                dManoeuvresTimegrids       = objDataset.dManoeuvresTimegrids;
+                return
+            end
+
+            % Loop over timestamps to build array
+            cellStates = cell(1, ui32NumStates);
+            for idT = 1:ui32NumStates
+
+                % Get camera data
+                dTimestamp     = objDataset.dTimestamps(idT);
+                dPos_W         = objDataset.dPosSC_W(:, idT);
+                dVel_W         = objDataset.dVelSC_W(:, idT);
+
+                if isempty(objDataset.dDCM_SCfromW)
+                    dDCM_SCfromW = eye(3);
+                else
+                    dDCM_SCfromW = objDataset.dDCM_SCfromW(:, :, idT);
+                end
+
+                % Get target data
+                if isempty(objDataset.dDCM_TBfromW)
+                    dDCM_TBfromW = eye(3);
+                else
+                    dDCM_TBfromW = objDataset.dDCM_TBfromW(:, :, idT);
+                end
+
+                % Initial camera and target instances in world frame
+                objCameraPose_W = SNavState(dTimestamp, dPos_W, dVel_W, dDCM_SCfromW');
+                objTargetPose_W = SPose3(objDataset.dTargetPosition_W(:, idT), dDCM_TBfromW');
+
+                % Initial camera and target instances in target frame
+                dPos_TB = dDCM_TBfromW * dPos_W;
+                dVel_TB = dDCM_TBfromW * dVel_W;
+                dDCM_SCfromTB = dDCM_TBfromW * dDCM_SCfromW;
+                objCameraPose_TB = SNavState(dTimestamp, dPos_TB, dVel_TB, dDCM_SCfromTB');
+
+                % Assemble simulation state entry
+                objState = CSimulationState(objCameraPose_W, objTargetPose_W, objCameraPose_TB);
+                
+                % Assign state data
+                objState.enumWorldFrame = objDataset.enumWorldFrame;
+                objState.ui32TimestampID = uint32(idT);
+                objState.dTimestamp = dTimestamp;
+
+                if isempty(objDataset.dRelativeTimestamps)
+                    objState.dRelativeTimestamp = dTimestamp - objDataset.dTimestamps(1);
+                else
+                    objState.dRelativeTimestamp = objDataset.dRelativeTimestamps(idT);
+                end
+
+                if not(isempty(objDataset.dSunPosition_W))
+                    objState.dSunPosition_W = objDataset.dSunPosition_W(:, idT);
+                end
+
+                objState.objCameraPose_W.dTimestamp  = dTimestamp;
+                objState.objCameraPose_TB.dTimestamp = dTimestamp;
+
+                % Assign 3rd bodies if present
+                if not(isempty(objDataset.cellAdditionalBodiesPos_W))
+
+                    for idB = 1:length(objDataset.cellAdditionalBodiesPos_W)
+                        dPosBody_W = objDataset.cellAdditionalBodiesPos_W{idB}(:, idT);
+                        dDCM_BodyFromW = eye(3);
+
+                        
+                        if not(isempty(objDataset.cellAdditionalBodiesDCM_TBfromW)) && ...
+                            length(objDataset.cellAdditionalBodiesDCM_TBfromW) >= idB && ...
+                             not(isempty(objDataset.cellAdditionalBodiesDCM_TBfromW{idB}))
+                        
+                            dDCM_BodyFromW = objDataset.cellAdditionalBodiesDCM_TBfromW{idB}(:, :, idT);
+                        end
+
+                        objState.obj3rdTargetPose_W(idB) = SPose3(dPosBody_W, dDCM_BodyFromW');
+
+                        dPosCamFromBody = dDCM_BodyFromW * (dPos_W - dPosBody_W);
+                        dDCM_CamFromBody = dDCM_BodyFromW * dDCM_SCfromW;
+                        objState.obj3rdCameraPose_TB(idB) = SPose3(dPosCamFromBody, dDCM_CamFromBody');
+                    end
+
+                end
+
+                cellStates{idT} = objState;
+            end
+
+            % Flatten cell to array
+            objSimStatesArray = [cellStates{:}];
+            dManoeuvresStartTimestamps = objDataset.dManoeuvresStartTimestamps;
+            dManoeuvresDeltaV_W        = objDataset.dManoeuvresDeltaV_SC;
+            dManoeuvresTimegrids       = objDataset.dManoeuvresTimegrids;
+        end
 
         function [self, dCameraAttDCM_WfromOF, dRot3Param, dOffPointingAngles] = generateAttitudePointing(self, kwargs)
             arguments
@@ -572,13 +849,13 @@ classdef SReferenceMissionDesign < CBaseDatastructWithTimes
             end
             arguments
                 kwargs.bShowAttitudePointingPlot       (1,1) logical {islogical, isscalar} = false
-                kwargs.dSigmaBoresightRollAngle        (1,1) double {isscalar, isnumeric} = 0.0;
-                kwargs.dSigmaOffPointingDegAngle       (1,1) double {isscalar, isnumeric} = 0.0;
+                kwargs.dSigmaBoresightRollAngle        (1,1) double {mustBeNumeric} = 0.0;
+                kwargs.dSigmaOffPointingDegAngle       (1,1) double {mustBeNumeric} = 0.0;
                 kwargs.enumConstraintType              (1,:) string {mustBeMember(kwargs.enumConstraintType, ["YorthogonalSun", "trackLVLH", "auxiliaryAxis"])} = "YorthogonalSun"
-                kwargs.enumOutRot3Param                (1,1) EnumRotParams {isa(kwargs.enumOutRot3Param, 'EnumRotParams')} = EnumRotParams.DCM
-                kwargs.dDCM_displacedPoseFromPose      (3,3,:) double {ismatrix, isnumeric} = zeros(3,3) % Custom rotation to apply to the rotation
+                kwargs.enumOutRot3Param                (1,1) EnumRotParams {mustBeA(kwargs.enumOutRot3Param, ["EnumRotParams", "string"])} = EnumRotParams.DCM
+                kwargs.dDCM_displacedPoseFromPose      (3,3,:) double {mustBeNumeric} = zeros(3,3) % Custom rotation to apply to the rotation
                 kwargs.enumOffPointingMode             (1,1) string {mustBeMember(kwargs.enumOffPointingMode, ["randomAxis", "refAxisOutOfPlane", "refAxisInPlane"])} = "randomAxis";
-                kwargs.dReferenceAxis_Frame            (3,:) double {ismatrix, isnumeric} = zeros(3,0)
+                kwargs.dReferenceAxis_Frame            (3,:) double {mustBeNumeric} = zeros(3,0)
                 kwargs.enumDisplaceDistribution           (1,:) string {mustBeMember(kwargs.enumDisplaceDistribution, ...
                     ["uniform", "gaussian", "time_correlation", "gaussian_same_on_batch", "uniform_same_on_batch"])} = "gaussian";
             end
