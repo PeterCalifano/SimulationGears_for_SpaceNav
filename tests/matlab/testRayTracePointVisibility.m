@@ -1,28 +1,33 @@
-% TEST SETUP
+function tests = testRayTracePointVisibility
+tests = functiontests(localfunctions);
+end
+
+%%
+function setupOnce(testCase)
+% Test setup function
 charThisScriptPath = fileparts(mfilename('fullpath'));
-addpath(genpath(fullfile(charThisScriptPath, "..", "..")));
+testCase.TestData.charThisScriptPath = charThisScriptPath;
+
+charRootPath = fullfile(charThisScriptPath, "..", "..");
+testCase.applyFixture( matlab.unittest.fixtures.PathFixture(charRootPath, IncludingSubfolders=true) );
+
+charPrevDir = pwd;
 cd(charThisScriptPath);
+testCase.addTeardown(@cd, charPrevDir);
 
-% profile on
 %%% Itokawa models
-% charShapeModelPath = fullfile(getenv('HOME'), "devDir", "rendering-sw", ...
-%                             "corto_PeterCdev", "data/scenarios/S2_Itokawa/Shape", "25143_Itokawa_512ICQ.obj");
-
 charShapeModelPath = fullfile(getenv('HOME'), "devDir", "rendering-sw", ...
                             "data", "asteroids", "Itokawa", "Itokawa_Hayabusa_50k_poly.obj");
 
-%%% Apophis models
-% charShapeModelPath = fullfile(getenv('HOME'), "devDir", "projects-DART", "data", "rcs1", "phase-C", "shape_models);
+testCase.assumeTrue(isfile(charShapeModelPath), ...
+    "Shape model file is missing, skipping ray trace visibility tests.");
 
 %%% Load shape model and target emulator
 objShapeModel = CShapeModel("file_obj", charShapeModelPath, "km", "m", true);
 
-ui32MaxNumPoints = 5000;
+ui32MaxNumPoints = 10000;
 objTargetEmulator = CTargetEmulator(objShapeModel, ui32MaxNumPoints);
 
-% profile viewer
-
-% [dPointsPositionsGT_TB_check, ui32pointsIDs_check] = objTargetEmulator.GetPointsInTargetFrame(ui32pointsIDs, false);
 [dPosVector_W, dRot3_WfromTB] = objTargetEmulator.GetPose();
 
 % Assign dummy but realistic data for test
@@ -67,7 +72,6 @@ dFovHW = objCameraIntrinsics.GetFovHW;
 
 strCamera.dFovX             = dFovHW(2); % [rad]
 strCamera.dFovY             = dFovHW(1); % [rad]
-% strCamera.dQuat_INfromCAM   = DCM2quat(dDCM_INfromCAM, true);
 strCamera.bIS_JPL_QUAT      = true;
 strCamera.dCAMpos_IN        = dCameraPosition_TB;
 strCamera = orderfields(strCamera);
@@ -86,305 +90,218 @@ strFcnOptions.bPointsAreMeshVertices = true;
 
 strTargetBody = objTargetEmulator.getTargetStruct();
 
+charRootDirRadiometricRGB_RT = getenv('WS_RENDER');
 
-%% test_CRadiometricRGB_RT
-addpath(genpath("/home/peterc/devDir/rendering-sw/radiometric-rgb-raytracer/matlab"));
-addpath("/home/peterc/devDir/rendering-sw/radiometric-rgb-raytracer/build/wrap/radiometric_cpu_raytracer/");
-addpath("/home/peterc/devDir/rendering-sw/radiometric-rgb-raytracer/build/wrap/radiometric_cpu_raytracer_mex/");
+if not(isempty(charRootDirRadiometricRGB_RT))
+    charRootDirRadiometricRGB_RT = fullfile(charRootDirRadiometricRGB_RT, "radiometric-rgb-raytracer");
+else
+    charRootDirRadiometricRGB_RT = fullfile(getenv('HOME'), "devDir", "rendering-sw", "radiometric-rgb-raytracer");
+end
 
-charSceneConfigFilePath = fullfile('/home/peterc/devDir/rendering-sw/radiometric-rgb-raytracer', 'tests', 'test_data', 'scene_configs', 'scene.yml');
+testCase.TestData.charShapeModelPath = charShapeModelPath;
+testCase.TestData.objShapeModel = objShapeModel;
+testCase.TestData.ui32MaxNumPoints = ui32MaxNumPoints;
+testCase.TestData.objTargetEmulator = objTargetEmulator;
+testCase.TestData.dPosVector_W = dPosVector_W;
+testCase.TestData.dRot3_WfromTB = dRot3_WfromTB;
+testCase.TestData.dCameraPosition_TB = dCameraPosition_TB;
+testCase.TestData.dSunPositionScaled_TB = dSunPositionScaled_TB;
+testCase.TestData.dSunPosition_TB = dSunPosition_TB;
+testCase.TestData.ui32VerticesIDs = ui32VerticesIDs;
+testCase.TestData.dPointsPositionsGT_TB = dPointsPositionsGT_TB;
+testCase.TestData.objAttitudePointGeneratior = objAttitudePointGeneratior;
+testCase.TestData.dDCM_TBfromCAM = dDCM_TBfromCAM;
+testCase.TestData.strShapeModel = strShapeModel;
+testCase.TestData.strTargetBodyData = strTargetBodyData;
+testCase.TestData.dFocalLength = dFocalLength;
+testCase.TestData.ui32ImageSize = ui32ImageSize;
+testCase.TestData.ui32OpticalCentre_uv = ui32OpticalCentre_uv;
+testCase.TestData.objCameraIntrinsics = objCameraIntrinsics;
+testCase.TestData.strCameraData = strCameraData;
+testCase.TestData.dFovHW = dFovHW;
+testCase.TestData.strCamera = strCamera;
+testCase.TestData.strVisibilityCheckOptions = strVisibilityCheckOptions;
+testCase.TestData.strFcnOptions = strFcnOptions;
+testCase.TestData.strTargetBody = strTargetBody;
+testCase.TestData.bDEBUG_MODE = false;
+testCase.TestData.charRootDirRadiometricRGB_RT = charRootDirRadiometricRGB_RT;
+end
 
-% Check if available
+%%
+function test_CRadiometricRGB_RT(testCase)
+% Test with test_CRadiometricRGB_RT implementation
+charRootDirRadiometricRGB_RT = testCase.TestData.charRootDirRadiometricRGB_RT;
+charSceneConfigFilePath = fullfile(charRootDirRadiometricRGB_RT, 'tests', 'test_data', 'scene_configs', 'scene.yml');
+
+if isfolder(charRootDirRadiometricRGB_RT)
+    charRayTracerMatlabPath = fullfile(charRootDirRadiometricRGB_RT, "matlab");
+    charRayTracerLibPath = fullfile(charRootDirRadiometricRGB_RT, "build", "wrap", "radiometric_cpu_raytracer");
+    charRayTracerMexPath = fullfile(charRootDirRadiometricRGB_RT, "build", "wrap", "radiometric_cpu_raytracer_mex");
+
+    if isfolder(charRayTracerMatlabPath)
+        testCase.applyFixture(matlab.unittest.fixtures.PathFixture(charRayTracerMatlabPath, "IncludeSubfolders", true));
+    end
+    if isfolder(charRayTracerLibPath)
+        testCase.applyFixture(matlab.unittest.fixtures.PathFixture(charRayTracerLibPath));
+    end
+    if isfolder(charRayTracerMexPath)
+        testCase.applyFixture(matlab.unittest.fixtures.PathFixture(charRayTracerMexPath));
+    end
+end
+
 charRTlibPath = which("radiometric_rgb_rt.CRadiometricRGB_RT");
 bHasExternalRaytracer = not(isempty(charRTlibPath));
 
-if bHasExternalRaytracer
-    % Initialize raytracer
-    objRayTracer = radiometric_rgb_rt.CRadiometricRGB_RT();
-    objRayTracer.configureFromYamlFile(charSceneConfigFilePath, false)
+testCase.assumeTrue(bHasExternalRaytracer, ...
+    "External radiometric RGB raytracer is unavailable, skipping test.");
+testCase.assumeTrue(isfile(charSceneConfigFilePath), ...
+    "Scene configuration file for radiometric raytracer is missing, skipping test.");
 
-    % Add mesh
-    objRayTracer.addTriaMeshToScene(objShapeModel.dVerticesPos, double(objShapeModel.ui32triangVertexPtr));
+objShapeModel = testCase.TestData.objShapeModel;
+dPointsPositionsGT_TB = testCase.TestData.dPointsPositionsGT_TB;
+dCameraPosition_TB = testCase.TestData.dCameraPosition_TB;
+dSunPosition_TB = testCase.TestData.dSunPosition_TB;
+dDCM_TBfromCAM = testCase.TestData.dDCM_TBfromCAM;
 
-    dTestPointsPos_TB = dPointsPositionsGT_TB - dCameraPosition_TB;
-    dTestPointsDir_TB = dTestPointsPos_TB ./vecnorm(dTestPointsPos_TB, 2, 1);
+% Initialize raytracer
+objRayTracer = radiometric_rgb_rt.CRadiometricRGB_RT();
+objRayTracer.configureFromYamlFile(char(charSceneConfigFilePath), false);
 
+% Set camera data
+objRayTracer.setCameraGeomParams(testCase.TestData.strCameraData.dResX, ...
+                                 testCase.TestData.strCameraData.dResY, ...
+                                 testCase.TestData.strCameraData.dKcam(1,1), ...
+                                 testCase.TestData.strCameraData.dKcam(2,2), ...
+                                 testCase.TestData.strCameraData.dKcam(1,3), ...
+                                 testCase.TestData.strCameraData.dKcam(2,3), ...
+                                 1, 0);
 
-    dIntersectPoints = objRayTracer.rayTraceDirections(dSunPosition_TB, ...
+% Add mesh
+objRayTracer.addTriaMeshToScene(objShapeModel.dVerticesPos, ...
+                                double(objShapeModel.ui32triangVertexPtr));
+
+dTestPointsPos_TB = dPointsPositionsGT_TB - dCameraPosition_TB;
+dTestPointsDir_TB = dTestPointsPos_TB ./ vecnorm(dTestPointsPos_TB, 2, 1);
+
+dIntersectPoints_TB = objRayTracer.rayTraceDirections(dSunPosition_TB, ...
+                                                dCameraPosition_TB, ...
+                                                dDCM_TBfromCAM, ...
+                                                dTestPointsDir_TB);
+
+% Test visibility using dedicated method
+bVisibilityMask_visibilityMethod = logical(objRayTracer.rayTracePointsVisibility(dSunPosition_TB, ...
                                                     dCameraPosition_TB, ...
                                                     dDCM_TBfromCAM, ...
-                                                    dTestPointsDir_TB);
+                                                    dPointsPositionsGT_TB));
 
-    % Test visibility using dedicated method
-    bVisibilityMask = logical(objRayTracer.rayTracePointsVisibility(dSunPosition_TB, ...
-                                                        dCameraPosition_TB, ...
-                                                        dDCM_TBfromCAM, ...
-                                                        dPointsPositionsGT_TB));
+% Compute depth of intersection points
+dIntersectDistance = vecnorm(dIntersectPoints_TB, 2, 1);
+bValidPoints = dIntersectDistance > eps('double');
 
-    % objAxes = PlotMeshWithRays(objShapeModel.dVerticesPos, ...
-    %                             objShapeModel.ui32triangVertexPtr, ...
-    %                             dCameraPosition_TB, ...
-    %                             dPointsPositionsGT_TB);
+% Reconstruct mask for visibility
+dIntersectPointsFromCam     = dIntersectPoints_TB - dCameraPosition_TB;
+dDistIntersectFromCam       = vecnorm(dIntersectPointsFromCam, 2, 1);
+bIsPointVisibleAndInFront   = bValidPoints & (abs(dDistIntersectFromCam - vecnorm(dTestPointsPos_TB, 2, 1)) <= eps('single'));
 
-    % Compute depth of intersection points
-    bIntersectDistance = vecnorm(dIntersectPoints, 2, 1);
-    bValidPoints = bIntersectDistance > eps('double');
-    fprintf('Found %d intersections / %d total test points.\n', sum(bValidPoints), size(dTestPointsDir_TB, 2));
-    fprintf('Direct visibility check returned %d visible points / %d total test points.\n', sum(bVisibilityMask), size(dTestPointsDir_TB, 2));
+dValidIntersectPoints = dIntersectPoints_TB(:, bValidPoints);
+% dValidVisiblePoints_intersectMethod = dIntersectPoints_TB(:, bIsPointVisibleAndInFront);
 
-    % Reconstruct mask for visibility
-    dIntersectPointsFromCam = dIntersectPoints - dCameraPosition_TB;
-    dSquaredDistIntersect = vecnorm(dIntersectPointsFromCam, 2, 1);
-    bIsPointVisibleAndInFront = bValidPoints & ( dSquaredDistIntersect - vecnorm(dTestPointsPos_TB, 2, 1) > 0 ...
-                                                   & dSquaredDistIntersect - vecnorm(dTestPointsPos_TB, 2, 1) > eps('single') );
-    
-    dValidIntersectPoints = dIntersectPoints(:, bValidPoints);
-    dValidVisiblePoints = dPointsPositionsGT_TB(:, bVisibilityMask);
+dValidVisiblePoints_visibilityMethod = dPointsPositionsGT_TB(:, bVisibilityMask_visibilityMethod);
+
+% Check numerical validity
+testCase.verifyTrue(all(isfinite(dIntersectPoints_TB(:))), ...
+    "Ray tracer returned non-finite intersection points.");
+testCase.verifyTrue(any(bIsPointVisibleAndInFront), ...
+    "Ray tracer did not find any visible points in front of the camera.");
+
+% Verify sizes
+testCase.verifySize(dIntersectPoints_TB, size(dPointsPositionsGT_TB));
+testCase.verifySize(bVisibilityMask_visibilityMethod, [size(dPointsPositionsGT_TB, 2), 1]);
+testCase.verifySize(dValidIntersectPoints, [3, nnz(bValidPoints)]);
+testCase.verifySize(dValidVisiblePoints_visibilityMethod, [3, nnz(bVisibilityMask_visibilityMethod)]);
+
+% Compare output between two cases
+testCase.verifyTrue( abs(nnz(bIsPointVisibleAndInFront) - nnz(bVisibilityMask_visibilityMethod)) < floor(0.005 * length(bValidPoints)) );
+
+% Rough timing 
+fcnHandle_mex = @() objRayTracer.rayTraceDirections(dSunPosition_TB, ...
+                                                dCameraPosition_TB, ...
+                                                dDCM_TBfromCAM, ...
+                                                dTestPointsDir_TB); 
+
+[dAvgRunTime, dTimings] = AverageFunctionTiming(fcnHandle_mex, 10);
 end
 
-%% test_RayTracePointVisibilityLocalPA_MEX
+%%
+function test_RayTracePointVisibilityLocalPA_MEX(testCase)
+% Test approximate function using raytracing with ellipsoid local assumption for illumination
 
-bDEBUG_MODE = false;
-strTargetBodyData = orderfields(strTargetBodyData);
-strCameraData = orderfields(strCameraData);
-strFcnOptions = orderfields(strFcnOptions);
+% TODO update input structure for usage
+bDEBUG_MODE = testCase.TestData.bDEBUG_MODE;
+strTargetBodyData = orderfields(testCase.TestData.strTargetBodyData);
+strCameraData = orderfields(testCase.TestData.strCameraData);
+strFcnOptions = orderfields(testCase.TestData.strFcnOptions);
+ui32VerticesIDs = testCase.TestData.ui32VerticesIDs;
+dPointsPositionsGT_TB = testCase.TestData.dPointsPositionsGT_TB;
+dSunPosition_TB = testCase.TestData.dSunPosition_TB;
+
+testCase.assumeTrue(exist("RayTracePointVisibility_EllipsLocalPA_MEX", "file") > 0, ...
+    "RayTracePointVisibility_EllipsLocalPA_MEX is unavailable, skipping test.");
 
 fcnHandle_mex = @() RayTracePointVisibility_EllipsLocalPA_MEX(uint32(ui32VerticesIDs), dPointsPositionsGT_TB, ...
     strTargetBodyData, strCameraData, dSunPosition_TB, strFcnOptions, bDEBUG_MODE);
 
-[dAvgRunTime, dTimings] = AverageFunctionTiming(fcnHandle_mex, 1);
+[dAvgRunTime, dTimings] = AverageFunctionTiming(fcnHandle_mex, 10);
 
-% Get output for visualization
-profile('clear')
-profile('on')
 [bAllPointsVisibilityMask_legacyEllipsLocalPA, ~] = RayTracePointVisibility_EllipsLocalPA_MEX(uint32(ui32VerticesIDs), ...
-                                                                                                 dPointsPositionsGT_TB, ...
-                                                                                                 strTargetBodyData, ...
-                                                                                                 strCameraData, ...
-                                                                                                 dSunPosition_TB, ...
-                                                                                                 strFcnOptions, ...
-                                                                                                 bDEBUG_MODE);
-p1 = profile('info');
-% profile viewer
+                                                                                               dPointsPositionsGT_TB, ...
+                                                                                               strTargetBodyData, ...
+                                                                                               strCameraData, ...
+                                                                                               dSunPosition_TB, ...
+                                                                                               strFcnOptions, ...
+                                                                                               bDEBUG_MODE);
 
-%% test_RayTracePointVisibility_ShadowRays
+testCase.verifyTrue(isnumeric(dAvgRunTime) && isscalar(dAvgRunTime));
+testCase.verifyTrue(isnumeric(dTimings) && all(isfinite(dTimings(:))));
+testCase.verifySize(bAllPointsVisibilityMask_legacyEllipsLocalPA, [size(dPointsPositionsGT_TB, 2), 1]);
+testCase.verifyClass(bAllPointsVisibilityMask_legacyEllipsLocalPA, "logical");
+end
+
+%%
+function test_RayTracePointVisibility_ShadowRays(testCase)
+% Test approximate function using raytracing with shadow rays check
+
+% TODO update input structure for usage
 bTwoSidedTest = true;
 bPointsAreMeshVertices = true;
 bSkipIlluminationCheck = false;
+bDEBUG_MODE = testCase.TestData.bDEBUG_MODE;
 
-profile('clear')
-profile('off')
-tic
-[bAllPointsVisibilityMask_RTwithShadowRays, ~] = RayTracePointVisibility_ShadowRays_MEX(uint32(ui32VerticesIDs), ...
-                                                                                         dPointsPositionsGT_TB, ...
-                                                                                         strTargetBodyData, ...
-                                                                                         strCameraData, ...
-                                                                                         dSunPosition_TB, ...
-                                                                                         bDEBUG_MODE, ...
-                                                                                         bTwoSidedTest, ...
-                                                                                         bPointsAreMeshVertices, ...
-                                                                                         bSkipIlluminationCheck); 
-try
-    p2 = profile('info');
-catch
+strTargetBodyData = orderfields(testCase.TestData.strTargetBodyData);
+strCameraData = orderfields(testCase.TestData.strCameraData);
+ui32VerticesIDs = testCase.TestData.ui32VerticesIDs;
+dPointsPositionsGT_TB = testCase.TestData.dPointsPositionsGT_TB;
+dSunPosition_TB = testCase.TestData.dSunPosition_TB;
+
+testCase.assumeTrue(exist("RayTracePointVisibility_ShadowRays_MEX", "file") > 0, ...
+    "RayTracePointVisibility_ShadowRays_MEX is unavailable, skipping test.");
+
+fcnHandle_mex = @() RayTracePointVisibility_ShadowRays_MEX(uint32(ui32VerticesIDs), ...
+                                                           dPointsPositionsGT_TB, ...
+                                                           strTargetBodyData, ...
+                                                           strCameraData, ...
+                                                           dSunPosition_TB, ...
+                                                           bDEBUG_MODE, ...
+                                                           bTwoSidedTest, ...
+                                                           bPointsAreMeshVertices, ...
+                                                           bSkipIlluminationCheck); 
+
+
+[dAvgRunTime, dTimings] = AverageFunctionTiming(fcnHandle_mex, 10); %#ok<*ASGLU>
+[bAllPointsVisibilityMask_RTwithShadowRays, ~] = fcnHandle_mex(); 
+
+testCase.verifySize(bAllPointsVisibilityMask_RTwithShadowRays, [size(dPointsPositionsGT_TB, 2), 1]);
+testCase.verifyClass(bAllPointsVisibilityMask_RTwithShadowRays, "logical");
+testCase.verifyTrue(any(bAllPointsVisibilityMask_RTwithShadowRays), ...
+    "Shadow ray tracing reported zero visible points.");
 end
-toc
-
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% DEBUG EMULATOR %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% % PASSED, result is identical.
-% objEmulatorSettings_MaxFidelity = SFrontEndTrackerEmulatorSettings("enumRandProcessType", "NONE", ...
-%     "enumTrackLossModel", "NONE", "bMaxFidelity", true);
-% 
-% % % Setup frontend emulator object 
-% objFrontEndEmulator_MaxFidelity = CFrontEndTracker_Emulator(objCameraIntrinsics, ...
-%                                                             objTargetEmulator, ...
-%                                                             objEmulatorSettings_MaxFidelity);
-% 
-% % Run frame acquisition to get visible points
-% objCameraPose_W = SPose3(strCameraData.dPosition_IN, strCameraData.dDCM_INfromCAM);
-% 
-% objFrontEndEmulator_MaxFidelity = objFrontEndEmulator_MaxFidelity.acquireFrame(objCameraPose_W, ...
-%                                                                                 dSunPosition_TB, ...
-%                                                                                 0);
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-
-%% test_ParallelRayTracePointVisibility_ShadowRays
-% NOTE: this is essentially useless...
-% profile('clear')
-% profile('on')
-% [bAllPointsVisibilityMask_ParallelRTwithShadowRays, dProjectedPoints_UV] = ParallelRayTracePointVisibility_ShadowRays(uint32(ui32pointsIDs), ...
-%                                                                                                                         dPointsPositionsGT_TB, ...
-%                                                                                                                         strTargetBodyData, ...
-%                                                                                                                         strCameraData, ...
-%                                                                                                                         dSunPosition_TB, ...
-%                                                                                                                         bDEBUG_MODE, ...
-%                                                                                                                         bTwoSidedTest); 
-% p3 = profile('info');
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% PLOTS
-%%%%%%%%%%%%%%%%%
-% 3D plot
-% Set flag for background color
-bUseBlackBackground = true; % Set to false for white background
-
-objFigPointCloud = figure('Renderer','opengl');
-
-% Set background color based on flag
-if bUseBlackBackground == true
-    charTextColor = 'w'; % White text
-else
-    charTextColor = 'k'; % Black text
-end
-
-% Plot the mesh using patch
-objPatchModel = patch('Vertices', strShapeModel.dVerticesPos', 'Faces', strShapeModel.ui32triangVertexPtr', ...
-      'FaceColor', [1.0, 1.0, 1.0], 'EdgeColor', 'none', 'FaceAlpha', 1, 'DisplayName', '3D model');
-hold on
-axis equal
-lighting flat;
-camlight('headlight');
-
-objPointCloud_GT = plot3(dPointsPositionsGT_TB(1, :), dPointsPositionsGT_TB(2, :), ...
-    dPointsPositionsGT_TB(3,:), 'g*', 'MarkerSize', 3, 'DisplayName', 'All GT points');
-
-DefaultPlotOpts()
-grid off
-xlabel('X [m]', 'Color', charTextColor);
-ylabel('Y [m]', 'Color', charTextColor);
-zlabel('Z [m]', 'Color', charTextColor);
-set(gca, 'XColor', charTextColor, 'YColor', charTextColor, 'ZColor', charTextColor);
-
-% camproj('perspective'); % Use perspective projection
-campos(dCameraPosition_TB'); % Set camera to camera position
-camtarget(-dCameraPosition_TB')
-% view(dCameraPosition_TB'); % Camera direction % TODO (PC) use this when showing plots of emulator!
-
-% TODO (img like visualization
-% objFigImgLike = figure('Renderer','opengl');
-% Project points 
-
-% Plot sun direction (TODO use this representation for the Sun in SLAM plots, much better)
-hold on;
-lineScale = 0.5; 
-objDirToSun = plot3([0, lineScale * dSunPositionScaled_TB(1)], ...
-                    [0, lineScale * dSunPositionScaled_TB(2)], ...
-                    [0, lineScale * dSunPositionScaled_TB(3)], 'r-', ...
-                    'LineWidth', 2, 'DisplayName', 'To Sun');
-
-
-% Show visible points in 3D plot
-figure(objFigPointCloud);
-hold on;
-% Local phase angle check (ellipsoid assumption)
-dPointsPositionsGT_RTwithEllipsLocalPA = dPointsPositionsGT_TB(:, bAllPointsVisibilityMask_legacyEllipsLocalPA);
-objPointCloud_RTwithEllipsLocalPA = plot3(dPointsPositionsGT_RTwithEllipsLocalPA(1, :), dPointsPositionsGT_RTwithEllipsLocalPA(2, :), ...
-                dPointsPositionsGT_RTwithEllipsLocalPA(3,:), 'bx', 'MarkerSize', 4, 'DisplayName', 'RT + Ellips. Local PA');
-
-dPointsPositionsGT_RTwithShadowRays = dPointsPositionsGT_TB(:, bAllPointsVisibilityMask_RTwithShadowRays);
-objPointCloud_RTwithShadowRays = plot3(dPointsPositionsGT_RTwithShadowRays(1, :), dPointsPositionsGT_RTwithShadowRays(2, :), ...
-                dPointsPositionsGT_RTwithShadowRays(3,:), 'x', 'Color', '#FFA500', 'MarkerSize', 4, 'DisplayName', 'RT + Shadow ray');
-
-% Set background color based on flag
-if bUseBlackBackground == true
-    set(gca, 'Color', 'k'); % Axes background
-    set(gcf, 'Color', 'k'); % Figure background
-else
-    set(gca, 'Color', 'w'); % White background
-    set(gcf, 'Color', 'w');
-end
-
-% Add legend
-legend([objPatchModel, objPointCloud_GT, objDirToSun, ...
-    objPointCloud_RTwithEllipsLocalPA, objPointCloud_RTwithShadowRays], 'TextColor', charTextColor);
-hold off;
-
-%%%%%%%%%%%%%%%%%
-if bHasExternalRaytracer
-
-    % Plot scatter3 of points from two raytracing with shadow rays
-    figure;
-    hold on
-    % scatter3(dValidIntersectPoints(1,:), dValidIntersectPoints(2,:), dValidIntersectPoints(3,:), 8, 'red', 'DisplayName', 'RGB-RT');
-    scatter3(dValidVisiblePoints(1,:), dValidVisiblePoints(2,:), dValidVisiblePoints(3,:), 8, 'green', 'DisplayName', 'RGB-RT visibility');
-    scatter3(dPointsPositionsGT_RTwithShadowRays(1,:), dPointsPositionsGT_RTwithShadowRays(2,:), ...
-        dPointsPositionsGT_RTwithShadowRays(3,:), 8, 'blue', 'DisplayName', 'MATLAB impl.');
-
-    xlabel('X [m]')
-    ylabel('Y [m]')
-    zlabel('Z [m]')
-    objFig = DefaultPlotOpts(gcf, "bEnableGrid", false, "bUseBlackBackground", true);
-    axis equal
-    legend("Color", "w")
-
-end
-
-
-%%%%%%%%%%%%%%%%%
-% 2D Image projection plot
-[dProjectedPoints_UV]   = pinholeProjectArrayHP_DCM(objCameraIntrinsics.K, dDCM_TBfromCAM', dCameraPosition_TB, dPointsPositionsGT_TB);
-bPointWithinFoV = ((dProjectedPoints_UV(1, :) > 0 & dProjectedPoints_UV(1, :) < objCameraIntrinsics.ImageSize(1)) &...
-                   (dProjectedPoints_UV(2, :) > 0 & dProjectedPoints_UV(2, :) < objCameraIntrinsics.ImageSize(2)))';
-
-% Determine visible and illuminated points
-bVisiblePoints_EllipsLocalPA    = bPointWithinFoV & bAllPointsVisibilityMask_legacyEllipsLocalPA;
-bVisiblePoints_RTwithShadowRays = bPointWithinFoV & bAllPointsVisibilityMask_RTwithShadowRays;
-
-% Plot projected points
-objFigImgPlane = figure('Renderer','opengl'); %#ok<*FGREN>
-hold on;
-xlabel('U [pixels]', 'Color', 'w'); % White labels
-ylabel('V [pixels]', 'Color', 'w');
-title('Projected 2D Mesh in Image Plane', 'Color', 'w');
-
-% ---- Set Background to Black ----
-set(gca, 'Color', 'k'); % Axes background
-set(gcf, 'Color', 'k'); % Full figure background
-
-title('Projected 2D visible points in Image Plane');
-
-% Plot only visible points
-objVisibleProj_EllipsLocalPA = scatter(dProjectedPoints_UV(1, bVisiblePoints_EllipsLocalPA), ...
-                                    dProjectedPoints_UV(2, bVisiblePoints_EllipsLocalPA), 5, ...
-    'b', 'filled', 'DisplayName', 'RT + Ellips. Local PA');
-hold on
-objVisibleProj_ShadowRays = plot(dProjectedPoints_UV(1, bVisiblePoints_RTwithShadowRays), dProjectedPoints_UV(2, bVisiblePoints_RTwithShadowRays), ...
-    '.', 'Color', '#FFA500', 'DisplayName', 'RT + Shadow Rays', 'LineStyle', 'none');
-
-% Flip Y-axis (Image coordinates have origin at top-left)
-set(gca, 'YDir', 'reverse');
-set(gca, 'XColor', 'w', 'YColor', 'w'); % White axis lines
-
-% Detector rectangle (sensor boundaries)
-% Draw the detector rectangle using `rectangle()`
-objCamDetector = rectangle('Position', [0, 0, objCameraIntrinsics.ImageSize(1), objCameraIntrinsics.ImageSize(2)], 'EdgeColor', 'r', 'LineWidth', 2);
-
-% Get valid indices for 2D patch
-dVertices2D = dProjectedPoints_UV';
-ui32Faces2D = strShapeModel.ui32triangVertexPtr';
-
-ui32MaxIndex = size(dVertices2D, 1);
-bValidFaces = all(ui32Faces2D <= ui32MaxIndex, 2);
-ui32Faces2D = ui32Faces2D(bValidFaces, :);
-
-% Plot the projected mesh using patch
-% objMeshProj = patch('Vertices', dVertices2D, 'Faces', ui32Faces2D, ...
-%       'FaceColor', [0.5 0.5 0.5], 'EdgeColor', 'none', 'FaceAlpha', 0.3);
-
-objMeshProj = scatter(dProjectedPoints_UV(1, :), dProjectedPoints_UV(2, :), 8, 'w', 'filled', 'DisplayName', 'Mesh vertices projection');
-uistack(objMeshProj, 'bottom'); % Send the mesh to the back
-
-legend([objVisibleProj_EllipsLocalPA, objVisibleProj_ShadowRays, objMeshProj], 'TextColor', 'w');
-hold off;
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-% Test analogous function implementation
-% 2D Image projection plot % DONE, OK
-% [objSceneFig, cellPlotObjs] = CPointProjectionPlotter.PlotProjectedPoints({dProjectedPoints_UV, dProjectedPoints_UV(:, bVisiblePoints_EllipsLocalPA), dProjectedPoints_UV(:, bVisiblePoints_RTwithShadowRays)}, ...
-%                                                             objCameraIntrisics, ...
-%                                                             "bUseBlackBackground", true, ...
-%                                                             "cellPlotNames", {'Mesh vertices projection', 'RT + Ellips. Local PA', 'RT + Shadow Rays'} );
-
