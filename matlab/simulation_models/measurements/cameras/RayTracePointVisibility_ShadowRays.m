@@ -10,13 +10,13 @@ function [bAllPointsVisibilityMask, dProjectedPoints_UV] = RayTracePointVisibili
 arguments
     ui32PointsIdx           (1,:) uint32
     dPointsPositions_TB     (3,:) double
-    strTargetBodyData       {isstruct}
-    strCameraData           {isstruct} 
+    strTargetBodyData       (1,1) struct
+    strCameraData           (1,1) struct
     dSunPosition_TB         (3,1) double
-    bDEBUG_MODE             (1,1) logical {islogical} = false
-    bTwoSidedTest           (1,1) logical {islogical} = false;
-    bPointsAreMeshVertices  (1,1) logical {islogical} = true;
-    bSkipIlluminationCheck  (1,1) logical {islogical} = false;
+    bDEBUG_MODE             (1,1) logical = false
+    bTwoSidedTest           (1,1) logical = false;
+    bPointsAreMeshVertices  (1,1) logical = true;
+    bSkipIlluminationCheck  (1,1) logical = false;
 end
 %% PROTOTYPE
 % [bAllPointsVisibilityMask, dProjectedPoints_UV] = RayTracePointVisibility_ShadowRays(ui32PointsIdx, ...
@@ -39,13 +39,15 @@ end
 %   here). All points that pass both intersection checks are marked as visible.
 % -------------------------------------------------------------------------------------------------------------
 %% INPUT
-% ui32PointsIdx       (1,:) uint32
-% dPointsPositions_TB (3,:) double
-% strTargetBodyData   {isstruct}
-% strCameraData       {isstruct}
-% dSunPosition_TB      (3,1) double
-% strFcnOptions       {isstruct}
-% bDEBUG_MODE         (1,1) logical {islogical} = false
+% ui32PointsIdx           (1,:) uint32
+% dPointsPositions_TB     (3,:) double
+% strTargetBodyData       (1,1) struct
+% strCameraData           (1,1) struct
+% dSunPosition_TB         (3,1) double
+% bDEBUG_MODE             (1,1) logical = false
+% bTwoSidedTest           (1,1) logical = false;
+% bPointsAreMeshVertices  (1,1) logical = true;
+% bSkipIlluminationCheck  (1,1) logical = false;
 % -------------------------------------------------------------------------------------------------------------
 %% OUTPUT
 % bPointsVisibilityMask

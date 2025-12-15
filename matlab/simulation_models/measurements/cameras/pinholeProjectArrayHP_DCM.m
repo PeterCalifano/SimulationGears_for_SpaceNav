@@ -1,9 +1,9 @@
 function [dUVpixCoord] = pinholeProjectArrayHP_DCM(dKcam, dDCM_CAMfromIN, dCameraPos_IN, dPointPos_IN) %#codegen
 arguments
-    dKcam           (3,3) double {ismatrix}
-    dDCM_CAMfromIN  (3,3) double {ismatrix}
-    dCameraPos_IN   (3,1) double {isvector}
-    dPointPos_IN    (3,:) double {isnumeric}
+    dKcam           (3,3) double {mustBeNumeric}
+    dDCM_CAMfromIN  (3,3) double {mustBeNumeric}
+    dCameraPos_IN   (3,1) double {mustBeNumeric}
+    dPointPos_IN    (3,:) double {mustBeNumeric}
 end
 %% PROTOTYPE
 % [dUVpixCoord] = pinholeProjectArrayHP_DCM(dKcam, dDCM_CAMfromIN, dCameraPos_IN, dPointPos_IN)
@@ -27,10 +27,10 @@ end
 % 2) Hera GNC Design Definition and Justification file (not public)
 % -------------------------------------------------------------------------------------------------------------
 %% INPUT
-% dKcam           (3,3) double {ismatrix}   Camera intrinsic (calibration) parameters (Normalized)
-% dDCM_CAMfromIN  (3,3) double {ismatrix}   Rotation matrix from IN to CAMinput quaternion
-% dCameraPos_IN   (3,1) double {isvector}   Position vector of SC in IN frame
-% dPointPos_IN    (3,:) double {isnumeric}  Position vector (array) in IN of points to project
+% dKcam           (3,3) double Camera intrinsic (calibration) parameters (Normalized)
+% dDCM_CAMfromIN  (3,3) double Rotation matrix from IN to CAMinput quaternion
+% dCameraPos_IN   (3,1) double Position vector of SC in IN frame
+% dPointPos_IN    (3,:) double Position vector (array) in IN of points to project
 % -------------------------------------------------------------------------------------------------------------
 %% OUTPUT
 % dUVpixCoord:      [2xN] Pixel coordinates of projected points in image plane

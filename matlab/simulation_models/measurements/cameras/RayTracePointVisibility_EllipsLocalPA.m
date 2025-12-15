@@ -8,11 +8,11 @@ function [bAllPointsVisibilityMask, dProjectedPoints_UV] = RayTracePointVisibili
 arguments
     ui32PointsIdx           (1,:) uint32
     dPointsPositions_TB     (3,:) double
-    strTargetBodyData       {isstruct}
-    strCameraData           {isstruct} 
+    strTargetBodyData       (1,1) struct
+    strCameraData           (1,1) struct
     dSunPosition_TB         (3,1) double
-    strFcnOptions           {isstruct}
-    bDEBUG_MODE             (1,1) logical {islogical} = false
+    strFcnOptions           (1,1) struct
+    bDEBUG_MODE             (1,1) logical = false
 end
 %% PROTOTYPE
 % [bAllPointsVisibilityMask, dProjectedPoints_UV] = RayTracePointVisibility_EllipsLocalPA(ui32PointsIdx, ...
@@ -34,13 +34,13 @@ end
 % - Intersection check performed using ray tracing to points against each triangle of the mesh.
 % -------------------------------------------------------------------------------------------------------------
 %% INPUT
-% ui32PointsIdx       (1,:) uint32
-% dPointsPositions_TB (3,:) double
-% strTargetBodyData   {isstruct}
-% strCameraData       {isstruct}
-% dSunPosition_TB      (3,1) double
-% strFcnOptions       {isstruct}
-% bDEBUG_MODE         (1,1) logical {islogical} = false
+% ui32PointsIdx           (1,:) uint32
+% dPointsPositions_TB     (3,:) double
+% strTargetBodyData       (1,1) struct
+% strCameraData           (1,1) struct
+% dSunPosition_TB         (3,1) double
+% strFcnOptions           (1,1) struct
+% bDEBUG_MODE             (1,1) logical = false
 % -------------------------------------------------------------------------------------------------------------
 %% OUTPUT
 % bPointsVisibilityMask
