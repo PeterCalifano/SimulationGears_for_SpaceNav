@@ -14,6 +14,7 @@ classdef SReferenceMissionDesign < CBaseDatastructWithTimes
     % 16-07-2025    Pietro Califano     Update class with new conveniency methods to produce plots and 
     %                                   attitude data directly from dataset
     % 14-12-2025    Pietro Califano     Implement conversion methods to/from simulation states arrays
+    % 22-12-2025    Pietro Califano     Extend conversion pipeline with intermediate representation class
     % -------------------------------------------------------------------------------------------------------------
     %% METHODS
     % [-]
@@ -28,7 +29,7 @@ classdef SReferenceMissionDesign < CBaseDatastructWithTimes
     properties (SetAccess = public, GetAccess = public)
         
         % Reference definition
-        enumWorldFrame                  (1,1) {mustBeA(enumWorldFrame, ["SEnumFrameName", "string", "char"])} = "IN"  % Enumeration class indicating the W frame to which the data are attached
+        enumWorldFrame                  (1,:) char {mustBeA(enumWorldFrame, ["SEnumFrameName", "string", "char"])} = "IN"  % Enumeration class indicating the W frame to which the data are attached
 
         % Orbit and attitude data
         dPosSC_W                        (3, :) double {mustBeNumeric} = zeros(3,0);
@@ -76,13 +77,13 @@ classdef SReferenceMissionDesign < CBaseDatastructWithTimes
                                                 optional)
             arguments
                 % Reference definition
-                enumWorldFrame               (1,1)     {mustBeA(enumWorldFrame, ["SEnumFrameName", "string", "char"])} = EnumFrameName.IN  % Enumeration class indicating the W frame to which the data are attached
-                dTimestamps                  (1, :)     {isnumeric, isvector} = [];
-                dStateSC_W                   (6, :)     {mustBeNumeric} = [];
-                dDCM_TBfromW                 (3, 3, :)  {mustBeNumeric} = [];
-                dTargetPosition_W            (3, :)     {mustBeNumeric} = [];
-                dSunPosition_W               (3, :)     {mustBeNumeric} = [];
-                dEarthPosition_W             (3, :)     {mustBeNumeric} = [];
+                enumWorldFrame               (1,:)      {mustBeA(enumWorldFrame, ["SEnumFrameName", "string", "char"])} = EnumFrameName.IN  % Enumeration class indicating the W frame to which the data are attached
+                dTimestamps                  (1,:)     {isnumeric, isvector} = [];
+                dStateSC_W                   (6,:)     {mustBeNumeric} = [];
+                dDCM_TBfromW                 (3,3, :)  {mustBeNumeric} = [];
+                dTargetPosition_W            (3,:)     {mustBeNumeric} = [];
+                dSunPosition_W               (3,:)     {mustBeNumeric} = [];
+                dEarthPosition_W             (3,:)     {mustBeNumeric} = [];
             end
             arguments
                 optional.dPrimaryPointingWhileMan_W   (3, :, :)  double {mustBeNumeric} = [] % TBC, primary pointing axis during manoeuvres
@@ -550,7 +551,30 @@ classdef SReferenceMissionDesign < CBaseDatastructWithTimes
     end
 
     methods (Access = public, Static)
-        function [objDataset] = fromSimulationStates(objSimStatesArray, kwargs)
+        function [objDataset] = fromSimStatesIntermediateRepr(objSimStatesIntermediateRepr)
+            arguments
+                objSimStatesIntermediateRepr (1,1) SDatasetFromSimStateIntermediateRepr {mustBeA(objSimStatesIntermediateRepr, "SDatasetFromSimStateIntermediateRepr")}
+            end
+
+            % Method to convert from simulation states intermediate representation to dataset object
+            objDataset = SReferenceMissionDesign.FromSimulationStates( ...
+                                objSimStatesIntermediateRepr.objSimStatesArray, ...
+                                'enumWorldFrame',             objSimStatesIntermediateRepr.enumWorldFrame, ...
+                                'dManoeuvresTimegrids',       objSimStatesIntermediateRepr.dManoeuvresTimegrids, ...
+                                'dManoeuvresStartTimestamps', objSimStatesIntermediateRepr.dManoeuvresStartTimestamps, ...
+                                'dManoeuvresDeltaV_W',        objSimStatesIntermediateRepr.dManoeuvresDeltaV_W, ...
+                                'dEarthPosition_W',           objSimStatesIntermediateRepr.dEarthPosition_W, ...
+                                'dRelativeTimestamps',        objSimStatesIntermediateRepr.dRelativeTimestamps, ...
+                                'cellAdditionalBodiesTags',   objSimStatesIntermediateRepr.cellAdditionalBodiesTags, ...
+                                'cellAdditionalTargetFrames', objSimStatesIntermediateRepr.cellAdditionalTargetFrames, ...
+                                'charLengthUnits',            objSimStatesIntermediateRepr.charLengthUnits ...
+                                );
+
+        end
+
+
+
+        function [objDataset] = FromSimulationStates(objSimStatesArray, kwargs)
             arguments
                 objSimStatesArray (1,:) {mustBeA(objSimStatesArray, "CSimulationState")}
             end
@@ -569,7 +593,7 @@ classdef SReferenceMissionDesign < CBaseDatastructWithTimes
 
             %%% Function code
             ui32NumStates = numel(objSimStatesArray);
-            assert(ui32NumStates > 0, 'ERROR: fromSimulationStates called with empty input array.');
+            assert(ui32NumStates > 0, 'ERROR: FromSimulationStates called with empty input array.');
 
             % Initialize variables
             dPosSC_W            = zeros(3, ui32NumStates);
