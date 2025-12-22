@@ -15,6 +15,7 @@ classdef (Abstract) CBaseDatastruct < handle & matlab.mixin.Copyable
     % 28-09-2025    Pietro Califano     Extend functionalities to fully support static usage of the class
     % 04-10-2025    Pietro Califano     [MAJOR] Extend functionalities to support input objects and struct
     %                                   arrays for struct, json and yaml export
+    % 22-12-2025    Pietro Califano     Add method to automatically hash data contents (charDataHash property)     
     % -------------------------------------------------------------------------------------------------------------
     %% METHODS
     % [-]
@@ -325,10 +326,36 @@ classdef (Abstract) CBaseDatastruct < handle & matlab.mixin.Copyable
                                             "bJsonPrettyPrint", kwargs.bJsonPrettyPrint);
         end
 
+
+        function [self, charDataHash] = generateDataHash(self)
+            arguments
+                self (1,1) {mustBeA(self, "CBaseDatastruct")}
+            end
+            % Update the charDataHash property with the current data hash
+            charDataHash = CBaseDatastruct.GenerateHashFromDatastruct(self);
+            self.charDataHash = charDataHash;
+        end
     end
 
     %% Static methods
     methods (Static, Access = public)
+        function charDataHash = GenerateHashFromDatastruct(objDatastruct)
+            arguments
+                objDatastruct {mustBeA(objDatastruct, "CBaseDatastruct")}
+            end
+
+            % Generate a hash from the datastruct content
+            strStruct = CBaseDatastruct.toStructStatic(objDatastruct, false);
+
+            try
+                % Try to use datahash package
+                charDataHash = DataHash(strStruct);
+            catch ME
+                warning('GenerateHashFromDatastruct:HashError', 'Error generating hash from datastruct: %s', ME.getReport());
+                charDataHash = '';
+            end
+
+        end
         function strOutputData = FlattenArrayInStruct(strInputData)
             arguments
                 strInputData (1,1) struct
