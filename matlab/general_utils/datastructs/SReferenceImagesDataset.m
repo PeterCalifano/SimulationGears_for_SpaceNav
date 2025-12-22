@@ -93,43 +93,6 @@ classdef SReferenceImagesDataset < SReferenceMissionDesign % TODO the name of th
 
         % METHODS
 
-        function objImagesDatasetFormatESA = exportAsFormatESA(self, charRootFolder, bSaveAllToDisk)
-            arguments (Input)
-                self            (1,1) SPoses3PointCloudImagesDataset
-                charRootFolder  (1,:) char {mustBeA(charRootFolder, ["string", "char"])}
-                bSaveAllToDisk  (1,1) logical
-            end
-            arguments (Output)
-                objImagesDatasetFormatESA (1,1)  {mustBeA(objImagesDatasetFormatESA, "SImagesDatasetFormatESA")}
-            end
-            %%% SIGNATURE
-            % objImagesDatasetFormatESA = exportAsFormatESA(self, charRootFolder, bSaveAllToDisk)
-            % -------------------------------------------------------------------------------------------------------------
-            %%% DESCRIPTION
-            % Function exporting the dataset object instance to an equivalent objImagesDatasetFormatESA
-            % filling all available fields. Optionally, the method to export to disk is also called
-            % -------------------------------------------------------------------------------------------------------------
-            %%% INPUT
-            % charRootFolder  (1,:) char {mustBeA(charRootFolder, ["string", "char"])}
-            % bSaveAllToDisk  {islogical, isscalar}
-            % -------------------------------------------------------------------------------------------------------------
-            %%% OUTPUT
-            % objImagesDatasetFormatESA (1,1)  {mustBeA(objImagesDatasetFormatESA, "SImagesDatasetFormatESA")}
-            % -------------------------------------------------------------------------------------------------------------
-            %%% CHANGELOG
-            % 28-05-2025    Pietro Califano     Design and implementation of prototype
-            % -------------------------------------------------------------------------------------------------------------
-
-            % TODO, class specific
-
-            % Convert to ESA format dataset object
-            objImagesDatasetFormatESA = SImagesDatasetFormatESA(length(self.dTimestamps));
-            % TODO
-            
-            if bSaveAllToDisk
-                objImagesDatasetFormatESA.exportAllToDisk(charRootFolder);
-            end
-        end
     end
 
 
@@ -152,7 +115,6 @@ classdef SReferenceImagesDataset < SReferenceMissionDesign % TODO the name of th
                 kwargs.bImageAcquisitionMask        (1,:) logical = false(0,0);
             end
             % Method to convert from simulation states array to dataset object
-
 
             % Call base class method
             objMissionDataset = SReferenceMissionDesign.fromSimulationStates(objSimStatesArray, ...
