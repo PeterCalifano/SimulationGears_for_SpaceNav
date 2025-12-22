@@ -1,4 +1,4 @@
-function tests = testSimulationStateConversions
+function tests = testDatasetConversionFromSimStateArray
 % Function-based test for conversions between datasets and CSimulationState arrays.
 tests = functiontests(localfunctions);
 end
