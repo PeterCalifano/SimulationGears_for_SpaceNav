@@ -40,7 +40,7 @@ classdef SPose3 < CBaseDatastruct
                 dDCM_NewFrameFromFrame (3,3) double {mustBeNumeric}
             end
 
-            self_copy = copy(self);
+            self_copy = self;
             self_copy.dPosition_Frame         = dDCM_NewFrameFromFrame * self_copy.dPosition_Frame;
             self_copy.dDCM_FrameFromPoseFrame = dDCM_NewFrameFromFrame * self_copy.dDCM_FrameFromPoseFrame;
         end

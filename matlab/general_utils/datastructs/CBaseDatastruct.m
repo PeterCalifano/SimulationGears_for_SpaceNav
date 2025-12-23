@@ -1,4 +1,4 @@
-classdef (Abstract) CBaseDatastruct < handle & matlab.mixin.Copyable
+classdef (Abstract) CBaseDatastruct % < matlab.mixin.Copyable
     %% DESCRIPTION
     % Base class for datastructs with import/export methods to struct, yaml, json and mat file.
     % -------------------------------------------------------------------------------------------------------------
@@ -15,6 +15,7 @@ classdef (Abstract) CBaseDatastruct < handle & matlab.mixin.Copyable
     % 28-09-2025    Pietro Califano     Extend functionalities to fully support static usage of the class
     % 04-10-2025    Pietro Califano     [MAJOR] Extend functionalities to support input objects and struct
     %                                   arrays for struct, json and yaml export
+    % 22-12-2025    Pietro Califano     Add override of copyElement to fix issues with copy() of handles
     % -------------------------------------------------------------------------------------------------------------
     %% METHODS
     % [-]
@@ -325,6 +326,60 @@ classdef (Abstract) CBaseDatastruct < handle & matlab.mixin.Copyable
                                             "bJsonPrettyPrint", kwargs.bJsonPrettyPrint);
         end
 
+    end
+
+    methods (Access = protected)
+        % function self_copy = copyElement(self)
+        % 
+        %     % Shallow copy via superclass (alloc new instance + assign props)
+        %     self_copy = copyElement@matlab.mixin.Copyable(self);
+        % 
+        %     if class(self) == "CBaseDatastruct"
+        %         return
+        %     end
+        % 
+        %     % Deep-copy for nested Copyables
+        %     props = properties(self);
+        % 
+        %     for id = 1:numel(props)
+        %         objProp = props{id};
+        % 
+        %         objValue_ = self.(objProp);
+        % 
+        %         % Skip empty
+        %         if isempty(objValue_)
+        %             continue; 
+        %         end
+        % 
+        %         % If property is a Copyable handle, copy it
+        %         if isa(objValue_, 'matlab.mixin.Copyable')
+        %             self_copy.(objProp) = copy(objValue_);
+        % 
+        %             % If it is an array/cell of Copyables
+        %         elseif iscell(objValue_)
+        %             self_copy.(objProp) = deepCopyCell(objValue_);
+        % 
+        %         elseif isobject(objValue_) && all(arrayfun(@(x) isa(x,'matlab.mixin.Copyable'), objValue_(:)))
+        %             self_copy.(objProp) = arrayfun(@(x) copy(x), objValue_);
+        % 
+        %             % Otherwise leave as-is (value types, non-copyable handles, etc.)
+        %         end
+        %     end
+        % 
+        %     function new_cell = deepCopyCell(old_cell)
+        %         new_cell = old_cell;
+        %         for k = 1:numel(old_cell)
+        %             vk = old_cell{k};
+        %             if isa(vk, 'matlab.mixin.Copyable')
+        %                 new_cell{k} = copy(vk);
+        %             elseif iscell(vk)
+        %                 new_cell{k} = deepCopyCell(vk);
+        %             else
+        %                 new_cell{k} = vk;
+        %             end
+        %         end
+        %     end
+        % end
     end
 
     %% Static methods
