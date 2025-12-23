@@ -551,7 +551,7 @@ classdef SReferenceMissionDesign < CBaseDatastructWithTimes
     end
 
     methods (Access = public, Static)
-        function [objDataset] = fromSimStatesIntermediateRepr(objSimStatesIntermediateRepr)
+        function [objDataset] = FromSimStatesIntermediateRepr(objSimStatesIntermediateRepr)
             arguments
                 objSimStatesIntermediateRepr (1,1) SDatasetFromSimStateIntermediateRepr {mustBeA(objSimStatesIntermediateRepr, "SDatasetFromSimStateIntermediateRepr")}
             end
@@ -564,7 +564,6 @@ classdef SReferenceMissionDesign < CBaseDatastructWithTimes
                                 'dManoeuvresStartTimestamps', objSimStatesIntermediateRepr.dManoeuvresStartTimestamps, ...
                                 'dManoeuvresDeltaV_W',        objSimStatesIntermediateRepr.dManoeuvresDeltaV_W, ...
                                 'dEarthPosition_W',           objSimStatesIntermediateRepr.dEarthPosition_W, ...
-                                'dRelativeTimestamps',        objSimStatesIntermediateRepr.dRelativeTimestamps, ...
                                 'cellAdditionalBodiesTags',   objSimStatesIntermediateRepr.cellAdditionalBodiesTags, ...
                                 'cellAdditionalTargetFrames', objSimStatesIntermediateRepr.cellAdditionalTargetFrames, ...
                                 'charLengthUnits',            objSimStatesIntermediateRepr.charLengthUnits ...
@@ -584,7 +583,6 @@ classdef SReferenceMissionDesign < CBaseDatastructWithTimes
                 kwargs.dManoeuvresStartTimestamps   (1,:) double {mustBeNumeric} = []
                 kwargs.dManoeuvresDeltaV_W          (3,:) double {mustBeNumeric} = []
                 kwargs.dEarthPosition_W                   double {mustBeNumeric} = []
-                kwargs.dRelativeTimestamps          (1,:) double {mustBeNumeric} = []
                 kwargs.cellAdditionalBodiesTags         cell = {}
                 kwargs.cellAdditionalTargetFrames       cell = {}
                 kwargs.charLengthUnits              char {mustBeA(kwargs.charLengthUnits, ["string", "char"])} = ""
@@ -685,17 +683,6 @@ classdef SReferenceMissionDesign < CBaseDatastructWithTimes
             end
 
             % Additional information
-            if isempty(kwargs.dRelativeTimestamps)
-                dRelativeTimestampsOut = dRelativeTimestamps;
-                
-                if all(dRelativeTimestampsOut == 0)
-                    dRelativeTimestampsOut = dTimestamps - dTimestamps(1);
-                end
-            
-            else
-                dRelativeTimestampsOut = kwargs.dRelativeTimestamps;
-            end
-
             if isempty(kwargs.enumWorldFrame)
                 enumWorldFrame = objSimStatesArray(1).enumWorldFrame;
                 if isempty(enumWorldFrame)
@@ -722,7 +709,7 @@ classdef SReferenceMissionDesign < CBaseDatastructWithTimes
                                                 "dManoeuvresTimegrids", kwargs.dManoeuvresTimegrids, ...
                                                 "dManoeuvresStartTimestamps", kwargs.dManoeuvresStartTimestamps, ...
                                                 "dManoeuvresDeltaV_SC", kwargs.dManoeuvresDeltaV_W, ...
-                                                "dRelativeTimestamps", dRelativeTimestampsOut, ...
+                                                "dRelativeTimestamps", dRelativeTimestamps, ...
                                                 "dDCM_SCfromW", dDCM_SCfromW);
 
             % Assign data

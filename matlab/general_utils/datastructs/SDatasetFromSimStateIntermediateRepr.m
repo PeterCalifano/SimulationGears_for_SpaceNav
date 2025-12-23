@@ -43,29 +43,27 @@ classdef SDatasetFromSimStateIntermediateRepr < CBaseDatastruct
                                                             objSimStatesArray, ...
                                                             objCamera, ...
                                                             enumWorldFrame, ...
+                                                            charLengthUnits, ...
+                                                            bImageAcquisitionMask, ...
                                                             dManoeuvresTimegrids, ...
                                                             dManoeuvresStartTimestamps, ...
                                                             dManoeuvresDeltaV_SC, ...
                                                             dEarthPosition_W, ...
-                                                            dRelativeTimestamps, ...
                                                             cellAdditionalBodiesTags, ...
-                                                            cellAdditionalTargetFrames, ...
-                                                            charLengthUnits, ...
-                                                            bImageAcquisitionMask)
+                                                            cellAdditionalTargetFrames)
             arguments
                 ui32NumOfEntries  (1,1) uint32 = uint32(1);
                 objSimStatesArray (1,:) {mustBeA(objSimStatesArray, "CSimulationState")} = CSimulationState()
                 objCamera         (1,1) {mustBeA(objCamera, ["CCameraIntrinsics", "cameraIntrinsics", "CProjectiveCamera"])} = CCameraIntrinsics();
                 enumWorldFrame               char                             = ""
+                charLengthUnits              char {mustBeA(charLengthUnits, ["string", "char"])} = "";
+                bImageAcquisitionMask        (1,:) logical = false(0,0);
                 dManoeuvresTimegrids         (3,:)     double {mustBeNumeric} = []
                 dManoeuvresStartTimestamps   (1,:)     double {mustBeNumeric} = []
                 dManoeuvresDeltaV_SC         (3,:)     double {mustBeNumeric} = []
                 dEarthPosition_W                       double {mustBeNumeric} = []
-                dRelativeTimestamps          (1,:)     double {mustBeNumeric} = []
                 cellAdditionalBodiesTags     cell = {} % TODO verify that 3rd bodies are converted from simulation states in conversion methods!
                 cellAdditionalTargetFrames   cell = {}
-                charLengthUnits              char {mustBeA(charLengthUnits, ["string", "char"])} = "";
-                bImageAcquisitionMask        (1,:) logical = false(0,0);
             end
 
             if nargin > 0
@@ -80,7 +78,6 @@ classdef SDatasetFromSimStateIntermediateRepr < CBaseDatastruct
             self.dManoeuvresStartTimestamps = dManoeuvresStartTimestamps;
             self.dManoeuvresDeltaV_W = dManoeuvresDeltaV_SC;
             self.dEarthPosition_W = dEarthPosition_W;
-            self.dRelativeTimestamps = dRelativeTimestamps;
             self.cellAdditionalBodiesTags = cellAdditionalBodiesTags;
             self.cellAdditionalTargetFrames = cellAdditionalTargetFrames;
             self.charLengthUnits = charLengthUnits;
@@ -90,7 +87,6 @@ classdef SDatasetFromSimStateIntermediateRepr < CBaseDatastruct
             if nargin == 1
                 self.objSimStatesArray = repmat(CSimulationState(), 1, ui32NumOfEntries);
                 self.dEarthPosition_W = zeros(3, ui32NumOfEntries);
-                self.dRelativeTimestamps = zeros(1, ui32NumOfEntries);
                 self.bImageAcquisitionMask = false(1,ui32NumOfEntries);
             else
                 self.ui32NextAllocPtr = uint32(numel(objSimStatesArray)) + uint32(1);
@@ -108,7 +104,7 @@ classdef SDatasetFromSimStateIntermediateRepr < CBaseDatastruct
             % Append simulation state and relevant data
             self.objSimStatesArray(self.ui32NextAllocPtr) = objSimState;
             self.dEarthPosition_W(:,self.ui32NextAllocPtr) = objSimState.dPosition_Earth_W;
-            self.dRelativeTimestamps(self.ui32NextAllocPtr) = objSimState.dRelativeTimestamp;
+            % self.dRelativeTimestamps(self.ui32NextAllocPtr) = objSimState.dRelativeTimestamp;
 
             %%% Add additional entries if input
             % Manoeuvres

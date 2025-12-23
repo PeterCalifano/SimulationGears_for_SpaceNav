@@ -12,6 +12,7 @@ classdef SReferenceImagesDataset < SReferenceMissionDesign % TODO the name of th
     % 17-02-2025    Pietro Califano     Derived from SReferenceMissionDesign to add data necessary to use
     %                                   datasets for navigation simulations (e.g. camera params)
     % 29-06-2025    Pietro Califano     Complete extension to handle multiple bodies data
+    % 22-12-2025    Pietro Califano     Extend conversion pipeline with intermediate representation class
     % -------------------------------------------------------------------------------------------------------------
     %% METHODS
     % [-]
@@ -108,7 +109,6 @@ classdef SReferenceImagesDataset < SReferenceMissionDesign % TODO the name of th
                 kwargs.dManoeuvresStartTimestamps   (1,:)     double {mustBeNumeric} = []
                 kwargs.dManoeuvresDeltaV_SC         (3,:)     double {mustBeNumeric} = []
                 kwargs.dEarthPosition_W             double {mustBeNumeric} = []
-                kwargs.dRelativeTimestamps          (1,:)     double {mustBeNumeric} = []
                 kwargs.cellAdditionalBodiesTags     cell = {}
                 kwargs.cellAdditionalTargetFrames   cell = {}
                 kwargs.charLengthUnits              char {mustBeA(kwargs.charLengthUnits, ["string", "char"])} = "";
@@ -123,7 +123,6 @@ classdef SReferenceImagesDataset < SReferenceMissionDesign % TODO the name of th
                                                     "dManoeuvresStartTimestamps", kwargs.dManoeuvresStartTimestamps, ...
                                                     "dManoeuvresDeltaV_SC", kwargs.dManoeuvresDeltaV_SC, ...
                                                     "dEarthPosition_W", kwargs.dEarthPosition_W, ...
-                                                    "dRelativeTimestamps", kwargs.dRelativeTimestamps, ...
                                                     "cellAdditionalBodiesTags", kwargs.cellAdditionalBodiesTags, ...
                                                     "cellAdditionalTargetFrames", kwargs.cellAdditionalTargetFrames, ...
                                                     "charLengthUnits", kwargs.charLengthUnits);
@@ -141,7 +140,7 @@ classdef SReferenceImagesDataset < SReferenceMissionDesign % TODO the name of th
             end
 
             % Call base class method
-            objMissionDataset = SReferenceMissionDesign.fromSimStatesIntermediateRepr(objSimStatesIntermediateRepr);
+            objMissionDataset = SReferenceMissionDesign.FromSimStatesIntermediateRepr(objSimStatesIntermediateRepr);
 
             % Construct an instance of this and assign
             objDataset = SReferenceImagesDataset.FromSReferenceMissionDesign(objMissionDataset);
