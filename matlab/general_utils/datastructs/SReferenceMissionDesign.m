@@ -267,12 +267,13 @@ classdef SReferenceMissionDesign < CBaseDatastructWithTimes
                 self
             end
             arguments
-                kwargs.dTargetTimegrid      double {isvector, isnumeric} = [];
+                kwargs.dTargetTimegrid      (1,:) double = [];
                 kwargs.dDeltaTimeMultiplier double {mustBeScalarOrEmpty} = [];
-                kwargs.bDisplayComparison   logical {isscalar} = false;
+                kwargs.bDisplayComparison   (1,1) logical = false;
             end
 
-            objInterpDataset = copy(self);
+            % Make a copy assignment
+            objInterpDataset = self;
 
             if not(isempty(kwargs.dTargetTimegrid))
                 dTimegrid = kwargs.dTargetTimegrid;
@@ -289,54 +290,61 @@ classdef SReferenceMissionDesign < CBaseDatastructWithTimes
 
             % Interpolate position/velocity data
             dTimeGridOriginal = self.dTimestamps;
-                objSplinerHandle = @(dInputData) spline(dTimeGridOriginal, dInputData, dTimegrid);
+            objSplinerHandle = @(dInputData) spline(dTimeGridOriginal, dInputData, dTimegrid);
 
-                dInterpPosSC_W          = objSplinerHandle( self.dPosSC_W );
-                dInterpVelSC_W          = objSplinerHandle( self.dVelSC_W );
-                dInterpSunPosition_W    = objSplinerHandle( self.dSunPosition_W );
-                dInterpEarthPosition_W  = objSplinerHandle( self.dEarthPosition_W );
-                dInterpTargetPosition_W = objSplinerHandle( self.dTargetPosition_W );
+            dInterpPosSC_W          = objSplinerHandle( self.dPosSC_W );
+            dInterpVelSC_W          = objSplinerHandle( self.dVelSC_W );
+            dInterpSunPosition_W    = objSplinerHandle( self.dSunPosition_W );
+            dInterpEarthPosition_W  = objSplinerHandle( self.dEarthPosition_W );
+            dInterpTargetPosition_W = objSplinerHandle( self.dTargetPosition_W );
 
-                % Interpolate target attitude
-                dInterpDCM_TBfromW = zeros(3,3, length(dTimegrid));
-                ui32InterpGridCheckID_  = zeros(1, length(dTimegrid), 'uint32');
+            % Interpolate target attitude
+            dInterpDCM_TBfromW = zeros(3,3, length(dTimegrid));
+            ui32InterpGridCheckID_  = zeros(1, length(dTimegrid), 'uint32');
 
-                ui32InterPtr = uint32(1);
+            ui32InterPtr = uint32(1);
 
-                for idQ = 1:length(dTimeGridOriginal)-1
+            % TODO modify to handle cases in which the points coincide with some of the original grid
+            % (assign only) and to consider extrapolation cases.
 
-                    % Get idQth interval limits
-                    dTime0_ = dTimeGridOriginal(idQ);
-                    dTime1_ = dTimeGridOriginal(idQ + 1);
+            for idQ = 1:length(dTimeGridOriginal)-1
 
-                    % Get all times in the target timegrid within it idQ interval
-                    bInitMask = dTimegrid >= dTime0_;
-                    bEndMask  = dTimegrid < dTime1_;
-                    bExtractionIdx = bInitMask & bEndMask;
+                % Get idQth interval limits
+                dTime0_ = dTimeGridOriginal(idQ);
+                dTime1_ = dTimeGridOriginal(idQ + 1);
 
-                    dInterpTargetTimesInInterval_ = dTimegrid(bExtractionIdx);
-                    ui32TargetIndices = find(bExtractionIdx > 0);
+                % Get all times in the target timegrid within it idQ interval
+                bInitMask = dTimegrid >= dTime0_;
+                bEndMask  = dTimegrid < dTime1_;
+                bExtractionIdx = bInitMask & bEndMask;
 
-                    % Compute quaternion from DCMs
-                    dDCM0_ = self.dDCM_TBfromW(:,:, idQ);
-                    dDCM1_ = self.dDCM_TBfromW(:,:, idQ+1);
+                dInterpTargetTimesInInterval_ = dTimegrid(bExtractionIdx);
+                ui32TargetIndices = find(bExtractionIdx > 0);
 
-                    % Interpolate quaternions
-                    dQuat0_ = DCM2quatSeq(dDCM0_, false);
-                    dQuat1_ = DCM2quatSeq(dDCM1_, false);
-
-                    dNormalizedInterpTargetTimesInInterval_ = (dInterpTargetTimesInInterval_ - dTime0_) / (dTime1_ - dTime0_); % Normalize timegrid to [0,1]
-                    dInterpTargetBodyQuat_TBfromW = InterpolateSlerp(dQuat0_, dQuat1_, dNormalizedInterpTargetTimesInInterval_);
-
-                    % Convert back to DCMs and allocate
-                    ui32NumNewInterpEntries = uint32(length(dInterpTargetTimesInInterval_));
-                    dInterpDCM_TBfromW(1:3, 1:3, ui32InterPtr:ui32InterPtr+ui32NumNewInterpEntries-1) = QuatSeq2DCM(dInterpTargetBodyQuat_TBfromW, false);
-                    ui32InterpGridCheckID_(ui32InterPtr:ui32InterPtr+ui32NumNewInterpEntries-1) = ui32TargetIndices;
-
-                    % Update ptr
-                    ui32InterPtr = ui32InterPtr + ui32NumNewInterpEntries;
+                if isempty(dInterpTargetTimesInInterval_) || isempty(ui32TargetIndices)
+                    continue; % Skip to next interval
                 end
 
+                % Compute quaternion from DCMs
+                dDCM0_ = self.dDCM_TBfromW(:,:, idQ);
+                dDCM1_ = self.dDCM_TBfromW(:,:, idQ+1);
+
+                % Interpolate quaternions
+                dQuat0_ = DCM2quatSeq(dDCM0_, false);
+                dQuat1_ = DCM2quatSeq(dDCM1_, false);
+
+                % Interpolate quaternion if required
+                dNormalizedInterpTargetTimesInInterval_ = (dInterpTargetTimesInInterval_ - dTime0_) / (dTime1_ - dTime0_); % Normalize timegrid to [0,1]
+                dInterpTargetBodyQuat_TBfromW = InterpolateSlerp(dQuat0_, dQuat1_, dNormalizedInterpTargetTimesInInterval_);
+
+                % Convert back to DCMs and allocate
+                ui32NumNewInterpEntries = uint32(length(dInterpTargetTimesInInterval_));
+                dInterpDCM_TBfromW(1:3, 1:3, ui32InterPtr:ui32InterPtr+ui32NumNewInterpEntries-1) = QuatSeq2DCM(dInterpTargetBodyQuat_TBfromW, false);
+                ui32InterpGridCheckID_(ui32InterPtr:ui32InterPtr+ui32NumNewInterpEntries-1) = ui32TargetIndices;
+
+                % Update ptr
+                ui32InterPtr = ui32InterPtr + ui32NumNewInterpEntries;
+            end
 
                 % TODO interpolate dInterpDCM_SCfromW
                 dInterpDCM_SCfromW = [];
@@ -381,11 +389,11 @@ classdef SReferenceMissionDesign < CBaseDatastructWithTimes
                 self            (1,1) {mustBeA(self, "SReferenceMissionDesign")}
             end
             arguments
-                kwargs.ui32TargetIndex          (1,1) uint32 {isscalar} = 0
-                kwargs.bPlotPhaseAngles         (1,1) logical {islogical, isscalar} = true
-                kwargs.bPlotTargetAttitude      (1,1) logical {islogical, isscalar} = false
-                kwargs.bPlotSpacecraftAttitude  (1,1) logical {islogical, isscalar} = false
-                kwargs.dTargetAttitudeSet2          double {ismatrix} = [];
+                kwargs.ui32TargetIndex          (1,1) uint32 = 0
+                kwargs.bPlotPhaseAngles         (1,1) logical = true
+                kwargs.bPlotTargetAttitude      (1,1) logical = false
+                kwargs.bPlotSpacecraftAttitude  (1,1) logical = false
+                kwargs.dTargetAttitudeSet2          double = [];
                 kwargs.charLblTargetAttitudeSet2    char {mustBeText} = '2nd attitude set';
                 kwargs.charTargetAttitudePlotTitle  char {mustBeText} = 'Target attitude quaternion states',
             end
@@ -461,12 +469,12 @@ classdef SReferenceMissionDesign < CBaseDatastructWithTimes
         function [objFig] = plotVectorData_(self, dDataVec1, dDataVec2, kwargs)
             arguments
                 self
-                dDataVec1  {isnumeric}
-                dDataVec2  = []
+                dDataVec1  (:,:) {mustBeNumeric}
+                dDataVec2  (:,:) {mustBeNumeric} = []
             end
             arguments
-                kwargs.cellSetNames     {iscell} = {'Set1', 'Set2'};
-                kwargs.cellStatesNames  {iscell} = {}
+                kwargs.cellSetNames     {mustBeA(kwargs.cellSetNames   , "cell")} = {'Set1', 'Set2'};
+                kwargs.cellStatesNames  {mustBeA(kwargs.cellStatesNames, "cell")} = {}
                 kwargs.bIsDataDCM       (1,1) logical = false
                 kwargs.ui32Decimation   (1,1) uint32 = 1
                 kwargs.charFigTitle     {mustBeText} = ""
