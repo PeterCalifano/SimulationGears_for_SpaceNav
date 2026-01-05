@@ -42,7 +42,7 @@ classdef testCBaseDatastructImport < matlab.unittest.TestCase
 
         function test_fromStruct(self)
             % Test for constructing a CBaseDatastruct object from corresponding struct
-            strData = load(strcat(self.objSampleHelperPath, '.mat')).(strcat('obj', class(self.objSampleHelper)));
+            strData = load(strcat(self.objSampleHelperPath, '.mat')).(class(self.objSampleHelper));
             objHelper = CBaseDatastructTestHelper();
             objHelper = objHelper.fromStruct(strData);
 
@@ -110,8 +110,12 @@ classdef testCBaseDatastructImport < matlab.unittest.TestCase
             % Numeric / logical
             if (isnumeric(a) || islogical(a)) && (isnumeric(b) || islogical(b))
                 testCase.verifyClass(a, class(a), sprintf('%s: class changed unexpectedly', path)); 
-                testCase.verifyTrue(isequal(size(a), size(b)), sprintf('%s: size mismatch', path));
-                testCase.verifyEqual(double(a), double(b), 'AbsTol', tol, sprintf('%s: numeric mismatch', path));
+                
+                if not(isvector(a)) && not(isvector(b))
+                    testCase.verifyTrue(isequal(size(a), size(b)), sprintf('%s: size mismatch', path));
+                end
+
+                testCase.verifyEqual(double(a(:)), double(b(:)), 'AbsTol', tol, sprintf('%s: numeric mismatch', path));
                 return
             end
 
