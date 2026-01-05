@@ -547,7 +547,92 @@ classdef (Abstract) CBaseDatastruct % < matlab.mixin.Copyable
                 end
             end
         end
-   
+
+        function varOutVal = formatDataForYml(varInVal)
+            %FORMATDATAFORYML Convert MATLAB data to a YAML-friendly orientation.
+            %
+            % Rules:
+            % - Non struct / non numeric/logical arrays: passthrough
+            % - struct: recurse on fields (supports struct arrays)
+            % - vector Nx1: transpose to 1xN
+            % - matrix MxN: transpose to NxM
+            % - 3D tensor MxNxP: permute to PxNxM
+            % - otherwise: error (ndims > 3)
+
+            arguments
+                varInVal % Any size, keep input
+            end
+
+            % If is cell, index each entry then recurse
+            if iscell(varInVal)
+                varOutVal = varInVal;
+                for idE = 1:numel(varInVal)
+                    ui32NumDims = ndims(varInVal);
+                    if ui32NumDims > 2 % Only process tensors with > 2 dimensions
+                        varOutVal{idE} = CBaseDatastruct.formatDataForYml(varInVal{idE});
+                    end
+                end
+                return
+            end
+
+            % Struct: go through fields
+            if isstruct(varInVal)
+                varOutVal = varInVal; % Preserve size of struct array
+                
+                for idElem = 1:numel(varInVal)
+
+                    strTmp = varInVal(idElem);
+                    charFieldNames = fieldnames(strTmp);
+                    
+                    for idField = 1:numel(charFieldNames)
+                        charFieldName = charFieldNames{idField};
+                        % Recursive call
+                        strTmp.(charFieldName) = CBaseDatastruct.formatDataForYml(strTmp.(charFieldName));
+                    end
+                    
+                    varOutVal(idElem) = strTmp;
+                end
+                
+                return;
+            end
+
+            % Passthrough for non array things (cell, char/string, objects, etc.)
+            if ~(isnumeric(varInVal) || islogical(varInVal))
+                varOutVal = varInVal;
+                return;
+            end
+
+            % Scalar numeric/logical array handling
+            if isscalar(varInVal)
+                varOutVal = varInVal;
+                return;
+            end
+
+            % Vectors handling (Seems not needed)
+            if isvector(varInVal) || ismatrix(varInVal)
+                % Only transpose column vectors Nx1 -> 1xN
+                % if size(varInVal, 2) == 1
+                %     varOutVal = varInVal';
+                % else
+                %     varOutVal = varInVal; % Already 1xN
+                % end
+                varOutVal = varInVal;
+                return;
+            end
+
+            % Determine if matrix or 3D tensor
+            ui32NumDims = ndims(varInVal);
+
+            if ui32NumDims == 3
+                % Tensor MxNxP -> PxMxN
+                varOutVal = permute(varInVal, [3, 1, 2]);
+                return;
+            end
+
+            error("formatDataForYml:UnsupportedNDims", ...
+                "Unsupported array with ndims=%d. Only scalars, vectors, 2D matrices, and 3D tensors are supported.", ui32NumDims);
+        end
+
         function [charYamlString] = toYamlStatic(objDatastruct, bSaveAsWrapped, bFlattenArrays, charDataName)
             arguments
                 objDatastruct  {CBaseDatastruct.validateObjectOrStruct_(objDatastruct)}
@@ -569,6 +654,9 @@ classdef (Abstract) CBaseDatastruct % < matlab.mixin.Copyable
 
             % Ensure to get the snakeyaml jar
             CBaseDatastruct.loadSnakeYaml();
+            
+            % Preprocess matrices and tensors to ensure proper formatting
+            strTmp = CBaseDatastruct.formatDataForYml(strTmp);
 
             % Emit a YAML string
             charYamlString = yaml.dump(strTmp, "auto");
