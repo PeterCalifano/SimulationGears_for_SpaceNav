@@ -51,6 +51,17 @@ classdef testCBaseDatastructImport < matlab.unittest.TestCase
 
         end
 
+        function test_fromYamlStatic(self)
+
+            % Test for constructing a CBaseDatastruct object from corresponding yaml
+            % objHelper = CBaseDatastructTestHelper();
+            objHelper = CBaseDatastructTestHelper.fromYamlStatic("CBaseDatastructTestHelper", ...
+                                strcat(self.objSampleHelperPath, '.yml'));
+
+            % Check all fields are corresponding to the saved struct
+            self.verifyCBaseDatastructMatches(objHelper, self.objSampleHelper, 1e-12);
+           
+        end
     end
 
     methods (Hidden)

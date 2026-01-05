@@ -15,7 +15,9 @@ classdef (Abstract) CBaseDatastruct % < matlab.mixin.Copyable
     % 28-09-2025    Pietro Califano     Extend functionalities to fully support static usage of the class
     % 04-10-2025    Pietro Califano     [MAJOR] Extend functionalities to support input objects and struct
     %                                   arrays for struct, json and yaml export
-    % 22-12-2025    Pietro Califano     Add method to automatically hash data contents (charDataHash property)     
+    % 22-12-2025    Pietro Califano     Add method to automatically hash data contents (charDataHash property) 
+    % 05-01-2026    Pietro Califano     [MAJOR] Implement new methods to handle yaml files (statically),
+    %                                   move assignField_ method to instance methods
     % -------------------------------------------------------------------------------------------------------------
     %% METHODS
     % [-]
@@ -164,7 +166,7 @@ classdef (Abstract) CBaseDatastruct % < matlab.mixin.Copyable
                 charFld = cellProvidedNames{idF};
                 
                 if ismember(charFld, cellPropNames)
-                    self = CBaseDatastruct.assignField_(self, charFld, strData.(charFld), bStrictUnknown);
+                    self = self.assignField_(charFld, strData.(charFld), bStrictUnknown);
                 else
                     % Ignore silently (or warn) if non-strict
                     % warning('fromStruct:IgnoringField','Ignoring unknown field %s for class %s.', charFld, class(self));
@@ -199,6 +201,8 @@ classdef (Abstract) CBaseDatastruct % < matlab.mixin.Copyable
             % 1) Cells containing vectors/matrices/arrays with rows/cols matching in size are converted to
             % single vectors/matrixs/arrays. This is because the parser cannot distinguish whether they
             % were dumped from a vector/matrix/array and loaded by yaml as cells of cells or not.
+            % 2) Derived classes must have public properties to let base assign values, else must
+            % reimplement assignField_ protected method.
 
             arguments
                 self            (1,1) {mustBeA(self, "CBaseDatastruct")}
@@ -266,7 +270,7 @@ classdef (Abstract) CBaseDatastruct % < matlab.mixin.Copyable
             strParsed = CBaseDatastruct.ConvertCellsToMatrices_(strParsed);
 
             % Call method to build data from yaml-parsed struct
-            self = self.fromStruct(strParsed, true);
+            self = self.fromStruct(strParsed, true, bStrict);
         end
 
         function self = fromJson(self, charInputJson, bIsFile, bStrict)
@@ -783,31 +787,49 @@ classdef (Abstract) CBaseDatastruct % < matlab.mixin.Copyable
             end
 
             % Method to convert struct to class (with fields check)
-
+            % TODO
         end
 
-        function varOut = fromYamlStatic(charInputFile, charClassName)
+        function objInstance = getDefaultInstance(charClassName)
             arguments
-                charInputFile (1,:) char {mustBeFile} % either yaml string or path to yaml file
-                charClassName (1,:) char {mustBeText} = ""
+                charClassName (1,:) char = ""
             end
-            % TODO, requires yaml package. Re-use code from operative dataset generation
+            % Static function based on Visitor design pattern
 
-            % Create class required by user if specified and build it if possible
-            if not(isempty(which()))
-                try
-                    varOut = feval(charClassName);
-                catch ME
+            try
+                % hDefaultConstructor = str2func(strcat(charClassName, '()'));
+                objInstance = feval(charClassName);
+                mustBeA(objInstance, charClassName);
+            catch ME
+                error(['You called getDefaultInstance of the base class with a class that is not default constructible. ' ...
+                    'Please either implement the method or make the class constructible without inputs. Error message: %s'], ME.getReport());
+            end
+        end
 
-                end
+        function objInstance = fromYamlStatic(thisClass, charInputYaml, bIsFile, bStrict)
+            arguments
+                thisClass     (1,:) {mustBeA(thisClass, ["string", "char", "CBaseDatastruct"])}
+                charInputYaml (1,:) char {mustBeFile} % Either yaml string or path to yaml file
+                bIsFile         logical = []   % Auto-detect if empty
+                bStrict         (1,1) logical = false
+            end
+            % Static function based on Visitor design pattern
 
+            % error(['Not implemented yet: note that this is more difficult than dumping. ' ...
+            %     'One has to first build the specific class, which means it must be somehow empty constructable.' ...
+            %     'This is not enforcable easily. Otherwise, another option is to force each derived class to implement the method.'])
+
+            %% Function code
+            if isa(thisClass, "CBaseDatastruct") && ismethod(thisClass, "getDefaultInstance")
+                % Construct a default instance
+                objInstance = thisClass.getDefaultInstance();
             else
-                % Load yaml and output as struct
-                varOut
+                % Attempt to construct a default instance using base class method
+                objInstance = CBaseDatastruct.getDefaultInstance(thisClass);  
             end
 
-
-
+            % Call implementation on instance
+            objInstance = objInstance.fromYaml(charInputYaml, bIsFile, bStrict);
         end
 
         function [] = fromJsonStatic(charInputFile)
@@ -826,6 +848,152 @@ classdef (Abstract) CBaseDatastruct % < matlab.mixin.Copyable
             error('Not implemented yet.')
         end
    
+    end
+
+    methods (Access = protected)
+        function self = assignField_(self, charField, varValueIn, bStrict)
+            %ASSIGNFIELD_ Assign one property with type-aware recursion/casting
+            % Implementation:
+            % 1) Inspect current property default/type via meta.Property and runtime value.
+            % 2) If target is a CBaseDatastruct (single, array, or in cell), recurse building objects.
+            % 3) Else if numeric/logical/char/string, attempt safe cast to existing class.
+            % 4) Else assign verbatim.
+            arguments
+                self
+                charField   (1,:) char
+                varValueIn
+                bStrict     (1,1) logical = false
+            end
+
+            % If the property does not exist (possible non-strict), skip
+            if ~isprop(self, charField)
+                return;
+            end
+
+            % Inspect meta
+            objMeta = metaclass(self);
+            idx = find(strcmp({objMeta.PropertyList.Name}, charField), 1, 'first');
+            % objMetaProperties = objMeta.PropertyList(idx);
+
+            % Determine target class expectation from current value (default)
+            hasDefault = false;
+            charDefaultClass = '';
+            try
+                currVal = self.(charField);
+                if ~isempty(currVal)
+                    hasDefault = true; charDefaultClass = class(currVal);
+                end
+            catch
+                currVal = [];
+            end
+
+            % Helper to check subclass-of CBaseDatastruct
+            isCBaseSubclass = @(cls) ~isempty(cls) && exist(cls,'class')==8 && any(strcmp(superclasses(cls), 'CBaseDatastruct'));
+
+            % Case A: struct destined to a CBaseDatastruct-like property
+            if isstruct(varValueIn)
+                % If default value is a CBaseDatastruct, use its class to build
+                if hasDefault && isCBaseSubclass(charDefaultClass)
+                    newObj = feval(charDefaultClass);
+                    newObj = newObj.fromStruct(varValueIn, bStrict);
+                    self.(charField) = newObj;
+                    return;
+                end
+
+                % If no default class info, but property name hints a class? Not reliable.
+                % Try soft match if the struct is wrapped (obj<Class>)
+                valueMaybeUnwrapped = CBaseDatastruct.unwrapWrapper_(varValueIn, ''); %#ok<NASGU>
+                % Without schema knowledge, assign struct as-is.
+                self.(charField) = varValueIn;
+                return;
+            end
+
+            % Case B: struct array -> object array or struct array assignment
+            if isstruct(varValueIn) && numel(varValueIn) > 1
+                if hasDefault && isCBaseSubclass(charDefaultClass)
+                    arr = arrayfun(@(s) feval(charDefaultClass).fromStruct(s, bStrict), varValueIn, 'UniformOutput', false);
+                    % Convert to homogeneous array if possible
+                    try
+                        self.(charField) = reshape([arr{:}], size(varValueIn));
+                    catch
+                        self.(charField) = arr; % fallback to cell array
+                    end
+                else
+                    self.(charField) = varValueIn; % keep as struct array
+                end
+                return;
+            end
+
+            % Case C: cell containing structs/objects -> recurse per element
+            if iscell(varValueIn)
+                cellIn = varValueIn;
+                if hasDefault && isCBaseSubclass(charDefaultClass)
+                    % Expecting cell of objects; map structs to objects of that class
+                    cellOut = cell(size(cellIn));
+                    for k = 1:numel(cellIn)
+                        vk = cellIn{k};
+                        if isstruct(vk)
+                            cellOut{k} = feval(charDefaultClass).fromStruct(vk, bStrict);
+                        else
+                            cellOut{k} = vk; % accept already-built object or scalar
+                        end
+                    end
+                    self.(charField) = cellOut;
+                else
+                    % Generic cell: just recurse lightly over structs
+                    cellOut = cell(size(cellIn));
+                    for k = 1:numel(cellIn)
+                        % vk = cellIn{k};
+                        % if isstruct(vk)
+                        cellOut{k} = cellIn{k};
+                        % else
+                        %     cellOut{k} = vk;
+                        % end
+                    end
+                    self.(charField) = cellOut;
+                end
+                return;
+            end
+
+            % Case D: primitive types — try safe cast to default class if present
+            if hasDefault && ~isempty(charDefaultClass)
+                try
+                    switch charDefaultClass
+                        case {'double','single','uint8','uint16','uint32','uint64','int8','int16','int32','int64'}
+                            self.(charField) = cast(varValueIn, charDefaultClass);
+                            return;
+                        case {'logical'}
+                            self.(charField) = logical(varValueIn);
+                            return;
+                        case {'string'}
+                            self.(charField) = string(varValueIn);
+                            return;
+                        case {'char'}
+                            if isstring(varValueIn)
+                                varValueIn = char(varValueIn); 
+                            end
+                            self.(charField) = char(varValueIn);
+                            return;
+                        otherwise
+                            % If default is an object (non-CBaseDatastruct), accept as-is if compatible
+                            if isa(varValueIn, charDefaultClass)
+                                self.(charField) = varValueIn; 
+                                return;
+                            end
+                    end
+                catch ME
+                    if bStrict
+                        rethrow(ME);
+                    else
+                        % fallthrough to plain assignment
+                    end
+                end
+            end
+
+            % Default: assign verbatim
+            self.(charField) = varValueIn;
+        end
+
     end
 
     methods (Static, Access = private)
@@ -1075,147 +1243,7 @@ classdef (Abstract) CBaseDatastruct % < matlab.mixin.Copyable
             strUnwrappedField = strValueIn;
         end
 
-        function self = assignField_(self, charField, varValueIn, bStrict)
-            %ASSIGNFIELD_ Assign one property with type-aware recursion/casting
-            % Implementation:
-            % 1) Inspect current property default/type via meta.Property and runtime value.
-            % 2) If target is a CBaseDatastruct (single, array, or in cell), recurse building objects.
-            % 3) Else if numeric/logical/char/string, attempt safe cast to existing class.
-            % 4) Else assign verbatim.
-            arguments
-                self
-                charField   (1,:) char
-                varValueIn
-                bStrict     (1,1) logical {islogical}
-            end
-
-            % If the property does not exist (possible non-strict), skip
-            if ~isprop(self, charField)
-                return;
-            end
-
-            % Inspect meta
-            objMeta = metaclass(self);
-            idx = find(strcmp({objMeta.PropertyList.Name}, charField), 1, 'first');
-            objMetaProperties = objMeta.PropertyList(idx);
-
-            % Determine target class expectation from current value (default)
-            hasDefault = false; 
-            charDefaultClass = '';
-            try
-                currVal = self.(charField);
-                if ~isempty(currVal)
-                    hasDefault = true; charDefaultClass = class(currVal);
-                end
-            catch
-                currVal = [];
-            end
-
-            % Helper to check subclass-of CBaseDatastruct
-            isCBaseSubclass = @(cls) ~isempty(cls) && exist(cls,'class')==8 && any(strcmp(superclasses(cls), 'CBaseDatastruct'));
-
-            % Case A: struct destined to a CBaseDatastruct-like property
-            if isstruct(varValueIn)
-                % If default value is a CBaseDatastruct, use its class to build
-                if hasDefault && isCBaseSubclass(charDefaultClass)
-                    newObj = feval(charDefaultClass);
-                    newObj = newObj.fromStruct(varValueIn, bStrict);
-                    self.(charField) = newObj;
-                    return;
-                end
-
-                % If no default class info, but property name hints a class? Not reliable.
-                % Try soft match if the struct is wrapped (obj<Class>)
-                valueMaybeUnwrapped = CBaseDatastruct.unwrapWrapper_(varValueIn, ''); %#ok<NASGU>
-                % Without schema knowledge, assign struct as-is.
-                self.(charField) = varValueIn;
-                return;
-            end
-
-            % Case B: struct array -> object array or struct array assignment
-            if isstruct(varValueIn) && numel(varValueIn) > 1 
-                if hasDefault && isCBaseSubclass(charDefaultClass)
-                    arr = arrayfun(@(s) feval(charDefaultClass).fromStruct(s, bStrict), varValueIn, 'UniformOutput', false);
-                    % Convert to homogeneous array if possible
-                    try
-                        self.(charField) = reshape([arr{:}], size(varValueIn));
-                    catch
-                        self.(charField) = arr; % fallback to cell array
-                    end
-                else
-                    self.(charField) = varValueIn; % keep as struct array
-                end
-                return;
-            end
-
-            % Case C: cell containing structs/objects -> recurse per element
-            if iscell(varValueIn)
-                cellIn = varValueIn;
-                if hasDefault && isCBaseSubclass(charDefaultClass)
-                    % Expecting cell of objects; map structs to objects of that class
-                    cellOut = cell(size(cellIn));
-                    for k = 1:numel(cellIn)
-                        vk = cellIn{k};
-                        if isstruct(vk)
-                            cellOut{k} = feval(charDefaultClass).fromStruct(vk, bStrict);
-                        else
-                            cellOut{k} = vk; % accept already-built object or scalar
-                        end
-                    end
-                    self.(charField) = cellOut;
-                else
-                    % Generic cell: just recurse lightly over structs
-                    cellOut = cell(size(cellIn));
-                    for k = 1:numel(cellIn)
-                        % vk = cellIn{k};
-                        % if isstruct(vk)
-                        cellOut{k} = cellIn{k};
-                        % else
-                        %     cellOut{k} = vk;
-                        % end
-                    end
-                    self.(charField) = cellOut;
-                end
-                return;
-            end
-
-            % Case D: primitive types — try safe cast to default class if present
-            if hasDefault && ~isempty(charDefaultClass)
-                try
-                    switch charDefaultClass
-                        case {'double','single','uint8','uint16','uint32','uint64','int8','int16','int32','int64'}
-                            self.(charField) = cast(varValueIn, charDefaultClass);
-                            return;
-                        case {'logical'}
-                            self.(charField) = logical(varValueIn);
-                            return;
-                        case {'string'}
-                            self.(charField) = string(varValueIn);
-                            return;
-                        case {'char'}
-                            if isstring(varValueIn); varValueIn = char(varValueIn); end
-                            self.(charField) = char(varValueIn);
-                            return;
-                        otherwise
-                            % If default is an object (non-CBaseDatastruct), accept as-is if compatible
-                            if isa(varValueIn, charDefaultClass)
-                                self.(charField) = varValueIn; return;
-                            end
-                    end
-                catch ME
-                    if bStrict
-                        rethrow(ME);
-                    else
-                        % fallthrough to plain assignment
-                    end
-                end
-            end
-
-            % Default: assign verbatim
-            self.(charField) = varValueIn;
-        end
-    
-        function [bIsObject] = validateObjectOrStruct_(objDatastruct)
+       function [bIsObject] = validateObjectOrStruct_(objDatastruct)
             bIsObject = isobject(objDatastruct) || isstruct(objDatastruct) || isa(objDatastruct, "CBaseDatastruct");
         end
     end
