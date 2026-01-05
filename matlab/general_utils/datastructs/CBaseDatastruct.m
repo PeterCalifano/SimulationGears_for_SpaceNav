@@ -897,7 +897,7 @@ classdef (Abstract) CBaseDatastruct % < matlab.mixin.Copyable
         function objInstance = fromYamlStatic(thisClass, charInputYaml, bIsFile, bStrict)
             arguments
                 thisClass     (1,:) {mustBeA(thisClass, ["string", "char", "CBaseDatastruct"])}
-                charInputYaml (1,:) char {mustBeFile} % Either yaml string or path to yaml file
+                charInputYaml (1,:) char {mustBeText} % Either yaml string or path to yaml file
                 bIsFile         logical = []   % Auto-detect if empty
                 bStrict         (1,1) logical = false
             end
