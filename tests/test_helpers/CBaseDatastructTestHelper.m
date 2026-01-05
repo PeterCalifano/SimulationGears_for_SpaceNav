@@ -19,7 +19,7 @@ classdef CBaseDatastructTestHelper < CBaseDatastruct
         dSimpleScalar double = 0.0;        
         dSimpleVector double = rand(1,3);  
         dSimpleMatrix double = rand(4,3);  
-        cellNestedCellVectors cell = {rand(3,1), rand(4,6)};  
+        cellNestedCellVectors cell = {rand(3,1), rand(4,6), rand(2,4,5)};  
         dTensor3D double = rand(2,4,5);           
 
         % --- Strings / text ---

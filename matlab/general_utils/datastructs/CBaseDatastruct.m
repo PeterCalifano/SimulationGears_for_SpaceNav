@@ -567,7 +567,7 @@ classdef (Abstract) CBaseDatastruct % < matlab.mixin.Copyable
             if iscell(varInVal)
                 varOutVal = varInVal;
                 for idE = 1:numel(varInVal)
-                    ui32NumDims = ndims(varInVal);
+                    ui32NumDims = ndims(varInVal{idE});
                     if ui32NumDims > 2 % Only process tensors with > 2 dimensions
                         varOutVal{idE} = CBaseDatastruct.formatDataForYml(varInVal{idE});
                     end
