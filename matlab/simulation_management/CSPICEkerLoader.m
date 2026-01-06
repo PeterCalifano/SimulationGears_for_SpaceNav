@@ -106,16 +106,14 @@ classdef CSPICEkerLoader
             cspice_furnsh('metakernel.mk'); % Load kernels
             cd(self.projectDir);
 
-            if bLoadCommonKernels == true
-                % Load common kernels
-                cd(fullfile(self.KERNELS_BASE_PATH_, 'common/'));
-                cspice_furnsh('mkcommon.mk');
-                cd(self.projectDir);
+            try
+                % Print number of loaded kernels
+                disp("The following kernels are loaded:")
+                kernelsInPool()
+            catch
+                warning('kernelsInPool() not in path. You can find it at comsica-simulator/gui-system/src/spiceUtils')
             end
 
-            % Print number of loaded kernels
-            fprintf("Total number of loaded kernels: %d\n", cspice_ktotal('all'))
-            % TODO: add info to specify type of kernels loaded
         end    
     
         % DESTRUCTOR (manual)
