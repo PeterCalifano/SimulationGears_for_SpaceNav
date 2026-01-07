@@ -875,7 +875,8 @@ classdef (Abstract) CBaseDatastruct % < matlab.mixin.Copyable
             end
 
             % Method to convert struct to class (with fields check)
-            % TODO
+            % TODO: Implement logic to create an instance of charTargetDatastruct from strDatastruct,
+            %       copying/validating fields and ensuring the result satisfies CBaseDatastruct constraints.
         end
 
         function objInstance = getDefaultInstance(charClassName)
