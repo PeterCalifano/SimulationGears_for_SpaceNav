@@ -553,11 +553,12 @@ classdef (Abstract) CBaseDatastruct % < matlab.mixin.Copyable
             %FORMATDATAFORYML Convert MATLAB data to a YAML-friendly orientation.
             %
             % Rules:
-            % - Non struct / non numeric/logical arrays: passthrough
-            % - struct: recurse on fields (supports struct arrays)
-            % - vector Nx1: transpose to 1xN
-            % - matrix MxN: transpose to NxM
-            % - 3D tensor MxNxP: permute to PxNxM
+            % - Non-struct and non-numeric/logical values (e.g., char, string, objects): passthrough
+            % - struct (including struct arrays): recurse on fields, preserving the struct array shape
+            % - cell: recurse on elements with ndims > 2, otherwise passthrough
+            % - numeric/logical scalar: passthrough
+            % - numeric/logical vectors and 2D matrices (ndims <= 2): passthrough, no transposition
+            % - 3D tensor MxNxP: permute to PxMxN
             % - otherwise: error (ndims > 3)
 
             arguments
