@@ -15,10 +15,17 @@ classdef testCBaseDatastructImport < matlab.unittest.TestCase
     methods (TestClassSetup)
         function saveSample(self)
             charThisClassPath = fileparts(mfilename('fullpath'));
-            self.charTestSamplePath = fullfile(charThisClassPath, 'tmp_test_samples');
+
+            charTestPath = fullfile(charThisClassPath, "../..");
+            cd(charTestPath);
+
+            self.charTestSamplePath = fullfile(charTestPath, 'tmp_test_samples');
             mkdir(self.charTestSamplePath);
 
-            addpath(fullfile(charThisClassPath, '../test_helpers'));
+            addpath(fullfile(charTestPath, 'test_helpers'));
+            addpath(genpath(fullfile(charTestPath, '../../matlab')));
+            addpath(genpath(fullfile(charTestPath, '../../lib')));
+
 
             self.objSampleHelper = CBaseDatastructTestHelper();
             self.objSampleHelperPath = fullfile(self.charTestSamplePath, 'baseDatastruct_test_sample');
@@ -42,7 +49,7 @@ classdef testCBaseDatastructImport < matlab.unittest.TestCase
 
         function test_fromStruct(self)
             % Test for constructing a CBaseDatastruct object from corresponding struct
-            strData = load(strcat(self.objSampleHelperPath, '.mat')).(strcat('obj', class(self.objSampleHelper)));
+            strData = load(strcat(self.objSampleHelperPath, '.mat')).(strcat("obj", class(self.objSampleHelper)));
             objHelper = CBaseDatastructTestHelper();
             objHelper = objHelper.fromStruct(strData);
 
@@ -51,6 +58,17 @@ classdef testCBaseDatastructImport < matlab.unittest.TestCase
 
         end
 
+        function test_fromYamlStatic(self)
+
+            % Test for constructing a CBaseDatastruct object from corresponding yaml
+            % objHelper = CBaseDatastructTestHelper();
+            objHelper = CBaseDatastructTestHelper.fromYamlStatic("CBaseDatastructTestHelper", ...
+                                strcat(self.objSampleHelperPath, '.yml'));
+
+            % Check all fields are corresponding to the saved struct
+            self.verifyCBaseDatastructMatches(objHelper, self.objSampleHelper, 1e-12);
+           
+        end
     end
 
     methods (Hidden)
@@ -99,8 +117,12 @@ classdef testCBaseDatastructImport < matlab.unittest.TestCase
             % Numeric / logical
             if (isnumeric(a) || islogical(a)) && (isnumeric(b) || islogical(b))
                 testCase.verifyClass(a, class(a), sprintf('%s: class changed unexpectedly', path)); 
-                testCase.verifyTrue(isequal(size(a), size(b)), sprintf('%s: size mismatch', path));
-                testCase.verifyEqual(double(a), double(b), 'AbsTol', tol, sprintf('%s: numeric mismatch', path));
+                
+                if not(isvector(a)) && not(isvector(b))
+                    testCase.verifyTrue(isequal(size(a), size(b)), sprintf('%s: size mismatch', path));
+                end
+
+                testCase.verifyEqual(double(a(:)), double(b(:)), 'AbsTol', tol, sprintf('%s: numeric mismatch', path));
                 return
             end
 

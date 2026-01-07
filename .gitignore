@@ -37,3 +37,5 @@ xcode/
 
 **/codegen/
 tmp_pathdef_backup.m
+**/tmp_test_samples/*
+**/tmp_test_samples/*
