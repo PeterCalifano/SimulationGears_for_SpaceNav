@@ -18,6 +18,7 @@ classdef (Abstract) CBaseDatastruct % < matlab.mixin.Copyable
     % 22-12-2025    Pietro Califano     Add method to automatically hash data contents (charDataHash property) 
     % 05-01-2026    Pietro Califano     [MAJOR] Implement new methods to handle yaml files (statically),
     %                                   move assignField_ method to instance methods
+    % 07-01-2026    Pietro Califano     Minor fixes before pull request
     % -------------------------------------------------------------------------------------------------------------
     %% METHODS
     % [-]
@@ -602,20 +603,8 @@ classdef (Abstract) CBaseDatastruct % < matlab.mixin.Copyable
                 return;
             end
 
-            % Scalar numeric/logical array handling
-            if isscalar(varInVal)
-                varOutVal = varInVal;
-                return;
-            end
-
-            % Vectors handling (Seems not needed)
-            if isvector(varInVal) || ismatrix(varInVal)
-                % Only transpose column vectors Nx1 -> 1xN
-                % if size(varInVal, 2) == 1
-                %     varOutVal = varInVal';
-                % else
-                %     varOutVal = varInVal; % Already 1xN
-                % end
+            % Scalar numeric/logical and arrays handling
+            if isscalar(varInVal) || isvector(varInVal) || ismatrix(varInVal)
                 varOutVal = varInVal;
                 return;
             end
@@ -784,6 +773,7 @@ classdef (Abstract) CBaseDatastruct % < matlab.mixin.Copyable
 
             % Ensure name is a valid matlab name
             charClassName = matlab.lang.makeValidName(charClassName);
+            charInstanceSaveName = strcat("obj", charClassName);
 
             % Object saving method
             fprintf("\nSaving datastruct to file %s in format %s...\n", charFilename, charFormat);
@@ -808,7 +798,7 @@ classdef (Abstract) CBaseDatastruct % < matlab.mixin.Copyable
                         charFilename = strcat(charFilename, '.mat');
                     end
 
-                    strTmp.(charClassName) = objDatastruct;
+                    strTmp.(charInstanceSaveName) = objDatastruct;
                     save(charFilename, "-struct", "strTmp"); % Save content of strTmp
 
                 case "struct"
@@ -820,7 +810,7 @@ classdef (Abstract) CBaseDatastruct % < matlab.mixin.Copyable
 
                     strData = CBaseDatastruct.toStructStatic(objDatastruct, kwargs.bFlattenBeforeSave);
 
-                    strTmp.(charClassName) = strData;
+                    strTmp.(charInstanceSaveName) = strData;
                     save(charFilename, "-struct", "strTmp"); % Save content of strTmp
 
                 case "yaml"
