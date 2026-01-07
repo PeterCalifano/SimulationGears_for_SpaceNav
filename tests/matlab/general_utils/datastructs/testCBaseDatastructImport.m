@@ -15,10 +15,17 @@ classdef testCBaseDatastructImport < matlab.unittest.TestCase
     methods (TestClassSetup)
         function saveSample(self)
             charThisClassPath = fileparts(mfilename('fullpath'));
-            self.charTestSamplePath = fullfile(charThisClassPath, 'tmp_test_samples');
+
+            charTestPath = fullfile(charThisClassPath, "../..");
+            cd(charTestPath);
+
+            self.charTestSamplePath = fullfile(charTestPath, 'tmp_test_samples');
             mkdir(self.charTestSamplePath);
 
-            addpath(fullfile(charThisClassPath, '../test_helpers'));
+            addpath(fullfile(charTestPath, 'test_helpers'));
+            addpath(genpath(fullfile(charTestPath, '../../matlab')));
+            addpath(genpath(fullfile(charTestPath, '../../lib')));
+
 
             self.objSampleHelper = CBaseDatastructTestHelper();
             self.objSampleHelperPath = fullfile(self.charTestSamplePath, 'baseDatastruct_test_sample');
@@ -42,7 +49,7 @@ classdef testCBaseDatastructImport < matlab.unittest.TestCase
 
         function test_fromStruct(self)
             % Test for constructing a CBaseDatastruct object from corresponding struct
-            strData = load(strcat(self.objSampleHelperPath, '.mat')).(class(self.objSampleHelper));
+            strData = load(strcat(self.objSampleHelperPath, '.mat')).(strcat("obj", class(self.objSampleHelper)));
             objHelper = CBaseDatastructTestHelper();
             objHelper = objHelper.fromStruct(strData);
 
