@@ -906,7 +906,7 @@ classdef (Abstract) CBaseDatastruct % < matlab.mixin.Copyable
 
             % error(['Not implemented yet: note that this is more difficult than dumping. ' ...
             %     'One has to first build the specific class, which means it must be somehow empty constructable.' ...
-            %     'This is not enforcable easily. Otherwise, another option is to force each derived class to implement the method.'])
+            %     'This is not enforceable easily. Otherwise, another option is to force each derived class to implement the method.'])
 
             %% Function code
             if isa(thisClass, "CBaseDatastruct") && ismethod(thisClass, "getDefaultInstance")
