@@ -978,8 +978,8 @@ classdef (Abstract) CBaseDatastruct % < matlab.mixin.Copyable
             % Helper to check subclass-of CBaseDatastruct
             isCBaseSubclass = @(cls) ~isempty(cls) && exist(cls,'class')==8 && any(strcmp(superclasses(cls), 'CBaseDatastruct'));
 
-            % Case A: struct destined to a CBaseDatastruct-like property
-            if isstruct(varValueIn)
+            % Case A: single struct destined to a CBaseDatastruct-like property
+            if isstruct(varValueIn) && numel(varValueIn) == 1
                 % If default value is a CBaseDatastruct, use its class to build
                 if hasDefault && isCBaseSubclass(charDefaultClass)
                     newObj = feval(charDefaultClass);
