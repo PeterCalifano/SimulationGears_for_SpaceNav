@@ -56,7 +56,7 @@ classdef SReferenceMissionDesign < CBaseDatastructWithTimes
         enumTimeScale                   (1, :) char {mustBeText, mustBeMember(enumTimeScale, ...
                                                      ["TAI", "TDB", "TDT", "TT", "ET", "JDTDB", "JDTDT", "JED", "GPS", "N/D"])} = "N/D";
         
-        ui32TargetPointingID              (1,:) uint32 {isnumeric} = []
+        ui32TargetPointingID              (1,:) uint32 {mustBeNumeric} = []
         cellAdditionalBodiesPos_W         {mustBeA(cellAdditionalBodiesPos_W      , "cell")} = {};
         cellAdditionalBodiesDCM_TBfromW   {mustBeA(cellAdditionalBodiesDCM_TBfromW, "cell")} = {};
         cellAdditionalTargetFrames        {mustBeA(cellAdditionalTargetFrames     , "cell")} = {};
@@ -89,7 +89,7 @@ classdef SReferenceMissionDesign < CBaseDatastructWithTimes
                 optional.dPrimaryPointingWhileMan_W   (3, :, :)  double {mustBeNumeric} = [] % TBC, primary pointing axis during manoeuvres
                 optional.dSecondPointingWhileMan_W    (3, :, :)  double {mustBeNumeric} = [] % TBC, secondary axis during manoeuvres
                 optional.dManoeuvresTimegrids         (3, :)     double {mustBeNumeric} = [];
-                optional.dManoeuvresStartTimestamps   (1, :)     double {isnumeric, isvector} = [];
+                optional.dManoeuvresStartTimestamps   (1, :)     double {mustBeNumeric} = [];
                 optional.dManoeuvresDeltaV_SC         (3, :)     double {mustBeNumeric} = [];
                 optional.dRelativeTimestamps          (1, :)     double {mustBeNumeric} = [];   
                 optional.dDCM_SCfromW                 (3, 3, :)  double {mustBeNumeric} = [];
