@@ -29,7 +29,8 @@ classdef SPose3 < CBaseDatastruct
             self.dPosition_Frame            = dPosition_Frame;
             self.dDCM_FrameFromPoseFrame    = dDCM_FrameFromPoseFrame;
 
-            if nargin > 0
+            if nargin > 0 && not( all( abs(self.dPosition_Frame) < eps, 'all') || ...
+                            all(abs(self.dDCM_FrameFromPoseFrame) <= eps, 'all') )
                 self.bDefaultConstructed = false;
             end
         end

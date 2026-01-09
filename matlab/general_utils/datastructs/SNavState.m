@@ -142,6 +142,7 @@ classdef SNavState < SPose3
         % TODO complete
         function [ui32MainAllocPtrs, ui32OffDiagAllocPtr] = determineStatesPtrs(~, ui32IdVecStates)
 
+            error('BUG: Method to fix')
             % Logic: multiply by 3 the index, and go back of -3, then expand
             ui32NumOfIndices = length(ui32IdVecStates);
             ui32NumOfOffDiagIndices = ui32NumOfIndices * (ui32NumOfIndices - 1) / 2; % TODO combinations!
