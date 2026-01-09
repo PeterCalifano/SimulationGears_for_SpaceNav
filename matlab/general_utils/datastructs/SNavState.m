@@ -32,20 +32,20 @@ classdef SNavState < SPose3
         objRot3_NavFromPose         {mustBeA(objRot3_NavFromPose, ["gtsam.Rot3", "double"])} = [];
         dMaxAPostVelocity_NavFrame  {mustBeA(dMaxAPostVelocity_NavFrame, ["gtsam.Point3", "double"])} = [];
 
-        dJointMarginalPosVel_PoseFrame  (6,6) {ismatrix, mustBeNumeric} = zeros(6,6)
-        dMarginalPoseCov_PoseFrame      (6,6) {ismatrix, mustBeNumeric} = zeros(6,6);
-        dMarginalVelCov_NavFrame        (3,3) {ismatrix, mustBeNumeric} = zeros(3,3);
-        dMarginalPoseCov_NavFrame       (6,6) {ismatrix, mustBeNumeric} = zeros(6,6);
+        dJointMarginalPosVel_PoseFrame  (6,6) {mustBeNumeric} = zeros(6,6)
+        dMarginalPoseCov_PoseFrame      (6,6) {mustBeNumeric} = zeros(6,6);
+        dMarginalVelCov_NavFrame        (3,3) {mustBeNumeric} = zeros(3,3);
+        dMarginalPoseCov_NavFrame       (6,6) {mustBeNumeric} = zeros(6,6);
     end
     
     methods (Access = public)
         function self = SNavState(dTimestamp, dPosition_Frame, dVelocity_Frame, dDCM_FrameFromPoseFrame, dStateCovariance)
             arguments
-                dTimestamp                  (1,1) double {isscalar, mustBeNumeric} = 0.0
-                dPosition_Frame             (3,1) double {isvector, mustBeNumeric} = zeros(3,1);
-                dVelocity_Frame             (3,1) double {isvector, mustBeNumeric} = zeros(3,1);
-                dDCM_FrameFromPoseFrame     (3,3) double {ismatrix, mustBeNumeric} = eye(3); 
-                dStateCovariance            (9,9) double {ismatrix, mustBeNumeric} = zeros(9,9);
+                dTimestamp                  (1,1) double {mustBeNumeric} = 0.0
+                dPosition_Frame             (3,1) double {mustBeNumeric} = zeros(3,1);
+                dVelocity_Frame             (3,1) double {mustBeNumeric} = zeros(3,1);
+                dDCM_FrameFromPoseFrame     (3,3) double {mustBeNumeric} = eye(3); 
+                dStateCovariance            (9,9) double {mustBeNumeric} = zeros(9,9);
             end
             
             % Store data
@@ -66,7 +66,7 @@ classdef SNavState < SPose3
         function self = changeReferenceFrame(self, dDCM_NewFrameFromFrame)
             arguments
                 self
-                dDCM_NewFrameFromFrame (3,3) {ismatrix, mustBeNumeric}
+                dDCM_NewFrameFromFrame (3,3) {mustBeNumeric}
             end
 
             self.dVelocity_Frame         = dDCM_NewFrameFromFrame * self.dVelocity_Frame;
