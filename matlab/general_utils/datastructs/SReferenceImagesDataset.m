@@ -62,7 +62,7 @@ classdef SReferenceImagesDataset < SReferenceMissionDesign % TODO the name of th
                 optional.dManoeuvresDeltaV_SC         (3,:)    double {mustBeNumeric} = [];
                 optional.dRelativeTimestamps          (1,:)    double {mustBeNumeric} = [];   
                 optional.dDCM_SCfromW                 (3,3,:)  double {mustBeNumeric} = [];
-                optional.dDCM_CamFromSC               (3,3) double = eye(3);
+                optional.dDCM_CamFromSCB              (3,3) double = eye(3);
 
                 optional.charLengthUnits            char {mustBeA(optional.charLengthUnits, ["string", "char"])} = '';
             end
@@ -84,8 +84,8 @@ classdef SReferenceImagesDataset < SReferenceMissionDesign % TODO the name of th
                                                 "dDCM_SCfromW", optional.dDCM_SCfromW);
 
             % Store camera data as fields
-            self.objCamera      = objCamera; 
-            self.dDCM_CamFromSCB = optional.dDCM_CamFromSC;
+            self.objCamera       = objCamera; 
+            self.dDCM_CamFromSCB = optional.dDCM_CamFromSCB;
 
             % Store additional fields
             self.charLengthUnits = optional.charLengthUnits;
