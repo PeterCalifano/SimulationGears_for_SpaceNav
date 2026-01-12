@@ -3,10 +3,9 @@ arguments
     dTimegridIn              double   {mustBeReal, mustBeFinite}
     charInputTimeRef (1,:)   char     {coder.mustBeConst, mustBeMember(charInputTimeRef, ["ET","GPS","TYVAK_ET", "TYVAK_GPS"])}
 end
+% BUG: conversion does not seem correct
 % TYVAK reference epoch in GPS seconds, precomputed as a compile-time constant
-% dTyvakGpsReference = coder.const(cspice_unitim( cspice_str2et('06 JAN 1980 00:00:00 UTC'), ...  % TYVAK reference in ET
-%                                                               'ET', ...
-%                                                               'GPS'));
+% dTyvakGpsReference = coder.const(cspice_unitim( cspice_str2et('06 JAN 1980 00:00:00 UTC'), 'ET','GPS'));
 
 dTyvakReference_ET  = coder.const(-630763148.815937);
 dTyvakReference_GPS = coder.const(-630763200);
@@ -35,7 +34,7 @@ switch upper(charInputTimeRef)
 
     case 'TYVAK_GPS'
         % Add fixed TYVAK reference (in GPS seconds)
-        dTimegridOut  = dTimegridIn + dTyvakReference_GPS;
+        dTimegridOut  = cspice_unitim( dTimegridIn + dTyvakReference_GPS, 'GPS', 'ET');
 
     otherwise
         % Should never happen because of mustBeMember, but kept for robustness
