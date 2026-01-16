@@ -150,12 +150,15 @@ end
 % Get figure and properties
 if kwargs.objFig == 0
     objFig = figure();
+    % Create new axis
+    objSceneAx = axes(objFig);
+
     kwargs.bEnforcePlotOpts = true; % No figure provided, enable plot opts
     [~, charTextColor, ~] = DefaultPlotOpts(objFig, ...
                                         "charRenderer", kwargs.charFigureRenderer, ...
-                                        "bUseBlackBackground", kwargs.bUseBlackBackground);
-    % Create new axis
-    objSceneAx = axes(objFig);
+                                        "bUseBlackBackground", kwargs.bUseBlackBackground, ...
+                                        "bEnableGrid", true);
+
 
 else
     objFig = kwargs.objFig;
