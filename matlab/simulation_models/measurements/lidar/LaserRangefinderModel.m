@@ -10,23 +10,23 @@ function [dMeasDistance, bInsersectionFlag, bValidityFlag, dIntersectionPoint, d
                                                                                                     bEnableHeuristicPruning, ...
                                                                                                     bEnableValidityChecks) %#codegen
 arguments (Input)
-    strTargetModelData      (1,1) struct    {isstruct, isscalar}
-    dBeamDirection_TB       (3,1) double    {isnumeric, isvector}
-    dSensorOrigin_TB        (3,1) double    {isnumeric, isvector} 
-    dMeasWhiteNoiseSigma    (1,1) double    {isnumeric, isscalar}
-    dConstantBias           (1,1) double    {isnumeric, isscalar}
-    dTargetPosition_TB      (3,1) double    {isnumeric, isvector} = [0;0;0]
-    dMeasValidInterval      (2,1) double    {isnumeric, isvector} = [0; 1e5]
-    bEnableNoiseModels      (1,1) logical   {islogical, isscalar} = false
-    bEnableHeuristicPruning (1,1) logical   {islogical, isscalar} = false
-    bEnableValidityChecks   (1,1) logical   {islogical, isscalar} = false
+    strTargetModelData      (1,1) struct 
+    dBeamDirection_TB       (3,1) double 
+    dSensorOrigin_TB        (3,1) double  
+    dMeasWhiteNoiseSigma    (1,1) double 
+    dConstantBias           (1,1) double 
+    dTargetPosition_TB      (3,1) double  = [0;0;0]
+    dMeasValidInterval      (2,1) double  = [0; 1e5]
+    bEnableNoiseModels      (1,1) logical = false
+    bEnableHeuristicPruning (1,1) logical = false
+    bEnableValidityChecks   (1,1) logical = false
 end
 arguments (Output)
-    dMeasDistance       (1,1) double  {isnumeric, isscalar}
-    bInsersectionFlag   (1,1) logical {islogical, isscalar}
-    bValidityFlag       (1,1) logical {islogical, isscalar}
-    dIntersectionPoint  (3,1) double  {isvector, isnumeric}
-    dMeasErr            (1,1) double  {isnumeric, isscalar}
+    dMeasDistance       (1,1) double 
+    bInsersectionFlag   (1,1) logical
+    bValidityFlag       (1,1) logical
+    dIntersectionPoint  (3,1) double 
+    dMeasErr            (1,1) double 
 end
 %% SIGNATURE
 % [dMeasDistance, bInsersectionFlag, bValidityFlag, dIntersectionPoint] = LaserRangefinderModel(strTargetModelData, ...
@@ -45,32 +45,33 @@ end
 % modelled as white noise since errors in shape and pointing are inherently in the ray tracing approach.
 % -------------------------------------------------------------------------------------------------------------
 %% INPUT
-% strTargetModelData      (1,1) struct    {isstruct, isscalar}
-% dBeamDirection_TB       (3,1) double    {isnumeric, isvector}
-% dSensorOrigin_TB        (3,1) double    {isnumeric, isvector} % TBC
-% dMeasWhiteNoiseSigma    (1,1) double    {isnumeric, isscalar}
-% dConstantBias           (1,1) double    {isnumeric, isscalar}
-% dTargetPosition_TB      (3,1) double    {isnumeric, isvector} = [0;0;0]
-% dMeasValidInterval      (2,1) double    {isnumeric, isvector} = [0; 1e5]
-% bEnableNoiseModels      (1,1) logical   {islogical, isscalar} = false
-% bEnableHeuristicPruning (1,1) logical   {islogical, isscalar} = false
-% bEnableValidityChecks   (1,1) logical   {islogical, isscalar} = false
+% strTargetModelData      (1,1) struct  
+% dBeamDirection_TB       (3,1) double  
+% dSensorOrigin_TB        (3,1) double  % TBC
+% dMeasWhiteNoiseSigma    (1,1) double  
+% dConstantBias           (1,1) double  
+% dTargetPosition_TB      (3,1) double  = [0;0;0]
+% dMeasValidInterval      (2,1) double  = [0; 1e5]
+% bEnableNoiseModels      (1,1) logical = false
+% bEnableHeuristicPruning (1,1) logical = false
+% bEnableValidityChecks   (1,1) logical = false
 % -------------------------------------------------------------------------------------------------------------
 %% OUTPUT
-% dMeasDistance       (1,1) {isnumeric, isscalar}
-% bInsersectionFlag   (1,1) {islogical, isscalar}
-% bValidityFlag       (1,1) {islogical, isscalar}
-% dIntersectionPoint  (3,1) double {isvector, isnumeric}
+% dMeasDistance       (1,1) double
+% bInsersectionFlag   (1,1) logical
+% bValidityFlag       (1,1) logical
+% dIntersectionPoint  (3,1) double
+% dMeasErr            (1,1) double
 % -------------------------------------------------------------------------------------------------------------
 %% CHANGELOG
-% 16-01-2024    Pietro Califano     First implementation for RCS-1 simulator
+% 16-01-2025    Pietro Califano     First implementation for RCS-1 simulator
+% 21-01-2026    Pietro Califano     Review and optimization for codegen
 % -------------------------------------------------------------------------------------------------------------
 %% DEPENDENCIES
 % [-]
 % -------------------------------------------------------------------------------------------------------------
-%% Future upgrades
-% [-]
-% -------------------------------------------------------------------------------------------------------------
+
+%% Function code
 
 % Check if the input structure contains the required fields
 assert(isfield(strTargetModelData, 'i32triangVertexPtrs') || ...
@@ -100,10 +101,10 @@ if bPointingCheckPassed
     dIntersectionPoint = -ones(3,1);
 
     [bInsersectionFlag(:), dMeasDistance(:), dIntersectionPoint(:)] = RayTraceTriangMesh(strTargetModelData, ...
-        dBeamDirection_TB, ...
-        dSensorOrigin_TB, ...
-        dTargetPosition_TB, ...
-        bEnableHeuristicPruning);
+                                                                                    dBeamDirection_TB, ...
+                                                                                    dSensorOrigin_TB, ...
+                                                                                    dTargetPosition_TB, ...
+                                                                                    bEnableHeuristicPruning);
 
 else
     return
