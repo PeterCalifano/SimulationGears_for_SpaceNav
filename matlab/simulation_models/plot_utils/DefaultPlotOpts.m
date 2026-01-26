@@ -120,7 +120,7 @@ if ~isempty(objLegends)
 
     for idL = 1:numel(objLegends)
         objLegends(idL).Color     = charBackGroundColor;
-        objLegends(idL).EdgeColor = charBackGroundColor;
+        objLegends(idL).EdgeColor = charTextColor;
         objLegends(idL).TextColor = charTextColor;
     end
 end
