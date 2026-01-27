@@ -31,8 +31,8 @@ end
 %                                          mustBeMember(enumTargetName, ["Apophis", "Itokawa", "Bennu", "Moon"])}
 % charDataRootPath                  (1,:) string = fullfile(getenv("HOME"), "devDir/nav-backend/simulationCodes/data/SPICE_kernels")
 % charBpyRootPath                   (1,:) string = fullfile(getenv("HOME"), "devDir/rendering-sw/corto_PeterCdev")
-% options.bVertFacesOnly            (1,1) {islogical} = true;
-% options.bLoadShapeModel           (1,1) {islogical} = true;
+% options.bVertFacesOnly            (1,1) logical= true;
+% options.bLoadShapeModel           (1,1) logical= true;
 % options.charOutputLengthUnits     (1,:) char {mustBeMember(options.charOutputLengthUnits, ["km", "m"])} = "m"
 % -------------------------------------------------------------------------------------------------------------
 %% OUTPUT
@@ -44,7 +44,7 @@ end
 % 03-05-2025    Pietro Califano     Minor revision, add Moon setup
 % 25-08-2025    Pietro Califano     Extend function to work with km and meters based on input options
 % 31-08-2025    Pietro Califano     Define ellipsoidal model for all available bodies
-% 27-01-2026    Pietro Califano     Improve overriding options management for paths
+% 27-01-2026    Pietro Califano     Improve overriding options management for paths, minor fixes
 % -------------------------------------------------------------------------------------------------------------
 %% DEPENDENCIES
 % [-]
@@ -126,7 +126,7 @@ switch enumTargetName
             charKernelname = fullfile(charDataRootPath, 'Itokawa/dsk/hay_a_amica_5_itokawashape_v1_0_64q.bds');
 
             objShapeModel = CShapeModel('cspice', charKernelname, 'km', options.charOutputLengthUnits, ...
-                options.bVertFacesOnly, char(enumTargetName));
+                                options.bVertFacesOnly, char(enumTargetName));
 
         else
             % Variant model
