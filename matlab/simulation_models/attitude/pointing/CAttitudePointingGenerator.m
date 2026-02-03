@@ -157,8 +157,8 @@ classdef CAttitudePointingGenerator < handle
                 % arguments
                 %     kwargs.dDisplaceValue               (1,:) double {mustBeNumeric} = 0; % Interpreted as angle or distance depending on enumDisplacementMode
                 %     options.enumDisplacementMethod      (1,1) string {mustBeMember(options.enumDisplacementMethod, ["lookAtPoint", "rotate3d"])} = "lookAtPoint";
-                %     options.dSigmaOffPointingDegAngle   (1,:) double {isscalar, mustBeNumeric} = 0.0 % Sigma to scatter camera boresight in a random direction
-                %     options.dScaleDistOffPointing       (1,:) double {isscalar, mustBeNumeric} = 0.0
+                %     options.dSigmaOffPointingDegAngle   (1,:) double {mustBeNumeric} = 0.0 % Sigma to scatter camera boresight in a random direction
+                %     options.dScaleDistOffPointing       (1,:) double {mustBeNumeric} = 0.0
                 %     options.enumOffPointingMode         (1,1) string {mustBeMember(options.enumOffPointingMode, ["randomAxis", "refAxisOutOfPlane", "refAxisInPlane"])} = "randomAxis";
                 % end
 
@@ -170,7 +170,10 @@ classdef CAttitudePointingGenerator < handle
                                                                  "enumDisplaceDistribution", options.enumDisplaceDistribution);
 
                 % Compute off-pointing half-cone angle
-                dOffPointingAngles = transpose(acosd(dot(dLookAtPointFromCam_Frame./vecnorm(dLookAtPointFromCam_Frame, 2, 1), dCamBoresightZ_Frame)));
+                dTmpDotProd = dot(dLookAtPointFromCam_Frame./vecnorm(dLookAtPointFromCam_Frame, 2, 1), dCamBoresightZ_Frame);
+                dTmpDotProd(abs(dTmpDotProd - 1.0) < eps('single')) = 1.0; % Saturate to 1.0 is small error above 1.0
+
+                dOffPointingAngles = transpose(acosd(dTmpDotProd));
 
                 charOffPoint = "+ off-pointing";
             else
@@ -288,15 +291,15 @@ classdef CAttitudePointingGenerator < handle
                                                                                     options)
             arguments (Input)
                 self
-                dCameraPosition_Frame (3, :) double = self.dCameraPosition_Frame
-                dTargetPosition_Frame (3, :) double = self.dTargetPosition_Frame
-                dSunPosition_Frame    (3, :) double = self.dSunPosition_Frame
+                dCameraPosition_Frame (3,:) double = self.dCameraPosition_Frame
+                dTargetPosition_Frame (3,:) double = self.dTargetPosition_Frame
+                dSunPosition_Frame    (3,:) double = self.dSunPosition_Frame
             end
             arguments (Input)
-                options.enumOutRot3Param (1,1) EnumRotParams {isa(options.enumOutRot3Param, ...
-                    'EnumRotParams')} = EnumRotParams.DCM
+                options.enumOutRot3Param (1,1) EnumRotParams {mustBeA(options.enumOutRot3Param, ...
+                                                            ["EnumRotParams", "string"])} = EnumRotParams.DCM
                 options.dDCM_displacedPoseFromPose      (3,3,:) double {mustBeNumeric} = zeros(3) % Custom rotation to apply to the rotation
-                options.dSigmaDegRotAboutBoresight      (1,1)   double {isscalar, mustBeNumeric} = 0.0 % Sigma to scatter camera pose around boresight
+                options.dSigmaDegRotAboutBoresight      (1,1)   double {mustBeNumeric} = 0.0 % Sigma to scatter camera pose around boresight
             end
             arguments (Output)
                 self    
@@ -362,7 +365,7 @@ classdef CAttitudePointingGenerator < handle
                 dCamBoresightZ_Frame 
                 dCamDirY_Frame 
                 dSigmaDegRotAboutBoresight 
-                bSameOnBatch (1,1) {islogical} = false;
+                bSameOnBatch (1,1) logical = false;
             end
             % Sampling functions for boresight roll
 
@@ -438,11 +441,11 @@ classdef CAttitudePointingGenerator < handle
                 dReferenceAxis_Frame    (3,:) double {mustBeNumeric} = zeros(3,0)
             end
             arguments
-                kwargs.dDisplaceOffsetValue         (1,:) double {isscalar, mustBeNumeric} = 0.0 % "Deterministic" offset
+                kwargs.dDisplaceOffsetValue         (1,:) double {mustBeNumeric} = 0.0 % "Deterministic" offset
                 options.enumDisplacementMethod      (1,1) string {mustBeMember(options.enumDisplacementMethod, ["lookAtPoint", "rotate3d"])} = "lookAtPoint";
                 options.enumDisplaceDistribution    (1,:) string = "gaussian"
-                options.dSigmaOffPointingDegAngle   (1,:) double {isscalar, mustBeNumeric} = 0.0 % Sigma to scatter camera boresight in a random direction
-                options.dScaleDistOffPointing       (1,:) double {isscalar, mustBeNumeric} = 0.0
+                options.dSigmaOffPointingDegAngle   (1,:) double {mustBeNumeric} = 0.0 % Sigma to scatter camera boresight in a random direction
+                options.dScaleDistOffPointing       (1,:) double {mustBeNumeric} = 0.0
                 options.enumOffPointingMode         (1,1) string {mustBeMember(options.enumOffPointingMode, ["randomAxis", "refAxisOutOfPlane", "refAxisInPlane"])} = "randomAxis";
             end
             
@@ -550,9 +553,7 @@ classdef CAttitudePointingGenerator < handle
             %% DEPENDENCIES
             % [-]
             % -------------------------------------------------------------------------------------------------------------
-            %% Future upgrades
-            % [-]
-            % -------------------------------------------------------------------------------------------------------------
+      
             %% Function code
             ui32NumOfSamples = size(dLookAtPoint_Frame, 2);
             assert( isscalar(settings.dDisplaceSigma) || length(settings.dDisplaceSigma) == ui32NumOfSamples);
@@ -565,7 +566,7 @@ classdef CAttitudePointingGenerator < handle
             dReferenceAxis_Frame = dReferenceAxis_Frame./vecnorm(dReferenceAxis_Frame, 2, 1);
 
             % Apply randomization of displacement value (angle or distance)
-            if settings.dDisplaceSigma > 0
+            if any(settings.dDisplaceSigma > 0)
             
                 switch settings.enumDisplaceDistribution
 

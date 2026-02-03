@@ -79,6 +79,9 @@ else
     objSceneAx = get(objFig, "CurrentAxes");
 end
 
+if isempty(objSceneAx) || not(isvalid(objSceneAx))
+    objSceneAx = axes(objFig);
+end
 
 % Refocus figure object
 hold(objSceneAx, "on")
