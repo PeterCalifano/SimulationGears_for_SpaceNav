@@ -54,9 +54,9 @@ classdef CShapeModel < CBaseDatastruct
                 charInputUnit           (1,:) string {mustBeA(charInputUnit       , ["string", "char"]), ...
                                                     mustBeMember(charInputUnit, ["m", "km"])} = 'km'
                 charTargetUnitOutput    (1,:) string {mustBeA(charTargetUnitOutput, ["string", "char"]), mustBeMember(charTargetUnitOutput, ["m", "km"])} = 'm' % TODO add enumaration
-                bVertFacesOnly          (1,1) {islogical} = true;
+                bVertFacesOnly          (1,1) logical = true;
                 charModelName           (1,:) char = ""
-                bLoadShapeModel         (1,1) {islogical} = true;
+                bLoadShapeModel         (1,1) logical = true;
             end
 
             % For default (placeholder) construction
@@ -295,7 +295,7 @@ classdef CShapeModel < CBaseDatastruct
             % -------------------------------------------------------------------------------------------------------------
             %% CHANGELOG
             % 03-01-2025    Pietro Califano         Function implemented for general obj format loading
-            % 16-11-2025    Pietro Califano,GP-5    [MAJOR] Change core implementation to use sscanf and 
+            % 16-11-2025    Pietro Califano,GTP-5   [MAJOR] Change core implementation to use sscanf and 
             %                                       reduce computational time when loading large obj files
             % -------------------------------------------------------------------------------------------------------------
             %% DEPENDENCIES
