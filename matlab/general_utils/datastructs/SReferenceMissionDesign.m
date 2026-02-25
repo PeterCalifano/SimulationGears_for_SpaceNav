@@ -135,7 +135,7 @@ classdef SReferenceMissionDesign < CBaseDatastructWithTimes
             self.dManoeuvresDeltaV_SC       = optional.dManoeuvresDeltaV_SC         ;
             self.dRelativeTimestamps        = optional.dRelativeTimestamps          ;
 
-            if nargin > 0 && not(isempty(dTimestamps))
+            if nargin > 0
                 self.bDefaultConstructed = false;
             end
         end

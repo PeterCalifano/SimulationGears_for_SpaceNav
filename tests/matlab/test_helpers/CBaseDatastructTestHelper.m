@@ -39,12 +39,12 @@ classdef CBaseDatastructTestHelper < CBaseDatastruct
             arguments
                 init = []
             end
-            if nargin == 1 || isempty(init)
+            if nargin == 0 || isempty(init)
                 return; % defaults only
             end
 
             if isstruct(init)
-                self.fromStruct(init, false);
+                self = self.fromStruct(init, false);
                 return;
             end
 
@@ -52,12 +52,14 @@ classdef CBaseDatastructTestHelper < CBaseDatastruct
                 init = string(init);
                 % Heuristic: treat as file path if it exists, else YAML content
                 if isfile(init)
-                    self.fromYaml(init, true, false);
+                    self = self.fromYaml(init, true, false);
                 else
-                    self.fromYaml(init, false, false);
+                    self = self.fromYaml(init, false, false);
                 end
                 return;
             end
+
+            self.bDefaultConstructed = false;
         end
     end
 end

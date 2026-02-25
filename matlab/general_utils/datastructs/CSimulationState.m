@@ -54,6 +54,10 @@ classdef CSimulationState < CBaseDatastruct
             self.objTargetPose_W = objTargetPose_W;
             self.objCameraPose_TB = objCameraPose_TB;
 
+            if nargin > 0
+                self.bDefaultConstructed = false;
+            end
+
         end
 
         % GETTERS
