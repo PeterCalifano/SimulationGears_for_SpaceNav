@@ -855,19 +855,48 @@ classdef (Abstract) CBaseDatastruct % < matlab.mixin.Copyable
 
         end
       
-        % TODO ------------------
-        function objDatastruct = fromStructStatic(strDatastruct, charTargetDatastruct) % TBC, better if abstract?
+        function objDatastruct = fromStructStatic(strDatastruct, charTargetDatastruct, bStrictUnknown, bStrictMissing)
+            %FROMSTRUCTSTATIC Build a datastruct instance from a struct payload.
             arguments (Input)
-                strDatastruct % either yaml string or path to yaml file
-                charTargetDatastruct % Specify name of target data struct
+                strDatastruct (1,1) struct
+                charTargetDatastruct (1,:) {mustBeA(charTargetDatastruct, ["string", "char", "CBaseDatastruct"])} = ""
+                bStrictUnknown (1,1) logical = true
+                bStrictMissing (1,1) logical = false
             end
             arguments (Output)
                 objDatastruct (1,1) {mustBeA(objDatastruct, 'CBaseDatastruct')}
             end
 
-            % Method to convert struct to class (with fields check)
-            % TODO: Implement logic to create an instance of charTargetDatastruct from strDatastruct,
-            %       copying/validating fields and ensuring the result satisfies CBaseDatastruct constraints.
+            % Select build target: existing instance or class name.
+            if isa(charTargetDatastruct, "CBaseDatastruct")
+                objDatastruct = charTargetDatastruct;
+            else
+                charTargetClassName = char(string(charTargetDatastruct));
+
+                % Optional inference from wrapped payload: struct('obj<ClassName>', payload)
+                if isempty(strtrim(charTargetClassName))
+                    cellFields_ = fieldnames(strDatastruct);
+                    if isscalar(cellFields_)
+                        charOnlyField_ = cellFields_{1};
+                        if startsWith(charOnlyField_, "obj")
+                            charInferredClass_ = char(extractAfter(string(charOnlyField_), "obj"));
+                            if ~isempty(strtrim(charInferredClass_))
+                                charTargetClassName = charInferredClass_;
+                            end
+                        end
+                    end
+                end
+
+                if isempty(strtrim(charTargetClassName))
+                    error("fromStructStatic:MissingTargetClass", ...
+                        "Target class is empty. Provide class name or a wrapper key of form obj<ClassName>.");
+                end
+
+                objDatastruct = CBaseDatastruct.getDefaultInstance(charTargetClassName);
+            end
+
+            % Delegate recursive assignment/type handling to instance method.
+            objDatastruct = objDatastruct.fromStruct(strDatastruct, bStrictUnknown, bStrictMissing);
         end
 
         function objInstance = getDefaultInstance(charClassName)
@@ -1330,4 +1359,3 @@ classdef (Abstract) CBaseDatastruct % < matlab.mixin.Copyable
 
 
 end
-
