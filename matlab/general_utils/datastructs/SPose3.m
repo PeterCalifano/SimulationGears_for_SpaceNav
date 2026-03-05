@@ -29,8 +29,9 @@ classdef SPose3 < CBaseDatastruct
             self.dPosition_Frame            = dPosition_Frame;
             self.dDCM_FrameFromPoseFrame    = dDCM_FrameFromPoseFrame;
 
-            if nargin > 0 && not( all( abs(self.dPosition_Frame) < eps, 'all') || ...
-                            all(abs(self.dDCM_FrameFromPoseFrame) <= eps, 'all') )
+            bPositionIsDefault_ = all(abs(self.dPosition_Frame) <= eps("double"), "all");
+            bAttitudeIsDefault_ = all(abs(self.dDCM_FrameFromPoseFrame - eye(3,3)) <= eps("double"), "all");
+            if nargin > 0 && ~(bPositionIsDefault_ && bAttitudeIsDefault_)
                 self.bDefaultConstructed = false;
             end
         end
@@ -71,4 +72,3 @@ classdef SPose3 < CBaseDatastruct
         
     end
 end
-

@@ -69,6 +69,23 @@ classdef testCBaseDatastructImport < matlab.unittest.TestCase
             self.verifyCBaseDatastructMatches(objHelper, self.objSampleHelper, 1e-12);
            
         end
+
+        function test_fromStructStatic(self)
+            % Test static construction from struct using explicit target class.
+            strData = load(strcat(self.objSampleHelperPath, '.mat')).(strcat("obj", class(self.objSampleHelper)));
+
+            objHelper = CBaseDatastruct.fromStructStatic(strData, "CBaseDatastructTestHelper");
+            self.verifyCBaseDatastructMatches(objHelper, self.objSampleHelper, 1e-12);
+        end
+
+        function test_fromStructStatic_WrappedInference(self)
+            % Test static construction from wrapped struct by inferring class name.
+            strData = load(strcat(self.objSampleHelperPath, '.mat')).(strcat("obj", class(self.objSampleHelper)));
+            strWrapped = struct("objCBaseDatastructTestHelper", strData);
+
+            objHelper = CBaseDatastruct.fromStructStatic(strWrapped);
+            self.verifyCBaseDatastructMatches(objHelper, self.objSampleHelper, 1e-12);
+        end
     end
 
     methods (Hidden)
