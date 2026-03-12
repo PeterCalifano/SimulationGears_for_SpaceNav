@@ -1,62 +1,270 @@
-# VERSION CONTROL 
+# VERSION CONTROL
 cmake_minimum_required(VERSION 3.15 FATAL_ERROR)
-
-#set(CMAKE_C_COMPILER gcc-11)
-#set(CMAKE_CXX_COMPILER g++-11)
-#set(CMAKE_CUDA_COMPILER nvcc)
-
-# Manually specify build type
-set(CMAKE_BUILD_TYPE Debug)
+set(PROJECT_PYTHON_VERSION 3.11)
+set(MATLAB_DEFAULT_RELEASE "R2023b")
 
 # PROJECT DEFINITION
 set(project_name "SimulationModels_for_SpaceNav")
 
+# Set install default directory if not specified
+if(NOT DEFINED CMAKE_INSTALL_PREFIX)
+  set(CMAKE_INSTALL_PREFIX ${CMAKE_SOURCE_DIR}/install CACHE PATH "Install path" FORCE)
+endif()
+
+# Major options
+option(ENABLE_CUDA "Enable CUDA" ON)
 option(ENABLE_OPTIX "Enable OptiX" OFF)
-set(languages CXX CUDA) # ACHTUNG: PTX code requires C language!
+include(cmake/HandleOpenMP.cmake)
+
+set(languages CXX) # ACHTUNG: PTX code requires C language!
 
 if (ENABLE_OPTIX)
-    list(APPEND languages C)
+  set(ENABLE_CUDA ON)
 endif()
+
+if (ENABLE_CUDA)
+    list(APPEND languages CUDA)
+    if (ENABLE_OPTIX)
+      list(APPEND languages C)
+    endif()
+endif()
+
+# Add cmake folder to path
+list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake")
+
+# Add git version handling
+include(cmake/HandleGitVersion.cmake)
 
 # Set version number
 set(PROJECT_VERSION_MAJOR 0)
 set(PROJECT_VERSION_MINOR 1)
 set(PROJECT_VERSION_PATCH 0)
 
-project( ${project_name} 
+# Resolve version: git --> VERSION file --> hardcoded defaults above
+resolve_project_version()
+
+project( ${project_name}
         LANGUAGES ${languages}
-        VERSION "${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}.${PROJECT_VERSION_PATCH}") # ACHTUNG: PTX code requires C language!
+        VERSION ${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}.${PROJECT_VERSION_PATCH})
 
-# Set C++ standard
-set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_EXTENSIONS OFF)
+# Write VERSION file to source and build directories
+write_source_VERSION_file()
+write_build_VERSION_file()
 
-# OPTIONS
-option(ENABLE_OMP "Enable OpenMP" OFF)
-if(NOT DEFINED NUM_OMP_THREADS)
-    set(NUM_OMP_THREADS 4 CACHE INTERNAL "Number of OpenMP threads to use")
+# Define variable for build as subproject (compare source dir)
+set(BUILD_AS_MAIN_PROJECT ON)
+if(NOT CMAKE_SOURCE_DIR STREQUAL PROJECT_SOURCE_DIR)
+  set(BUILD_AS_MAIN_PROJECT OFF)
 endif()
 
-option(USE_SYS_OPTIX_SDK "Use Optix system folder if specified" OFF)
-option(BUILD_PYTHON_WRAPPER "Build Python wrapper" OFF)
-option(BUILD_MATLAB_WRAPPER "Build MATLAB wrapper" OFF)
-option(ENABLE_SIMD "Enable SIMD instructions" ON)
-
-# TIP: if different options need to be specified for different targets of the build, use INTERFACE targets
-
-# COMPILER FLAGS
-string(TOUPPER "${CMAKE_BUILD_TYPE}" BUILD_TYPE_UPPER)
-if (NOT BUILD_TYPE_UPPER STREQUAL "DEBUG")      set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -O2")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -O2")
-else()
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wextra -O0 -g")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -O0 -g")
+# Define variable for namespacing (required to prevent global target clashes!)
+set(LIB_NAMESPACE "${PROJECT_NAME}")
+if (DEFINED LIB_NAMESPACE_OVERRIDE)
+  set(LIB_NAMESPACE "${LIB_NAMESPACE_OVERRIDE}")
 endif()
+set(CUDA_COMPILE_TARGET "${LIB_NAMESPACE}_cuda_compile_interface")
+set(OPTIX_COMPILE_TARGET "${LIB_NAMESPACE}_optix_compile_interface")
+set(OPENGL_COMPILE_TARGET "${LIB_NAMESPACE}_opengl_compile_interface")
+set(LIB_COMPILE_TARGET "${LIB_NAMESPACE}_lib_compile_interface")
+set(SANITIZER_TARGET "${LIB_NAMESPACE}_sanitizer_target_interface")
+
+# Handle toolchain settings (after project so compiler/system vars are populated)
+include(cmake/toolchains/HandleToolchain.cmake)
+
+# Configure cmake targets
+include(cmake/HandleCustomTargets.cmake)
+
+# Add build type if not specified
+if (NOT CMAKE_BUILD_TYPE)
+    set(CMAKE_BUILD_TYPE "RelWithDebInfo" CACHE STRING "Build type (Debug, Release, RelWithDebInfo, MinSizeRel, NOPTIM)" FORCE)
+endif()
+string(TOLOWER "${CMAKE_BUILD_TYPE}" CMAKE_BUILD_TYPE_LOWER)
 
 # Guard against in-source builds
 if(${CMAKE_SOURCE_DIR} STREQUAL ${CMAKE_BINARY_DIR})
   message(FATAL_ERROR "In-source builds not allowed. Please make a new directory (called a build directory) and run CMake from there. You may need to remove CMakeCache.txt. ")
+endif()
+
+# Add GNU install dirs
+include(GNUInstallDirs)
+
+# Add cmake modules
+include(ExternalProject)
+
+# Add CUDA/OptiX tools
+include(cmake/HandleCUDA.cmake)
+include(cmake/HandleOptiX.cmake)
+include(cmake/HandleTBB.cmake)
+
+# Add handle of python
+include(cmake/HandlePython.cmake)
+if(BUILD_AS_MAIN_PROJECT)
+  include(cmake/HandleWrapper.cmake)
+endif()
+
+# OPTIONS
+option(ENABLE_TESTS "Build and run tests" ON)
+option(ENABLE_FETCH_CATCH2 "Fetch Catch2 from GitHub if not found" ON)
+option(VERBOSE "Verbose output" OFF)
+
+if (NOT DEFINED GTWRAP_BUILD_PYTHON_DEFAULT)
+  set(GTWRAP_BUILD_PYTHON_DEFAULT OFF CACHE BOOL "Default Python wrapper setting for all subprojects")
+endif()
+if (NOT DEFINED GTWRAP_BUILD_MATLAB_DEFAULT)
+  set(GTWRAP_BUILD_MATLAB_DEFAULT OFF CACHE BOOL "Default MATLAB wrapper setting for all subprojects")
+endif()
+
+set(GTWRAP_PYTHON_OPTION_NAME "${LIB_NAMESPACE}_BUILD_PYTHON_WRAPPER")
+set(GTWRAP_MATLAB_OPTION_NAME "${LIB_NAMESPACE}_BUILD_MATLAB_WRAPPER")
+set(GTWRAP_INTERFACE_OPTION_NAME "${LIB_NAMESPACE}_WRAPPER_INTERFACE_FILES")
+set(GTWRAP_TOP_NAMESPACE_OPTION_NAME "${LIB_NAMESPACE}_GTWRAP_TOP_NAMESPACE")
+set(GTWRAP_DEPENDENCIES_OPTION_NAME "${LIB_NAMESPACE}_GTWRAP_DEPENDENCY_TARGETS")
+set(GTWRAP_ROOT_OPTION_NAME "${LIB_NAMESPACE}_GTWRAP_ROOT_DIR")
+
+option(${GTWRAP_PYTHON_OPTION_NAME} "Build Python wrapper" ${GTWRAP_BUILD_PYTHON_DEFAULT})
+option(${GTWRAP_MATLAB_OPTION_NAME} "Build MATLAB wrapper" ${GTWRAP_BUILD_MATLAB_DEFAULT})
+
+if (NOT DEFINED ${GTWRAP_INTERFACE_OPTION_NAME})
+  set(${GTWRAP_INTERFACE_OPTION_NAME}
+      "${CMAKE_CURRENT_SOURCE_DIR}/src/wrap_interface.i"
+      CACHE STRING
+      "Ordered list of gtwrap interface files (.i). First entry is the top-level module file."
+      FORCE)
+endif()
+
+if (NOT DEFINED ${GTWRAP_TOP_NAMESPACE_OPTION_NAME})
+  set(${GTWRAP_TOP_NAMESPACE_OPTION_NAME}
+      "simulation_gears"
+      CACHE STRING
+      "Top namespace used for gtwrap code generation."
+      FORCE)
+endif()
+
+if (NOT DEFINED ${GTWRAP_DEPENDENCIES_OPTION_NAME})
+  set(${GTWRAP_DEPENDENCIES_OPTION_NAME}
+      ""
+      CACHE STRING
+      "Additional dependency targets required before wrapping."
+      FORCE)
+endif()
+
+if (NOT DEFINED ${GTWRAP_ROOT_OPTION_NAME})
+  set(${GTWRAP_ROOT_OPTION_NAME}
+      ""
+      CACHE PATH
+      "Optional path to local wrap checkout root (contains cmake/PybindWrap.cmake)."
+      FORCE)
+endif()
+
+option(NO_OPTIMIZATION "Disable optimization flags" OFF)
+option(WARNINGS_ARE_ERRORS "Treat warnings as errors" OFF)
+option(USE_SYS_OPTIX_SDK "Use Optix system folder if specified" OFF)
+option(SANITIZE_BUILD "Enable sanitizers in build" OFF)
+set(SANITIZERS "address,undefined,leak" CACHE STRING "Sanitizers to enable when SANITIZE_BUILD is ON (comma-separated)")
+option(ENABLE_TBB "Enable Intel oneTBB support" OFF)
+option(CPU_ENABLE_NATIVE_TUNING "Enable -march=native -mtune=native for GNU/Clang in optimized builds" ON)
+option(CPU_ENABLE_FMA "Enable CPU FMA instructions (-mfma) for GNU/Clang in optimized builds" OFF)
+option(CPU_ENABLE_SIMD "Enable explicit SIMD ISA flags for GNU/Clang in optimized builds" OFF)
+set(CPU_SIMD_LEVEL "native" CACHE STRING "SIMD ISA when CPU_ENABLE_SIMD=ON: native,sse4.2,avx,avx2,avx512f")
+set_property(CACHE CPU_SIMD_LEVEL PROPERTY STRINGS native sse4.2 avx avx2 avx512f)
+set(CPU_EXTRA_OPT_FLAGS "" CACHE STRING "Extra CPU optimization flags for GNU/Clang optimized builds")
+option(CUDA_ENABLE_FMAD "Enable fused multiply-add contraction in NVCC (--fmad=true)" ON)
+option(CUDA_ENABLE_EXTRA_DEVICE_VECTORIZATION "Enable NVCC extra device vectorization" OFF)
+option(CUDA_USE_FAST_MATH "Enable NVCC fast math in regular CUDA compilation" OFF)
+option(CUDA_PTX_USE_FAST_MATH "Enable NVCC fast math when compiling PTX kernels" ON)
+set(CUDA_NVCC_EXTRA_FLAGS "" CACHE STRING "Extra flags passed to NVCC for CUDA/PTX compilation")
+set(PYTHON_EXECUTABLE "python3")
+
+# Set C++ standard
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+
+# COMPILER FLAGS
+set(_common_c_warnings -Wall -Wextra)
+set(_common_cxx_warnings ${_common_c_warnings} -Wsuggest-override)
+
+set(_debug_flags -Og -g -fmax-errors=3)
+set(_debug_sanitizers)
+if(SANITIZE_BUILD AND SANITIZERS)
+  set(_debug_sanitizers -fsanitize=${SANITIZERS})
+endif()
+set(_release_flags -O3 -fmax-errors=1)
+set(_relwithdebinfo_flags -O2 -g)
+set(_noptim_flags -O0 -g)
+set(_safety_warnings -Wnull-dereference -Wfloat-equal -fdelete-null-pointer-checks -Wconversion)
+
+set(_cpu_opt_flags)
+if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU" OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+  if(CPU_ENABLE_NATIVE_TUNING)
+    list(APPEND _cpu_opt_flags -march=native -mtune=native)
+  endif()
+  if(CPU_ENABLE_FMA)
+    list(APPEND _cpu_opt_flags -mfma)
+  endif()
+  if(CPU_ENABLE_SIMD)
+    string(TOLOWER "${CPU_SIMD_LEVEL}" _cpu_simd_level)
+    if(_cpu_simd_level STREQUAL "native")
+      list(APPEND _cpu_opt_flags -march=native -mtune=native)
+    elseif(_cpu_simd_level STREQUAL "sse4.2" OR _cpu_simd_level STREQUAL "sse4_2")
+      list(APPEND _cpu_opt_flags -msse4.2)
+    elseif(_cpu_simd_level STREQUAL "avx")
+      list(APPEND _cpu_opt_flags -mavx)
+    elseif(_cpu_simd_level STREQUAL "avx2")
+      list(APPEND _cpu_opt_flags -mavx2)
+    elseif(_cpu_simd_level STREQUAL "avx512f")
+      list(APPEND _cpu_opt_flags -mavx512f)
+    else()
+      message(FATAL_ERROR "Unsupported CPU_SIMD_LEVEL='${CPU_SIMD_LEVEL}'. Supported values: native,sse4.2,avx,avx2,avx512f")
+    endif()
+  endif()
+  if(NOT "${CPU_EXTRA_OPT_FLAGS}" STREQUAL "")
+    separate_arguments(_cpu_extra_opt_flags UNIX_COMMAND "${CPU_EXTRA_OPT_FLAGS}")
+    list(APPEND _cpu_opt_flags ${_cpu_extra_opt_flags})
+  endif()
+  list(REMOVE_DUPLICATES _cpu_opt_flags)
+elseif(CPU_ENABLE_NATIVE_TUNING OR CPU_ENABLE_FMA OR CPU_ENABLE_SIMD OR NOT "${CPU_EXTRA_OPT_FLAGS}" STREQUAL "")
+  message(WARNING "CPU optimization toggles are intended for GNU/Clang compilers. Current compiler is '${CMAKE_CXX_COMPILER_ID}'.")
+endif()
+
+set(_debug_c_flags ${_debug_flags} ${_common_c_warnings} ${_debug_sanitizers})
+set(_debug_cxx_flags ${_debug_flags} ${_common_cxx_warnings} ${_debug_sanitizers})
+set(_release_c_flags ${_release_flags} ${_common_c_warnings})
+set(_release_cxx_flags ${_release_flags} ${_common_cxx_warnings})
+set(_relwithdebinfo_c_flags ${_relwithdebinfo_flags} ${_common_c_warnings} ${_safety_warnings})
+set(_relwithdebinfo_cxx_flags ${_relwithdebinfo_flags} ${_common_cxx_warnings} ${_safety_warnings} -Wnon-virtual-dtor)
+set(_noptim_c_flags ${_noptim_flags} ${_common_c_warnings} ${_safety_warnings})
+set(_noptim_cxx_flags ${_noptim_flags} ${_common_cxx_warnings} ${_safety_warnings} -Wnon-virtual-dtor)
+
+list(APPEND _release_c_flags ${_cpu_opt_flags})
+list(APPEND _release_cxx_flags ${_cpu_opt_flags})
+list(APPEND _relwithdebinfo_c_flags ${_cpu_opt_flags})
+list(APPEND _relwithdebinfo_cxx_flags ${_cpu_opt_flags})
+
+string(JOIN " " CMAKE_C_FLAGS_DEBUG ${_debug_c_flags})
+string(JOIN " " CMAKE_CXX_FLAGS_DEBUG ${_debug_cxx_flags})
+string(JOIN " " CMAKE_C_FLAGS_RELEASE ${_release_c_flags})
+string(JOIN " " CMAKE_CXX_FLAGS_RELEASE ${_release_cxx_flags})
+string(JOIN " " CMAKE_C_FLAGS_RELWITHDEBINFO ${_relwithdebinfo_c_flags})
+string(JOIN " " CMAKE_CXX_FLAGS_RELWITHDEBINFO ${_relwithdebinfo_cxx_flags})
+string(JOIN " " CMAKE_C_FLAGS_NOPTIM ${_noptim_c_flags})
+string(JOIN " " CMAKE_CXX_FLAGS_NOPTIM ${_noptim_cxx_flags})
+
+# Handle OpenMP
+handle_openmp()
+
+# Handle sanitizers
+include(cmake/HandleSanitizers.cmake)
+handle_sanitizers()
+
+# Handle profiling support
+include(cmake/HandleProfiling.cmake)
+set(PROFILING_COMPILE_TARGET "${LIB_NAMESPACE}_profiling_interface")
+handle_profiling(TARGET ${PROFILING_COMPILE_TARGET})
+
+if (WARNINGS_ARE_ERRORS)
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Werror")
+    message(WARNING "ACHTUNG! Warnings will be treated as errors.")
 endif()
 
 message(STATUS "==============================================================")
@@ -64,355 +272,191 @@ message(STATUS "====================  Dependencies ===========================")
 
 # LIBRARY DEPENDENCIES DEFINITION
 find_package( Eigen3 3.3 REQUIRED )
-find_package( Doxygen )
-find_package( OpenGL REQUIRED )
-find_package( CUDAToolkit 12.0 REQUIRED) 
+find_package( Doxygen QUIET)
 
-#find_package( GTSAM 4.0 REQUIRED )
-#find_package( GTSAM_UNSTABLE REQUIRED)
-#find_package( sopengv )
-#find_package( OpenCV core imgproc highgui features2d calib3d video)
-#find_package( DBoW2 )
-#find_package( Pangolin )
-#find_package( jsoncpp )
-#find_package( rapid_yaml) ??
-# torch
-# tensort
+# Handle Catch2 tools
+include(cmake/HandleCatch2.cmake)
 
-# Handle CUDA and setup # TODO (PC) Move this code to a dedicated cmake file (HandleCUDA.cmake)
-if (CUDAToolkit_FOUND)
-    message(STATUS "CUDA found: ${CUDAToolkit_VERSION}")
-    message(STATUS "CUDA_INCLUDE_DIRS: ${CUDAToolkit_INCLUDE_DIRS}")
+# Include cmake tools (depends on Catch2)
+include(cmake/cmake_utils.cmake)
 
-    # TODO ensure this works correctly
-    # Detect the compute capability using nvidia-smi
-    if(CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64")
-      execute_process(
-          COMMAND nvidia-smi --query-gpu=compute_cap --format=csv,noheader
-          OUTPUT_VARIABLE gpu_compute_cap
-          OUTPUT_STRIP_TRAILING_WHITESPACE
-      )
+# Configure CUDA/OptiX (creates interface targets even when disabled)
+handle_cuda(TARGET ${CUDA_COMPILE_TARGET}
+            MIN_VERSION 12.0)
+handle_optix(TARGET ${OPTIX_COMPILE_TARGET}
+            CUDA_TARGET ${CUDA_COMPILE_TARGET})
 
-      # Map the compute capability to the correct architecture
-      string(REPLACE "." "" sm_version "${gpu_compute_cap}")
-      set(cuda_arch "sm_${sm_version}")
-
-      message(STATUS "Detected CUDA compute capability: ${gpu_compute_cap}")
-      message(STATUS "Using CUDA architecture: ${cuda_arch}")
-    endif() 
-
-    # Define target to specify includes and compile defs
-    add_library(cuda_compile_settings INTERFACE)
-    
-    # Include directories
-    target_include_directories(cuda_compile_settings INTERFACE ${CUDAToolkit_INCLUDE_DIRS})
-
-    set_property(TARGET cuda_compile_settings 
-                 PROPERTY CUDA_ARCHITECTURES ${sm_version})
-
-    target_compile_definitions(cuda_compile_settings INTERFACE WITH_CUDA=1)
-    
-    # Select CUDA libraries to link
-    set(CUDA_LINK_LIBRARIES CUDA::cublas CUDA::cudart CUDA::curand CUDA::cuda_driver)
-
-    # Check if empty
-    if (CUDA_LINK_LIBRARIES STREQUAL "")
-      message(FATAL_ERROR "CUDA libraries not found.")
-    else()
-      message(STATUS "CUDA interface target linked against CUDA libraries: ${CUDA_LINK_LIBRARIES}")
-    endif()
-
-    target_link_libraries(cuda_compile_settings INTERFACE ${CUDA_LINK_LIBRARIES})  # CUDA
-
+if (ENABLE_CUDA)
+  include(cmake/cmake_cuda_ptx_tools.cmake)
 endif()
 
-# OPTIX
-set(OPTIX_FOUND OFF) 
+# Handle OpenGL (creates interface targets even when disabled)
+include(cmake/HandleOpenGL.cmake)
+handle_opengl(TARGET ${OPENGL_COMPILE_TARGET})
 
-if (ENABLE_OPTIX) # TODO (PC) Move this code to a dedicated cmake file (HandleOptix.cmake)
+# Add submodules if any found
+include(cmake/HandleSubmodules.cmake)
+handle_submodules()
 
-  # Specify Optix installation directory
-  set(OptiX_INSTALL_DIR ${CMAKE_CURRENT_SOURCE_DIR}/NVIDIA-OptiX-SDK-8.0.0-linux64-x86_64)
+# Set the dependencies for the automated export
+set(EXPORT_TARGET_DEPS Eigen3)
+if(ENABLE_CUDA)
+  list(APPEND EXPORT_TARGET_DEPS CUDAToolkit)
+endif()
+if (ENABLE_OPENGL)
+  list(APPEND EXPORT_TARGET_DEPS OpenGL::GL)
+endif()
+if(ENABLE_TBB)
+  list(APPEND EXPORT_TARGET_DEPS TBB)
+endif()
+message(STATUS "Target dependencies: ${EXPORT_TARGET_DEPS}")
 
-  if(${USE_OPTIX_SDK})
-      if (DEFINED ENV{OPTIX_HOME})
-        set(OptiX_INSTALL_DIR $ENV{OPTIX_HOME})
-      else()
-      message(FATAL_ERROR "USE_SYS_OPTIX_SDK is enabled but OPTIX_HOME variable is not defined.")
-      endif()
+# Interface target for C++ flags
+add_library(${LIB_COMPILE_TARGET} INTERFACE)
+handle_tbb(TARGET ${LIB_COMPILE_TARGET})
+
+if (CMAKE_BUILD_TYPE_LOWER MATCHES "debug")
+  set(CMAKE_C_FLAGS ${CMAKE_CXX_FLAGS_DEBUG})
+  set(CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS_DEBUG})
+
+  set(_sanitizer_flags)
+  if(SANITIZE_BUILD AND SANITIZERS)
+    set(_sanitizer_flags -fsanitize=${SANITIZERS})
   endif()
+  target_compile_options(${LIB_COMPILE_TARGET} INTERFACE
+                      ${_sanitizer_flags}
+                      -fno-omit-frame-pointer)
+  target_link_options(${LIB_COMPILE_TARGET} INTERFACE
+                      ${_sanitizer_flags}
+                      -fno-omit-frame-pointer)
 
-  set(OPTIX_FOUND ON)
+elseif (CMAKE_BUILD_TYPE_LOWER MATCHES "release" AND NOT NO_OPTIMIZATION)
+  set(CMAKE_C_FLAGS ${CMAKE_CXX_FLAGS_RELEASE})
+  set(CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS_RELEASE})
 
-  # Define Optix includes
-  set(OPTIX_INCLUDE_DIR ${OptiX_INSTALL_DIR}/include)
-  list(APPEND OPTIX_INCLUDE_DIR ${OptiX_INSTALL_DIR}/SDK/) # Add headers in SDK/sutil
-  list(APPEND OPTIX_INCLUDE_DIR ${OptiX_INSTALL_DIR}/SDK/sutil) # Add headers in SDK/sutil
-  list(APPEND OPTIX_INCLUDE_DIR ${OptiX_INSTALL_DIR}/SDK/support)
-  list(APPEND OPTIX_INCLUDE_DIR ${OptiX_INSTALL_DIR}/SDK/optixConsole)
+elseif (CMAKE_BUILD_TYPE_LOWER MATCHES "relwithdebinfo" AND NOT NO_OPTIMIZATION)
+  set(CMAKE_C_FLAGS ${CMAKE_CXX_FLAGS_RELWITHDEBINFO})
+  set(CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS_RELWITHDEBINFO})
 
-  message(STATUS "OptiX enabled")
-  message(STATUS "OPTIX_INCLUDE_DIR: ${OPTIX_INCLUDE_DIR}")
-  list(APPEND INCLUDE_DIR_LIST ${OPTIX_INCLUDE_DIR})
-  
-  # Add Optix includes to interface target
-  target_include_directories(cuda_compile_settings INTERFACE ${OPTIX_INCLUDE_DIR})
+elseif (NO_OPTIMIZATION)
+  set(CMAKE_C_FLAGS ${CMAKE_CXX_FLAGS_NOPTIM})
+  set(CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS_NOPTIM})
+  target_compile_definitions(${LIB_COMPILE_TARGET} INTERFACE NDEBUG)
 
-endif()
-
-# Add conveniency tools adapted from GTSAM
-# Include CMake modules from GTSAM
-find_package(GTSAMCMakeTools REQUIRED)
-
-# Load build type flags and default to Debug mode
-#include(GtsamBuildTypes)
-
-# Use macros for creating tests/timing scripts
-#include(GtsamTesting)
-#include(GtsamPrinting)
-
-# Add CppUnitLite testing framework to build
-if ( NOT (BUILD_PYTHON_WRAPPER OR BUILD_MATLAB_WRAPPER) )
-  add_subdirectory(CppUnitLite) # ACHTUNG: when building with wrapper this MUST be excluded because GTSAM already includes it
-endif()
-
-# Add catch2 for unit testing
-find_package(Catch2)
-
-if (Catch2_FOUND)
-    message(STATUS "Catch2 found at system level: ${Catch2_DIR}")
 else()
-  message(STATUS "Catch2 not found. Fetching it...")
-  Include(FetchContent)
-
-  FetchContent_Declare(
-    Catch2
-    GIT_REPOSITORY https://github.com/catchorg/Catch2.git
-    GIT_TAG        v3.4.0 # or a later release (TO UPDATE AS NEEDED)
-  )
-
-  FetchContent_MakeAvailable(Catch2)
-  message(STATUS "Catch2 library fetched successfully.")
+  message(FATAL_ERROR "Unknown build type: ${CMAKE_BUILD_TYPE}. Stopping build.")
 endif()
 
-# Create the installation target list 
+# Create the installation target list
 set(installable_targets)
 
-# TIP: To set target compilation options (or any other thing) that must be specific for a target or propagated, use the following cmake pattern (example). Requires cmake 3.15 or later. Here flag BUILD_INTERFACE regulates whether the compile flags are added to the target_compile_options. If true, they are added.
-#add_library(library_compile_flags INTERFACE)
-#target_compile_options(library_compile_flags INTERFACE 
-#"$<${gcc_like_cxx}: $<BUILD_INTERFACE: -Wall;-Wextra;-Wshadow;-Wformat=2;-Wunused>>")
-#target_link_libraries(library_target PUBLIC any_other_target library_compile_flags)
+# Define include target interface
+add_library(${project_name}_include INTERFACE)
+target_include_directories(${project_name}_include INTERFACE
+                           $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
+                           $<INSTALL_INTERFACE:include/${project_name}>)
 
-# INCLUDE DIRECTORIES
-include_directories( ${OpenCV_INCLUDE_DIRS} ) 
-include_directories( ${PROJECT_SOURCE_DIR} )
-include_directories( ${JSONCPP_INCLUDE_DIRS}) 
-include_directories( ${GTSAM_INCLUDE_DIRS}) 
-include_directories( "src")
+target_link_options(${project_name}_include INTERFACE
+                    $<$<PLATFORM_ID:Linux>:-Wl,-rpath,\$ORIGIN/../lib>)
 
-# Include CTest and Catch2
-include(CTest)
-include(Catch)
+set(CMAKE_INSTALL_RPATH_USE_LINK_PATH ON)
 
-# Add other subdirectories if needed
-#add_subdirectory( other_folder )
+# Add header-only libraries if present
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/lib/header_only")
+  include_directories( lib/header_only )
+endif()
+
+message(STATUS "===================================================================")
+message(STATUS "====================  Library composition  ========================")
 
 # Add library
 add_subdirectory( src )
 
 # Add examples to build
-add_subdirectory( examples )
+if (BUILD_AS_MAIN_PROJECT)
+  add_subdirectory( examples )
+endif()
 
 # Add tests to build
-add_subdirectory( tests )
+if (ENABLE_TESTS AND Catch2_FOUND AND BUILD_AS_MAIN_PROJECT)
+  add_subdirectory( tests )
+endif()
 
 # Add documentation
-set(DOC_SUBDIRS "${${project_name}_INCLUDE_DIRS}")
+set(DOC_SUBDIRS "${CMAKE_SOURCE_DIR}/src")
 if (DOXYGEN_FOUND)
     add_subdirectory( doc )
 else()
-    message(STATUS "Doxygen not found. Skipping building documentation.") 
+    message(STATUS "Doxygen not found. Skipping building documentation.")
 endif()
 
-# Make catch2 to search for tests
-message(STATUS "List of test targets: ${TESTS_LIST}")
+###########################################################################
+### WRAPPERS CONFIGURATION
+set(ANY_WRAPPER_ENABLED OFF)
+if(BUILD_AS_MAIN_PROJECT)
+  set(LIBNAME_WRAP_TARGET ${project_name})
+  handle_gtwrappers()
+  handle_pybind11_wrapper()
 
-# Print configuration variables
+  # Determine if any wrapper is enabled
+  if (${GTWRAP_PYTHON_OPTION_NAME} OR PYBIND11_WRAPPER_ENABLED OR ${GTWRAP_MATLAB_OPTION_NAME})
+    set(ANY_WRAPPER_ENABLED ON)
+  endif()
+endif()
+
+###########################################################################
+# INFO SECTION
 message(STATUS "===============================================================")
 message(STATUS "================  Configuration Options  ======================")
+message(STATUS "LIBRARY NAME                              : ${project_name}")
+message(STATUS "CROSS COMPILING                           : ${CMAKE_CROSSCOMPILING}")
+message(STATUS "HOST SYSTEM                               : ${CMAKE_HOST_SYSTEM}")
+message(STATUS "TARGET SYSTEM                             : ${CMAKE_SYSTEM}")
+message(STATUS "TARGET ARCHITECTURE                       : ${CMAKE_SYSTEM_PROCESSOR}")
+message(STATUS "CMAKE_CXX_COMPILER                        : ${CMAKE_CXX_COMPILER}")
 message(STATUS "CMAKE_CXX_COMPILER_ID type                : ${CMAKE_CXX_COMPILER_ID}")
 message(STATUS "CMAKE_CXX_COMPILER_VERSION                : ${CMAKE_CXX_COMPILER_VERSION}")
-message(STATUS "Build flags                                               ")
+if (ENABLE_OPTIX)
+  message(STATUS "CMAKE_C_COMPILER                          : ${CMAKE_C_COMPILER}")
+  message(STATUS "CMAKE_C_COMPILER_ID type                  : ${CMAKE_C_COMPILER_ID}")
+  message(STATUS "CMAKE_C_COMPILER_VERSION                  : ${CMAKE_C_COMPILER_VERSION}")
+endif()
+if (ENABLE_CUDA)
+  message(STATUS "CUDA enabled                             : ${ENABLE_CUDA}")
+  message(STATUS "CUDA architecture                        : ${cuda_arch}")
+  message(STATUS "CUDA architecture sm version             : ${sm_version}")
+  message(STATUS "CMAKE_CUDA_COMPILER                      : ${CMAKE_CUDA_COMPILER}")
+  message(STATUS "CMAKE_CUDA_COMPILER_ID type              : ${CMAKE_CUDA_COMPILER_ID}")
+  message(STATUS "CMAKE_CUDA_COMPILER_VERSION              : ${CMAKE_CUDA_COMPILER_VERSION}")
+endif()
+message(STATUS "CMAKE_INSTALL_PREFIX                      : ${CMAKE_INSTALL_PREFIX}")
 if(NOT MSVC AND NOT XCODE_VERSION)
-  message(STATUS "  Build type                              : ${CMAKE_BUILD_TYPE}")
+  message(STATUS "Build type                                : ${CMAKE_BUILD_TYPE}")
   message(STATUS "  C compilation flags                     : ${CMAKE_C_FLAGS}")
   message(STATUS "  C++ compilation flags                   : ${CMAKE_CXX_FLAGS}")
 endif()
-
-# WRAPPERS CONFIGURATION
-# Handle wrappers
-if(BUILD_PYTHON_WRAPPER OR BUILD_MATLAB_WRAPPER)
-
-  if (NOT GTSAM_FOUND)
-    find_package( GTSAM 4.0 REQUIRED ) # GTSAM types are required for wrappers
-  endif() 
-
-  # Set the default Python version to use for wrapping
-  set(WRAP_PYTHON_VERSION ${PROJECT_PYTHON_VERSION}
-    CACHE STRING "The Python version to use for wrapping")
-
-  # Look for gtwrap
-  find_package(gtwrap QUIET) 
-
-  # Check if wrap subdirectory exists, else fetch it from github as submodule
-  if (NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/wrap") 
-
-      message(STATUS "Wrap subdirectory not found. Attempting to fetch it from GitHub...")
-      execute_process(COMMAND git submodule add "git@github.com:PeterCalifano/wrap.git"
-                      WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
-      execute_process(COMMAND git submodule update --init --recursive
-                      WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
-
-      if (NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/wrap")
-      # Throw an error if the submodule was not fetched successfully
-          message(FATAL_ERROR "Failed to fetch wrap subdirectory from GitHub!")
-      else()
-          message(STATUS "Wrap subdirectory fetched successfully.")
-      endif()
-      
-  else()
-      message(STATUS "GTwrap package OR Wrap subdirectory found. Proceeding to build wrappers...")
-  endif()
-
-  # DEFINE interface files for wrapper
-  set(SEARCH_DIR_WRAP 
-      "${CMAKE_CURRENT_SOURCE_DIR}/src")
-  
-  #message(STATUS "Searching for wrapper interface files in: ${SEARCH_DIR_WRAP}")
-  #file(GLOB WRAPPER_INTERFACE_FILES "${SEARCH_DIR_WRAP}" "*.i") # Not working for now
-
-  # Template: set(WRAPPER_INTERFACE_FILES "${SEARCH_DIR_WRAP}/<name>.i") # Add the interface files here
-  message(STATUS "Found wrapper interface files: ${WRAPPER_INTERFACE_FILES}")
-
-  if (NOT WRAPPER_INTERFACE_FILES)
-    message(FATAL_ERROR "WRAPPER_INTERFACE_FILES list not defined. Please check the cmake configuration.")
-  elseif (${WRAPPER_INTERFACE_FILES} STREQUAL "")
-    message(FATAL_ERROR "No interface files found for wrapping. Please check the search directory or provide files.")
-  endif()
-
-  # Set the include directory for matlab.h
-  set(GTWRAP_INCLUDE_NAME "wrap")
-
-  # Copy matlab.h to the correct folder.
-  configure_file(${PROJECT_SOURCE_DIR}/wrap/matlab.h
-              ${PROJECT_BINARY_DIR}/wrap/matlab.h COPYONLY)
-
-  if (NOT gtwrap_FOUND) # Build GTwrap within project
-    message(STATUS "GTwrap package NOT found. Attempting to build it as ExternalProject...")
-  
-    include(ExternalProject)
-
-    ExternalProject_Add(
-      wrap_project
-      SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/wrap
-      CMAKE_ARGS -DCMAKE_INSTALL_PREFIX=${WRAP_INSTALL_DIR}
-      BUILD_ALWAYS OFF  # Optional: rebuild every time (remove for performance)
-    )
-
-    # Add the install directory to CMake's module path
-    list(APPEND CMAKE_PREFIX_PATH ${WRAP_INSTALL_DIR})
-
-    message(STATUS "GTwrap package correctly built and added to CMAKE_PREFIX_PATH.")
-      
-    add_subdirectory(wrap)
-    list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/wrap/cmake")
-
-    # Python toolbox
-    if(BUILD_PYTHON_WRAPPER)
-        # Check if python folder exists
-        #if(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/python")
-        #    message(FATAL_ERROR "Python wrapper requested but python folder not found.")
-        #endif()
-        #add_subdirectory(python)
-    endif()
-
-    # Matlab toolbox
-    if(BUILD_MATLAB_WRAPPER)
-        # Check if matlab folder exists
-        #if(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/matlab")
-        #    message(FATAL_ERROR "MATLAB wrapper requested but matlab folder not found.")
-        #endif()
-        #add_subdirectory(matlab)
-    endif()
-  endif()
-
-  # Python toolbox
-  if(BUILD_PYTHON_WRAPPER)
-  # TODO: Add the python wrapper configuration here
-
-    if ( NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/python" )
-      # Make directory
-      file(MAKE_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/python")
-    endif()
-  endif()
-
-  # Matlab toolbox
-  if(BUILD_MATLAB_WRAPPER)
-    include( MatlabWrap ) 
-
-    # Configure MATLAB paths
-    message (STATUS "Including MATLAB directories...")
-    find_package (Matlab REQUIRED)
-    set(MATLAB_MEX_INCLUDE "${Matlab_ROOT_DIR}/extern/include")
-    set(SOURCE_DIR "mexCodes")
-    set(MATLAB_DEFAULT_RELEASE "R2023b")
-
-    message(STATUS "MATLAB_MEX_INCLUDE directory: ${MATLAB_MEX_INCLUDE}")
-    message(STATUS "Matlab_MEX_LIBRARY directory: ${Matlab_MEX_LIBRARY}")
-    message(STATUS "Matlab_MX_LIBRARY directory: ${Matlab_MX_LIBRARY}")
-
-    # Set the include directories
-    include_directories(${Matlab_INCLUDE_DIRS})
-    include_directories(${MATLAB_MEX_INCLUDE})
-
-    if ( NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/matlab" )
-      # Make directory
-      file(MAKE_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/matlab")
-    endif()
-
-    # Set up installation paths (#TODO Understand these options better)
-    set(WRAP_MEX_BUILD_STATIC_MODULE OFF) # Defines if the mex module is built as a static module
-    #set(WRAP_BUILD_MEX_BINARY_FLAGS ${GTSAM_BUILD_MEX_BINARY_FLAGS})
-    set(WRAP_TOOLBOX_INSTALL_PATH "${CMAKE_CURRENT_SOURCE_DIR}/matlab") # Defines the installation path for the MATLAB wrapper files
-    #set(WRAP_CUSTOM_MATLAB_PATH ${GTSAM_CUSTOM_MATLAB_PATH})
-    set(WRAP_BUILD_TYPE_POSTFIXES OFF) # Determines if post build type postfixes are added to the mex files 
-
-    # Add the MATLAB wrapper
-    wrap_and_install_library("${WRAPPER_INTERFACE_FILES}" "${project_name}" "" "" "" "" OFF)
-  endif()
-  
+if (ANY_WRAPPER_ENABLED)
+  message(STATUS "================  Wrappers Configuration  ======================")
+  message(STATUS "Python pybind11 direct wrapper              : ${PYBIND11_WRAPPER_ENABLED}")
+  message(STATUS "Python gtwrapper                            : ${${GTWRAP_PYTHON_OPTION_NAME}}")
+  message(STATUS "MATLAB gtwrapper                            : ${${GTWRAP_MATLAB_OPTION_NAME}}")
+  message(STATUS "MATLAB default release                      : ${MATLAB_DEFAULT_RELEASE}")
+  message(STATUS "Python executable                           : ${PYTHON_EXECUTABLE}")
+  message(STATUS "Python version                              : ${PROJECT_PYTHON_VERSION}")
+  message(STATUS "gtwrap interface files                      : ${${GTWRAP_INTERFACE_OPTION_NAME}}")
+  message(STATUS "gtwrap top namespace                        : ${${GTWRAP_TOP_NAMESPACE_OPTION_NAME}}")
 endif()
+message(STATUS "===============================================================")
 
-# AUXILIARY 
-# Set dashboard properties (needed for CDash)
+# AUXILIARY
 set(CTEST_PROJECT_NAME ${project_name})
 set(CTEST_NIGHTLY_START_TIME "00:00:00 CET")
 
-# Set the dashboard drop method and location
-#set(CTEST_DROP_METHOD "http")
-#set(CTEST_DROP_SITE "my.cdash.org")
-#set(CTEST_DROP_LOCATION "/submit.php?project=CMakeTutorial")
-#set(CTEST_DROP_SITE_CDASH TRUE)
-
-# PACKAGING CONFIGURATION # TODO test and extended prototype cmake code (this is copied from tutorials)
-#include(InstallRequiredSystemLibraries)
-#set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/License")
-#set(CPACK_PACKAGE_VERSION_MAJOR "${PROJECT_VERSION_MAJOR}")
-#set(CPACK_PACKAGE_VERSION_MINOR "${PROJECT_VERSION_MINOR}")
-#set(CPACK_GENERATOR "TGZ")
-#set(CPACK_SOURCE_GENERATOR "TGZ")
-#include(CPack)
-
-# TODO: add cmake configuration to export project, such that it can be found by other projects using find_package()
-# See https://cmake.org/cmake/help/latest/guide/tutorial/Adding%20Export%20Configuration.html
+# PACKAGING CONFIGURATION
+include(InstallRequiredSystemLibraries)
+set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE")
+set(CPACK_PACKAGE_VERSION_MAJOR "${PROJECT_VERSION_MAJOR}")
+set(CPACK_PACKAGE_VERSION_MINOR "${PROJECT_VERSION_MINOR}")
+set(CPACK_GENERATOR "TGZ")
+set(CPACK_SOURCE_GENERATOR "TGZ")
+include(CPack)
