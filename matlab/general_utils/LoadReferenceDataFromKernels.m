@@ -8,34 +8,34 @@ function [objReferenceMissionData, dStateSC_TargetFixed, dSunPosition_TargetFixe
 arguments (Input)
     varTargetID             {mustBeA(varTargetID, ["string", "char", "double", "int32", "uint32", "single"])} 
     enumTrajectKernelName   (1,:) {mustBeA(enumTrajectKernelName, ["string", "char", "EnumTrajectoryNames", "EnumTrajectKernelName"])}
-    dTimegridVect_kernelTimeScale           (1,:) double {ismatrix, mustBeNumeric}
+    dTimegridVect_kernelTimeScale           (1,:) double {mustBeNumeric}
     enumWorldFrame          (1,1) {mustBeA(enumWorldFrame, ["SEnumFrameName", "string", "char"])}  % Enumeration class indicating the W frame in which the data are expressed
     varReferenceCentre      (1,1) {mustBeA(varReferenceCentre, ["SEnumFrameName", "string", "char", "double", "int32", "uint32"])}
     enumTargetFrame         (1,1) {mustBeA(enumTargetFrame, ["SEnumFrameName", "string", "char"])} = enumWorldFrame
 end
 arguments (Input)
     kwargs.bIsTimeGridRelative      (1,1) logical {mustBeScalarOrEmpty} = true
-    kwargs.charTrajKernelFolderPath (1,:) char {ischar, isstring, mustBeFolder} = '.'
-    kwargs.dDeltaTimeStep           (1,1) double {isscalar, mustBeNumeric} = 60.0
-    kwargs.dEphTimes0toFinal        (2,1) double {isvector, mustBeNumeric} = [0;0]
-    kwargs.bLoadManoeuvres          {islogical, isscalar} = true;
-    kwargs.charKernelLengthUnits    (1,:) char {ischar, isstring, mustBeMember(kwargs.charKernelLengthUnits, ["km", "m"])} = "km";
-    kwargs.charOutputLengthUnits    (1,:) char {ischar, isstring, mustBeMember(kwargs.charOutputLengthUnits, ["km", "m"])} = "km";
-    kwargs.varTargetBodyID          {mustBeA(kwargs.varTargetBodyID, ["string", "char", "double", "int32", "uint32", "single"])} = varReferenceCentre % Defaults to reference centre in most cases
-    kwargs.cellAdditionalTargetsID         {iscell} = {};
-    kwargs.cellAdditionalTargetFrames      {iscell} = {};
-    kwargs.cellAdditionalTargetNames       {iscell} = {};
-    kwargs.bAdditionalBodiesRequireAttitude (1,:) logical {islogical} = false(0,0);
-    kwargs.charKernelTimescale       (1,:) char {ischar, isstring, mustBeMember(kwargs.charKernelTimescale, ...
+    kwargs.charTrajKernelFolderPath (1,:) char {mustBeFolder, mustBeText} = '.'
+    kwargs.dDeltaTimeStep           (1,1) double {mustBeNumeric} = 60.0
+    kwargs.dEphTimes0toFinal        (2,1) double {mustBeNumeric} = [0;0]
+    kwargs.bLoadManoeuvres          (1,1) logical = true;
+    kwargs.charKernelLengthUnits    (1,:) char {mustBeText, mustBeMember(kwargs.charKernelLengthUnits, ["km", "m"])} = "km";
+    kwargs.charOutputLengthUnits    (1,:) char {mustBeText, mustBeMember(kwargs.charOutputLengthUnits, ["km", "m"])} = "km";
+    kwargs.varTargetBodyID                 {mustBeA(kwargs.varTargetBodyID, ["string", "char", "double", "int32", "uint32", "single"])} = varReferenceCentre % Defaults to reference centre in most cases
+    kwargs.cellAdditionalTargetsID         {mustBeA(kwargs.cellAdditionalTargetsID   , "cell")} = {};
+    kwargs.cellAdditionalTargetFrames      {mustBeA(kwargs.cellAdditionalTargetFrames, "cell")} = {};
+    kwargs.cellAdditionalTargetNames       {mustBeA(kwargs.cellAdditionalTargetNames , "cell")} = {};
+    kwargs.bAdditionalBodiesRequireAttitude (1,:) logical = false(0,0);
+    kwargs.charKernelTimescale          (1,:) char {mustBeText, mustBeMember(kwargs.charKernelTimescale, ...
                                                         ["TAI", "TDB", "TDT", "TT", "ET", "JDTDB", "JDTDT", "JED", "GPS"])} = "ET";
-    kwargs.charUserDefTimescale     (1,:) char {ischar, isstring, mustBeMember(kwargs.charUserDefTimescale, ...
+    kwargs.charUserDefTimescale         (1,:) char {mustBeText, mustBeMember(kwargs.charUserDefTimescale, ...
                                                         ["TAI", "TDB", "TDT", "TT", "ET", "JDTDB", "JDTDT", "JED", "GPS"])} = "ET";
-    kwargs.bUseKernelInitialTimestamp (1,1) logical {mustBeScalarOrEmpty} = false
+    kwargs.bUseKernelInitialTimestamp   (1,1) logical {mustBeScalarOrEmpty} = false
 end
 arguments (Output)
     objReferenceMissionData     (1,1) SReferenceImagesDataset
-    dStateSC_TargetFixed        (6,:) double {ismatrix, mustBeNumeric} 
-    dSunPosition_TargetFixed    (3,:) double {ismatrix, mustBeNumeric} 
+    dStateSC_TargetFixed        (6,:) double {mustBeNumeric} 
+    dSunPosition_TargetFixed    (3,:) double {mustBeNumeric} 
 end
 %% SIGNATURE
 % [objReferenceMissionData, dStateSC_TargetFixed, dSunPosition_TargetFixed] = LoadReferenceDataFromKernels(varTargetID, ...
@@ -55,34 +55,37 @@ end
 % Impulsive manoeuvres can be retrieved if the SPK is split in different intervals, retrieved using spkcov.
 % -------------------------------------------------------------------------------------------------------------
 %% INPUT
-% arguments (Input)
-%     varTargetID             {mustBeA(varTargetID, ["string", "char", "double", "int32", "uint32", "single"])} 
-%     enumTrajectKernelName   (1,:) {mustBeA(enumTrajectKernelName, ["string", "char", "EnumTrajectoryNames", "EnumTrajectKernelName"])}
-%     dTimegridVect           (1,:) double {ismatrix, mustBeNumeric}
-%     enumWorldFrame          (1,1) {mustBeA(enumWorldFrame, ["SEnumFrameName", "string", "char"])}  % Enumeration class indicating the W frame in which the data are expressed
-%     varReferenceCentre      (1,1) {mustBeA(varReferenceCentre, ["SEnumFrameName", "string", "char", "double", "int32", "uint32"])}
-%     enumTargetFrame         (1,1) {mustBeA(enumTargetFrame, ["SEnumFrameName", "string", "char"])} = enumWorldFrame
-% end
-% arguments (Input)
-%     kwargs.charTrajKernelFolderPath (1,:) char {ischar, isstring, mustBeFolder} = '.'
-%     kwargs.dDeltaTimeStep           (1,1) double {isscalar, mustBeNumeric} = 60.0
-%     kwargs.dEphTimes0toFinal        (2,1) double {isvector, mustBeNumeric} = [0;0]
-%     kwargs.bLoadManoeuvres          {islogical, isscalar} = true;
-%     kwargs.charKernelLengthUnits    (1,:) char {ischar, isstring, mustBeMember(kwargs.charKernelLengthUnits, ["km", "m"])} = "km";
-%     kwargs.charOutputLengthUnits    (1,:) char {ischar, isstring, mustBeMember(kwargs.charOutputLengthUnits, ["km", "m"])} = "km";
-%     kwargs.varTargetBodyID          {mustBeA(kwargs.varTargetBodyID, ["string", "char", "double", "int32", "uint32", "single"])} = varReferenceCentre % Defaults to reference centre in most cases
-% end
+% varTargetID             {mustBeA(varTargetID, ["string", "char", "double", "int32", "uint32", "single"])}
+% enumTrajectKernelName   (1,:) {mustBeA(enumTrajectKernelName, ["string", "char", "EnumTrajectoryNames", "EnumTrajectKernelName"])}
+% dTimegridVect_kernelTimeScale           (1,:) double {mustBeNumeric}
+% enumWorldFrame          (1,1) {mustBeA(enumWorldFrame, ["SEnumFrameName", "string", "char"])}  % Enumeration class indicating the W frame in which the data are expressed
+% varReferenceCentre      (1,1) {mustBeA(varReferenceCentre, ["SEnumFrameName", "string", "char", "double", "int32", "uint32"])}
+% enumTargetFrame         (1,1) {mustBeA(enumTargetFrame, ["SEnumFrameName", "string", "char"])} = enumWorldFrame
+% kwargs.bIsTimeGridRelative      (1,1) logical {mustBeScalarOrEmpty} = true
+% kwargs.charTrajKernelFolderPath (1,:) char {mustBeFolder} = '.'
+% kwargs.dDeltaTimeStep           (1,1) double {mustBeNumeric} = 60.0
+% kwargs.dEphTimes0toFinal        (2,1) double {mustBeNumeric} = [0;0]
+% kwargs.bLoadManoeuvres          (1,1) logical = true;
+% kwargs.charKernelLengthUnits    (1,:) char {ischar, isstring, mustBeMember(kwargs.charKernelLengthUnits, ["km", "m"])} = "km";
+% kwargs.charOutputLengthUnits    (1,:) char {ischar, isstring, mustBeMember(kwargs.charOutputLengthUnits, ["km", "m"])} = "km";
+% kwargs.varTargetBodyID          {mustBeA(kwargs.varTargetBodyID, ["string", "char", "double", "int32", "uint32", "single"])} = varReferenceCentre % Defaults to reference centre in most cases
+% kwargs.cellAdditionalTargetsID     {mustBeA(kwargs.cellAdditionalTargetsID   , "cell")} = {};
+% kwargs.cellAdditionalTargetFrames  {mustBeA(kwargs.cellAdditionalTargetFrames, "cell")} = {};
+% kwargs.cellAdditionalTargetNames   {mustBeA(kwargs.cellAdditionalTargetNames , "cell")} = {};
+% kwargs.bAdditionalBodiesRequireAttitude (1,:) logical = false(0,0);
+% kwargs.charKernelTimescale       (1,:) char {mustBeMember(kwargs.charKernelTimescale, ...
+%     ["TAI", "TDB", "TDT", "TT", "ET", "JDTDB", "JDTDT", "JED", "GPS"])} = "ET";
+% kwargs.charUserDefTimescale     (1,:) char {mustBeMember(kwargs.charUserDefTimescale, ...
+%     ["TAI", "TDB", "TDT", "TT", "ET", "JDTDB", "JDTDT", "JED", "GPS"])} = "ET";
+% kwargs.bUseKernelInitialTimestamp (1,1) logical {mustBeScalarOrEmpty} = false
 % -------------------------------------------------------------------------------------------------------------
 %% OUTPUT
-% arguments (Output)
-%     objReferenceMissionData     (1,1) SReferenceImagesDataset
-%     dStateSC_TargetFixed        (6,:) double {ismatrix, mustBeNumeric} 
-%     dSunPosition_TargetFixed    (3,:) double {ismatrix, mustBeNumeric} 
-% end
+% objReferenceMissionData     (1,1) SReferenceImagesDataset
+% dStateSC_TargetFixed        (6,:) double {mustBeNumeric}
+% dSunPosition_TargetFixed    (3,:) double {mustBeNumeric}
 % -------------------------------------------------------------------------------------------------------------
 %% CHANGELOG
 % 25-06-2025        Pietro Califano     Derived from LoadReferenceRCS1 and generalized for any SPK kernel
-
 % -------------------------------------------------------------------------------------------------------------
 %% DEPENDENCIES
 % SReferenceImagesDataset; SReferenceMissionDesign
@@ -212,8 +215,9 @@ else
 end
 
 % Print monitoring information
-fprintf('Using %s timegrid with relative bounds from ET0: [%8.0f, %8.0f].\nData spans a total of %s.\n', ...
-    upper(charGridType), dRelativeTimegridVect(1), dRelativeTimegridVect(end), FormatElapsedTime_(dETtimegridVect(end) - dETtimegridVect(1)));
+fprintf('Using %s timegrid [%10.1f, %10.1f], with relative bounds from ET0: [%8.0f, %8.0f].\nData spans a total of %s.\n', ...
+    upper(charGridType), dAbsTimegrid_ET(1), dAbsTimegrid_ET(2), ...
+    dRelativeTimegridVect(1), dRelativeTimegridVect(end), FormatElapsedTime_(dETtimegridVect(end) - dETtimegridVect(1)));
 
 % Check that last entry of timegrid is within allowed bounds
 assert(dAbsTimegrid_ET(end) <= dETf, "ERROR: last time instant specified in absolute timegrid is outside allowed ET bounds! %6.2g < %6.2g\n", dETf, dETtimegridVect(end));
@@ -281,7 +285,16 @@ if ~isempty(kwargs.cellAdditionalTargetsID)
     cellTargetDCM_TBfromW   = cell(1, ui32NumAdditionalBodies);
 
     if isempty(kwargs.bAdditionalBodiesRequireAttitude)
+        % Assume false if empty
         kwargs.bAdditionalBodiesRequireAttitude = false(1, ui32NumAdditionalBodies);
+
+    elseif length(kwargs.bAdditionalBodiesRequireAttitude) == 1 && ui32NumAdditionalBodies > 1
+        % Broadcast to size
+        kwargs.bAdditionalBodiesRequireAttitude = logical(kwargs.bAdditionalBodiesRequireAttitude * true(1, ui32NumAdditionalBodies));
+    else
+        % Assert validity
+        assert(length(kwargs.bAdditionalBodiesRequireAttitude) == ui32NumAdditionalBodies, ['ERROR: invalid size of bool array. ' ...
+            'Must be either scalar (broadcasted) or of ui32NumAdditionalBodies length.'])
     end
 
     ui32AllocIdx = uint32(1);

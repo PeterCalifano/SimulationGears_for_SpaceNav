@@ -12,6 +12,7 @@ classdef SReferenceImagesDataset < SReferenceMissionDesign % TODO the name of th
     % 17-02-2025    Pietro Califano     Derived from SReferenceMissionDesign to add data necessary to use
     %                                   datasets for navigation simulations (e.g. camera params)
     % 29-06-2025    Pietro Califano     Complete extension to handle multiple bodies data
+    % 22-12-2025    Pietro Califano     Extend conversion pipeline with intermediate representation class
     % -------------------------------------------------------------------------------------------------------------
     %% METHODS
     % [-]
@@ -22,13 +23,12 @@ classdef SReferenceImagesDataset < SReferenceMissionDesign % TODO the name of th
     %% DEPENDENCIES
     % [-]
     % -------------------------------------------------------------------------------------------------------------
-    %% Future upgrades
-    % [-]
-    % -------------------------------------------------------------------------------------------------------------
+
 
     properties (SetAccess = public, GetAccess = public)
         objCamera {mustBeA(objCamera, ["CCameraIntrinsics", "cameraIntrinsics", "CProjectiveCamera"])} = CCameraIntrinsics();
-        bImageAcquisitionMask (1,:) {islogical, isvector} = false(0,0); % Mask for images acquisition
+        dDCM_CamFromSCB        (3,3) double = eye(3);
+        bImageAcquisitionMask (1,:) logical = false(0,0); % Mask for images acquisition
     end
 
 
@@ -46,22 +46,24 @@ classdef SReferenceImagesDataset < SReferenceMissionDesign % TODO the name of th
             arguments
                 % Reference definition
                 objCamera                    (1,1)     {mustBeA(objCamera, ["CCameraIntrinsics", "cameraIntrinsics", "CProjectiveCamera"])} = CCameraIntrinsics();
-                enumWorldFrame               (1,1)     {mustBeA(enumWorldFrame, ["SEnumFrameName", "string", "char"])} = EnumFrameName.IN  % Enumeration class indicating the W frame to which the data are attached
-                dTimestamps                  (1,:)      {isnumeric, isvector} = [];
-                dStateSC_W                   (6, :)     {isnumeric, ismatrix} = [];
-                dDCM_TBfromW                 (3, 3, :)  {isnumeric, ismatrix} = [];
-                dTargetPosition_W            (3, :)     {isnumeric, ismatrix} = [];
-                dSunPosition_W               (3, :)     {isnumeric, ismatrix} = [];
-                dEarthPosition_W             (3, :)     {isnumeric, ismatrix} = [];
+                enumWorldFrame               (1,:) char {mustBeA(enumWorldFrame, ["SEnumFrameName", "string", "char"])} = EnumFrameName.IN  % Enumeration class indicating the W frame to which the data are attached
+                dTimestamps                  (1,:)     {mustBeNumeric} = [];
+                dStateSC_W                   (6,:)    {mustBeNumeric} = [];
+                dDCM_TBfromW                 (3,3,:)  {mustBeNumeric} = [];
+                dTargetPosition_W            (3,:)    {mustBeNumeric} = [];
+                dSunPosition_W               (3,:)    {mustBeNumeric} = [];
+                dEarthPosition_W             (3,:)    {mustBeNumeric} = [];
             end
             arguments
-                optional.dPrimaryPointingWhileMan_W   (3, :, :)  double {isnumeric, ismatrix} = [] % TBC, primary pointing axis during manoeuvres
-                optional.dSecondPointingWhileMan_W    (3, :, :)  double {isnumeric, ismatrix} = [] % TBC, secondary axis during manoeuvres
-                optional.dManoeuvresTimegrids         (3, :)     double {isnumeric, ismatrix} = [];
-                optional.dManoeuvresStartTimestamps   (1, :)     double {isnumeric, isvector} = [];
-                optional.dManoeuvresDeltaV_SC         (3, :)     double {isnumeric, ismatrix} = [];
-                optional.dRelativeTimestamps          (1, :)     double {isnumeric, ismatrix} = [];   
-                optional.dDCM_SCfromW                 (3, 3, :)  double {isnumeric, ismatrix} = []
+                optional.dPrimaryPointingWhileMan_W   (3,:,:)  double {mustBeNumeric} = [] % TBC, primary pointing axis during manoeuvres
+                optional.dSecondPointingWhileMan_W    (3,:,:)  double {mustBeNumeric} = [] % TBC, secondary axis during manoeuvres
+                optional.dManoeuvresTimegrids         (3,:)    double {mustBeNumeric} = [];
+                optional.dManoeuvresStartTimestamps   (1,:)    double {mustBeNumeric} = [];
+                optional.dManoeuvresDeltaV_SC         (3,:)    double {mustBeNumeric} = [];
+                optional.dRelativeTimestamps          (1,:)    double {mustBeNumeric} = [];   
+                optional.dDCM_SCfromW                 (3,3,:)  double {mustBeNumeric} = [];
+                optional.dDCM_CamFromSCB              (3,3) double = eye(3);
+
                 optional.charLengthUnits            char {mustBeA(optional.charLengthUnits, ["string", "char"])} = '';
             end
 
@@ -82,7 +84,8 @@ classdef SReferenceImagesDataset < SReferenceMissionDesign % TODO the name of th
                                                 "dDCM_SCfromW", optional.dDCM_SCfromW);
 
             % Store camera data as fields
-            self.objCamera = objCamera; 
+            self.objCamera       = objCamera; 
+            self.dDCM_CamFromSCB = optional.dDCM_CamFromSCB;
 
             % Store additional fields
             self.charLengthUnits = optional.charLengthUnits;
@@ -95,48 +98,76 @@ classdef SReferenceImagesDataset < SReferenceMissionDesign % TODO the name of th
 
         % METHODS
 
-        function objImagesDatasetFormatESA = exportAsFormatESA(self, charRootFolder, bSaveAllToDisk)
-            arguments (Input)
-                self            (1,1) SPoses3PointCloudImagesDataset
-                charRootFolder  (1,:) char {mustBeA(charRootFolder, ["string", "char"])}
-                bSaveAllToDisk  {islogical, isscalar}
-            end
-            arguments (Output)
-                objImagesDatasetFormatESA (1,1)  {mustBeA(objImagesDatasetFormatESA, "SImagesDatasetFormatESA")}
-            end
-            %%% SIGNATURE
-            % objImagesDatasetFormatESA = exportAsFormatESA(self, charRootFolder, bSaveAllToDisk)
-            % -------------------------------------------------------------------------------------------------------------
-            %%% DESCRIPTION
-            % Function exporting the dataset object instance to an equivalent objImagesDatasetFormatESA
-            % filling all available fields. Optionally, the method to export to disk is also called
-            % -------------------------------------------------------------------------------------------------------------
-            %%% INPUT
-            % charRootFolder  (1,:) char {mustBeA(charRootFolder, ["string", "char"])}
-            % bSaveAllToDisk  {islogical, isscalar}
-            % -------------------------------------------------------------------------------------------------------------
-            %%% OUTPUT
-            % objImagesDatasetFormatESA (1,1)  {mustBeA(objImagesDatasetFormatESA, "SImagesDatasetFormatESA")}
-            % -------------------------------------------------------------------------------------------------------------
-            %%% CHANGELOG
-            % 28-05-2025    Pietro Califano     Design and implementation of prototype
-            % -------------------------------------------------------------------------------------------------------------
-
-            % TODO, class specific
-
-            % Convert to ESA format dataset object
-            objImagesDatasetFormatESA = SImagesDatasetFormatESA(length(self.dTimestamps));
-            % TODO
-            
-            if bSaveAllToDisk
-                objImagesDatasetFormatESA.exportAllToDisk(charRootFolder);
-            end
-        end
     end
 
 
     methods (Static)
-        function self = fromSReferenceMissionDesign(objReferenceMissionDesign)
+        function objDataset = FromSimulationStates(objSimStatesArray, kwargs)
+            arguments
+                objSimStatesArray (1,:) {mustBeA(objSimStatesArray, "CSimulationState")}
+            end
+            arguments
+                kwargs.objCamera                    (1,1)     {mustBeA(kwargs.objCamera, ["CCameraIntrinsics", "cameraIntrinsics", "CProjectiveCamera"])} = CCameraIntrinsics();
+                kwargs.enumWorldFrame               (1,:)     char = ""
+                kwargs.dManoeuvresTimegrids         (3,:)     double {mustBeNumeric} = []
+                kwargs.dManoeuvresStartTimestamps   (1,:)     double {mustBeNumeric} = []
+                kwargs.dManoeuvresDeltaV_SC         (3,:)     double {mustBeNumeric} = []
+                kwargs.dEarthPosition_W             double {mustBeNumeric} = []
+                kwargs.cellAdditionalBodiesTags     cell = {}
+                kwargs.cellAdditionalTargetFrames   cell = {}
+                kwargs.charLengthUnits              char {mustBeA(kwargs.charLengthUnits, ["string", "char"])} = "";
+                kwargs.bImageAcquisitionMask        (1,:) logical = false(0,0);
+            end
+            % Method to convert from simulation states array to dataset object
+
+            % Call base class method
+            objMissionDataset = SReferenceMissionDesign.FromSimulationStates(objSimStatesArray, ...
+                                                    "enumWorldFrame", kwargs.enumWorldFrame, ...
+                                                    "dManoeuvresTimegrids", kwargs.dManoeuvresTimegrids, ...
+                                                    "dManoeuvresStartTimestamps", kwargs.dManoeuvresStartTimestamps, ...
+                                                    "dManoeuvresDeltaV_SC", kwargs.dManoeuvresDeltaV_SC, ...
+                                                    "dEarthPosition_W", kwargs.dEarthPosition_W, ...
+                                                    "cellAdditionalBodiesTags", kwargs.cellAdditionalBodiesTags, ...
+                                                    "cellAdditionalTargetFrames", kwargs.cellAdditionalTargetFrames, ...
+                                                    "charLengthUnits", kwargs.charLengthUnits);
+
+
+            % Construct an instance of this and assign
+            objDataset = SReferenceImagesDataset.FromSReferenceMissionDesign(objMissionDataset);
+            objDataset.objCamera              = kwargs.objCamera;
+            objDataset.bImageAcquisitionMask  = kwargs.bImageAcquisitionMask;
+        end
+
+        function objDataset = FromSimStatesIntermediateRepr(objSimStatesIntermediateRepr)
+            arguments
+                objSimStatesIntermediateRepr (1,1) SDatasetFromSimStateIntermediateRepr {mustBeA(objSimStatesIntermediateRepr, "SDatasetFromSimStateIntermediateRepr")}
+            end
+
+            % Call base class method
+            objMissionDataset = SReferenceMissionDesign.FromSimStatesIntermediateRepr(objSimStatesIntermediateRepr);
+
+            % Construct an instance of this and assign
+            objDataset = SReferenceImagesDataset.FromSReferenceMissionDesign(objMissionDataset);
+            objDataset.objCamera              = objSimStatesIntermediateRepr.objCamera;
+            objDataset.bImageAcquisitionMask  = objSimStatesIntermediateRepr.bImageAcquisitionMask;
+        end
+
+        function [objSimStatesArray, dManoeuvresStartTimestamps, ...
+                    dManoeuvresDeltaV_W, dManoeuvresTimegrids, ...
+                    objCamera, bImageAcquisitionMask] = toSimulationStates(objDataset)
+            arguments
+                objDataset (1,1) {mustBeA(objDataset, "SReferenceImagesDataset")}
+            end
+
+            [objSimStatesArray, dManoeuvresStartTimestamps, dManoeuvresDeltaV_W, dManoeuvresTimegrids] = SReferenceMissionDesign.toSimulationStates(objDataset);
+            
+            % This class specific attributes
+            objCamera             = objDataset.objCamera;
+            bImageAcquisitionMask = self.bImageAcquisitionMask;
+
+        end
+
+        function objDataset = FromSReferenceMissionDesign(objReferenceMissionDesign)
             arguments
                 objReferenceMissionDesign (1,1) SReferenceMissionDesign {mustBeA(objReferenceMissionDesign, "SReferenceMissionDesign")}
             end
@@ -145,23 +176,22 @@ classdef SReferenceImagesDataset < SReferenceMissionDesign % TODO the name of th
             objCamera = CCameraIntrinsics();
 
             % Build the new SReferenceImagesDataset by forwarding all the mission‐design data (including optionals).
-            self = SReferenceImagesDataset( ...
-                objCamera, ...
-                objReferenceMissionDesign.enumWorldFrame, ...
-                objReferenceMissionDesign.dTimestamps, ...
-                objReferenceMissionDesign.dStateSC_W, ...
-                objReferenceMissionDesign.dDCM_TBfromW, ...
-                objReferenceMissionDesign.dTargetPosition_W, ...
-                objReferenceMissionDesign.dSunPosition_W, ...
-                objReferenceMissionDesign.dEarthPosition_W, ...
-                'dPrimaryPointingWhileMan_W',  objReferenceMissionDesign.dPrimaryPointingWhileMan_W, ...
-                'dSecondPointingWhileMan_W',   objReferenceMissionDesign.dSecondPointingWhileMan_W, ...
-                'dManoeuvresTimegrids',        objReferenceMissionDesign.dManoeuvresTimegrids, ...
-                'dManoeuvresStartTimestamps',  objReferenceMissionDesign.dManoeuvresStartTimestamps, ...
-                'dManoeuvresDeltaV_SC',        objReferenceMissionDesign.dManoeuvresDeltaV_SC, ...
-                'dRelativeTimestamps',         objReferenceMissionDesign.dRelativeTimestamps, ...
-                'dDCM_SCfromW',                objReferenceMissionDesign.dDCM_SCfromW ...
-                );
+            objDataset = SReferenceImagesDataset(objCamera, ...
+                                           objReferenceMissionDesign.enumWorldFrame, ...
+                                           objReferenceMissionDesign.dTimestamps, ...
+                                           objReferenceMissionDesign.dStateSC_W, ...
+                                           objReferenceMissionDesign.dDCM_TBfromW, ...
+                                           objReferenceMissionDesign.dTargetPosition_W, ...
+                                           objReferenceMissionDesign.dSunPosition_W, ...
+                                           objReferenceMissionDesign.dEarthPosition_W, ...
+                                           'dPrimaryPointingWhileMan_W',  objReferenceMissionDesign.dPrimaryPointingWhileMan_W, ...
+                                           'dSecondPointingWhileMan_W',   objReferenceMissionDesign.dSecondPointingWhileMan_W, ...
+                                           'dManoeuvresTimegrids',        objReferenceMissionDesign.dManoeuvresTimegrids, ...
+                                           'dManoeuvresStartTimestamps',  objReferenceMissionDesign.dManoeuvresStartTimestamps, ...
+                                           'dManoeuvresDeltaV_SC',        objReferenceMissionDesign.dManoeuvresDeltaV_SC, ...
+                                           'dRelativeTimestamps',         objReferenceMissionDesign.dRelativeTimestamps, ...
+                                           'dDCM_SCfromW',                objReferenceMissionDesign.dDCM_SCfromW ...
+                                           );
         end
     end
 
@@ -171,4 +201,3 @@ classdef SReferenceImagesDataset < SReferenceMissionDesign % TODO the name of th
 
     end
 end
-

@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<addOn>
+  <identifier>f971f257-019c-46da-a929-1bb009ea1f61</identifier>
+  <displayType>Collection</displayType>
+  <translatedDisplayType>
+    <en_US>Collection</en_US>
+    <ja_JP>コレクション</ja_JP>
+    <ko_KR>컬렉션</ko_KR>
+    <zh_CN>集合</zh_CN>
+  </translatedDisplayType>
+  <name>yaml</name>
+  <author>Martin Koch</author>
+  <version>1.5.6</version>
+  <downloadUrl>https://www.mathworks.com/matlabcentral/mlc-downloads/downloads/f971f257-019c-46da-a929-1bb009ea1f61/dfb0eedf-849a-4383-9ba7-96cdf1d612ec/packages/zip?src=addons_ml_desktop_install&amp;profile_id=16532837&amp;license=924786&amp;release_family=R2023b</downloadUrl>
+  <licenseUrl>https://addons.mathworks.com/registry/v1/f971f257-019c-46da-a929-1bb009ea1f61/1.5.6.0/-/license</licenseUrl>
+  <previewImageUrl>https://www.mathworks.com/responsive_image/160/120/0/0/0/cache/matlabcentral/images/default_screenshot.jpg</previewImageUrl>
+  <releaseNotesUrl>https://www.mathworks.com/add-ons/f971f257-019c-46da-a929-1bb009ea1f61/dfb0eedf-849a-4383-9ba7-96cdf1d612ec/releaseNotes</releaseNotesUrl>
+  <installationFolder>Collections</installationFolder>
+</addOn>

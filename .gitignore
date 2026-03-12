@@ -1,3 +1,10 @@
+/*build*/
+/*debug*/
+/*install*/
+
+VERSION
+**/*bak*
+.gitmodules
 CMakeLists.txt.user
 CMakeCache.txt
 CMakeFiles
@@ -13,8 +20,6 @@ CMakeUserPresets.json
 
 *.asv
 *.png
-**/*.mex*
-debug*/
 .idea
 *.pyc
 *.DS_Store
@@ -26,6 +31,7 @@ debug*/
 *.txt.user.6d59f0c
 *.pydevproject
 #.vscode
+lib/Catch2
 .env
 /.vs/
 /CMakeSettings.json
@@ -34,6 +40,3 @@ CMakeLists.txt.user*
 xcode/
 /Dockerfile
 /python/gtsam/notebooks/.ipynb_checkpoints/ellipses-checkpoint.ipynb
-
-**/codegen
-tmp_pathdef_backup.m

@@ -20,9 +20,7 @@ classdef CScenarioGenerator < CGeneralPropagator
     %% DEPENDENCIES
     % [-]
     % -------------------------------------------------------------------------------------------------------------
-    %% Future upgrades
-    % [-]
-    % -------------------------------------------------------------------------------------------------------------
+
 
     properties (SetAccess = protected, GetAccess = public)
         
@@ -54,21 +52,21 @@ classdef CScenarioGenerator < CGeneralPropagator
                                             kwargs, ...
                                             settings)
             arguments
-                dPosVelState0     (6,:) double {ismatrix, isnumeric} = zeros(6,1)
-                dRelativeTimegrid (1,:) double {isvector, isnumeric} = 0.0
-                strDynParams      (1,1) struct {isstruct} = struct();
+                dPosVelState0     (6,:) double {mustBeNumeric} = zeros(6,1)
+                dRelativeTimegrid (1,:) double {mustBeNumeric} = 0.0
+                strDynParams      (1,1) struct  = struct();
             end
             arguments
                 kwargs.enumWorldFrameName (1,:) {mustBeA(kwargs.enumWorldFrameName, "SEnumFrameName")} = EnumFrameName.J2000
-                kwargs.dEphemerisTimegrid (1,:) double {isvector, isnumeric} = 0.0
+                kwargs.dEphemerisTimegrid (1,:) double {mustBeNumeric} = 0.0
                 kwargs.objOrbitDynamicFcnHandle = [] % Assign if not empty
             end
             arguments
                 % To select between Chbv polynomials and SPICE
                 settings.enumGenerationMode         (1,:) string {mustBeMember(settings.enumGenerationMode, ["OrbitDyn", "OrbitPointing", ""])} = "OrbitPointing"
                 settings.enumEphemerisMode          (1,:) string {mustBeMember(settings.enumEphemerisMode, ["SPICE", "interpolants"])} = "interpolants"
-                settings.bEnablePlots               (1,1) logical {islogical, isscalar} = false % TODO
-                settings.bProvideAccelerationData   (1,1) logical {islogical, isscalar} = false 
+                settings.bEnablePlots               (1,1) logical = false % TODO
+                settings.bProvideAccelerationData   (1,1) logical = false 
             end
 
             if nargin > 1
@@ -269,29 +267,22 @@ classdef CScenarioGenerator < CGeneralPropagator
                                                                                                 settings)
             arguments
                 enumScenarioName EnumScenarioName {mustBeA(enumScenarioName, ["EnumScenarioName", "string", "char"])}
-                strDynParams (1,1) = struct()
+                strDynParams (1,1) struct = struct()
             end
             arguments
                 % TODO load from file if specified
                 kwargs.charSpherHarmCoeffInputFileName (1,:) string {mustBeA(kwargs.charSpherHarmCoeffInputFileName, ["string", "char"])} = ""
-                kwargs.bUseKilometersScale             (1,1) logical {isscalar, islogical} = false;
+                kwargs.bUseKilometersScale             (1,1) logical = false;
             end
             arguments
-                settings.bAddNonSphericalGravityCoeffs (1,1) logical {islogical, isscalar} = false;
+                settings.bAddNonSphericalGravityCoeffs (1,1) logical = false;
             end
             %% INPUT
-            % arguments
-            %     enumScenarioName EnumScenarioName {mustBeA(enumScenarioName, ["EnumScenarioName", "string", "char"])}
-            %     strDynParams (1,1) = struct()
-            % end
-            % arguments
-            %     % TODO load from file if specified
-            %     kwargs.charSpherHarmCoeffInputFileName (1,:) string {mustBeA(kwargs.charSpherHarmCoeffInputFileName, ["string", "char"])} = ""
-            %     kwargs.bUseKilometersScale             (1,1) logical {isscalar, islogical} = false;
-            % end
-            % arguments
-            %     settings.bAddNonSphericalGravityCoeffs (1,1) logical {islogical, isscalar} = false;
-            % end
+            % enumScenarioName EnumScenarioName {mustBeA(enumScenarioName, ["EnumScenarioName", "string", "char"])}
+            % strDynParams (1,1) struct = struct()
+            % kwargs.charSpherHarmCoeffInputFileName (1,:) string {mustBeA(kwargs.charSpherHarmCoeffInputFileName, ["string", "char"])} = ""
+            % kwargs.bUseKilometersScale             (1,1) logical = false;
+            % settings.bAddNonSphericalGravityCoeffs (1,1) logical = false;
             % -------------------------------------------------------------------------------------------------------------
             %% OUTPUT
             % charTargetName
@@ -382,7 +373,7 @@ classdef CScenarioGenerator < CGeneralPropagator
                     charTargetName = 'MOON';
                     charTargetFixedFrame = 'IAU_MOON'; 
                     dTargetReferenceRadius  = dLengthUnitsScale * 1737.4E+03; % [m] ACHTUNG: Value used for Gravity SH expansion!
-                    dTargetGravityParameter = (dLengthUnitsScale)^3 * 4.9048695E+12; % [m^3/s^2]
+                    dTargetGravityParameter = (dLengthUnitsScale)^3 * 4.9028695E+12; % [m^3/s^2]
                 
                 otherwise
                     error('Invalid scenario name. See EnumScenarioName enum class for supported ones.')
@@ -526,22 +517,22 @@ classdef CScenarioGenerator < CGeneralPropagator
                 % Reference definition
                 objCamera                    (1,1)      {mustBeA(objCamera, ["CCameraIntrinsics", "cameraIntrinsics", "CProjectiveCamera"])} = CCameraIntrinsics();
                 enumWorldFrame               (1,1)      {mustBeA(enumWorldFrame, ["SEnumFrameName", "string", "char"])} = EnumFrameName.IN  % Enumeration class indicating the W frame to which the data are attached
-                dTimestamps                  (1,:)      double {isnumeric, isvector} = [];
-                dStateSC_W                   (6, :)     double {isnumeric, ismatrix} = [];
-                dDCM_SCfromW                 (3, 3, :)  double {isnumeric, ismatrix} = [];
-                dDCM_TBfromW                 (3, 3, :)  {isnumeric, ismatrix} = [];
-                dTargetPosition_W            (3,:)      {isnumeric, ismatrix} = [];
-                dSunPosition_W               (3,:)      {isnumeric, ismatrix} = [];
-                dEarthPosition_W             (3,:)      {isnumeric, ismatrix} = [];
-                dRelativeTimestamps          (1,:)      {isnumeric, isvector} = [];
+                dTimestamps                  (1,:)      double {mustBeNumeric} = [];
+                dStateSC_W                   (6,:)      double {mustBeNumeric} = [];
+                dDCM_SCfromW                 (3,3,:)    double {mustBeNumeric} = [];
+                dDCM_TBfromW                 (3,3,:)    {mustBeNumeric} = [];
+                dTargetPosition_W            (3,:)      {mustBeNumeric} = [];
+                dSunPosition_W               (3,:)      {mustBeNumeric} = [];
+                dEarthPosition_W             (3,:)      {mustBeNumeric} = [];
+                dRelativeTimestamps          (1,:)      {mustBeNumeric} = [];
             end
             arguments
                 optional.strAccelInfoData = []
-                optional.dPrimaryPointingWhileMan_W   (3, :, :)  double {isnumeric, ismatrix} = [] % TBC, primary pointing axis during manoeuvres
-                optional.dSecondPointingWhileMan_W    (3, :, :)  double {isnumeric, ismatrix} = [] % TBC, secondary axis during manoeuvres
-                optional.dManoeuvresTimegrids         (3, :)     double {isnumeric, ismatrix} = [];
-                optional.dManoeuvresStartTimestamps   (1, :)     double {isnumeric, isvector} = [];
-                optional.dManoeuvresDeltaV_SC         (3, :)     double {isnumeric, ismatrix} = [];
+                optional.dPrimaryPointingWhileMan_W   (3,:,:)  double {mustBeNumeric} = [] % TBC, primary pointing axis during manoeuvres
+                optional.dSecondPointingWhileMan_W    (3,:,:)  double {mustBeNumeric} = [] % TBC, secondary axis during manoeuvres
+                optional.dManoeuvresTimegrids         (3,:)    double {mustBeNumeric} = [];
+                optional.dManoeuvresStartTimestamps   (1,:)    double {mustBeNumeric} = [];
+                optional.dManoeuvresDeltaV_SC         (3,:)    double {mustBeNumeric} = [];
             end
 
             % Determine relative timegrid if not provided

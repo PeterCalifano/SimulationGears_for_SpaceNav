@@ -29,19 +29,22 @@ classdef SPose3 < CBaseDatastruct
             self.dPosition_Frame            = dPosition_Frame;
             self.dDCM_FrameFromPoseFrame    = dDCM_FrameFromPoseFrame;
 
-            if nargin > 0
+            bPositionIsDefault_ = all(abs(self.dPosition_Frame) <= eps("double"), "all");
+            bAttitudeIsDefault_ = all(abs(self.dDCM_FrameFromPoseFrame - eye(3,3)) <= eps("double"), "all");
+            if nargin > 0 && ~(bPositionIsDefault_ && bAttitudeIsDefault_)
                 self.bDefaultConstructed = false;
             end
         end
 
-        function self = changeReferenceFrame(self, dDCM_NewFrameFromFrame)
+        function self_copy = changeReferenceFrame(self, dDCM_NewFrameFromFrame)
             arguments
                 self
-                dDCM_NewFrameFromFrame (3,3) {ismatrix, isnumeric}
+                dDCM_NewFrameFromFrame (3,3) double {mustBeNumeric}
             end
 
-            self.dPosition_Frame         = dDCM_NewFrameFromFrame * self.dPosition_Frame;
-            self.dDCM_FrameFromPoseFrame = dDCM_NewFrameFromFrame * self.dDCM_FrameFromPoseFrame;
+            self_copy = self;
+            self_copy.dPosition_Frame         = dDCM_NewFrameFromFrame * self_copy.dPosition_Frame;
+            self_copy.dDCM_FrameFromPoseFrame = dDCM_NewFrameFromFrame * self_copy.dDCM_FrameFromPoseFrame;
         end
 
         function [objNewPose] = composeRightSide(self, objOtherPose3)
@@ -69,4 +72,3 @@ classdef SPose3 < CBaseDatastruct
         
     end
 end
-

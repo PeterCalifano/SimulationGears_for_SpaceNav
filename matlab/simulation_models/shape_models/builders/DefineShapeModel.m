@@ -5,14 +5,18 @@ function [objShapeModel, strBpyCommManagerPaths] = DefineShapeModel(enumTargetNa
 arguments
     enumTargetName      (1,:) {mustBeA(enumTargetName, ["string", "char", "EnumScenarioName"]), ...
         mustBeMember(enumTargetName, ["Apophis", "Itokawa", "Bennu", "Moon", "Mars", "Ceres", "Dydimos", "Eros", "NotDefined"])}
-    charDataRootPath    (1,:) string = fullfile(getenv("HOME"), "devDir/nav-backend/simulationCodes/data/SPICE_kernels")
-    charBpyRootPath     (1,:) string = fullfile(getenv("HOME"), "devDir/rendering-sw/corto_PeterCdev")
+    charDataRootPath    (1,:) string = fullfile(getenv("WS_NAVSYS"), "nav-backend/data/SPICE_kernels")
+    charBpyRootPath     (1,:) string = fullfile(getenv("WS_NAVSYS"), "rendering-sw/corto_PeterCdev")
 end
 arguments
-    options.bVertFacesOnly          (1,1) {islogical} = true;
-    options.bLoadShapeModel         (1,1) {islogical} = true;
-    options.charOutputLengthUnits   (1,:) char {mustBeMember(options.charOutputLengthUnits, ["km", "m"])} = "m"
-    options.bLoadModifiedVariant    (1,1) logical = false;
+    options.bVertFacesOnly              (1,1) logical = true;
+    options.bLoadShapeModel             (1,1) logical = true;
+    options.charOutputLengthUnits       (1,:) char {mustBeMember(options.charOutputLengthUnits, ["km", "m"])} = "m"
+    options.bLoadModifiedVariant        (1,1) logical = false;
+    options.charBlenderModelPath        (1,:) string {mustBeText} = ""
+    options.charShapeModelObjPath       (1,:) string {mustBeText} = ""
+    options.dObjectReferenceSizeInKm    (1,1) double = -1.0
+    options.dTargetShapeMatrix_OF       (3,3) double = zeros(3,3);
 end
 %% SIGNATURE
 % [objShapeModel, strBpyCommManagerPaths] = DefineShapeModel(enumTargetName, charDataRootPath, options)
@@ -27,8 +31,8 @@ end
 %                                          mustBeMember(enumTargetName, ["Apophis", "Itokawa", "Bennu", "Moon"])}
 % charDataRootPath                  (1,:) string = fullfile(getenv("HOME"), "devDir/nav-backend/simulationCodes/data/SPICE_kernels")
 % charBpyRootPath                   (1,:) string = fullfile(getenv("HOME"), "devDir/rendering-sw/corto_PeterCdev")
-% options.bVertFacesOnly            (1,1) {islogical} = true;
-% options.bLoadShapeModel           (1,1) {islogical} = true;
+% options.bVertFacesOnly            (1,1) logical= true;
+% options.bLoadShapeModel           (1,1) logical= true;
 % options.charOutputLengthUnits     (1,:) char {mustBeMember(options.charOutputLengthUnits, ["km", "m"])} = "m"
 % -------------------------------------------------------------------------------------------------------------
 %% OUTPUT
@@ -40,12 +44,10 @@ end
 % 03-05-2025    Pietro Califano     Minor revision, add Moon setup
 % 25-08-2025    Pietro Califano     Extend function to work with km and meters based on input options
 % 31-08-2025    Pietro Califano     Define ellipsoidal model for all available bodies
+% 27-01-2026    Pietro Califano     Improve overriding options management for paths, minor fixes
 % -------------------------------------------------------------------------------------------------------------
 %% DEPENDENCIES
 % [-]
-% -------------------------------------------------------------------------------------------------------------
-%% Future upgrades
-% TODO: remove hardcoded path (add as input root of all data!)
 % -------------------------------------------------------------------------------------------------------------
 
 %% Function code
@@ -53,11 +55,13 @@ end
 % Assert path existent
 assert(isfolder(charDataRootPath), sprintf("ERROR: input data path %s not found", charDataRootPath));
 
-[~, charUsrName] = system("whoami"); % Get user
-assert(contains(charUsrName, "peter") || contains(string(charUsrName(1:end-1)), "peterc-flip\pietr"), ...
-    'ERROR: current implementation is only valid for peterc machines due to hardcoded paths.')
+% [~, charUsrName] = system("whoami"); % Get user
+% assert(contains(charUsrName, "peter") || contains(string(charUsrName(1:end-1)), "peterc-flip\pietr"), ...
+%     'ERROR: current implementation is only valid for peterc machines due to hardcoded paths.')
 
-charCallDir = pwd;
+charCallDir             = pwd;
+charBlenderModelPath    = "";
+charShapeModelObjPath_  = "";
 
 if strcmpi(options.charOutputLengthUnits, "km")
     dLengthScaleCoeff       = 1.0;
@@ -71,60 +75,77 @@ end
 switch enumTargetName
     case "Apophis"
         % DEVNOTE: currently assumes rcs-1 simulator loader
-        bDO_NOT_INIT_RCS1_ENV = true; %#ok<NASGU>
-        LoadUserConfig;
-        % charBlenderModelPath = fullfile(getenv("HOME"), "devDir/projects-DART/data/rcs-1/phase-C/blender/ApophisParticles.blend");
-        % charBlenderModelPath = fullfile(getenv("HOME"), "devDir/projects-DART/data/rcs-1/phase-C/blender/Apophis_RGB_Centered_Elongated_500m.blend");
+        charPathToShapeModels = fullfile(getenv("HOME"), "devDir/projects-DART/data/rcs-1/phase-C/shape_models/");
 
         % Define shape model object
         if not(options.bLoadModifiedVariant)
-            charBlenderModelPath   = fullfile(getenv("HOME"), "devDir/projects-DART/data/rcs-1/phase-C/blender/Apophis_RGB_smoothed.blend");
-            charShapeModelObjPath_ = fullfile(path_to_shape_models, "apophis_v233s7_vert2_new.mod.obj");
+            % charBlenderModelPath   = fullfile(getenv("HOME"), "devDir/projects-DART/data/rcs-1/phase-C/blender/Apophis_RGB_smoothed.blend");
+            % charShapeModelObjPath_ = fullfile(path_to_shape_models, "apophis_v233s7_vert2_new.mod.obj");
+            charBlenderModelPath   = fullfile(getenv("HOME"), "devDir/projects-DART/data/rcs-1/phase-C/blender/Apophis_RGB_Centered_MeanSize.blend");
+            % charShapeModelObjPath_ = fullfile(path_to_shape_models, "Apophis_RGB_Centered_MeanSize.obj");
+            charShapeModelObjPath_ = fullfile(charPathToShapeModels, "Apophis_RGB_Centered_MeanSize_NoTexture.obj");
+            dObjectReferenceSize_  = dLengthScaleCoeff * 0.16011;
         else
             charBlenderModelPath   = fullfile(getenv("HOME"), "devDir/projects-DART/data/rcs-1/phase-C/blender/Apophis_RGB_Centered_Elongated_550m.blend");
-            charShapeModelObjPath_ = fullfile(path_to_shape_models, "Apophis_RGB_Centered_Elongated_550m.obj");
+            charShapeModelObjPath_ = fullfile(charPathToShapeModels, "Apophis_RGB_Centered_Elongated_550m.obj");
+            dObjectReferenceSize_  = dLengthScaleCoeff * 0.175930344;
         end
+
+
+        % Override paths to model, shape and reference size if provided
+        charBlenderModelPath   = OverrideFilePathIfProvided(charBlenderModelPath, options.charBlenderModelPath);
+        charShapeModelObjPath_ = OverrideFilePathIfProvided(charShapeModelObjPath_, options.charShapeModelObjPath);
 
         objShapeModel = CShapeModel('file_obj', charShapeModelObjPath_, ...
             'km', options.charOutputLengthUnits, options.bVertFacesOnly, char(enumTargetName), options.bLoadShapeModel);
+        % objShapeModel.charModelName = "Apophis";
 
         try
             ui32ID = 20099942;
             objShapeModel.dObjectReferenceSize  = dLengthScaleCoeff * mean(cspice_bodvrd(num2str(ui32ID),'RADII',3)); % [m] ACHTUNG: Value used for Gravity SH expansion!
         catch
             warning('Fetch of Apophis data from kernels failed. Fallback to hardcoded data...')
-            objShapeModel.dObjectReferenceSize  = dLengthScaleCoeff * 0.175930344; % [m] ACHTUNG: Value used for Gravity SH expansion!
+            objShapeModel.dObjectReferenceSize  = dObjectReferenceSize_; 
         end
         
         objShapeModel.charTargetUnitOutput = options.charOutputLengthUnits;
 
         dEllipsoidABC = dLengthScaleCoeff * [0.19884391053956174, 0.15921442216621817, 0.14822745272788257]; % [m] or [km]
         % DEVNOTE: From Paolo's fitting + conversion from Inertia Tensor with unitary density to semi-axes
-        objShapeModel.dTargetShapeMatrix_OF = diag([1/dEllipsoidABC(1)^2, 1/dEllipsoidABC(2)^2, 1/dEllipsoidABC(3)^2]); % Ellipsoid inverse shape matrix entries [1/a2, 1/b2, 1/c2];
+        objShapeModel.dTargetShapeMatrix_OF = diag([1/dEllipsoidABC(1)^2, 1/dEllipsoidABC(2)^2, 1/dEllipsoidABC(3)^2]); % Ellipsoid inverse shape matrix entries [1/a2, 1/b2, 1/c2];        
 
     case "Itokawa"
 
         % Define blender model path
         if not(options.bLoadModifiedVariant)
 
-            charBlenderModelPath                = fullfile(charBpyRootPath, "data/scenarios/S2_Itokawa/S2_Itokawa.blend");
+            charBlenderModelPath = fullfile(charBpyRootPath, "data/scenarios/S2_Itokawa/S2_Itokawa.blend");
+            charBlenderModelPath = OverrideFilePathIfProvided(charBlenderModelPath, options.charBlenderModelPath);
 
             % Define shape model object
             charKernelname = fullfile(charDataRootPath, 'Itokawa/dsk/hay_a_amica_5_itokawashape_v1_0_64q.bds');
 
             objShapeModel = CShapeModel('cspice', charKernelname, 'km', options.charOutputLengthUnits, ...
-                options.bVertFacesOnly, char(enumTargetName));
+                                options.bVertFacesOnly, char(enumTargetName));
+
         else
             % Variant model
-            charBlenderModelPath                = fullfile(charBpyRootPath, "data/scenarios/S2_Itokawa/S2_Itokawa_modified.blend");
+            charBlenderModelPath   = fullfile(charBpyRootPath, "data/scenarios/S2_Itokawa/S2_Itokawa_modified.blend");
+            charShapeModelObjPath_ = fullfile(charBpyRootPath, "data/scenarios/S2_Itokawa/S2_Itokawa_modified.obj");
+
+            % Override paths to model, shape and reference size if provided
+            charBlenderModelPath   = OverrideFilePathIfProvided(charBlenderModelPath, options.charBlenderModelPath);
+            charShapeModelObjPath_ = OverrideFilePathIfProvided(charShapeModelObjPath_, options.charShapeModelObjPath);
 
             % Define shape model object
-            objShapeModel = CShapeModel('file_obj', fullfile(charBpyRootPath, "data/scenarios/S2_Itokawa/S2_Itokawa_modified.obj"), ...
+            objShapeModel = CShapeModel('file_obj', charShapeModelObjPath_, ...
                                          'km', ...
                                          options.charOutputLengthUnits, ...
                                          options.bVertFacesOnly, ...
                                          char(enumTargetName), ...
                                          false);
+
+            % objShapeModel.charModelName = "Itokawa";
         end
 
 
@@ -137,7 +158,11 @@ switch enumTargetName
     case "Bennu"
 
         % Define blender model path
-        charBlenderModelPath                = fullfile(charBpyRootPath, "data/scenarios/S4_Bennu/S4_Bennu.blend");
+        charBlenderModelPath = fullfile(charBpyRootPath, "data/scenarios/S4_Bennu/S4_Bennu.blend");
+        % charShapeModelObjPath_ = fullfile(charBpyRootPath, "data/scenarios/S2_Itokawa/S2_Itokawa_modified.obj");
+
+        % Override paths to model, shape and reference size if provided
+        charBlenderModelPath = OverrideFilePathIfProvided(charBlenderModelPath, options.charBlenderModelPath);
 
         % Define shape model object
         % charKernelname = fullfile(charDataRootPath, 'Bennu_OREx/dsk/bennu_l_00050mm_alt_ptm_5595n04217_v021.bds'); %  Too large!
@@ -148,23 +173,28 @@ switch enumTargetName
                         options.bVertFacesOnly, char(enumTargetName), options.bLoadShapeModel);
 
         % Assign reference radius
-        objShapeModel.dObjectReferenceSize = 245.03 / dInvLengthScaleCoeff; % [m]
+        objShapeModel.dObjectReferenceSize = dLengthScaleCoeff * 1E-3 * 245.03 ; % [m]
         objShapeModel.charTargetUnitOutput = options.charOutputLengthUnits;
 
         % Define shape matrix in principal TF
-        dEllipsoidABC = dLengthScaleCoeff * 1E-3 * [3395428, 3395428, 3377678]; % [m] or [km]
+        dEllipsoidABC = dLengthScaleCoeff * [0.25278, 0.24620, 0.22869]; % [m] or [km]
         objShapeModel.dTargetShapeMatrix_OF = diag([1/dEllipsoidABC(1)^2, 1/dEllipsoidABC(2)^2, 1/dEllipsoidABC(3)^2]);
+        % objShapeModel.charModelName = "Bennu";
 
 
     case "Moon"
 
         % Define blender model path
-        charBlenderModelPath                = fullfile(charBpyRootPath, "data/scenarios/S6_Moon/S6_Moon.blend");
+        charBlenderModelPath   = fullfile(charBpyRootPath, "data/scenarios/S6_Moon/S6_Moon.blend");
 
         % Define shape model object
-        charObjModelFilePath = fullfile(charBpyRootPath, "data/scenarios/S6_Moon/Moon.obj");
+        charShapeModelObjPath_ = fullfile(charBpyRootPath, "data/scenarios/S6_Moon/Moon.obj");
 
-        objShapeModel = CShapeModel('file_obj', charObjModelFilePath, 'km', options.charOutputLengthUnits, ...
+        % Override paths to model, shape and reference size if provided
+        charBlenderModelPath    = OverrideFilePathIfProvided(charBlenderModelPath, options.charBlenderModelPath);
+        charShapeModelObjPath_  = OverrideFilePathIfProvided(charShapeModelObjPath_, options.charShapeModelObjPath);
+
+        objShapeModel = CShapeModel('file_obj', charShapeModelObjPath_, 'km', options.charOutputLengthUnits, ...
                                 options.bVertFacesOnly, char(enumTargetName), options.bLoadShapeModel);
 
         objShapeModel.dObjectReferenceSize = dLengthScaleCoeff * 1737.42; % [m] or [km]
@@ -173,12 +203,14 @@ switch enumTargetName
         % Define shape matrix in principal TF
         dEllipsoidABC = objShapeModel.dObjectReferenceSize * ones(1,3); % [m] or [km]
         objShapeModel.dTargetShapeMatrix_OF = diag([1/dEllipsoidABC(1)^2, 1/dEllipsoidABC(2)^2, 1/dEllipsoidABC(3)^2]);
+        % objShapeModel.charModelName = ;
 
     case "Mars"
 
-        charObjModelFilePath = ""; % None for now
+        charShapeModelObjPath_ = ""; % None for now
+        charShapeModelObjPath_ = OverrideFilePathIfProvided(charShapeModelObjPath_, options.charShapeModelObjPath);
 
-        objShapeModel = CShapeModel('file_obj', charObjModelFilePath, 'km', options.charOutputLengthUnits, ...
+        objShapeModel = CShapeModel('file_obj', charShapeModelObjPath_, 'km', options.charOutputLengthUnits, ...
                             options.bVertFacesOnly, char(enumTargetName), options.bLoadShapeModel);
 
         objShapeModel.dObjectReferenceSize = dLengthScaleCoeff * 3386.2; % [m] or [km]
@@ -187,12 +219,13 @@ switch enumTargetName
         % Define shape matrix in principal TF
         dEllipsoidABC = dLengthScaleCoeff * 1E-3 * [3395428, 3395428, 3377678]; % [m] or [km]
         objShapeModel.dTargetShapeMatrix_OF = diag([1/dEllipsoidABC(1)^2, 1/dEllipsoidABC(2)^2, 1/dEllipsoidABC(3)^2]);
-
+        % objShapeModel.charModelName = "Mars";
         
     case "Ceres" 
-        charObjModelFilePath = ""; % None for now
-
-        objShapeModel = CShapeModel('file_obj', charObjModelFilePath, 'km', options.charOutputLengthUnits, ...
+        charShapeModelObjPath_ = ""; % None for now
+        charShapeModelObjPath_ = OverrideFilePathIfProvided(charShapeModelObjPath_, options.charShapeModelObjPath);
+        
+        objShapeModel = CShapeModel('file_obj', charShapeModelObjPath_, 'km', options.charOutputLengthUnits, ...
                                 options.bVertFacesOnly, char(enumTargetName), options.bLoadShapeModel);
 
         objShapeModel.dObjectReferenceSize = dLengthScaleCoeff * 939.0/2; % [m] or [km]
@@ -201,6 +234,7 @@ switch enumTargetName
         % Define shape matrix in principal TF
         dEllipsoidABC = dLengthScaleCoeff * 1E-3 * [483.1, 481.0, 445.9]; % [m] or [km]
         objShapeModel.dTargetShapeMatrix_OF = diag([1/dEllipsoidABC(1)^2, 1/dEllipsoidABC(2)^2, 1/dEllipsoidABC(3)^2]);
+        % objShapeModel.charModelName = "Ceres";
 
     case "Dydimos"
         error('Not implemented yet')
@@ -227,6 +261,16 @@ switch enumTargetName
         end
 end
 
+% Override shape and reference size if provided
+if options.dObjectReferenceSizeInKm > 0.0
+    objShapeModel.dObjectReferenceSize = dLengthScaleCoeff * options.dObjectReferenceSizeInKm;
+end
+
+if any(options.dTargetShapeMatrix_OF > 0, 'all')
+    objShapeModel.dTargetShapeMatrix_OF = options.dTargetShapeMatrix_OF;
+end
+
+% Set paths to scripts
 charBlenderPyInterfacePath          = fullfile(charBpyRootPath, "server_api/BlenderPy_UDP_TCP_interface_withCaching.py" );
 charStartBlenderServerScriptPath    = fullfile(charBpyRootPath, "server_api/StartBlenderServer.sh");
 
@@ -241,3 +285,10 @@ cd(charCallDir);
 assert(objShapeModel.bHasData_ || options.bLoadShapeModel == false, 'ERROR: loading of mesh model has failed. Check input path first; report issue if it persists.')
 end
 
+%%% Local helper function
+function charPath = OverrideFilePathIfProvided(charPath, charOverridePath)
+if strlength(charOverridePath) > 0
+    mustBeFile(charOverridePath);
+    charPath = charOverridePath;
+end
+end

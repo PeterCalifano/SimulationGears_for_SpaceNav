@@ -1,14 +1,14 @@
-function o_dSHEaccTB = ExtSHE_AccTB(i_dRSC_TB, ...
-    i_ui32MaxDegree, ...
-    i_dCSlmCoeffCols, ...
-    i_dMu, ...
-    i_dBodyRref) %#codegen
+function o_dSHEaccTB = ExtSHE_AccTB(dRSC_TB, ...
+                                    ui32MaxDegree, ...
+                                    dCSlmCoeffCols, ...
+                                    dMu, ...
+                                    dBodyRref) %#codegen
 arguments
-    i_dRSC_TB        (3,1) double {isvector}
-    i_ui32MaxDegree  (1,1) uint32 {isscalar}
-    i_dCSlmCoeffCols (:,:) double {ismatrix}
-    i_dMu            (1,1) double {isscalar}
-    i_dBodyRref      (1,1) double {isscalar}
+    dRSC_TB        (3,1) double
+    ui32MaxDegree  (1,1) uint32
+    dCSlmCoeffCols (:,:) double
+    dMu            (1,1) double
+    dBodyRref      (1,1) double
 end
 %% PROTOTYPE
 % o_dSHEaccTB = ExtSHE_AccTB(i_dRSC_TB, i_ui8MaxDegree, i_dCSlmCoeffCols,
@@ -49,24 +49,22 @@ end
 %% DEPENDENCIES
 % No external function.
 % -------------------------------------------------------------------------------------------------------------
-%% Future upgrades
-% [-]
-% -------------------------------------------------------------------------------------------------------------
 
-%% Unpack inputs
-rSC = sqrt(i_dRSC_TB(1)^2 + i_dRSC_TB(2)^2 + i_dRSC_TB(3)^2);
-RSC_unitVec = i_dRSC_TB./rSC;
+%% Function code
+% Unpack inputs
+rSC = sqrt(dRSC_TB(1)^2 + dRSC_TB(2)^2 + dRSC_TB(3)^2);
+RSC_unitVec = dRSC_TB./rSC;
 
 % Compute SCLat and SCLong in Target body fixed frame given position vector
 SCLat = asin(RSC_unitVec(3)); 
 SCLong = atan2(RSC_unitVec(2), RSC_unitVec(1));
 
 % Compute Gradient of Gravitational potential wrt Spherical Coords.
-GradU = ExtSHE_GradU(rSC, SCLat, SCLong, i_ui32MaxDegree,...
-    i_dCSlmCoeffCols, i_dMu, i_dBodyRref);
+GradU = ExtSHE_GradU(rSC, SCLat, SCLong, ui32MaxDegree,...
+    dCSlmCoeffCols, dMu, dBodyRref);
 
 % Compute derivative of Spherical Coords wrt Position vector
-dSphdRSC = ComputedSpherdRSC(i_dRSC_TB, rSC);
+dSphdRSC = ComputedSpherdRSC(dRSC_TB, rSC);
 
 % Assign derivative values
 % drdRSC = dSphdRSC(:, 1);
