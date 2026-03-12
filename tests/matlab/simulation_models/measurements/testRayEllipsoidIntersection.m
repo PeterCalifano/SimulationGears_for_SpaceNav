@@ -1,0 +1,288 @@
+function tests = testRayEllipsoidIntersection
+% Unit tests for RayEllipsoidIntersection covering sphere/ellipsoid cases,
+% misses, tangency, rotations, and jacobian consistency.
+tests = functiontests(localfunctions);
+end
+
+function setupOnce(~)
+charRepoRoot = fileparts(fileparts(fileparts(fileparts(mfilename('fullpath')))));
+addpath(charRepoRoot);
+addpath(fullfile(charRepoRoot, "..", ".."))
+SetupPaths_EstimationGears;
+end
+
+function testSphereFromOutside(testCase)
+
+dOrigin = [0; 0; 3];
+dDirection = [0; 0; -1];
+
+dCentre = zeros(3,1);
+dInvDiag = ones(3,1); % Radius = 1
+
+[bHit, dIntersectDist, bFailure, dIntersectPoint] = RayEllipsoidIntersection(dOrigin, dDirection, dCentre, dInvDiag);
+
+testCase.verifyTrue(bHit);
+testCase.verifyFalse(bFailure);
+testCase.verifyEqual(dIntersectDist, 2, 'AbsTol', 1e-12);
+testCase.verifyEqual(dIntersectPoint, [0; 0; 1], 'AbsTol', 1e-12);
+
+end
+
+function testSphereFromInside(testCase)
+
+dOrigin = [0; 0; 0];
+dDirection = [1; 0; 0];
+dCentre = zeros(3,1);
+dInvDiag = ones(3,1);
+
+[bHit, dIntersectDist, bFailure] = RayEllipsoidIntersection(dOrigin, dDirection, dCentre, dInvDiag);
+
+testCase.verifyTrue(bHit);
+testCase.verifyFalse(bFailure);
+testCase.verifyEqual(dIntersectDist, 1, 'AbsTol', 1e-12);
+end
+
+function testMissedIntersection(testCase)
+
+dOrigin = [0; 0; 3];
+dDirection = [0; 0; 1]; % Pointing away from sphere
+dCentre = zeros(3,1);
+dInvDiag = ones(3,1);
+
+[bHit, dIntersectDist, bFailure] = RayEllipsoidIntersection(dOrigin, dDirection, dCentre, dInvDiag);
+
+testCase.verifyFalse(bHit);
+testCase.verifyFalse(bFailure);
+testCase.verifyEqual(dIntersectDist, 0, 'AbsTol', 1e-12);
+end
+
+function testTangentialContactSetsFailure(testCase)
+
+dOrigin = [1; 0; 0];
+dDirection = [0; 1; 0]; % Tangent on unit sphere
+dCentre = zeros(3,1);
+dInvDiag = ones(3,1);
+
+[bHit, dIntersectDist, bFailure] = RayEllipsoidIntersection(dOrigin, dDirection, dCentre, dInvDiag);
+
+testCase.verifyFalse(bHit); % Consider tangency as invalid
+testCase.verifyTrue(bFailure); % Tangency -> ill-conditioned jacobians
+testCase.verifyEqual(dIntersectDist, 0, 'AbsTol', 1e-12);
+end
+
+function testRotatedEllipsoidMatchesAnalytic(testCase)
+
+dOrigin = [2; -0.5; 1.2];
+dDirection = NormalizeVec_([-1; 0.1; -0.2]);
+dCentre = [0.3; -0.1; 0.2];
+dInvDiag = [1/9; 1/4; 1/2.25];
+
+dR = RotFromAxis_([0; 0; 1], deg2rad(20)) * RotFromAxis_([0; 1; 0], deg2rad(15));
+
+[bHit, dIntersectDist, bFailure, dIntersecPoint] = RayEllipsoidIntersection(dOrigin, dDirection, dCentre, dInvDiag, dR, dR);
+testCase.verifyTrue(bHit);
+testCase.verifyFalse(bFailure);
+
+dExpectedDist = SolveRayEllipsoidDistance_(dR * dOrigin, dR * dDirection, dR * dCentre, dInvDiag);
+
+testCase.verifyEqual(dIntersectDist, dExpectedDist, 'AbsTol', 1e-10);
+testCase.verifyEqual(dIntersecPoint, dR * (dOrigin + dDirection * dIntersectDist), 'AbsTol', 1e-10);
+end
+
+function testJacobiansAgainstFiniteDiff_Sphere(testCase)
+
+% Build test case
+dOrigin_TB = [4; -1; 0.5];
+dDirection_TB = NormalizeVec_([-1; 0.2; -0.1]);
+dCentre_TB = [0.5; -0.25; 0.2];
+dRtrue_TBfromW = RotFromAxis_([0; 0; 1], deg2rad(25));
+
+dRadius = 2;
+dInvDiag_TB = 1/dRadius^2 * ones(1,3);
+
+% Intersect
+[bHit, dIntersectDist, bFailure, ~, dJacOrigin, dJacAtt] = RayEllipsoidIntersection(dRtrue_TBfromW' * dOrigin_TB, ...
+                                                                                    dRtrue_TBfromW' * dDirection_TB, ...
+                                                                                    dRtrue_TBfromW' * dCentre_TB, ...
+                                                                                    dInvDiag_TB, ...
+                                                                                    eye(3), ...
+                                                                                    eye(3));
+
+% Intersect check (should not change)
+[~, dIntersectDist_check, ~, ~, dJacOrigin_check] = RayEllipsoidIntersection(dRtrue_TBfromW' * dOrigin_TB, ...
+                                                                                            dRtrue_TBfromW' * dDirection_TB, ...
+                                                                                            dRtrue_TBfromW' * dCentre_TB, ...
+                                                                                            dInvDiag_TB, ...
+                                                                                            dRtrue_TBfromW, ...
+                                                                                            dRtrue_TBfromW);
+
+% Assert the two cases are equal (i.e. rotation does not matter)
+testCase.verifyEqual(dIntersectDist, dIntersectDist_check, 'AbsTol', 1e-6);
+testCase.verifyEqual(dJacOrigin, dJacOrigin_check, 'AbsTol', 1e-6);
+
+% Checks
+testCase.verifyTrue(bHit);
+testCase.verifyFalse(bFailure);
+testCase.verifyGreaterThan(dIntersectDist, 0);
+
+dFdmJacOrigin = dFiniteDiff(@(origin) EvalDistanceWithOrigin_(origin, ...
+                                                              dRtrue_TBfromW' * dDirection_TB, ...
+                                                              dRtrue_TBfromW' * dCentre_TB, ...
+                                                              dInvDiag_TB, dRtrue_TBfromW), ...
+                                                              dRtrue_TBfromW' * dOrigin_TB, 1e-6);
+% Check position jacobian
+testCase.verifyEqual(dJacOrigin, dFdmJacOrigin, 'AbsTol', 5e-6);
+end
+
+function testJacobiansAgainstFiniteDiff_EllipseIdentityRot(testCase)
+
+% Build test case
+dOrigin_TB = [4; -1; 0.5];
+dDirection_TB = NormalizeVec_([-1; 0.2; -0.1]);
+dCentre_TB = [0.5; -0.25; 0.2];
+dInvDiag_TB = [1/9; 1/4; 1/1.44];
+
+% Intersect
+[bHit, dIntersectDist, bFailure, ~, dJacOrigin, dJacAtt] = RayEllipsoidIntersection(dOrigin_TB, ...
+                                                                                    dDirection_TB, ...
+                                                                                    dCentre_TB, ...
+                                                                                    dInvDiag_TB, ...
+                                                                                    eye(3), ...
+                                                                                    eye(3));
+
+% Checks
+testCase.verifyTrue(bHit);
+testCase.verifyFalse(bFailure);
+testCase.verifyGreaterThan(dIntersectDist, 0);
+
+dFdmJacOrigin = dFiniteDiff(@(origin) EvalDistanceWithOrigin_(origin, ...
+                                                              dDirection_TB, ...
+                                                              dCentre_TB, ...
+                                                              dInvDiag_TB, ...
+                                                              eye(3)), ...
+                                                              dOrigin_TB, 1e-6);
+
+% Check position jacobian
+testCase.verifyEqual(dJacOrigin, dFdmJacOrigin, 'AbsTol', 5e-6);
+
+% TODO fix jacobian wrt attitude!
+dFdmJacAtt = dFiniteDiff(@(theta) EvalDistanceWithAttErr_(theta, dOrigin_TB, dDirection_TB, dCentre_TB, dInvDiag_TB, eye(3)), zeros(3,1), 1e-6);
+testCase.verifyEqual(dJacAtt, dFdmJacAtt, 'AbsTol', 5e-6);
+
+end
+
+function testJacobiansAgainstFiniteDiff_GeneralCase(testCase)
+
+% Build test case
+dOrigin_TB = [4; -1; 0.5];
+dDirection_TB = NormalizeVec_([-1; 0.2; -0.1]);
+dCentre_TB = [0.5; -0.25; 0.2];
+dRtrue_TBfromW = RotFromAxis_([0; 0; 1], deg2rad(25));
+
+dInvDiag_TB = [1/9; 1/4; 1/1.44];
+
+% Intersect
+[bHit, dIntersectDist, bFailure, ~, dJacOrigin, dJacAtt] = RayEllipsoidIntersection(dRtrue_TBfromW' * dOrigin_TB, ...
+                                                                                    dRtrue_TBfromW' * dDirection_TB, ...
+                                                                                    dRtrue_TBfromW' * dCentre_TB, ...
+                                                                                    dInvDiag_TB, ...
+                                                                                    dRtrue_TBfromW, ...
+                                                                                    dRtrue_TBfromW);
+
+% Checks
+testCase.verifyTrue(bHit);
+testCase.verifyFalse(bFailure);
+testCase.verifyGreaterThan(dIntersectDist, 0);
+
+dFdmJacOrigin = dFiniteDiff(@(origin) EvalDistanceWithOrigin_(origin, ...
+                                                              dRtrue_TBfromW' * dDirection_TB, ...
+                                                              dRtrue_TBfromW' * dCentre_TB, ...
+                                                              dInvDiag_TB, dRtrue_TBfromW), dRtrue_TBfromW' * dOrigin_TB, 1e-6);
+
+% Test jacobian of position
+testCase.verifyEqual(dJacOrigin, dFdmJacOrigin, 'AbsTol', 5e-6);
+
+% TODO fix jacobian wrt attitude!
+dFdmJacAtt = dFiniteDiff(@(theta) EvalDistanceWithAttErr_(theta, dOrigin_TB, dDirection_TB, dCentre_TB, dInvDiag_TB, dRtrue_TBfromW), zeros(3,1), 1e-6);
+testCase.verifyEqual(dJacAtt, dFdmJacAtt, 'AbsTol', 5e-6);
+
+end
+
+%% Helpers
+function dIntersectDist = SolveRayEllipsoidDistance_(dOrigin, dDirection, dCentre, dInvDiag)
+% Regenerated by GPT 5.1 Codex for comparison
+M = diag(dInvDiag);
+o = dOrigin - dCentre;
+a = dDirection' * M * dDirection;
+b = dDirection' * M * o;
+c = o' * M * o - 1;
+delta = b^2 - a * c;
+
+if delta < -eps || abs(a) < eps
+    dIntersectDist = NaN;
+    return
+end
+
+t0 = (-b + sqrt(max(delta, 0))) / a;
+t1 = (-b - sqrt(max(delta, 0))) / a;
+vals = [t0, t1];
+vals = vals(vals >= -sqrt(eps));
+
+if isempty(vals)
+    dIntersectDist = NaN;
+else
+    dIntersectDist = min(vals);
+    if dIntersectDist < 0
+        dIntersectDist = 0;
+    end
+end
+end
+
+function dVec = NormalizeVec_(dVec)
+dVec = dVec / norm(dVec);
+end
+
+function R = RotFromAxis_(axis, angle)
+ax = NormalizeVec_(axis);
+K = [  0,   -ax(3),  ax(2);
+      ax(3),   0,   -ax(1);
+     -ax(2), ax(1),   0  ];
+R = eye(3) + sin(angle) * K + (1 - cos(angle)) * (K * K);
+end
+
+function jac = dFiniteDiff(funHandle, x0, step)
+
+n = numel(x0);
+jac = zeros(1, n);
+
+for idx = 1:n
+    dx = zeros(size(x0));
+    dx(idx) = step;
+    fp = funHandle(x0 + dx);
+    fm = funHandle(x0 - dx);
+    jac(idx) = (fp - fm) / (2 * step);
+end
+end
+
+function dIntersectDist = EvalDistanceWithOrigin_(dOrigin, dDirection, dCentre, dInvDiag, R)
+[bHit, d] = RayEllipsoidIntersection(dOrigin, dDirection, dCentre, dInvDiag, R, R, [false, false]);
+assert(bHit, 'Finite-diff dOrigin perturbation lost intersection.');
+dIntersectDist = d;
+end
+
+function dIntersectDist = EvalDistanceWithAttErr_(theta, dOrigin, dDirection, dCentre, dInvDiag, Rtrue)
+Rpert = ComputeSmallRotationMatrix_(theta) * Rtrue;
+[bHit, d] = RayEllipsoidIntersection(dOrigin, dDirection, dCentre, dInvDiag, Rtrue, Rpert, [false, false]);
+assert(bHit, 'Finite-diff attitude perturbation lost intersection.');
+dIntersectDist = d;
+end
+
+function R = ComputeSmallRotationMatrix_(theta)
+angle = norm(theta);
+if angle < eps
+    R = eye(3);
+    return
+end
+axis = theta / angle;
+R = RotFromAxis_(axis, angle);
+end

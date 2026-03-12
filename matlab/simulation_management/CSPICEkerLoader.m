@@ -110,6 +110,7 @@ classdef CSPICEkerLoader
                 % Load common kernels
                 cd(fullfile(self.KERNELS_BASE_PATH_, 'common/'));
                 cspice_furnsh('mkcommon.mk');
+                cd(self.projectDir);
             end
 
             % Print number of loaded kernels

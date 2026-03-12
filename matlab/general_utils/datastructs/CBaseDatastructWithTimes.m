@@ -36,6 +36,10 @@ classdef (Abstract) CBaseDatastructWithTimes < CBaseDatastruct
             
             % Store REQUIRED attributes
             self.dTimestamps   = dTimestamps;
+
+            if ~isempty(dTimestamps)
+                self.bDefaultConstructed = false;
+            end
         end
 
         % GETTERS

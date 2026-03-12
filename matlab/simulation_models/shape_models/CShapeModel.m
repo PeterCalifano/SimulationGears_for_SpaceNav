@@ -8,17 +8,16 @@ classdef CShapeModel < CBaseDatastruct
     % 05-10-2024    Pietro Califano     First implementation completed.
     % 13-02-2025    Pietro Califano     Update implementation to inherit from CBaseDatastruct (handle)
     % 03-05-2025    Pietro Califano     Add implementation to support loading from and writing to obj file
+    % 10-11-2025    Pietro Califano     Minor bug fixes
     % -------------------------------------------------------------------------------------------------------------
     %% DEPENDENCIES
     % [-]
     % -------------------------------------------------------------------------------------------------------------
-    %% Future upgrades
-    % [-]
-    % -------------------------------------------------------------------------------------------------------------
+
 
     properties (SetAccess = public, GetAccess = public)
-        dTargetShapeMatrix_OF {ismatrix, isnumeric} = zeros(0,0,'double')
-        dObjectReferenceSize {isscalar, isnumeric}  = zeros(0,0)
+        dTargetShapeMatrix_OF (3,3) double {mustBeNumeric} = zeros(3,3,'double')
+        dObjectReferenceSize  (1,1) double {mustBeNumeric}  = zeros(1,1)
         charTargetUnitOutput = 'm';
     end
 
@@ -55,9 +54,9 @@ classdef CShapeModel < CBaseDatastruct
                 charInputUnit           (1,:) string {mustBeA(charInputUnit       , ["string", "char"]), ...
                                                     mustBeMember(charInputUnit, ["m", "km"])} = 'km'
                 charTargetUnitOutput    (1,:) string {mustBeA(charTargetUnitOutput, ["string", "char"]), mustBeMember(charTargetUnitOutput, ["m", "km"])} = 'm' % TODO add enumaration
-                bVertFacesOnly          (1,1) {islogical} = true;
+                bVertFacesOnly          (1,1) logical = true;
                 charModelName           (1,:) char = ""
-                bLoadShapeModel         (1,1) {islogical} = true;
+                bLoadShapeModel         (1,1) logical = true;
             end
 
             % For default (placeholder) construction
@@ -66,6 +65,7 @@ classdef CShapeModel < CBaseDatastruct
             end
 
             self.charTargetUnitOutput = charTargetUnitOutput;
+            self.bDefaultConstructed  = false;
 
             % Determine scaling to match length unit
             if (strcmpi(charInputUnit, 'm') && strcmpi(self.charTargetUnitOutput, 'm')) || ...
@@ -277,7 +277,7 @@ classdef CShapeModel < CBaseDatastruct
                 ui32TrianglesTexIndex, dNormals, ui32TrianglesNormalsIndex] = LoadModelFromObj(charObjFilePath, bVertFacesOnly) %#codegen
             arguments
                 charObjFilePath (1,1) string {mustBeA(charObjFilePath, ["string", "char"])}
-                bVertFacesOnly  (1,1) {islogical} = true;
+                bVertFacesOnly  (1,1) logical = true;
             end
             %% SIGNATURE
             % [ui32TrianglesIndex, dVerticesCoords, dTexCoords, ...
@@ -294,14 +294,14 @@ classdef CShapeModel < CBaseDatastruct
             %     dNormals              - Q-by-3 double array of normals (if present)
             % -------------------------------------------------------------------------------------------------------------
             %% CHANGELOG
-            % 03-01-2025    Pietro Califano     Function implemented for general obj format loading
+            % 03-01-2025    Pietro Califano         Function implemented for general obj format loading
+            % 16-11-2025    Pietro Califano,GTP-5   [MAJOR] Change core implementation to use sscanf and 
+            %                                       reduce computational time when loading large obj files
             % -------------------------------------------------------------------------------------------------------------
             %% DEPENDENCIES
             % [-]
             % -------------------------------------------------------------------------------------------------------------
-            %% Future upgrades
-            % [-]
-            % -------------------------------------------------------------------------------------------------------------
+
             %% Function code
             
             tic
@@ -320,42 +320,34 @@ classdef CShapeModel < CBaseDatastruct
             charFileText = fileread(charObjFilePath);
         
             % Vertex lines: 'v x y z'
-            vPattern = '^v\s+([\-\d\.eE\+]+)\s+([\-\d\.eE\+]+)\s+([\-\d\.eE\+]+)';
-            vLines = regexp(charFileText, vPattern, 'tokens', 'lineanchors');
+            vMatch = regexp(charFileText, '^v\s+.*$', 'match', 'lineanchors');
 
-            if ~isempty(vLines)
-                vTokens = vertcat(vLines{:});
-                dVerticesCoords = str2double(vTokens);
-                dVerticesCoords = reshape(dVerticesCoords', 3, []);
+            if ~isempty(vMatch)
+                charVBlock = sprintf('%s\n', vMatch{:});           % Single big char array
+                dVerticesCoords = sscanf(charVBlock, 'v %f %f %f\n', [3, Inf]);
             else
                 dVerticesCoords = zeros(0,3);
             end
 
             % Texture-coordinate lines: 'vt u v'
-            vtPattern = '^vt\s+([\-\d\.eE\+]+)\s+([\-\d\.eE\+]+)';
-            vtLines = regexp(charFileText, vtPattern, 'tokens', 'lineanchors');
+            vtMatch = regexp(charFileText, '^vt\s+.*$', 'match', 'lineanchors');
 
-            if ~isempty(vtLines) && not(bVertFacesOnly)
-                vtTokens = vertcat(vtLines{:});
-                dTexCoords = str2double(vtTokens);
-                dTexCoords = reshape(dTexCoords, 2, [])';
+            if ~isempty(vtMatch) && ~bVertFacesOnly
+                charVTBlock = sprintf('%s\n', vtMatch{:});
+                dTexCoords = sscanf(charVTBlock, 'vt %f %f\n', [2, Inf]);
             else
                 dTexCoords = zeros(0,2);
             end
 
             % Normal lines: 'vn nx ny nz'
-            vnPattern = '^vn\s+([\-\d\.eE\+]+)\s+([\-\d\.eE\+]+)\s+([\-\d\.eE\+]+)';
-            vnLines = regexp(charFileText, vnPattern, 'tokens', 'lineanchors');
+            vnMatch = regexp(charFileText, '^vn\s+.*$', 'match', 'lineanchors');
 
-            
-            if ~isempty(vnLines) && not(bVertFacesOnly)
-                vnTokens = vertcat(vnLines{:});
-                dNormals = str2double(vnTokens);
-                dNormals = reshape(dNormals, 3, [])';
+            if ~isempty(vnMatch) && ~bVertFacesOnly
+                charVNBlock = sprintf('%s\n', vnMatch{:});
+                dNormals = sscanf(charVNBlock, 'vn %f %f %f\n', [3, Inf]);
             else
                 dNormals = zeros(0,3);
             end
-
 
             % Defaults
             ui32TrianglesIndex          = zeros(0,3,'uint32');
@@ -367,38 +359,47 @@ classdef CShapeModel < CBaseDatastruct
             bHasVN = ~isempty(dNormals);
 
             % Build regex and index maps
-            if bHasVT && bHasVN
-                charPattern = '^f\s+(\d+)/(\d+)/(\d+)\s+(\d+)/(\d+)/(\d+)\s+(\d+)/(\d+)/(\d+)';
-                vidx = 1:3:9; tidx = 2:3:9; nidx = 3:3:9;
+            if bHasVT && bHasVN && not(bVertFacesOnly)
+                % Case to handle both texture and normals
+                fMatch = regexp(charFileText, '^f\s+\d+/\d+/\d+.*$', 'match', 'lineanchors');
+                if ~isempty(fMatch)
+                    charFBlock = sprintf('%s\n', fMatch{:});
+                    ui32AllFaceLines = sscanf(charFBlock, 'f %u/%u/%u %u/%u/%u %u/%u/%u\n', [9, Inf]);
+                    ui32AllFaceLines = uint32(ui32AllFaceLines);              % 9-by-N
+                    ui32TrianglesIndex        = ui32AllFaceLines(1:3:end, :);
+                    ui32TrianglesTexIndex     = ui32AllFaceLines(2:3:end, :);
+                    ui32TrianglesNormalsIndex = ui32AllFaceLines(3:3:end, :);
+                end
 
-            elseif bHasVT
-                charPattern = '^f\s+(\d+)/(\d+)\s+(\d+)/(\d+)\s+(\d+)/(\d+)';
-                vidx = 1:2:6; tidx = 2:2:6; nidx = [];
-            
-            elseif bHasVN
-                charPattern = '^f\s+(\d+)//(\d+)\s+(\d+)//(\d+)\s+(\d+)//(\d+)';
-                vidx = 1:2:6; tidx = [];    nidx = 2:2:6;
+            elseif bHasVT && not(bVertFacesOnly)
+                % Case to handle only texture
+                fMatch = regexp(charFileText, '^f\s+\d+/\d+.*$', 'match', 'lineanchors');
+                if ~isempty(fMatch)
+                    charFBlock = sprintf('%s\n', fMatch{:});
+                    ui32AllFaceLines = sscanf(charFBlock, 'f %u/%u %u/%u %u/%u\n', [6, Inf]);
+                    ui32AllFaceLines = uint32(ui32AllFaceLines);
+                    ui32TrianglesIndex    = ui32AllFaceLines(1:2:end, :);
+                    ui32TrianglesTexIndex = ui32AllFaceLines(2:2:end, :);
+                end
+
+            elseif bHasVN && not(bVertFacesOnly)
+                % Case to handle only normals
+                fMatch = regexp(charFileText, '^f\s+\d+//\d+.*$', 'match', 'lineanchors');
+                if ~isempty(fMatch)
+                    charFBlock = sprintf('%s\n', fMatch{:});
+                    ui32AllFaceLines = sscanf(charFBlock, 'f %u//%u %u//%u %u//%u', [6, Inf]);
+                    ui32AllFaceLines = uint32(ui32AllFaceLines);
+                    ui32TrianglesIndex        = ui32AllFaceLines(1:2:end, :);
+                    ui32TrianglesNormalsIndex = ui32AllFaceLines(2:2:end, :);
+                end
             
             else
-                charPattern = '^f\s+(\d+)\s+(\d+)\s+(\d+)';
-                vidx = 1:3; tidx = [];    nidx = [];
-            end
-
-            % Parse face lines
-            fTokens = regexp(charFileText, charPattern, 'tokens', 'lineanchors');
-            assert(not(isempty(fTokens)), ['ERROR: no faces detected in obj file. ' ...
-                'Something in regexpr interpreter may have failed. ' ...
-                'Your file may contain quads, but this function only supports triangular meshes.'])
-
-            if ~isempty(fTokens)
-
-                dValues = str2double(vertcat(fTokens{:}));
-                dFacesMatrix = reshape(dValues', numel(vidx) + numel(tidx) + numel(nidx), []);
-                ui32TrianglesIndex = uint32(dFacesMatrix(vidx, :));
-
-                if not(bVertFacesOnly)
-                    if bHasVT, ui32TrianglesTexIndex = uint32(dFacesMatrix(tidx, :)); end
-                    if bHasVN, ui32TrianglesNormalsIndex   = uint32(dFacesMatrix(nidx, :)); end
+                % No normals, no texture, indices only
+                fMatch = regexp(charFileText, '^f\s+.*$', 'match', 'lineanchors');
+                if ~isempty(fMatch)
+                    charFBlock = sprintf('%s\n', fMatch{:});
+                    ui32AllFaceLines = sscanf(charFBlock, 'f %u %u %u\n', [3, Inf]);
+                    ui32TrianglesIndex = uint32(ui32AllFaceLines);
                 end
             end
 

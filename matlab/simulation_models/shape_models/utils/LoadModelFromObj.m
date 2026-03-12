@@ -2,9 +2,11 @@ function [ui32TrianglesIndex, dVerticesCoords, dTexCoords, ...
     ui32TrianglesTexIndex, dNormals, ui32TrianglesNormalsIndex] = LoadModelFromObj(charObjFilePath, bVertFacesOnly) %#codegen
 arguments
     charObjFilePath (1,1) string {mustBeA(charObjFilePath, ["string", "char"])}
-    bVertFacesOnly (1,1) {islogical} = true;
+    bVertFacesOnly  (1,1) logical = true;
 end
 %% SIGNATURE
+% DEPRECATION warning: this function has been entirely replaced by CShapeModel class methods and is not
+% maintained anymore. However, it still works for obj files that are not too large.
 % [ui32TrianglesIndex, dVerticesCoords, dTexCoords, ...
 %  ui32TrianglesTexIndex, dNormals, ui32TrianglesNormalsIndex] = LoadModelFromObj(charObjFilePath, bVertFacesOnly) %#codegen
 % -------------------------------------------------------------------------------------------------------------
@@ -24,9 +26,7 @@ end
 %% DEPENDENCIES
 % [-]
 % -------------------------------------------------------------------------------------------------------------
-%% Future upgrades
-% [-]
-% -------------------------------------------------------------------------------------------------------------
+
 %% Function code
 
 tic

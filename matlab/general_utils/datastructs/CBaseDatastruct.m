@@ -1,4 +1,4 @@
-classdef (Abstract) CBaseDatastruct < handle & matlab.mixin.Copyable
+classdef (Abstract) CBaseDatastruct % < matlab.mixin.Copyable
     %% DESCRIPTION
     % Base class for datastructs with import/export methods to struct, yaml, json and mat file.
     % -------------------------------------------------------------------------------------------------------------
@@ -11,9 +11,14 @@ classdef (Abstract) CBaseDatastruct < handle & matlab.mixin.Copyable
     % 02-06-2025    Pietro Califano     Upgrade to remove empty fields when dumping to struct, json, yaml;
     %                                   fix yml dump pipeline, add warning suppression
     % 25-08-2025    Pietro Califano     [MAJOR] Implement prototype methods "from" struct and yaml.
-    %                                   Development of release version still open.
     % 27-08-2025    Pietro Califano     Minor improvement to avoid unnecessary warning.
     % 28-09-2025    Pietro Califano     Extend functionalities to fully support static usage of the class
+    % 04-10-2025    Pietro Califano     [MAJOR] Extend functionalities to support input objects and struct
+    %                                   arrays for struct, json and yaml export
+    % 22-12-2025    Pietro Califano     Add method to automatically hash data contents (charDataHash property) 
+    % 05-01-2026    Pietro Califano     [MAJOR] Implement new methods to handle yaml files (statically),
+    %                                   move assignField_ method to instance methods
+    % 07-01-2026    Pietro Califano     Minor fixes before pull request
     % -------------------------------------------------------------------------------------------------------------
     %% METHODS
     % [-]
@@ -26,7 +31,7 @@ classdef (Abstract) CBaseDatastruct < handle & matlab.mixin.Copyable
     % -------------------------------------------------------------------------------------------------------------
 
     properties (SetAccess = public, GetAccess = public)
-        bDefaultConstructed {islogical, isscalar} = true;
+        bDefaultConstructed (1,1) logical = true;
         charDataHash;
         charInstanceName;
     end
@@ -76,18 +81,20 @@ classdef (Abstract) CBaseDatastruct < handle & matlab.mixin.Copyable
 
         % METHODS
         % Dump "to" methods
-        function strData = toStruct(self)
+        function strData = toStruct(self, bFlattenArrays)
             arguments
                 self {mustBeA(self, "CBaseDatastruct")}
+                bFlattenArrays (1,1) logical = false;
             end
             % Dump to data struct
-            strData = CBaseDatastruct.toStructStatic(self);
+            strData = CBaseDatastruct.toStructStatic(self, bFlattenArrays);
         end
        
-        function [charYamlString] = toYaml(self, bSaveAsWrapped)
+        function [charYamlString] = toYaml(self, bSaveAsWrapped, bFlattenArrays)
             arguments
                 self           {CBaseDatastruct.validateObjectOrStruct_(self), mustBeA(self, "CBaseDatastruct")}
-                bSaveAsWrapped {mustBeNumericOrLogical, mustBeScalarOrEmpty} = false
+                bSaveAsWrapped (1,1) {mustBeNumericOrLogical, mustBeScalarOrEmpty} = false
+                bFlattenArrays (1,1) logical = false;
             end
             % Check yaml package is available
             if isempty( which('yaml.dumpFile') )
@@ -99,16 +106,17 @@ classdef (Abstract) CBaseDatastruct < handle & matlab.mixin.Copyable
             charClassName = strcat("obj", charClassName);
 
             % Call static method implementation
-            [charYamlString] = CBaseDatastruct.toYamlStatic(self, bSaveAsWrapped, charClassName);
+            [charYamlString] = CBaseDatastruct.toYamlStatic(self, bSaveAsWrapped, bFlattenArrays, charClassName);
 
         end
 
-        function [charJsonString] = toJson(self)
+        function [charJsonString] = toJson(self, bFlattenArrays)
             arguments
                 self {mustBeA(self, "CBaseDatastruct")}
+                bFlattenArrays (1,1) logical = false;
             end
             % Recursively convert to strOut first
-            strData = self.toStruct();
+            strData = self.toStruct(bFlattenArrays);
 
             % Parse to JSON
             charJsonString = jsonencode(strData, "PrettyPrint", true);
@@ -127,9 +135,9 @@ classdef (Abstract) CBaseDatastruct < handle & matlab.mixin.Copyable
             % 5) Return the populated instance.
             arguments
                 self     (1,1) {mustBeA(self, "CBaseDatastruct")}
-                strInput (1,1) struct {isstruct}
-                bStrictUnknown  (1,1) logical {islogical} = true
-                bStrictMissing  (1,1) logical {islogical} = false
+                strInput (1,1) struct
+                bStrictUnknown  (1,1) logical = true
+                bStrictMissing  (1,1) logical = false
             end
 
             % Unwrap wrapper if present: struct('obj<Class>', payload)
@@ -159,7 +167,7 @@ classdef (Abstract) CBaseDatastruct < handle & matlab.mixin.Copyable
                 charFld = cellProvidedNames{idF};
                 
                 if ismember(charFld, cellPropNames)
-                    self = CBaseDatastruct.assignField_(self, charFld, strData.(charFld), bStrictUnknown);
+                    self = self.assignField_(charFld, strData.(charFld), bStrictUnknown);
                 else
                     % Ignore silently (or warn) if non-strict
                     % warning('fromStruct:IgnoringField','Ignoring unknown field %s for class %s.', charFld, class(self));
@@ -194,12 +202,14 @@ classdef (Abstract) CBaseDatastruct < handle & matlab.mixin.Copyable
             % 1) Cells containing vectors/matrices/arrays with rows/cols matching in size are converted to
             % single vectors/matrixs/arrays. This is because the parser cannot distinguish whether they
             % were dumped from a vector/matrix/array and loaded by yaml as cells of cells or not.
+            % 2) Derived classes must have public properties to let base assign values, else must
+            % reimplement assignField_ protected method.
 
             arguments
-                self (1,1) {mustBeA(self, "CBaseDatastruct")}
-                charInputYaml {mustBeText}
-                bIsFile  logical {islogical} = []   % Auto-detect if empty
-                bStrict (1,1) logical {islogical} = false
+                self            (1,1) {mustBeA(self, "CBaseDatastruct")}
+                charInputYaml   {mustBeText}
+                bIsFile         logical = []   % Auto-detect if empty
+                bStrict         (1,1) logical = false
             end
 
             % Check yaml package is available
@@ -261,7 +271,7 @@ classdef (Abstract) CBaseDatastruct < handle & matlab.mixin.Copyable
             strParsed = CBaseDatastruct.ConvertCellsToMatrices_(strParsed);
 
             % Call method to build data from yaml-parsed struct
-            self = self.fromStruct(strParsed, true);
+            self = self.fromStruct(strParsed, true, bStrict);
         end
 
         function self = fromJson(self, charInputJson, bIsFile, bStrict)
@@ -270,7 +280,7 @@ classdef (Abstract) CBaseDatastruct < handle & matlab.mixin.Copyable
                 self (1,1) {mustBeA(self, "CBaseDatastruct")}
                 charInputJson {mustBeText}
                 bIsFile {mustBeScalarOrEmpty} = []   % Auto-detect if empty
-                bStrict (1,1) logical {islogical} = false
+                bStrict (1,1) logical = false
             end
             % ACHTUNG: implementation not fully tested!
             if isempty(bIsFile)
@@ -305,101 +315,125 @@ classdef (Abstract) CBaseDatastruct < handle & matlab.mixin.Copyable
                 charFormat      (1,:) string {mustBeA(charFormat, ["string", "char"]), mustBeMember(charFormat, ["json", "yaml", "mat", "struct", "yml"])} = "mat"
             end
             arguments
-                kwargs.bSaveAsWrapped (1,1) logical = false;
+                kwargs.bSaveAsWrapped       (1,1) logical = false;
+                kwargs.bFlattenBeforeSave   (1,1) logical = false;
+                kwargs.bJsonPrettyPrint     (1,1) logical = true;
             end
 
-            if charFormat == "yml"
-                charFormat = "yaml"; % To allow both formats
-            end
-
-            % Object saving method
-            fprintf("\nSaving datastruct to file %s in format %s...", charFilename, charFormat);
-
-            [charRootFolder, charFilename_, charFileExt] = fileparts(charFilename);
-
-            % Handle arrays of objects
-            if length(self) > 1
-                error('Arrays of objects are currently not handled. Please call method on a single instance')
-            end
-
-            if not(exist(charRootFolder, "dir"))
-                mkdir(charRootFolder)
-            end
-
-            if strcmpi(charRootFolder, '')
-                charRootFolder = '.';
-                charFilename = fullfile( charRootFolder, strcat(charFilename_, charFileExt) );
-            end
-
-            % Determine name of saved object
+            % Call static implementation
             charClassName = class(self);
-            charClassName = strcat("obj",charClassName);
-
-            % Save according to requested format
-            switch charFormat
-
-                case "mat"
-                    if isempty(charFileExt) || strcmpi(charFileExt, "")
-                        charFilename = strcat(charFilename, '.mat');
-                    end
-                           
-                    strTmp.(charClassName) = self;
-                    save(charFilename, "-struct", "strTmp"); % Save content of strTmp
-                
-                case "struct"
-                    if isempty(charFileExt) || strcmpi(charFileExt, "")
-                        charFilename = strcat(charFilename, '.mat');
-                    end
-                    warning(['This may be a lossy saving, as all properties that contain objects may be lost ' ...
-                        'if cannot be converted to struct. Prefer using .mat format directly if possible.'])
-
-                    strData = self.toStruct();
-
-                    strTmp.(charClassName) = strData;
-                    save(charFilename, "-struct", "strTmp"); % Save content of strTmp
-
-                case "yaml"
-                    if isempty(charFileExt) || strcmpi(charFileExt, "")
-                        charFilename = strcat(charFilename, '.yml');
-                    end
-                    
-                    % Check yaml package is available
-                    if isempty( which('yaml.dumpFile') )
-                        error('YAML toolbox not found. Please install Martin Koch''s yaml and add it to your MATLAB path.');
-                    end
-                    
-                    charYamlParsed = self.toYaml(kwargs.bSaveAsWrapped);
-                    
-                    % Write file to disk
-                    fileID = fopen(charFilename, 'w');
-                    fwrite(fileID, charYamlParsed, 'char');
-                    fclose(fileID);
-
-                case "json"
-                    if isempty(charFileExt) || strcmpi(charFileExt, "")
-                        charFilename = strcat(charFilename, '.json');
-                    end
-
-                    charJsonParsed = self.toJson();
-
-                    % Write to file
-                    fileID = fopen(charFilename, 'w');
-                    fprintf(fileID, charJsonParsed, 'char');
-                    fclose(fileID);
-
-                otherwise
-                    error('Invalid selected format.')
-
-            end
-
-            fprintf(" DONE.\n");
-
+            CBaseDatastruct.saveDataToFileStatic(self, ...
+                                            charFilename, ...
+                                            charFormat, ...
+                                            charClassName, ...
+                                            "bFlattenBeforeSave", kwargs.bFlattenBeforeSave, ...
+                                            "bSaveAsWrapped",  kwargs.bSaveAsWrapped, ...
+                                            "bJsonPrettyPrint", kwargs.bJsonPrettyPrint);
         end
 
+        function [self, charDataHash] = generateDataHash(self)
+            arguments
+                self (1,1) {mustBeA(self, "CBaseDatastruct")}
+            end
+            % Update the charDataHash property with the current data hash
+            charDataHash = CBaseDatastruct.GenerateHashFromDatastruct(self);
+            self.charDataHash = charDataHash;
+        end
+    end
+
+    methods (Access = protected)
+        % function self_copy = copyElement(self)
+        % 
+        %     % Shallow copy via superclass (alloc new instance + assign props)
+        %     self_copy = copyElement@matlab.mixin.Copyable(self);
+        % 
+        %     if class(self) == "CBaseDatastruct"
+        %         return
+        %     end
+        % 
+        %     % Deep-copy for nested Copyables
+        %     props = properties(self);
+        % 
+        %     for id = 1:numel(props)
+        %         objProp = props{id};
+        % 
+        %         objValue_ = self.(objProp);
+        % 
+        %         % Skip empty
+        %         if isempty(objValue_)
+        %             continue; 
+        %         end
+        % 
+        %         % If property is a Copyable handle, copy it
+        %         if isa(objValue_, 'matlab.mixin.Copyable')
+        %             self_copy.(objProp) = copy(objValue_);
+        % 
+        %             % If it is an array/cell of Copyables
+        %         elseif iscell(objValue_)
+        %             self_copy.(objProp) = deepCopyCell(objValue_);
+        % 
+        %         elseif isobject(objValue_) && all(arrayfun(@(x) isa(x,'matlab.mixin.Copyable'), objValue_(:)))
+        %             self_copy.(objProp) = arrayfun(@(x) copy(x), objValue_);
+        % 
+        %             % Otherwise leave as-is (value types, non-copyable handles, etc.)
+        %         end
+        %     end
+        % 
+        %     function new_cell = deepCopyCell(old_cell)
+        %         new_cell = old_cell;
+        %         for k = 1:numel(old_cell)
+        %             vk = old_cell{k};
+        %             if isa(vk, 'matlab.mixin.Copyable')
+        %                 new_cell{k} = copy(vk);
+        %             elseif iscell(vk)
+        %                 new_cell{k} = deepCopyCell(vk);
+        %             else
+        %                 new_cell{k} = vk;
+        %             end
+        %         end
+        %     end
+        % end
     end
 
     %% Static methods
     methods (Static, Access = public)
+        function charDataHash = GenerateHashFromDatastruct(objDatastruct)
+            arguments
+                objDatastruct {mustBeA(objDatastruct, "CBaseDatastruct")}
+            end
+
+            % Generate a hash from the datastruct content
+            strStruct = CBaseDatastruct.toStructStatic(objDatastruct, false);
+
+            try
+                % Try to use datahash package
+                charDataHash = DataHash(strStruct);
+            catch ME
+                warning('GenerateHashFromDatastruct:HashError', 'Error generating hash from datastruct: %s', ME.getReport());
+                charDataHash = '';
+            end
+
+        end
+        function strOutputData = FlattenArrayInStruct(strInputData)
+            arguments
+                strInputData (1,1) struct
+            end
+            % FlattenArrayInStruct
+            % Flatten arrays in a struct recursively.
+            % - Non-vectors -> flattened in column-major order, returned as row.
+            % - Column vectors -> returned as row.
+            % - Row vectors -> unchanged.
+            % - Scalars -> unchanged shape (1x1).
+            % - Applies to numeric, logical, char, string, datetime, duration, categorical.
+            % - Recurse into structs and cells. Leaves tables/timetables unchanged.
+
+            % Flatten all fields
+            strOutputData = strInputData; % Initialize struct fields
+
+            % TODO handle recursion
+            strOutputData = CBaseDatastruct.FlattenValue_(strOutputData);
+
+        end
 
         %%% Static methods implementations
         function strParsedNoCell = ConvertCellsToMatrices_(strParsed)
@@ -457,41 +491,143 @@ classdef (Abstract) CBaseDatastruct < handle & matlab.mixin.Copyable
             end % Endfor on fields
         end
 
-        function outStruct = toStructStatic(objDatastruct)
+        function outDataStruct = toStructStatic(objDatastruct, bFlattenArrays)
             arguments
                 objDatastruct (:,1) {CBaseDatastruct.validateObjectOrStruct_(objDatastruct)}
+                bFlattenArrays (1,1) logical = false;
             end
 
             % Disable warning temporarily
-            warning('off', 'MATLAB:structOnObject');
+            warnState = warning('off', 'MATLAB:structOnObject');
+            objCleanupHandle = onCleanup(@() warning(warnState.state,'MATLAB:structOnObject'));
 
-            % Do shallow conversion first      
-            outStruct = struct(objDatastruct);
-            
-            % Enable warnings again
-            warning('on', 'MATLAB:structOnObject');
+            % Normalize to struct array elementwise
+            ui32StructArraySize = numel(objDatastruct);
+            outDataStruct = struct.empty(1,0);
 
-            % Recursively convert any nested object/cell/struct
-            cellFlds = fieldnames(outStruct);
-
-            for idi = 1:numel(cellFlds)
-                charName = cellFlds{idi};
-                outStruct.(charName) = CBaseDatastruct.convertValue_(outStruct.(charName));
+            if ui32StructArraySize == 0
+                warning('toStructStatic called with an empty array.')
+                return
             end
 
-            % Remove bDefaultConstructedField if existing
-            if isfield(outStruct, "bDefaultConstructed")
-                outStruct = rmfield(outStruct, "bDefaultConstructed");
-            end
+            % Loop over structured array entries
+            for idInstance = 1:ui32StructArraySize
 
-            % Remove empty fields and order struct
-            outStruct = CBaseDatastruct.CleanAndSortStructFields(outStruct);
+                % Do shallow conversion to struct first
+                if isstruct(objDatastruct)
+                    strTmp_ = objDatastruct(idInstance);
+                else
+                    strTmp_ = struct(objDatastruct(idInstance));
+                end
+
+                % Perform flattening of array fields if required
+                if bFlattenArrays
+                    strTmp_ = CBaseDatastruct.FlattenArrayInStruct(strTmp_);
+                end
+
+                % Recursively convert any nested object/cell/struct
+                cellFlds = fieldnames(strTmp_);
+
+                for idi = 1:numel(cellFlds)
+                    charName = cellFlds{idi};
+                    strTmp_.(charName) = CBaseDatastruct.convertValue_(strTmp_.(charName));
+                end
+
+                % Remove bDefaultConstructedField if existing
+                if isfield(strTmp_, "bDefaultConstructed")
+                    strTmp_ = rmfield(strTmp_, "bDefaultConstructed");
+                end
+
+                % Remove empty fields and order struct, assign to out
+                strTmp_ = CBaseDatastruct.CleanAndSortStructFields(strTmp_);
+
+                if isempty(outDataStruct)
+                    outDataStruct = repmat(strTmp_, 1, ui32StructArraySize); % 1xN for predictable JSON/YAML order
+                else
+                    outDataStruct(idInstance) = strTmp_;
+                end
+            end
         end
-   
-        function [charYamlString] = toYamlStatic(objDatastruct, bSaveAsWrapped, charDataName)
+
+        function varOutVal = formatDataForYml(varInVal)
+            %FORMATDATAFORYML Convert MATLAB data to a YAML-friendly orientation.
+            %
+            % Rules:
+            % - Non-struct and non-numeric/logical values (e.g., char, string, objects): passthrough
+            % - struct (including struct arrays): recurse on fields, preserving the struct array shape
+            % - cell: recurse on elements with ndims > 2, otherwise passthrough
+            % - numeric/logical scalar: passthrough
+            % - numeric/logical vectors and 2D matrices (ndims <= 2): passthrough, no transposition
+            % - 3D tensor MxNxP: permute to PxMxN
+            % - otherwise: error (ndims > 3)
+
+            arguments
+                varInVal % Any size, keep input
+            end
+
+            % If is cell, index each entry then recurse
+            if iscell(varInVal)
+                varOutVal = varInVal;
+                for idE = 1:numel(varInVal)
+                    ui32NumDims = ndims(varInVal{idE});
+                    if ui32NumDims > 2 % Only process tensors with > 2 dimensions
+                        varOutVal{idE} = CBaseDatastruct.formatDataForYml(varInVal{idE});
+                    end
+                end
+                return
+            end
+
+            % Struct: go through fields
+            if isstruct(varInVal)
+                varOutVal = varInVal; % Preserve size of struct array
+                
+                for idElem = 1:numel(varInVal)
+
+                    strTmp = varInVal(idElem);
+                    charFieldNames = fieldnames(strTmp);
+                    
+                    for idField = 1:numel(charFieldNames)
+                        charFieldName = charFieldNames{idField};
+                        % Recursive call
+                        strTmp.(charFieldName) = CBaseDatastruct.formatDataForYml(strTmp.(charFieldName));
+                    end
+                    
+                    varOutVal(idElem) = strTmp;
+                end
+                
+                return;
+            end
+
+            % Passthrough for non array things (cell, char/string, objects, etc.)
+            if ~(isnumeric(varInVal) || islogical(varInVal))
+                varOutVal = varInVal;
+                return;
+            end
+
+            % Scalar numeric/logical and arrays handling
+            if isscalar(varInVal) || isvector(varInVal) || ismatrix(varInVal)
+                varOutVal = varInVal;
+                return;
+            end
+
+            % Determine if matrix or 3D tensor
+            ui32NumDims = ndims(varInVal);
+
+            if ui32NumDims == 3
+                % Tensor MxNxP -> PxMxN
+                varOutVal = permute(varInVal, [3, 1, 2]);
+                return;
+            end
+
+            error("formatDataForYml:UnsupportedNDims", ...
+                "Unsupported array with ndims=%d. Only scalars, vectors, 2D matrices, and 3D tensors are supported.", ui32NumDims);
+        end
+
+        function [charYamlString] = toYamlStatic(objDatastruct, bSaveAsWrapped, bFlattenArrays, charDataName)
             arguments
                 objDatastruct  {CBaseDatastruct.validateObjectOrStruct_(objDatastruct)}
-                bSaveAsWrapped {mustBeNumericOrLogical, mustBeScalarOrEmpty} = false
+                bSaveAsWrapped (1,1) {mustBeNumericOrLogical, mustBeScalarOrEmpty} = false
+                bFlattenArrays (1,1) logical = false;
                 charDataName   {mustBeText} = "varDatastruct";
             end
             % Check yaml package is available
@@ -501,25 +637,49 @@ classdef (Abstract) CBaseDatastruct < handle & matlab.mixin.Copyable
 
             if bSaveAsWrapped
                 % Recursively convert to strOut first
-                strTmp.(charDataName) = CBaseDatastruct.toStructStatic(objDatastruct);
+                strTmp.(charDataName) = CBaseDatastruct.toStructStatic(objDatastruct, bFlattenArrays);
             else
-                strTmp = CBaseDatastruct.toStructStatic(objDatastruct);
+                strTmp = CBaseDatastruct.toStructStatic(objDatastruct, bFlattenArrays);
             end
+
+            % Ensure to get the snakeyaml jar
+            CBaseDatastruct.loadSnakeYaml();
+            
+            % Preprocess matrices and tensors to ensure proper formatting
+            strTmp = CBaseDatastruct.formatDataForYml(strTmp);
 
             % Emit a YAML string
             charYamlString = yaml.dump(strTmp, "auto");
         end
 
-        function [charJsonString] = toJsonStatic(objDatastruct)
+        function [charSnakeYamlFilePath] = loadSnakeYaml()
+
+            charYamlLibPath = which("yaml.dump");
+            assert(not(isempty(charYamlLibPath)), 'ERROR: yaml package not found. Please install it from community packages.');
+            charYamlLibPath = fileparts(charYamlLibPath);
+            mustBeFolder(charYamlLibPath);
+
+            charSnakeYamlFilePath = fullfile(charYamlLibPath, 'snakeyaml', 'snakeyaml-1.30.jar');
+
+            if ~ismember(charSnakeYamlFilePath, javaclasspath('-dynamic'))
+                javaaddpath(charSnakeYamlFilePath);
+            end
+
+            import org.yaml.snakeyaml.*;
+        end
+
+        function [charJsonString] = toJsonStatic(objDatastruct, bFlattenArrays, bPrettyPrint)
             arguments
                 objDatastruct {CBaseDatastruct.validateObjectOrStruct_(objDatastruct)}
+                bFlattenArrays (1,1) logical = false;
+                bPrettyPrint   (1,1) logical = true;
             end
 
             % Recursively convert to strOut first
-            strData = CBaseDatastruct.toStructStatic(objDatastruct);
+            strData = CBaseDatastruct.toStructStatic(objDatastruct, bFlattenArrays);
 
             % Parse to JSON
-            charJsonString = jsonencode(strData, "PrettyPrint", true);
+            charJsonString = jsonencode(strData, "PrettyPrint", bPrettyPrint);
         end
 
         %%% Struct handling functionalities
@@ -530,7 +690,7 @@ classdef (Abstract) CBaseDatastruct < handle & matlab.mixin.Copyable
             %   All nested structs are cleaned recursively, and their fields are sorted alphabetically.
 
             arguments
-                strInputStruct (1,1) {CBaseDatastruct.validateObjectOrStruct_(strInputStruct)}   % Input struct to clean and sort
+                strInputStruct (1,:) {CBaseDatastruct.validateObjectOrStruct_(strInputStruct)}   % Input struct to clean and sort
             end
 
             % Initialize output as a copy of the input
@@ -542,22 +702,38 @@ classdef (Abstract) CBaseDatastruct < handle & matlab.mixin.Copyable
             % Loop through each field using a index
             for dIdx = 1:numel(cellFieldNames)
                 charFieldName = cellFieldNames{dIdx};
-                varTmpFieldValue   = strInputStruct.(charFieldName);
+                bEmpty = false(1, numel(strInputStruct));  % Track empties for this field
 
-                if isstruct(varTmpFieldValue)
-                    % Recursive cleaning for nested struct
-                    strCleanedStruct = CBaseDatastruct.CleanAndSortStructFields(varTmpFieldValue);
-                    % Remove field if nested struct is empty
-                    if isempty(fieldnames(strCleanedStruct))
-                        strOutputStruct = rmfield(strOutputStruct, charFieldName);
-                    else
-                        strOutputStruct.(charFieldName) = strCleanedStruct;
+                % Generalized struct array handling
+                for idS = 1:numel(strInputStruct)
+                    varTmpFieldValue   = strInputStruct(idS).(charFieldName);
+
+                    if isstruct(varTmpFieldValue)
+                        % Recursive cleaning for nested struct
+                        strCleanedStruct = CBaseDatastruct.CleanAndSortStructFields(varTmpFieldValue);
+
+                        % Remove field if nested struct is empty
+                        if isempty(fieldnames(strCleanedStruct))
+                            % Keep struct schema, mark empty
+                            strOutputStruct(idS).(charFieldName) = [];
+                            bEmpty(idS) = true;
+                        else
+                            strOutputStruct(idS).(charFieldName) = strCleanedStruct;
+                        end
+
+                    elseif isempty(varTmpFieldValue)
+                        % Remove field if its value is empty
+                        strOutputStruct(idS).(charFieldName) = [];
+                        bEmpty(idS) = true;
                     end
+                    
+                end
 
-                elseif isempty(varTmpFieldValue)
-                    % Remove field if its value is empty
+                % If ALL elements are empty for this field, remove it once, uniformly
+                if all(bEmpty)
                     strOutputStruct = rmfield(strOutputStruct, charFieldName);
                 end
+
             end
 
             % After cleaning, sort remaining fields alphabetically
@@ -587,7 +763,9 @@ classdef (Abstract) CBaseDatastruct < handle & matlab.mixin.Copyable
                 charClassName   (1,:) char {mustBeText} = "varDatastruct"
             end
             arguments
-                kwargs.bSaveAsWrapped (1,1) logical = false;
+                kwargs.bSaveAsWrapped       (1,1) logical = false;
+                kwargs.bFlattenBeforeSave   (1,1) logical = false;
+                kwargs.bJsonPrettyPrint     (1,1) logical = true;
             end
 
             if charFormat == "yml"
@@ -596,17 +774,14 @@ classdef (Abstract) CBaseDatastruct < handle & matlab.mixin.Copyable
 
             % Ensure name is a valid matlab name
             charClassName = matlab.lang.makeValidName(charClassName);
+            charInstanceSaveName = strcat("obj", charClassName);
 
             % Object saving method
-            fprintf("\nSaving datastruct to file %s in format %s...", charFilename, charFormat);
+            fprintf("\nSaving datastruct to file %s in format %s...\n", charFilename, charFormat);
 
             [charRootFolder, charFilename_, charFileExt] = fileparts(charFilename);
 
             % Handle arrays of objects
-            if length(objDatastruct) > 1
-                error('Arrays of objects are currently not handled. Please call method on a single instance')
-            end
-
             if not(isfolder(charRootFolder))
                 mkdir(charRootFolder)
             end
@@ -624,7 +799,7 @@ classdef (Abstract) CBaseDatastruct < handle & matlab.mixin.Copyable
                         charFilename = strcat(charFilename, '.mat');
                     end
 
-                    strTmp.(charClassName) = self;
+                    strTmp.(charInstanceSaveName) = objDatastruct;
                     save(charFilename, "-struct", "strTmp"); % Save content of strTmp
 
                 case "struct"
@@ -634,9 +809,9 @@ classdef (Abstract) CBaseDatastruct < handle & matlab.mixin.Copyable
                     warning(['This may be a lossy saving, as all properties that contain objects may be lost ' ...
                         'if cannot be converted to struct. Prefer using .mat format directly if possible.'])
 
-                    strData = CBaseDatastruct.toStructStatic(objDatastruct);
+                    strData = CBaseDatastruct.toStructStatic(objDatastruct, kwargs.bFlattenBeforeSave);
 
-                    strTmp.(charClassName) = strData;
+                    strTmp.(charInstanceSaveName) = strData;
                     save(charFilename, "-struct", "strTmp"); % Save content of strTmp
 
                 case "yaml"
@@ -649,7 +824,10 @@ classdef (Abstract) CBaseDatastruct < handle & matlab.mixin.Copyable
                         error('YAML toolbox not found. Please install Martin Koch''s yaml and add it to your MATLAB path.');
                     end
 
-                    charYamlParsed = CBaseDatastruct.toYamlStatic(objDatastruct, kwargs.bSaveAsWrapped, charClassName);
+                    charYamlParsed = CBaseDatastruct.toYamlStatic(objDatastruct, ...
+                                                                kwargs.bSaveAsWrapped, ...
+                                                                kwargs.bFlattenBeforeSave, ...
+                                                                charClassName);
 
                     % Write file to disk
                     fileID = fopen(charFilename, 'w');
@@ -657,11 +835,11 @@ classdef (Abstract) CBaseDatastruct < handle & matlab.mixin.Copyable
                     fclose(fileID);
 
                 case "json"
-                    if isempty(charFileExt) || strcmpi(charFileExt, "")
+                    if isempty(charFileExt) || strcmpi(charFileExt, "") || strcmpi(charFileExt, ".cfg")
                         charFilename = strcat(charFilename, '.json');
                     end
 
-                    charJsonParsed = CBaseDatastruct.toJsonStatic(objDatastruct);
+                    charJsonParsed = CBaseDatastruct.toJsonStatic(objDatastruct, kwargs.bFlattenBeforeSave, kwargs.bJsonPrettyPrint);
 
                     % Write to file
                     fileID = fopen(charFilename, 'w');
@@ -677,25 +855,90 @@ classdef (Abstract) CBaseDatastruct < handle & matlab.mixin.Copyable
 
         end
       
-        % TODO ------------------
-        function objDatastruct = fromStructStatic(strDatastruct, charTargetDatastruct) % TBC, better if abstract?
+        function objDatastruct = fromStructStatic(strDatastruct, charTargetDatastruct, bStrictUnknown, bStrictMissing)
+            %FROMSTRUCTSTATIC Build a datastruct instance from a struct payload.
             arguments (Input)
-                strDatastruct % either yaml string or path to yaml file
-                charTargetDatastruct % Specify name of target data struct
+                strDatastruct (1,1) struct
+                charTargetDatastruct (1,:) {mustBeA(charTargetDatastruct, ["string", "char", "CBaseDatastruct"])} = ""
+                bStrictUnknown (1,1) logical = true
+                bStrictMissing (1,1) logical = false
             end
             arguments (Output)
-                objDatastruct (1,1) {isa(objDatastruct, 'CBaseDatastruct')}
+                objDatastruct (1,1) {mustBeA(objDatastruct, 'CBaseDatastruct')}
             end
 
-            % Method to convert struct to class (with fields check)
+            % Select build target: existing instance or class name.
+            if isa(charTargetDatastruct, "CBaseDatastruct")
+                objDatastruct = charTargetDatastruct;
+            else
+                charTargetClassName = char(string(charTargetDatastruct));
 
+                % Optional inference from wrapped payload: struct('obj<ClassName>', payload)
+                if isempty(strtrim(charTargetClassName))
+                    cellFields_ = fieldnames(strDatastruct);
+                    if isscalar(cellFields_)
+                        charOnlyField_ = cellFields_{1};
+                        if startsWith(charOnlyField_, "obj")
+                            charInferredClass_ = char(extractAfter(string(charOnlyField_), "obj"));
+                            if ~isempty(strtrim(charInferredClass_))
+                                charTargetClassName = charInferredClass_;
+                            end
+                        end
+                    end
+                end
+
+                if isempty(strtrim(charTargetClassName))
+                    error("fromStructStatic:MissingTargetClass", ...
+                        "Target class is empty. Provide class name or a wrapper key of form obj<ClassName>.");
+                end
+
+                objDatastruct = CBaseDatastruct.getDefaultInstance(charTargetClassName);
+            end
+
+            % Delegate recursive assignment/type handling to instance method.
+            objDatastruct = objDatastruct.fromStruct(strDatastruct, bStrictUnknown, bStrictMissing);
         end
 
-        function [] = fromYamlStatic(charInputFile)
+        function objInstance = getDefaultInstance(charClassName)
             arguments
-                charInputFile % either yaml string or path to yaml file
+                charClassName (1,:) char = ""
             end
-            % TODO, requires yaml package. Re-use code from operative dataset generation
+            % Static function based on Visitor design pattern
+
+            try
+                % hDefaultConstructor = str2func(strcat(charClassName, '()'));
+                objInstance = feval(charClassName);
+                mustBeA(objInstance, charClassName);
+            catch ME
+                error(['You called getDefaultInstance of the base class with a class that is not default constructible. ' ...
+                    'Please either implement the method or make the class constructible without inputs. Error message: %s'], ME.getReport());
+            end
+        end
+
+        function objInstance = fromYamlStatic(thisClass, charInputYaml, bIsFile, bStrict)
+            arguments
+                thisClass     (1,:) {mustBeA(thisClass, ["string", "char", "CBaseDatastruct"])}
+                charInputYaml (1,:) char {mustBeText} % Either yaml string or path to yaml file
+                bIsFile         logical = []   % Auto-detect if empty
+                bStrict         (1,1) logical = false
+            end
+            % Static function based on Visitor design pattern
+
+            % error(['Not implemented yet: note that this is more difficult than dumping. ' ...
+            %     'One has to first build the specific class, which means it must be somehow empty constructable.' ...
+            %     'This is not enforceable easily. Otherwise, another option is to force each derived class to implement the method.'])
+
+            %% Function code
+            if isa(thisClass, "CBaseDatastruct") && ismethod(thisClass, "getDefaultInstance")
+                % Construct a default instance
+                objInstance = thisClass.getDefaultInstance();
+            else
+                % Attempt to construct a default instance using base class method
+                objInstance = CBaseDatastruct.getDefaultInstance(thisClass);  
+            end
+
+            % Call implementation on instance
+            objInstance = objInstance.fromYaml(charInputYaml, bIsFile, bStrict);
         end
 
         function [] = fromJsonStatic(charInputFile)
@@ -707,16 +950,228 @@ classdef (Abstract) CBaseDatastruct < handle & matlab.mixin.Copyable
 
         % TODO with protobuf or msgpack
         function [] = serialize()
-
+            error('Not implemented yet.')
         end
 
         function [] = deserialize()
-
+            error('Not implemented yet.')
         end
    
     end
 
+    methods (Access = protected)
+        function self = assignField_(self, charField, varValueIn, bStrict)
+            %ASSIGNFIELD_ Assign one property with type-aware recursion/casting
+            % Implementation:
+            % 1) Inspect current property default/type via meta.Property and runtime value.
+            % 2) If target is a CBaseDatastruct (single, array, or in cell), recurse building objects.
+            % 3) Else if numeric/logical/char/string, attempt safe cast to existing class.
+            % 4) Else assign verbatim.
+            arguments
+                self
+                charField   (1,:) char
+                varValueIn
+                bStrict     (1,1) logical = false
+            end
+
+            % If the property does not exist (possible non-strict), skip
+            if ~isprop(self, charField)
+                return;
+            end
+
+            % Inspect meta
+            objMeta = metaclass(self);
+            idx = find(strcmp({objMeta.PropertyList.Name}, charField), 1, 'first');
+            % objMetaProperties = objMeta.PropertyList(idx);
+
+            % Determine target class expectation from current value (default)
+            hasDefault = false;
+            charDefaultClass = '';
+            try
+                currVal = self.(charField);
+                if ~isempty(currVal)
+                    hasDefault = true; charDefaultClass = class(currVal);
+                end
+            catch
+                currVal = [];
+            end
+
+            % Helper to check subclass-of CBaseDatastruct
+            isCBaseSubclass = @(cls) ~isempty(cls) && exist(cls,'class')==8 && any(strcmp(superclasses(cls), 'CBaseDatastruct'));
+
+            % Case A: struct destined to a CBaseDatastruct-like property
+            if isstruct(varValueIn)
+                % If default value is a CBaseDatastruct, use its class to build
+                if hasDefault && isCBaseSubclass(charDefaultClass)
+                    newObj = feval(charDefaultClass);
+                    newObj = newObj.fromStruct(varValueIn, bStrict);
+                    self.(charField) = newObj;
+                    return;
+                end
+
+                % If no default class info, but property name hints a class? Not reliable.
+                % Try soft match if the struct is wrapped (obj<Class>)
+                valueMaybeUnwrapped = CBaseDatastruct.unwrapWrapper_(varValueIn, ''); %#ok<NASGU>
+                % Without schema knowledge, assign struct as-is.
+                self.(charField) = varValueIn;
+                return;
+            end
+
+            % Case B: struct array -> object array or struct array assignment
+            if isstruct(varValueIn) && numel(varValueIn) > 1
+                if hasDefault && isCBaseSubclass(charDefaultClass)
+                    arr = arrayfun(@(s) feval(charDefaultClass).fromStruct(s, bStrict), varValueIn, 'UniformOutput', false);
+                    % Convert to homogeneous array if possible
+                    try
+                        self.(charField) = reshape([arr{:}], size(varValueIn));
+                    catch
+                        self.(charField) = arr; % fallback to cell array
+                    end
+                else
+                    self.(charField) = varValueIn; % keep as struct array
+                end
+                return;
+            end
+
+            % Case C: cell containing structs/objects -> recurse per element
+            if iscell(varValueIn)
+                cellIn = varValueIn;
+                if hasDefault && isCBaseSubclass(charDefaultClass)
+                    % Expecting cell of objects; map structs to objects of that class
+                    cellOut = cell(size(cellIn));
+                    for k = 1:numel(cellIn)
+                        vk = cellIn{k};
+                        if isstruct(vk)
+                            cellOut{k} = feval(charDefaultClass).fromStruct(vk, bStrict);
+                        else
+                            cellOut{k} = vk; % accept already-built object or scalar
+                        end
+                    end
+                    self.(charField) = cellOut;
+                else
+                    % Generic cell: just recurse lightly over structs
+                    cellOut = cell(size(cellIn));
+                    for k = 1:numel(cellIn)
+                        % vk = cellIn{k};
+                        % if isstruct(vk)
+                        cellOut{k} = cellIn{k};
+                        % else
+                        %     cellOut{k} = vk;
+                        % end
+                    end
+                    self.(charField) = cellOut;
+                end
+                return;
+            end
+
+            % Case D: primitive types — try safe cast to default class if present
+            if hasDefault && ~isempty(charDefaultClass)
+                try
+                    switch charDefaultClass
+                        case {'double','single','uint8','uint16','uint32','uint64','int8','int16','int32','int64'}
+                            self.(charField) = cast(varValueIn, charDefaultClass);
+                            return;
+                        case {'logical'}
+                            self.(charField) = logical(varValueIn);
+                            return;
+                        case {'string'}
+                            self.(charField) = string(varValueIn);
+                            return;
+                        case {'char'}
+                            if isstring(varValueIn)
+                                varValueIn = char(varValueIn); 
+                            end
+                            self.(charField) = char(varValueIn);
+                            return;
+                        otherwise
+                            % If default is an object (non-CBaseDatastruct), accept as-is if compatible
+                            if isa(varValueIn, charDefaultClass)
+                                self.(charField) = varValueIn; 
+                                return;
+                            end
+                    end
+                catch ME
+                    if bStrict
+                        rethrow(ME);
+                    else
+                        % fallthrough to plain assignment
+                    end
+                end
+            end
+
+            % Default: assign verbatim
+            self.(charField) = varValueIn;
+        end
+
+    end
+
     methods (Static, Access = private)
+
+        function varOut = FlattenValue_(varInput)
+            arguments
+                varInput
+            end
+            % Local helper function for flattening of arrays
+            if isstruct(varInput)
+                % Handle struct arrays elementwise
+                varOut = varInput;
+
+                for idK = 1:numel(varInput)
+                    cellFields = fieldnames(varInput(idK));
+
+                    for idF = 1:numel(cellFields)
+                        charField_ = cellFields{idF};
+                        varOut(idK).(charField_) = CBaseDatastruct.FlattenValue_(varInput(idK).(charField_));
+                    end
+                end
+
+                return
+
+            elseif iscell(varInput)
+                % Handle cell object
+                varOut = cell(size(varInput));
+
+                for idK = 1:numel(varInput)
+                    varOut{idK} = CBaseDatastruct.FlattenValue_(varInput{idK});
+                end
+
+                return
+
+            elseif istable(varInput) || isa(varInput,'timetable') || isa(varInput,'containers.Map') || isobject(varInput)
+                % Leave tables/timetables/containers.Map and objects as-is
+                varOut = varInput;
+                return
+
+
+            elseif isnumeric(varInput) || islogical(varInput)
+                % Arrays to flatten: numeric, logical, char, string, datetime, duration, categorical
+                % MATLAB linear indexing is column-major; reshape(1,[]) preserves that order and yields a row.
+
+                try
+                    dArraySize = size(varInput);
+                    if isnumeric(varInput) || ~ismatrix(varInput) || (islogical(varInput) && numel(dArraySize) > 1)
+                        if numel(dArraySize) > 2
+                            % Collapse first 2 dims, preserve others
+                            varOut = reshape(varInput, [prod(dArraySize(1:2)), dArraySize(3:end)]);
+                        else
+                            % For vectors/matrices: force row
+                            varOut = reshape(varInput, 1, []);
+                        end
+                    else
+                        varOut = varInput;
+                    end
+                catch
+                    % Fallback for edge cases (e.g., empty size handling on some types)
+                    varOut = transpose(varInput(:));
+                end
+                return
+
+            end
+
+            % Default: pass through
+            varOut = varInput;
+
+        end
 
         function varOut = handleCellElement_(varIn)
             arguments
@@ -828,16 +1283,22 @@ classdef (Abstract) CBaseDatastruct < handle & matlab.mixin.Copyable
                 % Recurse on OBJECTS
                 if numel(inVal) > 1
                     % Array of objects → struct array
-                    tmpConvertedArray = arrayfun(@(o) o.toStruct(), inVal);
+                    tmpConvertedArray = arrayfun(@(out) out.toStruct(), inVal);
                     outValue = reshape(tmpConvertedArray, size(inVal));
 
                 elseif ismethod(inVal, 'toStruct')
                     % If object has method "toStruct" (base is this class, call it)
                     outValue = inVal.toStruct();
 
+                elseif isenum(inVal)
+                    % Handle enumeration classes by convertion to strings
+                    outValue = string(inVal);
                 else
                     % Else, fallback to casting
                     outValue = struct(inVal);
+                    if isempty(outValue) && not(isempty(inVal))
+                        warning('Fallback method "cast using struct()" on type %s returned empty. Field will be lost.', class(inVal));
+                    end
                 end
 
             elseif iscell(inVal)
@@ -850,7 +1311,14 @@ classdef (Abstract) CBaseDatastruct < handle & matlab.mixin.Copyable
 
                 for idj = 1:numel(subflds)
                     charFieldName = subflds{idj};
-                    inVal.(charFieldName) = CBaseDatastruct.convertValue_(inVal.(charFieldName));
+
+                    if isscalar(inVal)
+                        inVal.(charFieldName) = CBaseDatastruct.convertValue_(inVal.(charFieldName));
+                    else
+                        for idS = 1:numel(inVal)
+                            inVal(idS).(charFieldName) = CBaseDatastruct.convertValue_(inVal(idS).(charFieldName));
+                        end
+                    end
                 end
 
                 outValue = inVal;
@@ -884,151 +1352,10 @@ classdef (Abstract) CBaseDatastruct < handle & matlab.mixin.Copyable
             strUnwrappedField = strValueIn;
         end
 
-        function self = assignField_(self, charField, varValueIn, bStrict)
-            %ASSIGNFIELD_ Assign one property with type-aware recursion/casting
-            % Implementation:
-            % 1) Inspect current property default/type via meta.Property and runtime value.
-            % 2) If target is a CBaseDatastruct (single, array, or in cell), recurse building objects.
-            % 3) Else if numeric/logical/char/string, attempt safe cast to existing class.
-            % 4) Else assign verbatim.
-            arguments
-                self
-                charField   (1,:) char
-                varValueIn
-                bStrict     (1,1) logical {islogical}
-            end
-
-            % If the property does not exist (possible non-strict), skip
-            if ~isprop(self, charField)
-                return;
-            end
-
-            % Inspect meta
-            objMeta = metaclass(self);
-            idx = find(strcmp({objMeta.PropertyList.Name}, charField), 1, 'first');
-            objMetaProperties = objMeta.PropertyList(idx);
-
-            % Determine target class expectation from current value (default)
-            hasDefault = false; 
-            charDefaultClass = '';
-            try
-                currVal = self.(charField);
-                if ~isempty(currVal)
-                    hasDefault = true; charDefaultClass = class(currVal);
-                end
-            catch
-                currVal = [];
-            end
-
-            % Helper to check subclass-of CBaseDatastruct
-            isCBaseSubclass = @(cls) ~isempty(cls) && exist(cls,'class')==8 && any(strcmp(superclasses(cls), 'CBaseDatastruct'));
-
-            % Case A: struct destined to a CBaseDatastruct-like property
-            if isstruct(varValueIn)
-                % If default value is a CBaseDatastruct, use its class to build
-                if hasDefault && isCBaseSubclass(charDefaultClass)
-                    newObj = feval(charDefaultClass);
-                    newObj = newObj.fromStruct(varValueIn, bStrict);
-                    self.(charField) = newObj;
-                    return;
-                end
-
-                % If no default class info, but property name hints a class? Not reliable.
-                % Try soft match if the struct is wrapped (obj<Class>)
-                valueMaybeUnwrapped = CBaseDatastruct.unwrapWrapper_(varValueIn, ''); %#ok<NASGU>
-                % Without schema knowledge, assign struct as-is.
-                self.(charField) = varValueIn;
-                return;
-            end
-
-            % Case B: struct array -> object array or struct array assignment
-            if isstruct(varValueIn) && numel(varValueIn) > 1 
-                if hasDefault && isCBaseSubclass(charDefaultClass)
-                    arr = arrayfun(@(s) feval(charDefaultClass).fromStruct(s, bStrict), varValueIn, 'UniformOutput', false);
-                    % Convert to homogeneous array if possible
-                    try
-                        self.(charField) = reshape([arr{:}], size(varValueIn));
-                    catch
-                        self.(charField) = arr; % fallback to cell array
-                    end
-                else
-                    self.(charField) = varValueIn; % keep as struct array
-                end
-                return;
-            end
-
-            % Case C: cell containing structs/objects -> recurse per element
-            if iscell(varValueIn)
-                cellIn = varValueIn;
-                if hasDefault && isCBaseSubclass(charDefaultClass)
-                    % Expecting cell of objects; map structs to objects of that class
-                    cellOut = cell(size(cellIn));
-                    for k = 1:numel(cellIn)
-                        vk = cellIn{k};
-                        if isstruct(vk)
-                            cellOut{k} = feval(charDefaultClass).fromStruct(vk, bStrict);
-                        else
-                            cellOut{k} = vk; % accept already-built object or scalar
-                        end
-                    end
-                    self.(charField) = cellOut;
-                else
-                    % Generic cell: just recurse lightly over structs
-                    cellOut = cell(size(cellIn));
-                    for k = 1:numel(cellIn)
-                        % vk = cellIn{k};
-                        % if isstruct(vk)
-                        cellOut{k} = cellIn{k};
-                        % else
-                        %     cellOut{k} = vk;
-                        % end
-                    end
-                    self.(charField) = cellOut;
-                end
-                return;
-            end
-
-            % Case D: primitive types — try safe cast to default class if present
-            if hasDefault && ~isempty(charDefaultClass)
-                try
-                    switch charDefaultClass
-                        case {'double','single','uint8','uint16','uint32','uint64','int8','int16','int32','int64'}
-                            self.(charField) = cast(varValueIn, charDefaultClass);
-                            return;
-                        case {'logical'}
-                            self.(charField) = logical(varValueIn);
-                            return;
-                        case {'string'}
-                            self.(charField) = string(varValueIn);
-                            return;
-                        case {'char'}
-                            if isstring(varValueIn); varValueIn = char(varValueIn); end
-                            self.(charField) = char(varValueIn);
-                            return;
-                        otherwise
-                            % If default is an object (non-CBaseDatastruct), accept as-is if compatible
-                            if isa(varValueIn, charDefaultClass)
-                                self.(charField) = varValueIn; return;
-                            end
-                    end
-                catch ME
-                    if bStrict
-                        rethrow(ME);
-                    else
-                        % fallthrough to plain assignment
-                    end
-                end
-            end
-
-            % Default: assign verbatim
-            self.(charField) = varValueIn;
-        end
-    
-        function [bIsObject] = validateObjectOrStruct_(objDatastruct)
+       function [bIsObject] = validateObjectOrStruct_(objDatastruct)
             bIsObject = isobject(objDatastruct) || isstruct(objDatastruct) || isa(objDatastruct, "CBaseDatastruct");
         end
     end
 
 
 end
-
