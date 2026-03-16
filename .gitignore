@@ -1,6 +1,9 @@
 /*build*/
 /*debug*/
 /*install*/
+**/codegen*/
+
+*.mexa64
 
 VERSION
 **/*bak*
