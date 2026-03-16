@@ -5,8 +5,8 @@ function [objShapeModel, strBpyCommManagerPaths] = DefineShapeModel(enumTargetNa
 arguments
     enumTargetName      (1,:) {mustBeA(enumTargetName, ["string", "char", "EnumScenarioName"]), ...
         mustBeMember(enumTargetName, ["Apophis", "Itokawa", "Bennu", "Moon", "Mars", "Ceres", "Dydimos", "Eros", "NotDefined"])}
-    charDataRootPath    (1,:) string = fullfile(getenv("WS_NAVSYS"), "nav-backend/data/SPICE_kernels")
-    charBpyRootPath     (1,:) string = fullfile(getenv("WS_NAVSYS"), "rendering-sw/corto_PeterCdev")
+    charDataRootPath    (1,:) string = ""
+    charBpyRootPath     (1,:) string = fullfile(getenv("WS_RENDER"), "corto_PeterCdev")
 end
 arguments
     options.bVertFacesOnly              (1,1) logical = true;
@@ -17,6 +17,10 @@ arguments
     options.charShapeModelObjPath       (1,:) string {mustBeText} = ""
     options.dObjectReferenceSizeInKm    (1,1) double = -1.0
     options.dTargetShapeMatrix_OF       (3,3) double = zeros(3,3);
+end
+charResolvedDataRootPath = ResolveNavBackendDataRoot_();
+if strlength(charDataRootPath) == 0 && strlength(charResolvedDataRootPath) > 0
+    charDataRootPath = charResolvedDataRootPath;
 end
 %% SIGNATURE
 % [objShapeModel, strBpyCommManagerPaths] = DefineShapeModel(enumTargetName, charDataRootPath, options)
@@ -290,5 +294,27 @@ function charPath = OverrideFilePathIfProvided(charPath, charOverridePath)
 if strlength(charOverridePath) > 0
     mustBeFile(charOverridePath);
     charPath = charOverridePath;
+end
+end
+
+%% Helper functions
+function charDataRootPath = ResolveNavBackendDataRoot_()
+
+charDataRootPath = "";
+charWorkspaceRoot = getenv("WS_NAVSYS");
+if strlength(charWorkspaceRoot) == 0 || ~isfolder(charWorkspaceRoot)
+    return
+end
+
+cellCandidates = {
+    fullfile(charWorkspaceRoot, "space-nav-backend", "data", "SPICE_kernels"), ...
+    fullfile(charWorkspaceRoot, "nav-backend", "data", "SPICE_kernels")
+    };
+
+for idx = 1:numel(cellCandidates)
+    if isfolder(cellCandidates{idx})
+        charDataRootPath = string(cellCandidates{idx});
+        return
+    end
 end
 end
