@@ -89,7 +89,23 @@ function(maybe_init_wrap_submodule OUT_VAR)
   endif()
 
   if("${_submodule_path}" STREQUAL "")
-    return()
+    if(NOT GTWRAP_ADD_SUBMODULE_IF_MISSING)
+      return()
+    endif()
+
+    if(NOT DEFINED GTWRAP_SUBMODULE_PATH OR "${GTWRAP_SUBMODULE_PATH}" STREQUAL "")
+      set(_submodule_path "lib/wrap")
+    else()
+      set(_submodule_path "${GTWRAP_SUBMODULE_PATH}")
+    endif()
+
+    if(NOT DEFINED GTWRAP_SUBMODULE_REPO OR "${GTWRAP_SUBMODULE_REPO}" STREQUAL "")
+      set(_gtwrap_submodule_repo "git@github.com:PeterCalifano/wrap.git")
+    else()
+      set(_gtwrap_submodule_repo "${GTWRAP_SUBMODULE_REPO}")
+    endif()
+  else()
+    set(_gtwrap_submodule_repo "")
   endif()
 
   set(_candidate_root "${PROJECT_SOURCE_DIR}/${_submodule_path}")
@@ -109,7 +125,31 @@ function(maybe_init_wrap_submodule OUT_VAR)
     return()
   endif()
 
-  message(STATUS "Initializing wrap submodule at '${_submodule_path}'...")
+  if(NOT "${_gtwrap_submodule_repo}" STREQUAL "")
+    get_filename_component(_submodule_parent "${_candidate_root}" DIRECTORY)
+    file(MAKE_DIRECTORY "${_submodule_parent}")
+
+    message(STATUS "Adding wrap submodule '${_gtwrap_submodule_repo}' at '${_submodule_path}'...")
+    execute_process(
+      COMMAND git submodule add "${_gtwrap_submodule_repo}" "${_submodule_path}"
+      WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
+      RESULT_VARIABLE _add_result
+      OUTPUT_QUIET
+      ERROR_VARIABLE _add_error
+    )
+    if(NOT _add_result EQUAL 0)
+      string(STRIP "${_add_error}" _add_error)
+      if("${_add_error}" STREQUAL "")
+        set(_add_error "unknown error")
+      endif()
+      message(WARNING
+        "Failed to add wrap submodule '${_gtwrap_submodule_repo}' at '${_submodule_path}': ${_add_error}")
+      return()
+    endif()
+  else()
+    message(STATUS "Initializing wrap submodule at '${_submodule_path}'...")
+  endif()
+
   execute_process(
     COMMAND git submodule sync --recursive
     WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
@@ -230,6 +270,19 @@ function(configure_gtwrappers_common)
     option(GTWRAP_INIT_SUBMODULE_IF_MISSING
            "Initialize the wrap git submodule only after local search and find_package(gtwrap) both fail."
            ON)
+  endif()
+  if(NOT DEFINED GTWRAP_ADD_SUBMODULE_IF_MISSING)
+    option(GTWRAP_ADD_SUBMODULE_IF_MISSING
+           "Add wrap as a git submodule when it is not yet declared in .gitmodules and wrapper resolution fails."
+           ON)
+  endif()
+  if(NOT DEFINED GTWRAP_SUBMODULE_REPO)
+    set(GTWRAP_SUBMODULE_REPO "git@github.com:PeterCalifano/wrap.git" CACHE STRING
+        "Git repository used when auto-adding wrap as a submodule.")
+  endif()
+  if(NOT DEFINED GTWRAP_SUBMODULE_PATH)
+    set(GTWRAP_SUBMODULE_PATH "lib/wrap" CACHE STRING
+        "Relative path used when auto-adding wrap as a submodule.")
   endif()
 
   if(NOT DEFINED ${_gtwrap_root_var_name})
@@ -458,7 +511,8 @@ function(configure_gtwrappers_common)
       message(FATAL_ERROR
         "Could not locate wrap/gtwrap. Provide a local checkout at 'wrap/' or 'lib/wrap/', "
         "or set ${_gtwrap_root_var_name}=<path>, or install gtwrap so find_package(gtwrap) succeeds. "
-        "Set GTWRAP_INIT_SUBMODULE_IF_MISSING=ON to allow submodule initialization when declared in .gitmodules.")
+        "Set GTWRAP_INIT_SUBMODULE_IF_MISSING=ON to allow submodule initialization when declared in .gitmodules, "
+        "or GTWRAP_ADD_SUBMODULE_IF_MISSING=ON to auto-add '${GTWRAP_SUBMODULE_PATH}' from '${GTWRAP_SUBMODULE_REPO}'.")
     endif()
   endif()
 
