@@ -4,7 +4,7 @@ set(PROJECT_PYTHON_VERSION 3.11)
 set(MATLAB_DEFAULT_RELEASE "R2023b")
 
 # PROJECT DEFINITION
-set(project_name "SimulationModels_for_SpaceNav")
+set(project_name "SimulationGears_for_SpaceNav")
 
 # Set install default directory if not specified
 if(NOT DEFINED CMAKE_INSTALL_PREFIX)
@@ -383,11 +383,13 @@ if (ENABLE_TESTS AND Catch2_FOUND AND BUILD_AS_MAIN_PROJECT)
 endif()
 
 # Add documentation
-set(DOC_SUBDIRS "${CMAKE_SOURCE_DIR}/src")
-if (DOXYGEN_FOUND)
-    add_subdirectory( doc )
-else()
-    message(STATUS "Doxygen not found. Skipping building documentation.")
+if (BUILD_AS_MAIN_PROJECT)
+  set(DOC_SUBDIRS "${CMAKE_SOURCE_DIR}/src")
+  if (DOXYGEN_FOUND)
+      add_subdirectory( "doc" )
+  else()
+      message(STATUS "Doxygen not found. Skipping building documentation.") 
+  endif()
 endif()
 
 ###########################################################################
