@@ -39,6 +39,28 @@ if (NOT COMMAND cuda_compile_and_embed)
       message(FATAL_ERROR "cuda_compile_and_embed requires at least one CUDA file.")
     endif()
 
+    set(cuda_arch_values ${cuda_arch})
+    if (NOT cuda_arch_values)
+      message(FATAL_ERROR
+        "cuda_compile_and_embed requires one resolved CUDA architecture value. "
+        "Set CUDA_ARCHITECTURES or CMAKE_CUDA_ARCHITECTURES explicitly.")
+    endif()
+
+    list(LENGTH cuda_arch_values cuda_arch_count)
+    if (NOT cuda_arch_count EQUAL 1)
+      message(FATAL_ERROR
+        "cuda_compile_and_embed requires a single CUDA architecture value, but got '${cuda_arch}'. "
+        "Set CUDA_ARCHITECTURES or CMAKE_CUDA_ARCHITECTURES to one architecture for PTX embedding.")
+    endif()
+
+    list(GET cuda_arch_values 0 cuda_arch_value)
+    string(STRIP "${cuda_arch_value}" cuda_arch_value)
+    if (NOT cuda_arch_value MATCHES "^[0-9]+$")
+      message(FATAL_ERROR
+        "cuda_compile_and_embed expected a numeric CUDA architecture value, but got '${cuda_arch_value}'. "
+        "Set CUDA_ARCHITECTURES or CMAKE_CUDA_ARCHITECTURES explicitly.")
+    endif()
+
     set(${output_var} "")
     set(${output_var}_SYMBOLS "")
 
@@ -119,7 +141,7 @@ if (NOT COMMAND cuda_compile_and_embed)
                 ${cuda_cxx_standard_flag}
                 --relocatable-device-code=true
                 ${_ptx_nvcc_flags}
-                -arch=sm_${cuda_arch}
+                -arch=sm_${cuda_arch_value}
                 ${cuda_file}
                 -o ${ptx_file}
                 ${expanded_include_dirs}
