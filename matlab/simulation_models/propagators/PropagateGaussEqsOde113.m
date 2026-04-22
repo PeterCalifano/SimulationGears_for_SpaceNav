@@ -19,7 +19,7 @@ arguments (Input)
     dBodyRadius         (1,1) double {mustBeNumeric, mustBePositive}
     dJ2coeff            (1,1) double {mustBeNumeric}
     dBcoeffPoly         {mustBeNumeric, mustBeFinite, mustBeVector, mustHaveAtLeastOneElement_(dBcoeffPoly)}
-    dPerturbationType   (1,1) double {mustBeNumeric, mustBeInteger, mustBeMember(dPerturbationType, [0, 1, 2, 3])}
+    dPerturbationType   (1,1) double {mustBeNumeric, mustBeInteger, coder.mustBeConst, mustBeMember(dPerturbationType, [0, 1, 2, 3])}
 end
 arguments (Input)
     kwargs.objOdeOpts = []
@@ -46,6 +46,7 @@ end
 %   1 --> J2 perturbation only
 %   2 --> J2 + atmospheric drag
 %   3 --> Atmospheric drag only
+% For code generation, `dPerturbationType` must be compile-time constant.
 % If `objOdeOpts` is not provided, the legacy tolerance heuristic is kept:
 % scalar ballistic coefficient --> tighter tolerances, polynomial profile
 % --> slightly looser tolerances.
