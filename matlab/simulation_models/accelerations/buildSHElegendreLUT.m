@@ -1,8 +1,33 @@
 function [dPlm, ui32IdPlm0] = buildSHElegendreLUT(dGamma, dDerGamma, ui32lMax) %#codegen
+%% PROTOTYPE
+% [dPlm, ui32IdPlm0] = buildSHElegendreLUT(dGamma, dDerGamma, ui32lMax) %#codegen
+% -------------------------------------------------------------------------------------------------------------
 %% DESCRIPTION
-% buildSHElegendreLUT Build unnormalized associated Legendre values for ExtSHE.
-% The output stores the non-zero P_lm terms degree-by-degree in a column
-% vector and returns the offset of the m=0 term for each degree.
+% Function computing a column-vector lookup table of the non-zero Legendre
+% polynomial terms required by the Exterior SHE model.
+%
+% The output stores the terms degree-by-degree in a flattened triangular
+% layout and returns the pointer to the m = 0 entry for each degree.
+%
+% The function is tailored for ExtSHE by using:
+%   dGamma    = sin(latitude)
+%   dDerGamma = cos(latitude)
+%
+% REFERENCE:
+% 1) Fundamentals Of Astrodynamics And Applications, Vallado (chapters 8.6, 8.7)
+% -------------------------------------------------------------------------------------------------------------
+%% INPUTS
+% dGamma:        [1] Evaluation point of the polynomial recursion.
+% dDerGamma:     [1] Derivative of dGamma.
+% ui32lMax:      [1] Maximum harmonic degree.
+% -------------------------------------------------------------------------------------------------------------
+%% OUTPUTS
+% dPlm:          [N x1]   Flattened lookup table of Legendre polynomial values.
+% ui32IdPlm0:    [lMax+2] Pointers to the m = 0 entry for each degree.
+% -------------------------------------------------------------------------------------------------------------
+%% DEPENDENCIES
+% [-]
+% -------------------------------------------------------------------------------------------------------------
 
 %% Function code
 ui32lMax = uint32(ui32lMax);
