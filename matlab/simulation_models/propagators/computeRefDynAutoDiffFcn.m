@@ -31,11 +31,6 @@ end
 %% DEPENDENCIES
 % [-]
 % -------------------------------------------------------------------------------------------------------------
-%% Future upgrades
-% [-]
-% -------------------------------------------------------------------------------------------------------------
-
-% Check for 3rd bodies
 if not(isfield(strDynParams, 'strBody3rdData'))
     ui32NumOf3rdBodies = 0;
 else
@@ -112,6 +107,5 @@ dCoeffSRP = (strDynParams.strSRPdata.dP_SRP * strDynParams.strSCdata.dReflCoeff 
                                 dBodyEphemerides, ...
                                 strDynParams.strMainData.dSHcoeff, ...
                                 strDynParams.strMainData.ui16MaxSHdegree);
-
 
 end

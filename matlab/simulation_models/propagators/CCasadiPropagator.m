@@ -22,7 +22,6 @@ classdef CCasadiPropagator < handle
 
     end
 
-
     methods (Access = public)
         % CONSTRUCTOR
         function self = CCasadiPropagator()
@@ -39,9 +38,7 @@ classdef CCasadiPropagator < handle
         % METHODS
     end
 
-
     methods (Access = protected)
-
 
     end
 

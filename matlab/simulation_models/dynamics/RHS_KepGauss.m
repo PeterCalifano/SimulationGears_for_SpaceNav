@@ -20,22 +20,9 @@ function dxdt = RHS_KepGauss(x, params)
 % -------------------------------------------------------------------------------------------------------------
 %% DEPENDENCIES
 % -------------------------------------------------------------------------------------------------------------
-%% Future upgrades
-
-
 %% Function code
 % State Vector: x: [SMA, ECC, INCL, RAAN, OMEGA, LAMBDA]
 
 % NEED TO STUDY VALLADO CHAPTER FIRST
-
-
-
-
-
-
-
-
-
-
 
 end

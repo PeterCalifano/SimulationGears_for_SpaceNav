@@ -49,13 +49,6 @@ end
 %% DEPENDENCIES
 % 1) fastRayTriangleIntersection()
 % -------------------------------------------------------------------------------------------------------------
-%% Future upgrades
-% 
-% -------------------------------------------------------------------------------------------------------------
-
-% Defaults
-
-% TARGET BODY
 assert(size(strTargetBodyData.strShapeModel.ui32triangVertexPtr, 1) == 3, "ERROR: strShapeModel.ui32triangVertexPtr must have [3xN] shape.")
 assert(size(strTargetBodyData.strShapeModel.dVerticesPos, 1) == 3, "ERROR: strShapeModel.dVerticesPos must have [3xM] shape.")
 
@@ -198,7 +191,6 @@ parfor idL = 1:i32NumOfPointsToTrace
                 bTwoSidedTest, ...
                 false); % Normal ray, one-sided test
 
-
             if (dRayToPointsFromCamNorm(idL) - dIntersectDistance) > eps('single') && bTmpIntersectFlag == true
                 % Intersection closer than point detected --> point occluded by mesh (camera does not see it)
                 assert(idT <= ui32NumOfTriangles)
@@ -248,7 +240,6 @@ end
 bAllPointsVisibilityMask = bPointsToRayTrace;
 bAllPointsVisibilityMask(bPointsToRayTrace == 1) = bPointsVisibilityMask;
 dProjectedPoints_UV = dProjectedPoints_UV(:, bAllPointsVisibilityMask);
-
 
 end
 
@@ -301,5 +292,4 @@ for id = 1:ui32NumTrianglesInSubset
 end
 
 end
-
 

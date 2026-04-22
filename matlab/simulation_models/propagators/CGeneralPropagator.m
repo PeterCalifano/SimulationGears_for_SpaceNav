@@ -37,13 +37,11 @@ classdef CGeneralPropagator < handle
 
     end
 
-
     methods (Access = public)
         % CONSTRUCTOR
         function self = CGeneralPropagator()
             arguments
             end
-
 
         end
 
@@ -98,17 +96,19 @@ classdef CGeneralPropagator < handle
 
         function [] = propagateNavPoseTrajectory(self)
             % TODO: integrates equations of motions of orbit dynamics + attitude kinematics
+            error('%s:NotImplemented', class(self), ...
+                'propagateNavPoseTrajectory is not implemented yet.');
         end
 
         function [] = propagatePoseDynamicsTrajectory(self)
             % TODO: integrates equations of motions of orbit and attitude dynamics + kinematics
+            error('%s:NotImplemented', class(self), ...
+                'propagatePoseDynamicsTrajectory is not implemented yet.');
         end
 
     end
 
-
     methods (Access = protected)
-
 
     end
 
@@ -132,7 +132,6 @@ classdef CGeneralPropagator < handle
                 settings.objOdeOpts {isstruct} = odeset('RelTol', 1E-12, 'AbsTol', 1E-12) % Default
                 settings.enumOdeFunctioName {mustBeMember(settings.enumOdeFunctioName, ["ode113", "ode45", "ode78", "RK4", "RK8"])} = "ode113"
             end
-
 
             % objDynamicFcnHandle = @(dTime, dxState) objDynamicFcnHandle(dTime, dxState);
             % cellOdeInput = {objDynamicFcnHandle, dTimegrid, dxState0, settings.objOdeOpts};
@@ -176,7 +175,6 @@ classdef CGeneralPropagator < handle
             end
         end
 
-
         function [] = propagatedStateAutoDiff(objDynamicFcnHandle, ...
                                                 dTimegrid, ...
                                                 dxState0, ...
@@ -201,7 +199,6 @@ classdef CGeneralPropagator < handle
 
         end
 
-
         function cellSettings = unwrapSettings(settings)
             arguments
                 settings (1,1) {isstruct}
@@ -225,9 +222,6 @@ classdef CGeneralPropagator < handle
             end
         end
 
-
-
-
         %%% Additional tools from "simulationUtils" repository (private)
         function [y, tInt,te, ye, ie] = PropagateOrbitTrajectoryHF_Static(xi, t_vect, data, kwargs, options)
             arguments
@@ -246,8 +240,6 @@ classdef CGeneralPropagator < handle
     % methods (Access=private)
     % 
     % end
-
-
 
     % methods (Abstract, Access=public)
     % [x,y] = abstract_function_name(args) NOTE: number of args matter.

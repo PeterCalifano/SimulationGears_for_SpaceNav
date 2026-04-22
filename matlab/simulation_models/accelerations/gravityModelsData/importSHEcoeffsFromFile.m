@@ -23,9 +23,6 @@ function [modelSHEcoefficients, savedFileName] = importSHEcoeffsFromFile(PathToF
 %% DEPENDENCIES
 % [-]
 % ----------------------------------------------------------------------------------------------------------
-%% Future upgrades
-% [-]
-% ----------------------------------------------------------------------------------------------------------
 %% Function code
 
 % Initialize variables
@@ -77,5 +74,4 @@ if bENABLE_SAVING
 else
     savedFileName = "dataNotSaved";
 end
-
 

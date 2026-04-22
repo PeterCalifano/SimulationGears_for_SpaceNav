@@ -41,11 +41,6 @@ end
 %% DEPENDENCIES
 % [-]
 % -------------------------------------------------------------------------------------------------------------
-%% Future upgrades
-% 1) Add validity check for UV pixels inside detector
-% -------------------------------------------------------------------------------------------------------------
-
-
 %% Function code
 % Get size of input (how many points to project)
 i32Npoints = int32(size(dPointPos_IN, 2));

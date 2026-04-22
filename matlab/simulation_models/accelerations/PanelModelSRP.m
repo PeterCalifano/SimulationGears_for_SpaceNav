@@ -33,10 +33,6 @@ function [o_dSRPaccel_IN, o_dSRPtorque_SCB, o_dPanelsCosSPA] = PanelModelSRP(i_d
 %% DEPENDENCIES
 % [-]
 % -------------------------------------------------------------------------------------------------------------
-%% Future upgrades
-% 1) Add selector of quaternion convention
-% 2) Add extension to better handle solar arrays motion
-% -------------------------------------------------------------------------------------------------------------
 %% Function code
 % i_dLightSpeed = 299792458 * 1E3; % [km/s]
 
@@ -92,7 +88,6 @@ dSRPaccel_SCB = sum(dForcePerPanel_SCB, 2)/i_dMassSC;
 % Equivalent to A(q)*vec2rotate;
 tmp = qCross( qCross( i_dqSCBwrtIN, [dSRPaccel_SCB; 0] ), [-i_dqSCBwrtIN(1:3); i_dqSCBwrtIN(4)] );
 o_dSRPaccel_IN(1:3) = tmp(1:3);
-
 
 %% LOCAL FUNCTIONS
 

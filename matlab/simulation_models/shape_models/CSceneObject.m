@@ -23,13 +23,11 @@ classdef (Abstract) CSceneObject < handle
 
     end
 
-
     methods (Access = public)
         % CONSTRUCTOR
         function self = CSceneObject()
             arguments
             end
-
 
         end
 
@@ -39,8 +37,6 @@ classdef (Abstract) CSceneObject < handle
 
         % METHODS
     end
-
-
 
     % methods (Access=private)
     % 

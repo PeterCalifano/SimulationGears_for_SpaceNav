@@ -46,13 +46,6 @@ end
 %% DEPENDENCIES
 % 1) fastRayTriangleIntersection()
 % -------------------------------------------------------------------------------------------------------------
-%% Future upgrades
-%
-% -------------------------------------------------------------------------------------------------------------
-
-% Defaults
-
-% TARGET BODY
 assert(size(strTargetBodyData.strShapeModel.ui32triangVertexPtr, 1) == 3, "ERROR: strShapeModel.ui32triangVertexPtr must have [3xN] shape.")
 assert(size(strTargetBodyData.strShapeModel.dVerticesPos, 1) == 3, "ERROR: strShapeModel.dVerticesPos must have [3xM] shape.")
 
@@ -196,7 +189,6 @@ parfor idL = 1:i32NumOfPointsToTrace
         % PlotRays(dCamPosition_TB, [dPointPosX_TB(idL); dPointPosY_TB(idL); dPointPosZ_TB(idL)], dIntersectPoint_TB, dSunPosition_TB);
         %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-
         % DEVNOTE: conditions below possibly wrong
         % elseif bTmpIntersectFlag == false
         % One-sided test may return no intersection because computation has been culled.
@@ -207,7 +199,6 @@ parfor idL = 1:i32NumOfPointsToTrace
 
     end
 end % Parallelized Loop over points to trace
-
 
 if bDEBUG_MODE == true
     ui32HowManyVisLM = sum(bPointsVisibilityMask, "all");
@@ -271,5 +262,4 @@ end
 bLightOcclusion = any(bLightOcclusion == true);
 
 end
-
 

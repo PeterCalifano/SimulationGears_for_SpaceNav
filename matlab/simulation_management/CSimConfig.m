@@ -16,16 +16,13 @@ classdef CSimConfig
 
     end
 
-
     methods (Access=public)
         % CONSTRUCTOR
         function this = CSimConfig()
         end
     end
 
-
     methods (Access=protected)
-
 
     end
 

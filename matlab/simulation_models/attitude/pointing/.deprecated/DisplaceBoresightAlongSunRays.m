@@ -34,9 +34,6 @@ end
 %% DEPENDENCIES
 % [-]
 % -------------------------------------------------------------------------------------------------------------
-%% Future upgrades
-% [-]
-% -------------------------------------------------------------------------------------------------------------
 %% Function code
 
 error('DEPRECATED: use static function in CAttitudePointingGenerator instead.');
@@ -73,6 +70,5 @@ dCameraPositionToPoint_Frame = dCameraPosition_Frame - (dScaleModulus * dDeltaDi
 if nargout > 1
     dCamBoresight_Frame = dCameraPositionToPoint_Frame./vecnorm(dCameraPositionToPoint_Frame, 2, 1);
 end
-
 
 end

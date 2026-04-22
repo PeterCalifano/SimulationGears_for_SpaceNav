@@ -74,13 +74,6 @@ end
 %% DEPENDENCIES
 % qCross()
 % -------------------------------------------------------------------------------------------------------------
-%% Future upgrades
-% 1) Add displacement of CAM origin from SCB
-% 2) Add correlation of the attitude error in time using a FOGM
-% 3) MAJOR: Distinguish between pointing error (to add to ref to simulate
-%           pointing error (first scattering from truth) and knowledge 
-%           error (second scattering). The current version is not accurate.
-% -------------------------------------------------------------------------------------------------------------
 %% Function code
 error('DEPRECATED: use static function in CAttitudePointingGenerator instead.');
 
@@ -151,6 +144,5 @@ else
     o_dqSCBwrtIN_ref = qCross(i_dqCAMwrtSCB, o_dqCAMwrtIN_ref);
     o_dqSCBwrtIN_est = qCross(i_dqCAMwrtSCB, o_dqCAMwrtIN_est);
 end
-
 
 end

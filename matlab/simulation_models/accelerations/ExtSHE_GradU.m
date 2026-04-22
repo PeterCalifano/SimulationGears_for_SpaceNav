@@ -43,12 +43,6 @@ function [o_dGradU, o_dPlm] = ExtSHE_GradU(i_dRSCnorm, i_dSCLat, i_dSCLong, i_ui
 %% DEPENDENCIES
 % ExtSHE_normFactors()
 % -------------------------------------------------------------------------------------------------------------
-%% Future upgrades
-% 1) Implementation of conversion of coefficients to unnormalized 
-%    at run-time.
-% 2) Removing struct input for better "equivalency" with C.
-% -------------------------------------------------------------------------------------------------------------
-
 %% Unpack inputs
 dMu = i_strParams.mu; %[LU^3/TU^2]
 dMeanRbody = i_strParams.meanRbody; % [LU]

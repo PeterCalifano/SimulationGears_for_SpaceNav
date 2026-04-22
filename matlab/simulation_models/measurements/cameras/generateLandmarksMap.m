@@ -29,9 +29,6 @@ function dLMposMap = generateLandmarksMap(strShapeModel, dSamplingGrid)%#codegen
 %% DEPENDENCIES
 % [-]
 % -------------------------------------------------------------------------------------------------------------
-%% Future upgrades
-% 1) See below: landmark search and selection criterion improvements
-% -------------------------------------------------------------------------------------------------------------
 %% Function code
 % ACHTUNG: the map must retain the same indices as of the input moddel 
 % (i.e., the connectivity map to triangles)!
@@ -114,10 +111,5 @@ elseif isscalar(dSamplingGrid)
 
 end
 
-
-
 end
-
-
-
 

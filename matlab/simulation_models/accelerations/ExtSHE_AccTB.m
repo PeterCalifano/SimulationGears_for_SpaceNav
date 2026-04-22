@@ -148,7 +148,6 @@ o_dSHEaccTB = GradU(1)*dSphdRSC(:, 1) + GradU(2)*dSphdRSC(:, 2) + GradU(3)*dSphd
 %         i_dMu = i_strParams.mu; %[LU^3/TU^2]
 %         i_dBodyRref = i_strParams.meanRbody; % [LU]
 
-
         % Check if conversion is required by the user
         % if isfield(params, "normFlag") && params.normFlag == 1
         %

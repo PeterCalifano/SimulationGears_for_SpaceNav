@@ -38,9 +38,6 @@ end
 %% DEPENDENCIES
 % [-]
 % -------------------------------------------------------------------------------------------------------------
-%% Future upgrades
-% [-]
-% -------------------------------------------------------------------------------------------------------------
 %% Function code
 
 % Construct reference frame of terminator plane (+Z toward the Sun)
@@ -48,7 +45,6 @@ dTerminatorPlaneUnitVector_Frame = dSunDirection_Frame - dEllipsoidCentre_Frame;
 dTerminatorPlaneUnitVector_Frame = dTerminatorPlaneUnitVector_Frame.norm(dTerminatorPlaneUnitVector_Frame);
 
 dDCM_TerminatorPlaneFromFrame = zeros(3,3); % TODO
-
 
 % Rotate ellipsoid from TF to Terminator Plane
 dDCM_TerminatorPlaneFromTF = dDCM_TerminatorPlaneFromFrame * transpose(dDCM_TFfromFrame);

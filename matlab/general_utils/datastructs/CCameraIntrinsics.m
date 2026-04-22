@@ -9,10 +9,6 @@ classdef CCameraIntrinsics < cameraIntrinsics
 %% DEPENDENCIES
 % [-]
 % -------------------------------------------------------------------------------------------------------------
-%% Future upgrades
-% 1) Implement code to remove dependency from Image Processing toolbox
-% -------------------------------------------------------------------------------------------------------------
-    
     properties (SetAccess = protected, GetAccess = public)
         bDefaultConstructed logical     = true;
         dPixelSize          double      = zeros(2,1); % [micro_m]
@@ -60,7 +56,6 @@ classdef CCameraIntrinsics < cameraIntrinsics
             dFovHW = self.dFovHW;
         end
 
-
     end
 
     methods (Access = protected)
@@ -71,7 +66,6 @@ classdef CCameraIntrinsics < cameraIntrinsics
             assert( all( self.ImageSize ~= [1;1]        , 'all'), 'ERROR: Attempt to use default initialized instance (empty)!' )
         end
     end
-
 
     methods (Static, Access = public)
 
@@ -154,7 +148,6 @@ classdef CCameraIntrinsics < cameraIntrinsics
 
             dMeanIFovInRad = dFovInRadHW ./ dImageSizeHW;
         end
-
 
     end
 end

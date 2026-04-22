@@ -31,9 +31,6 @@ end
 %% DEPENDENCIES
 % [-]
 % -------------------------------------------------------------------------------------------------------------
-%% Future upgrades
-% [-]
-% -------------------------------------------------------------------------------------------------------------
 %% Build scenario
 % Build data scenario generator class
 % ACHTUNG: timgegrid MUST be in Ephemeris Time (ET, for CSPICE)
@@ -76,6 +73,5 @@ if bDEBUG_MODE
     ylabel('Y');
     zlabel('Z');
 end
-
 
 end
