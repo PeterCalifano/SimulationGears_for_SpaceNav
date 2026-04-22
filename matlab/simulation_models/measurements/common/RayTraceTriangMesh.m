@@ -106,14 +106,15 @@ for id = 1:ui32NumTrianglesInSubset
     tmpTriangleVertices(1:3, 2) = dVerticesPos(:, i32triangVertPtr2_tmp );
     tmpTriangleVertices(1:3, 3) = dVerticesPos(:, i32triangVertPtr3_tmp );
 
+    % TODO(devDir): keep root-repo callers aligned with the 6-input
+    % RayTriangleIntersection_MollerTrumbore signature.
     % Ray trace to get intersection point if any
     [bTmpIntersectFlag, ~, ~, dTmptParamDistance, dTmpIntersectionPoint] = RayTriangleIntersection_MollerTrumbore(dRayOrigin_TB, ...
                                                                                                                      dRayDirection_TB, ...
                                                                                                                      tmpTriangleVertices(:, 1), ...
                                                                                                                      tmpTriangleVertices(:, 2), ...
                                                                                                                      tmpTriangleVertices(:, 3), ...
-                                                                                                                     true, ...
-                                                                                                                     false);
+                                                                                                                     true);
     
     % If intersection AND distance less than distance to target centre --> found, can break and return
     if bTmpIntersectFlag
@@ -140,8 +141,7 @@ end
                                                                                                 dTriangVert0, ...
                                                                                                 dTriangVert1, ...
                                                                                                 dTriangVert2, ...
-                                                                                                bTwoSidedTest, ...
-                                                                                                bCheckOcclusionOnly) %#codegen
+                                                                                                bTwoSidedTest) %#codegen
         % arguments
         %     dRayOrigin          %(3,1)  double   % {isvector, isnumeric} % Removed for speed up. Enable is debug.
         %     dRayDirection       %(3,1)  double   % {isvector, isnumeric} %
@@ -149,7 +149,6 @@ end
         %     dTriangVert1        %(3,1)  double   % {isvector, isnumeric} %
         %     dTriangVert2        %(3,1)  double   % {isvector, isnumeric} %
         %     bTwoSidedTest       %(1,1)  logical = true;
-        %     bCheckOcclusionOnly %(1,1)  logical = false; % Ray is of shadow type
         % end
         %% SIGNATURE
         % [bIntersectionFlag, dUbarycenCoord, dVbarycenCoord, ...
@@ -159,8 +158,7 @@ end
         %                                                                               dTriangVert0, ...
         %                                                                               dTriangVert1, ...
         %                                                                               dTriangVert2, ...
-        %                                                                               bTwoSidedTest, ...
-        %                                                                               bCheckOcclusionOnly) %#codegen
+        %                                                                               bTwoSidedTest) %#codegen
         % -------------------------------------------------------------------------------------------------------------
         %% DESCRIPTION
         % Implementation of Ray-triangle intersection test algorithm by Moller and Trumbore, original version
@@ -175,7 +173,6 @@ end
         % dTriangVert1          (3,1)  double   {isvector, isnumeric} Position vector of triangle vertex 1
         % dTriangVert2          (3,1)  double   {isvector, isnumeric} Position vector of triangle vertex 2
         % bTwoSidedTest         (1,1) logical = true;  % Perform full two-sided test (back-facing triang not culled)
-        % bCheckOcclusionOnly   (1,1) logical = false; % Ray is of shadow type
         % -------------------------------------------------------------------------------------------------------------
         %% OUTPUT
         % bIntersectionFlag:    (0) Miss, (1) Hit.
@@ -276,10 +273,20 @@ end
                 return;
             end
 
-            % Both (u,v) valid --> Intersection exists
-            bIntersectionFlag = true;
             % Compute t parameter of intersection point in unscaled space
             dtRangeToIntersection = dInvDet * dot(dEdge2, dQ);
+
+            if dtRangeToIntersection <= EPS
+                bIntersectionFlag       = false;
+                dUbarycenCoord          = 0;
+                dVbarycenCoord          = 0;
+                dtRangeToIntersection   = 0;
+                dIntersectionPoint      = zeros(3,1);
+                return;
+            end
+
+            % Both (u,v) and positive t valid --> Forward ray intersection exists
+            bIntersectionFlag = true;
 
         else
             %% One-sided test
@@ -299,7 +306,7 @@ end
             % Compute scaled U barycentric coordinate
             dUbarycenCoord = dot(dRayOriginFromV0, dP);
 
-            if (dUbarycenCoord < 0.0 && dUbarycenCoord > dDet)
+            if (dUbarycenCoord < 0.0 || dUbarycenCoord > dDet)
                 % Triangle u-missed
                 bIntersectionFlag       = false;
                 dUbarycenCoord          = 0;
@@ -332,28 +339,28 @@ end
                 return;
             end
 
-            % Both (u,v) valid --> Intersection exists
-            bIntersectionFlag = true;
-
             % Compute auxiliary quantity before division, for shadow rays
             dEdge2dotQ = dot(dEdge2, dQ);
-
-            % Check occlusion only case (do not compute t param and intersection point) % For shadow rays
-            if bCheckOcclusionOnly && ( (dEdge2dotQ > 0 && dDet < 0 ) || (dEdge2dotQ < 0 && dDet > 0 ) )
-                dUbarycenCoord          = 0; % Reset to zero, because (U,V) here are not in the unscaled space
-                dVbarycenCoord          = 0;
-                dtRangeToIntersection   = -1;
-                dIntersectionPoint      = zeros(3,1);
-                return;
-            end
 
             % Compute t parameter of intersection point in unscaled space
             dInvDet = 1./dDet;
             dtRangeToIntersection = dInvDet * dEdge2dotQ;
 
+            if dtRangeToIntersection <= EPS
+                bIntersectionFlag       = false;
+                dUbarycenCoord          = 0;
+                dVbarycenCoord          = 0;
+                dtRangeToIntersection   = 0;
+                dIntersectionPoint      = zeros(3,1);
+                return;
+            end
+
             % Scale (U,V) barycentric coordinates
             dUbarycenCoord = dInvDet * dUbarycenCoord;
             dVbarycenCoord = dInvDet * dVbarycenCoord;
+
+            % Both (u,v) and positive t valid --> Forward ray intersection exists
+            bIntersectionFlag = true;
 
         end % End of intersection algorithm
 
