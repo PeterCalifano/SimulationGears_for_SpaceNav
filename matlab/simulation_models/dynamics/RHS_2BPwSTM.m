@@ -1,30 +1,52 @@
-function [dxPhidt] = RHS_2BPwSTM(~, state, mu)
+function dxSTMdt = RHS_2BPwSTM(dTime, xSTMState, dGravParam) %#codegen
+arguments (Input)
+    dTime       (1,1) double {mustBeNumeric}
+    xSTMState   (42,1) double {mustBeNumeric}
+    dGravParam  (1,1) double {mustBeNumeric, mustBePositive}
+end
+arguments (Output)
+    dxSTMdt     (42,1) double
+end
+%% PROTOTYPE
+% dxSTMdt = RHS_2BPwSTM(dTime, xSTMState, dGravParam)
+% -------------------------------------------------------------------------------------------------------------
+%% DESCRIPTION
+% Right-hand side of the Cartesian two-body problem augmented with first-order variational equations for the
+% state transition matrix (STM). The input vector is [state; vec(STM)] with a 6-state Cartesian orbit model.
+% -------------------------------------------------------------------------------------------------------------
+%% INPUT
+% dTime       (1,1) double   Time tag [TU]. Present for ODE-solver compatibility; dynamics are time-invariant
+% xSTMState   (42,1) double  Augmented state [position; velocity; vec(STM)]
+% dGravParam  (1,1) double   Central-body gravitational parameter [LU^3/TU^2]
+% -------------------------------------------------------------------------------------------------------------
+%% OUTPUT
+% dxSTMdt     (42,1) double  Time derivative of augmented state [state derivative; vec(dSTM/dt)]
+% -------------------------------------------------------------------------------------------------------------
+%% CHANGELOG
+% 31-07-2023    Pietro Califano     Function reviewed from earlier SGN assignment material.
+% 22-04-2026    OpenAI Codex        Modernized interface, documentation, and naming; reused EvalJac_2BP.
+% -------------------------------------------------------------------------------------------------------------
+%% DEPENDENCIES
+% EvalJac_2BP(dState, dGravParam): analytical Jacobian of the Cartesian two-body dynamics
+% -------------------------------------------------------------------------------------------------------------
 
-% Derivatives of state vector
-dxdt = [state(4:6);
-    -mu/norm(state(1:3))^3 * state(1:3)];
+ui8StateSize = 6;
 
-n_states = length(dxdt);
+% Extract Cartesian state and STM from the augmented vector
+dPosVelState = xSTMState(1:ui8StateSize);
+dSTM = reshape(xSTMState(ui8StateSize+1:end), ui8StateSize, ui8StateSize);
 
-% STM at actual time
-Phi_t = state(7:end);
+% State dynamics for the two-body problem
+dPosVec = dPosVelState(1:3);
+dPosNorm = norm(dPosVec);
+dxdt = [dPosVelState(4:6);
+    -dGravParam / dPosNorm^3 * dPosVec];
 
-Phi_t = reshape(Phi_t, n_states, n_states);
+% Variational equations: dPhi/dt = A(t) * Phi
+dJacobian = EvalJac_2BP(dPosVelState, dGravParam);
+dSTMdt = reshape(dJacobian * dSTM, ui8StateSize^2, 1);
 
-% Jacobian of the dynamics
-A_2BP = [0, 0, 0, 1, 0, 0;
- 0, 0, 0, 0, 1, 0;
- 0, 0, 0, 0, 0, 1;
- (3*mu*state(1)*abs(state(1))*sign(state(1)))/(abs(state(1))^2 + abs(state(2))^2 + abs(state(3))^2)^(5/2) - mu/(abs(state(1))^2 + abs(state(2))^2 + abs(state(3))^2)^(3/2), (3*mu*state(1)*abs(state(2))*sign(state(2)))/(abs(state(1))^2 + abs(state(2))^2 + abs(state(3))^2)^(5/2), (3*mu*state(1)*abs(state(3))*sign(state(3)))/(abs(state(1))^2 + abs(state(2))^2 + abs(state(3))^2)^(5/2), 0, 0, 0;
- (3*mu*state(2)*abs(state(1))*sign(state(1)))/(abs(state(1))^2 + abs(state(2))^2 + abs(state(3))^2)^(5/2), (3*mu*state(2)*abs(state(2))*sign(state(2)))/(abs(state(1))^2 + abs(state(2))^2 + abs(state(3))^2)^(5/2) - mu/(abs(state(1))^2 + abs(state(2))^2 + abs(state(3))^2)^(3/2), (3*mu*state(2)*abs(state(3))*sign(state(3)))/(abs(state(1))^2 + abs(state(2))^2 + abs(state(3))^2)^(5/2), 0, 0, 0;
- (3*mu*state(3)*abs(state(1))*sign(state(1)))/(abs(state(1))^2 + abs(state(2))^2 + abs(state(3))^2)^(5/2), (3*mu*state(3)*abs(state(2))*sign(state(2)))/(abs(state(1))^2 + abs(state(2))^2 + abs(state(3))^2)^(5/2), (3*mu*state(3)*abs(state(3))*sign(state(3)))/(abs(state(1))^2 + abs(state(2))^2 + abs(state(3))^2)^(5/2) - mu/(abs(state(1))^2 + abs(state(2))^2 + abs(state(3))^2)^(3/2), 0, 0, 0];
-
-% STM derivatives
-dPhidt = A_2BP * Phi_t;
-dPhidt = reshape(dPhidt, n_states^2, 1);
-
-% Assembly of derivatives vector for state + STM
-dxPhidt = [dxdt; dPhidt];
-
+% Assemble derivative of the augmented state
+dxSTMdt = [dxdt; dSTMdt];
 
 end
