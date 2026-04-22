@@ -58,7 +58,9 @@ end
 %% OUTPUT
 % dAccGrav:        [3x1, LU/TU^2]      Gravitational acceleration (gradient of potential)
 % dJacAccGrav:     [3x3, 1/TU^2]       Jacobian of acceleration (Hessian of potential)
-% dGravPotential:  [1x1, LU^2/TU^2]    Gravitational potential
+% dGravPotential:  [1x1, LU^2/TU^2]    Gravitational potential U
+%                                      (celestial-mechanics sign convention,
+%                                      so dAccGrav = grad(U))
 % dLaplacian:      [1x1, 1/TU^2]       Laplacian of the potential
 % -------------------------------------------------------------------------------------------------------------
 %% CHANGELOG

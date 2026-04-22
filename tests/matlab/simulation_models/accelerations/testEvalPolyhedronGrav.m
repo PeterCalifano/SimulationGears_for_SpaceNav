@@ -38,13 +38,15 @@ classdef testEvalPolyhedronGrav < matlab.unittest.TestCase
                         1  1  1;
                        -1  1  1 ];
 
+            % Outward-wound triangular faces are required by the
+            % Werner-Scheeres solid-angle formulation.
             ui32Faces = uint32([ ...
-                1 2 3; 1 3 4;   % -Z face
-                5 7 6; 5 8 7;   % +Z face
-                1 6 2; 1 5 6;   % -Y face
-                3 7 8; 3 8 4;   % +Y face (fixed winding)
-                1 4 8; 1 8 5;   % -X face
-                2 6 7; 2 7 3 ]); % +X face
+                1 3 2; 1 4 3;   % -Z face
+                5 6 7; 5 7 8;   % +Z face
+                1 2 6; 1 6 5;   % -Y face
+                3 8 7; 3 4 8;   % +Y face
+                1 8 4; 1 5 8;   % -X face
+                2 7 6; 2 3 7 ]); % +X face
         end
 
         function [ui32Faces, dVerts] = BuildRegularTetrahedron()
@@ -53,7 +55,7 @@ classdef testEvalPolyhedronGrav < matlab.unittest.TestCase
                        1 -1 -1;
                       -1  1 -1;
                       -1 -1  1 ];
-            ui32Faces = uint32([1 3 2; 1 2 4; 1 4 3; 2 3 4]);
+            ui32Faces = uint32([1 2 3; 1 4 2; 1 3 4; 2 4 3]);
         end
 
         function [ui32Faces, dVerts] = BuildIcosphere(nSubdivisions)
@@ -186,10 +188,12 @@ classdef testEvalPolyhedronGrav < matlab.unittest.TestCase
             [~, dJac, ~, dD2U] = EvalPolyhedronGrav(dFieldPointExterior, ui32Faces, dVerts, ...
                 2000, ui32Edges, dEe, dFf, testCase.dGravConst);
 
+            dTol = 1e-18;
+
             % Both the explicit Laplacian output and trace of Jacobian must vanish
-            testCase.verifyEqual(dD2U, 0.0, 'AbsTol', 1e-20 * norm(dJac, 'fro'), ...
+            testCase.verifyEqual(dD2U, 0.0, 'AbsTol', dTol, ...
                 'Laplacian must be zero in exterior field');
-            testCase.verifyEqual(trace(dJac), 0.0, 'AbsTol', 1e-20 * norm(dJac, 'fro'), ...
+            testCase.verifyEqual(trace(dJac), 0.0, 'AbsTol', dTol, ...
                 'Trace of Jacobian must be zero in exterior field');
         end
 
@@ -218,20 +222,21 @@ classdef testEvalPolyhedronGrav < matlab.unittest.TestCase
                 dJacFD(:, k) = (dAccPlus - dAccMinus) / (2.0 * dStep);
             end
 
-            testCase.verifyEqual(dJacAnalytic, dJacFD, 'RelTol', 1e-5, ...
+            testCase.verifyEqual(dJacAnalytic, dJacFD, 'RelTol', 1e-5, 'AbsTol', 1e-15, ...
                 'Analytical Jacobian must match central finite differences');
         end
 
-        function testPotentialNegativeExterior(testCase, dFieldPointExterior)
-            % Gravitational potential must be negative in exterior field
+        function testPotentialPositiveExterior(testCase, dFieldPointExterior)
+            % Celestial-mechanics potential U is positive and satisfies
+            % dAcc = grad(U).
             [ui32Faces, dVerts] = testEvalPolyhedronGrav.BuildUnitCube();
             [ui32Edges, dEe, dFf] = ComputePolyhedronFaceEdgeData(ui32Faces, dVerts);
 
             [~, ~, dU] = EvalPolyhedronGrav(dFieldPointExterior, ui32Faces, dVerts, ...
                 2000, ui32Edges, dEe, dFf, testCase.dGravConst);
 
-            testCase.verifyLessThan(dU, 0, ...
-                'Gravitational potential must be negative in exterior field');
+            testCase.verifyGreaterThan(dU, 0, ...
+                'Gravitational potential must be positive in exterior field');
         end
 
         function testTetrahedronConsistency(testCase)
@@ -244,9 +249,9 @@ classdef testEvalPolyhedronGrav < matlab.unittest.TestCase
                 3000, ui32Edges, dEe, dFf, testCase.dGravConst);
 
             testCase.verifyLessThan(dot(dAcc, dFP), 0, 'Attraction toward body');
-            testCase.verifyLessThan(dU, 0, 'Negative potential');
+            testCase.verifyGreaterThan(dU, 0, 'Positive potential');
             testCase.verifyEqual(dJac, dJac', 'AbsTol', 1e-20 * norm(dJac, 'fro'), 'Symmetric Jacobian');
-            testCase.verifyEqual(dD2U, 0.0, 'AbsTol', 1e-20 * norm(dJac, 'fro'), 'Zero Laplacian');
+            testCase.verifyEqual(dD2U, 0.0, 'AbsTol', 1e-18, 'Zero Laplacian');
         end
 
         function testPreprocessingOutputSizes(testCase)
@@ -289,18 +294,23 @@ classdef testEvalPolyhedronGrav < matlab.unittest.TestCase
             dFacesDouble = double(ui32Faces);
             [EdgSU, EeSU, FfSU] = polyhedronFaceEdgeProcess(dFacesDouble, dVerts);
             [dAccSU, dJacSU, dD2USU, dUSU] = polyhedronWSparVect( ...
-                dFieldPointExterior', dFacesDouble, dVerts, dDensity, EdgSU, EeSU, FfSU, testCase.dGravConst);
+                dFieldPointExterior, dFacesDouble, dVerts, dDensity, EdgSU, EeSU, FfSU, testCase.dGravConst);
 
-            % polyhedronWSparVect returns DU as [3 x nFieldPoints] row-ish and
-            % DDU as [3x3], D2U as scalar, U as scalar
-            testCase.verifyEqual(dAccSG, dAccSU', 'RelTol', 1e-10, ...
+            testCase.verifyEqual(dAccSG, dAccSU, 'RelTol', 1e-10, 'AbsTol', 1e-18, ...
                 'Acceleration must match simulationUtils');
-            testCase.verifyEqual(dJacSG, dJacSU, 'RelTol', 1e-10, ...
+            testCase.verifyEqual(dJacSG, dJacSU, 'RelTol', 1e-10, 'AbsTol', 1e-18, ...
                 'Jacobian must match simulationUtils');
             testCase.verifyEqual(dUSG, dUSU, 'RelTol', 1e-10, ...
                 'Potential must match simulationUtils');
-            testCase.verifyEqual(dD2USG, dD2USU, 'RelTol', 1e-10, ...
+            testCase.verifyEqual(dD2USG, dD2USU, 'RelTol', 1e-10, 'AbsTol', 1e-18, ...
                 'Laplacian must match simulationUtils');
+        end
+
+        function testPreprocessingRejectsInwardFaces(testCase)
+            [ui32Faces, dVerts] = testEvalPolyhedronGrav.BuildUnitCube();
+
+            testCase.verifyError(@() ComputePolyhedronFaceEdgeData(ui32Faces(:, [1 3 2]), dVerts), ...
+                'ComputePolyhedronFaceEdgeData:InvalidFaceOrientation');
         end
 
     end

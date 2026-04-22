@@ -9,6 +9,8 @@ classdef CShapeModel < CBaseDatastruct
     % 13-02-2025    Pietro Califano     Update implementation to inherit from CBaseDatastruct (handle)
     % 03-05-2025    Pietro Califano     Add implementation to support loading from and writing to obj file
     % 10-11-2025    Pietro Califano     Minor bug fixes
+    % 22-04-2026    Pietro Califano     Extend class with utilities to build SH and Polyhedral gravity from
+    %                                   shape model with known density and mass
     % -------------------------------------------------------------------------------------------------------------
     %% DEPENDENCIES
     % [-]
@@ -36,23 +38,29 @@ classdef CShapeModel < CBaseDatastruct
         ui32TrianglesNormalsIndex = [];
         charModelName = ""
 
+        % Polyhedron gravity preprocessing cache (populated by BuildPolyhedronGravityData)
+        bHasGravityData_ = false;
+        ui32GravEdgeVertexIds  = [];  % [nEdges x 2, uint32]
+        dGravEdgeDyadics       = [];  % [3 x 3 x nEdges, double]
+        dGravFaceDyadics       = [];  % [3 x 3 x nFaces, double]
+
     end
 
     methods (Access = public)
-        % CONSTRUCTOR 
+        % CONSTRUCTOR
         function self = CShapeModel(enumLoadingMethod, ...
-                                    varInputData, ...
-                                    charInputUnit, ...
-                                    charTargetUnitOutput, ...
-                                    bVertFacesOnly, ...
-                                    charModelName, ...
-                                    bLoadShapeModel)
+                varInputData, ...
+                charInputUnit, ...
+                charTargetUnitOutput, ...
+                bVertFacesOnly, ...
+                charModelName, ...
+                bLoadShapeModel)
             arguments
                 enumLoadingMethod       (1,:) string {mustBeA(enumLoadingMethod, ["string", "char"]), ...
-                                                mustBeMember(enumLoadingMethod, ["mat", "cspice", "struct", "file_obj"])} = "file_obj"
+                    mustBeMember(enumLoadingMethod, ["mat", "cspice", "struct", "file_obj"])} = "file_obj"
                 varInputData            (1,:) = []
                 charInputUnit           (1,:) string {mustBeA(charInputUnit       , ["string", "char"]), ...
-                                                    mustBeMember(charInputUnit, ["m", "km"])} = 'km'
+                    mustBeMember(charInputUnit, ["m", "km"])} = 'km'
                 charTargetUnitOutput    (1,:) string {mustBeA(charTargetUnitOutput, ["string", "char"]), mustBeMember(charTargetUnitOutput, ["m", "km"])} = 'm' % TODO add enumaration
                 bVertFacesOnly          (1,1) logical = true;
                 charModelName           (1,:) char = ""
@@ -71,14 +79,14 @@ classdef CShapeModel < CBaseDatastruct
             if (strcmpi(charInputUnit, 'm') && strcmpi(self.charTargetUnitOutput, 'm')) || ...
                     strcmpi(charInputUnit, 'km') && strcmpi(self.charTargetUnitOutput, 'km')
                 self.unitScaler = 1;
-                
+
             elseif strcmpi(charInputUnit, 'km') && strcmpi(self.charTargetUnitOutput, 'm')
                 self.unitScaler = 1000;
 
             elseif (strcmpi(charInputUnit, 'm') && strcmpi(self.charTargetUnitOutput, 'km'))
                 self.unitScaler = 1E-3;
             end
-            
+
             if bLoadShapeModel
                 % Call input specific loading function
                 if strcmpi(enumLoadingMethod, 'cspice')
@@ -100,13 +108,13 @@ classdef CShapeModel < CBaseDatastruct
 
                 end
             end
-        
-            % Write model name 
+
+            % Write model name
             self.charModelName = charModelName;
 
             % Get number of vertices
             self.ui32NumOfVertices = size(self.dVerticesPos, 2);
-            
+
             if self.ui32NumOfVertices > 0
                 % Update unit scaling
                 self.dVerticesPos = self.unitScaler * self.dVerticesPos;
@@ -132,11 +140,11 @@ classdef CShapeModel < CBaseDatastruct
             end
             ui32NumOfVertices = self.ui32NumOfVertices;
         end
-        
+
         function bool = hasData(self)
             bool = self.bHasData_;
         end
-        
+
         %% PUBLIC METHODS
         function [objFig] = visualizeMesh(self)
             arguments
@@ -148,7 +156,7 @@ classdef CShapeModel < CBaseDatastruct
                 objFig = figure;
                 hold on
                 scatter3(self.dVerticesPos(1,:), self.dVerticesPos(2,:), self.dVerticesPos(3,:), ...
-                        'black', 'filled');
+                    'black', 'filled');
 
                 % Options
                 objCurrentAx = gca();
@@ -164,12 +172,63 @@ classdef CShapeModel < CBaseDatastruct
                 ylabel('Y');
                 zlabel('Z');
                 axis equal
-                
+
             else
                 warning('Visualization method called without any loaded data. Nothing will be shown.')
             end
 
         end
+
+        function BuildPolyhedronGravityData(self)
+            %% DESCRIPTION
+            % Precomputes and caches the geometric data (edge vertex IDs, edge
+            % dyadic tensors, face dyadic tensors) required by EvalPolyhedronGrav.
+            % Must be called after the shape model is loaded. The results are
+            % stored in the object properties and can be retrieved via
+            % getPolyhedronGravityData().
+            % ACHTUNG: Vertices and faces are stored internally as [3,N]. This
+            % method transposes them to [N,3] for ComputePolyhedronFaceEdgeData.
+            % -------------------------------------------------------------------------------------------------------------
+            %% DEPENDENCIES
+            % ComputePolyhedronFaceEdgeData
+            % -------------------------------------------------------------------------------------------------------------
+            arguments
+                self
+            end
+
+            assert(self.bHasData_, 'CShapeModel:NoData', ...
+                'Shape model must be loaded before building gravity data.');
+
+            % Transpose from internal [3,N] to [N,3] convention
+            dVerticesRows = self.dVerticesPos';
+            ui32FacesRows = uint32(self.ui32triangVertexPtr');
+
+            [self.ui32GravEdgeVertexIds, self.dGravEdgeDyadics, self.dGravFaceDyadics] = ...
+                ComputePolyhedronFaceEdgeData(ui32FacesRows, dVerticesRows);
+
+            self.bHasGravityData_ = true;
+        end
+
+        function [ui32EdgeVertexIds, dEdgeDyadics, dFaceDyadics, ui32FacesRows, dVerticesRows] = getPolyhedronGravityData(self)
+            %% DESCRIPTION
+            % Returns the cached polyhedron gravity preprocessing data and
+            % the mesh arrays in [N,3] row-major convention expected by
+            % EvalPolyhedronGrav. Call BuildPolyhedronGravityData() first.
+            % -------------------------------------------------------------------------------------------------------------
+            arguments
+                self
+            end
+
+            assert(self.bHasGravityData_, 'CShapeModel:NoGravityData', ...
+                'Gravity data not available. Call BuildPolyhedronGravityData() first.');
+
+            ui32EdgeVertexIds = self.ui32GravEdgeVertexIds;
+            dEdgeDyadics      = self.dGravEdgeDyadics;
+            dFaceDyadics      = self.dGravFaceDyadics;
+            ui32FacesRows     = uint32(self.ui32triangVertexPtr');
+            dVerticesRows     = self.dVerticesPos';
+        end
+
     end
 
     methods (Access = protected)
@@ -246,9 +305,9 @@ classdef CShapeModel < CBaseDatastruct
             checkIfModelAlreadyLoaded(self);
 
             [self.ui32triangVertexPtr, self.dVerticesPos, ...
-             self.dTexCoords, self.ui32TrianglesTexIndex, ...
-             self.dNormals, self.ui32TrianglesNormalsIndex] = CShapeModel.LoadModelFromObj(charObjFilePath, bVertFacesOnly);
-    
+                self.dTexCoords, self.ui32TrianglesTexIndex, ...
+                self.dNormals, self.ui32TrianglesNormalsIndex] = CShapeModel.LoadModelFromObj(charObjFilePath, bVertFacesOnly);
+
             % Transpose vertices and triangles
             self.ui32triangVertexPtr = self.ui32triangVertexPtr;
             self.dVerticesPos        = self.dVerticesPos;
@@ -285,8 +344,8 @@ classdef CShapeModel < CBaseDatastruct
             % -------------------------------------------------------------------------------------------------------------
             %% DESCRIPTION
             % [ui32TrianglesIndex, dVerticesCoords] = LoadModelFromObj(charObjFilePath) reads the vertices and the
-            % triangles data as specified in the input Wavefront .obj file. 
-            % This implementation uses vectorized regexp and sscanf on the entire file content, avoiding 
+            % triangles data as specified in the input Wavefront .obj file.
+            % This implementation uses vectorized regexp and sscanf on the entire file content, avoiding
             % per-line loops and dynamic allocation. Output formats:
             %     ui32TrianglesIndex    - R-by-3 uint32 array of face indices (v/vt/vn)
             %     dVerticesCoords       - M-by-3 double array of vertex coordinates
@@ -295,7 +354,7 @@ classdef CShapeModel < CBaseDatastruct
             % -------------------------------------------------------------------------------------------------------------
             %% CHANGELOG
             % 03-01-2025    Pietro Califano         Function implemented for general obj format loading
-            % 16-11-2025    Pietro Califano,GTP-5   [MAJOR] Change core implementation to use sscanf and 
+            % 16-11-2025    Pietro Califano, GTP-5   [MAJOR] Change core implementation to use sscanf and
             %                                       reduce computational time when loading large obj files
             % -------------------------------------------------------------------------------------------------------------
             %% DEPENDENCIES
@@ -303,7 +362,7 @@ classdef CShapeModel < CBaseDatastruct
             % -------------------------------------------------------------------------------------------------------------
 
             %% Function code
-            
+
             tic
             % Check extension
             [~,~, charFileExt] = fileparts(charObjFilePath);
@@ -318,7 +377,7 @@ classdef CShapeModel < CBaseDatastruct
 
             % Read entire file as text
             charFileText = fileread(charObjFilePath);
-        
+
             % Vertex lines: 'v x y z'
             vMatch = regexp(charFileText, '^v\s+.*$', 'match', 'lineanchors');
 
@@ -392,7 +451,7 @@ classdef CShapeModel < CBaseDatastruct
                     ui32TrianglesIndex        = ui32AllFaceLines(1:2:end, :);
                     ui32TrianglesNormalsIndex = ui32AllFaceLines(2:2:end, :);
                 end
-            
+
             else
                 % No normals, no texture, indices only
                 fMatch = regexp(charFileText, '^f\s+.*$', 'match', 'lineanchors');
