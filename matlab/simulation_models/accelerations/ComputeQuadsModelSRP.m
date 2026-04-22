@@ -35,7 +35,7 @@ end
 % -------------------------------------------------------------------------------------------------------------
 %% INPUT
 % dDirSCtoSun_SCB        (3,1) double   Spacecraft-to-Sun direction in SC body frame [-]
-% dqSCBwrtIN             (4,1) double   Quaternion rotating SC body vectors into inertial frame (VSRP+, scalar last)
+% dqSCBwrtIN             (4,1) double   Quaternion rotating SC body vectors into inertial frame (SVRP+, scalar first)
 % dMassSC                (1,1) double   Spacecraft mass [kg]
 % dCoMpos_SCB            (3,1) double   Spacecraft center-of-mass position in SC body frame [m]
 % dSolarPressure         (1,1) double   Solar radiation pressure at spacecraft distance [N/m^2]
@@ -55,7 +55,7 @@ end
 %                                               and validation-ready header.
 % -------------------------------------------------------------------------------------------------------------
 %% DEPENDENCIES
-% [-]
+% Quat2DCM()   [MathCore_for_SpaceNav]
 % -------------------------------------------------------------------------------------------------------------
 
 dSCquadsArea = dSCquadsArea(:);
@@ -103,7 +103,8 @@ end
 
 % Compute accelerations
 dSRPaccel_SCB = sum(dForcePerQuad_SCB, 2) / dMassSC;
-dSRPaccel_IN = RotateVectorQuatVSRPplus(dqSCBwrtIN, dSRPaccel_SCB);
+dDCM_INfromSCB = Quat2DCM(dqSCBwrtIN);
+dSRPaccel_IN = dDCM_INfromSCB * dSRPaccel_SCB;
 
 end
 
@@ -113,21 +114,4 @@ coder.inline('always')
 dNorm = norm(dVector);
 assert(dNorm > 0, 'ComputeQuadsModelSRP:ZeroVector', charErrorMessage);
 dUnitVector = dVector / dNorm;
-end
-
-function dVector_Ref2 = RotateVectorQuatVSRPplus(dqRef1wrtRef2, dVector_Ref1)
-coder.inline('always')
-dQuatConj = [-dqRef1wrtRef2(1:3); dqRef1wrtRef2(4)];
-dRotatedQuat = qCrossLocal(qCrossLocal(dqRef1wrtRef2, [dVector_Ref1; 0]), dQuatConj);
-dVector_Ref2 = dRotatedQuat(1:3);
-end
-
-function dq1xq2 = qCrossLocal(dq1, dq2)
-coder.inline('always')
-dPsi = [dq1(4)  dq1(3) -dq1(2)  dq1(1); ...
-    -dq1(3)  dq1(4)  dq1(1)  dq1(2); ...
-    dq1(2) -dq1(1)  dq1(4)  dq1(3); ...
-    -dq1(1) -dq1(2) -dq1(3)  dq1(4)];
-dq1xq2 = dPsi * dq2;
-
 end
