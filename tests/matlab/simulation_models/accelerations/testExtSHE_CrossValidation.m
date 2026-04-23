@@ -255,7 +255,7 @@ classdef testExtSHE_CrossValidation < matlab.unittest.TestCase
             [dCmat, dSmat] = testExtSHE_CrossValidation.BuildRandomNormalizedCoeffMatrices(ui32MaxDeg, 1e-6, 9);
             dCSlmCols = testExtSHE_CrossValidation.ConvertMatrixToColPairs(dCmat, dSmat, ui32MaxDeg);
 
-            dJac = EvalJac_ExtSHE(dPos, ui32MaxDeg, dCSlmCols, testCase.dMuEarth, testCase.dRadiusEarth);
+            dJac = EvalJac_ExtSphericalHarmExp(dPos, ui32MaxDeg, dCSlmCols, testCase.dMuEarth, testCase.dRadiusEarth);
             dJacFD = testExtSHE_CrossValidation.FiniteDifferenceJacobian( ...
                 dPos, ui32MaxDeg, dCSlmCols, testCase.dMuEarth, testCase.dRadiusEarth);
 
@@ -268,9 +268,9 @@ classdef testExtSHE_CrossValidation < matlab.unittest.TestCase
             ui32MaxDeg = uint32(4);
             dCSlmCols = zeros(double(testExtSHE_CrossValidation.GetCoeffCount(ui32MaxDeg)), 2);
 
-            testCase.verifyError(@() EvalJac_ExtSHE([0; 0; 0], ui32MaxDeg, ...
+            testCase.verifyError(@() EvalJac_ExtSphericalHarmExp([0; 0; 0], ui32MaxDeg, ...
                 dCSlmCols, testCase.dMuEarth, testCase.dRadiusEarth), ...
-                'EvalJac_ExtSHE:ZeroPosition');
+                'EvalJac_ExtSphericalHarmExp:ZeroPosition');
         end
 
         function testEvalJacobianRejectsInsufficientCoefficients(testCase)
@@ -278,9 +278,9 @@ classdef testExtSHE_CrossValidation < matlab.unittest.TestCase
             dCSlmCols = zeros(3, 2);
             dPos = [4000; 3000; 4500];
 
-            testCase.verifyError(@() EvalJac_ExtSHE(dPos, ui32MaxDeg, ...
+            testCase.verifyError(@() EvalJac_ExtSphericalHarmExp(dPos, ui32MaxDeg, ...
                 dCSlmCols, testCase.dMuEarth, testCase.dRadiusEarth), ...
-                'EvalJac_ExtSHE:InsufficientCoefficients');
+                'EvalJac_ExtSphericalHarmExp:InsufficientCoefficients');
         end
 
         function testExtSHEAccCodegenMatchesMATLAB(testCase, dTestPosition)
