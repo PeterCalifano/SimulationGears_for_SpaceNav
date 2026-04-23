@@ -11,6 +11,9 @@
 		},
 		{
 			"path": "../simulationUtils"
+		},
+		{
+			"path": "../SLAM-repos/MSCKF_for_SpaceNav"
 		}
 	],
 	"settings": {
