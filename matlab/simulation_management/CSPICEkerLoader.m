@@ -11,10 +11,6 @@ classdef CSPICEkerLoader
 %% DEPENDENCIES
 % CSPICE mice
 % -------------------------------------------------------------------------------------------------------------
-%% Future upgrades
-% See TODO (search for the expression)
-% -------------------------------------------------------------------------------------------------------------
-
     properties (Access = protected)
         KERNELS_BASE_PATH_ = ""
         scenarioName;
@@ -26,7 +22,6 @@ classdef CSPICEkerLoader
         defaultTargetPaths = {"Milani_KERNELS", "Itokawa", "Bennu_OREx", "", ""};
         defaultTargetsDict;
     end
-
 
     methods (Access = public)
 

@@ -42,7 +42,6 @@ classdef CTargetEmulator < CSceneObject
         enumPointGTsamplingMethod     = -1;
     end
 
-
     methods (Access = public)
         % CONSTRUCTORS
         function self = CTargetEmulator(objShapeModel, ui32NumOfPointsGT, objPose3_WorldFromPoseFrame, kwargs)
@@ -193,7 +192,6 @@ classdef CTargetEmulator < CSceneObject
             strTargetDataStruct = orderfields(strTargetDataStruct);
         end
 
-
         function [strShapeDataStruct] = getShapeStruct(self)
             strShapeDataStruct = self.objShapeModel.getShapeStruct();
             strShapeDataStruct = orderfields(strShapeDataStruct);
@@ -207,7 +205,6 @@ classdef CTargetEmulator < CSceneObject
             self.dRot3_WfromTB  = objPose3_WorldFromPoseFrame.rotation;
             self.dPosVector_W   = objPose3_WorldFromPoseFrame.translation;
         end
-
 
         function [self] = SetPose(self, dPosVector_W, dRot3_WfromTB)
             arguments
@@ -285,7 +282,6 @@ classdef CTargetEmulator < CSceneObject
                 enumPointGTsamplingMethod (1,1) EnumPointGTsamplingMethod = EnumPointGTsamplingMethod.PICK_UNIFORM_RANDOM_ID
             end
 
-
             switch enumPointGTsamplingMethod
 
                 case EnumPointGTsamplingMethod.PICK_UNIFORM_RANDOM_ID
@@ -296,9 +292,7 @@ classdef CTargetEmulator < CSceneObject
             end
         end
 
-
     end
 
 end
-
 

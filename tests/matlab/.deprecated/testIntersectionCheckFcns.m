@@ -108,8 +108,10 @@ parfor idTriang = 1:ui32NumTrianglesInSubset
 
 
     % RayTriangleIntersection_MollerTrumbore
+    % TODO(devDir): regenerate the MEX entry point after the
+    % RayTriangleIntersection_MollerTrumbore signature reduction.
     [bIntersectFlag_new(idTriang), ~, ~, dIntersectDistance_new(idTriang)] = RayTriangleIntersection_MollerTrumbore_MEX(dCameraPosition_TB, dRayDirection_TB, ...
-        dTmpTriangleVertices(:, 1), dTmpTriangleVertices(:, 2), dTmpTriangleVertices(:, 3), true, false);
+        dTmpTriangleVertices(:, 1), dTmpTriangleVertices(:, 2), dTmpTriangleVertices(:, 3), true);
 
 end
 
@@ -189,6 +191,5 @@ sum(bDifferenceMask)
 % Check results of vectorized against for loop version
 dIntersectMinDist = min(dIntersectDistance_twoSided(dIntersectDistance_twoSided > 0));
 dIntersectMinDist_new = min(dIntersectDistance_new(dIntersectDistance_new > 0));
-
 
 

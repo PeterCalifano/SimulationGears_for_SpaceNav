@@ -66,9 +66,6 @@ end
 %% DEPENDENCIES
 % [-]
 % -------------------------------------------------------------------------------------------------------------
-%% Future upgrades
-% [-]
-% -------------------------------------------------------------------------------------------------------------
 %% Function code
 % TODO: add optional plot of the camera using computer vision toolbox: 
 % https://www.mathworks.com/help/vision/ref/plotcamera.html
@@ -144,7 +141,6 @@ if isempty(kwargs.cellPlotColors)
 
 end
 
-
 % Get figure and properties
 if kwargs.objFig == 0
     objFig = figure('Renderer', 'opengl');
@@ -204,7 +200,6 @@ end
 % Additional option: plot dashed line connecting camera to any of the bodies
 % TODO (PC)
 
-
 % Apply additional formatting 
 cellFramesAxesGlobal = [cellPrevLegendObjEntries(:)', cellFramesAxesGlobal(:)']; % Appned all objects into common cell
 
@@ -224,5 +219,4 @@ if kwargs.objFig == 0
 end
 
 end
-
 

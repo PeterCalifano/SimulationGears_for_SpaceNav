@@ -29,9 +29,6 @@ function [o_dCSlmCoeffCols, o_dlmPairs] = loadSHEcoeffModel(modelCoeffDataPath, 
 %% DEPENDENCIES
 % importSHEcoeffsFromFile()
 % -------------------------------------------------------------------------------------------------------------
-%% Future upgrades
-% [-]
-% -------------------------------------------------------------------------------------------------------------
 %% Function code
 
 % DEFINE

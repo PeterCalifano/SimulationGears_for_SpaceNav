@@ -1,5 +1,5 @@
 function [dP_SRP, dP_SRP0] = ComputeSolarRadPressure(dInvNormSunPositionFromSC, ...
-                                                    bUseKilometersScale)%#codegen
+                                                bUseKilometersScale)%#codegen
 arguments
     dInvNormSunPositionFromSC (1,1) double  {mustBePositive}
     bUseKilometersScale       (1,1) logical {coder.mustBeConst} = false

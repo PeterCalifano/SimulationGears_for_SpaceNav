@@ -26,7 +26,6 @@ classdef CAttitudePointingGenerator < handle
         bShowAttitudePointingPlot = false;
     end
 
-
     methods (Access = public)
         %% CONSTRUCTOR
         function self = CAttitudePointingGenerator(dCameraPosition_Frame, dTargetPosition_Frame, dSunPosition_Frame, options)
@@ -138,7 +137,6 @@ classdef CAttitudePointingGenerator < handle
             else
                 dLookAtPointFromCam_Frame = dTargetPosition_Frame - dCameraPosition_Frame;
             end
-
 
             dCamBoresightZ_Frame = dLookAtPointFromCam_Frame./vecnorm(dLookAtPointFromCam_Frame, 2, 1);
             % Is3dPointOn3dLine(dTargetPosition_Frame(:,1), dCameraPosition_Frame(:,1), dCamBoresightZ_Frame(:,1), 1E-6);
@@ -252,7 +250,6 @@ classdef CAttitudePointingGenerator < handle
                 otherwise
                     error('Invalid rotation parameterization. Please select one defined in EnumRotParams class.')
             end
-
 
             if self.bShowAttitudePointingPlot == true
                 
@@ -382,7 +379,6 @@ classdef CAttitudePointingGenerator < handle
                 dCamDirY_Frame = Rot3dVecAboutDir(dCamBoresightZ_Frame, dCamDirY_Frame, dScatterBoresightAngle);
         end
 
-
         function [dCamDirY_Frame] = DefineYaxisFromConstraint(dCameraPosition_Frame, dCamBoresightZ_Frame, kwargs, options)
             arguments (Input)
                 dCameraPosition_Frame (3, :) double {mustBeNumeric}
@@ -430,7 +426,6 @@ classdef CAttitudePointingGenerator < handle
                     return
             end
         end
-
 
         function [dCamBoresightAxis_Frame, dCamLookAtPoint_Frame] = ApplyAxisOffPointing(dCamLookAtPoint_Frame, ...
                                                                                         dReferenceAxis_Frame, ...
@@ -496,9 +491,6 @@ classdef CAttitudePointingGenerator < handle
                                                                                                     "dDisplaceSigma", dDisplaceSigma, ...
                                                                                                     "enumDisplacementMode", options.enumDisplacementMethod, ...
                                                                                                     "enumDisplaceDistribution", options.enumDisplaceDistribution);
-
-
-
 
         end
 
@@ -585,7 +577,6 @@ classdef CAttitudePointingGenerator < handle
 
                         dDisplaceValue = dDisplaceValue + uniformScatter(dInterval(:,1), dInterval(:,2), 1);
 
-
                     case "time_correlation"
                         error('Not implemented yet')
                         % Run simulation of FOGM stochastic process dynamics
@@ -624,7 +615,6 @@ classdef CAttitudePointingGenerator < handle
                 return
             end
 
-
             % Apply displacement using selected displacement mode
             switch settings.enumDisplacementMode
                 case "lookAtPoint"
@@ -640,7 +630,6 @@ classdef CAttitudePointingGenerator < handle
                 otherwise
                     error('Invalid displacement mode.')
             end
-
 
         end
 
@@ -748,7 +737,5 @@ classdef CAttitudePointingGenerator < handle
     % methods (Abstract, Access=protected)
     % 
     % end
-
-
 
 end

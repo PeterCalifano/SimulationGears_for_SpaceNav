@@ -43,11 +43,6 @@ end
 %% DEPENDENCIES
 % [-]
 % -------------------------------------------------------------------------------------------------------------
-%% Future upgrades
-% [-]
-% -------------------------------------------------------------------------------------------------------------
-
-% Uninitialized memory allocation for codegen
 dPosPix     = coder.nullcopy(zeros(3, 1));
 
 % Compute "position vector" of pixel in CAM frame

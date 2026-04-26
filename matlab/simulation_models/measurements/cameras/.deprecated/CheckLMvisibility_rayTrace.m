@@ -37,10 +37,6 @@ end
 %% DEPENDENCIES
 % 1) fastRayTriangleIntersection()
 % -------------------------------------------------------------------------------------------------------------
-%% Future upgrades
-% 1) Additional conditions to reduce number of intersections to check
-%    (triangles subset extraction conditions)
-% -------------------------------------------------------------------------------------------------------------
 %% Function code
 % Get data from structures
 % OPTIONS
@@ -241,7 +237,5 @@ if DEBUG_ON == true
     howManyVisLM = sum(bIsLMvisibleMask, "all");
     fprintf("\nNumber of VISIBLE LM: %d\n", howManyVisLM);
 end
-
-
 
 end

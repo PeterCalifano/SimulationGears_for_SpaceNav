@@ -22,13 +22,11 @@ classdef CPointProjectionPlotter < CBasePlotter
 
     end
 
-
     methods (Access = public)
         % CONSTRUCTOR
         function self = CPointProjectionPlotter()
             arguments
             end
-
 
         end
 
@@ -39,9 +37,7 @@ classdef CPointProjectionPlotter < CBasePlotter
         % METHODS
     end
 
-
     methods (Access = protected)
-
 
     end
 
@@ -126,7 +122,6 @@ classdef CPointProjectionPlotter < CBasePlotter
             objCamDetector = rectangle('Position', [0, 0, objCameraParams.ImageSize(1), objCameraParams.ImageSize(2)], ...
                                         'EdgeColor', 'r', 'LineWidth', 2); %#ok<NASGU>
 
-
             % Plot points set
             for idS = 1:ui32NumOfSets
 
@@ -156,7 +151,6 @@ classdef CPointProjectionPlotter < CBasePlotter
             xlabel('u [pix]', 'Color', charTextColor); 
             ylabel('v [pix]', 'Color', charTextColor);
             title('Projected 2D Mesh in Image Plane', 'Color', 'w');
-
 
             if kwargs.objSceneFig == 0 && kwargs.bEnforcePlotOpts
                 objCurrentAx = gca;
@@ -188,5 +182,4 @@ classdef CPointProjectionPlotter < CBasePlotter
     % [x,y] = abstract_function_name(args) NOTE: number of args matter.
     % end
 end
-
 

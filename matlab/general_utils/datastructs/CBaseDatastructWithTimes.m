@@ -67,14 +67,11 @@ classdef (Abstract) CBaseDatastructWithTimes < CBaseDatastruct
         end
     end
 
-
     methods (Access = protected)
         function assertValidity_(self)
             assert(not(isempty(self.dTimestamps)), 'ERROR: called query method with empty self.dTimestamps. You MUST specify timestamps to use this data struct.')
             assert(self.dTimestamps(end) > self.dTimestamps(1), 'ERROR: invalid self.dTimestamps. Last timestamp must be greater than first timestamp!')
         end
     end
-
-
 
 end

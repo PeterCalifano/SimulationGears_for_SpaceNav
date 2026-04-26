@@ -22,9 +22,6 @@ function [o_dlimbPixCoords, o_strConicData] = PlotPointsFromConicMatrix(dtightCo
 %% DEPENDENCIES
 % [-]
 % -------------------------------------------------------------------------------------------------------------
-%% Future upgrades
-% [-]
-% -------------------------------------------------------------------------------------------------------------
 %% Function code
 
 % Extract coefficients from the matrix (from GPT 4o)

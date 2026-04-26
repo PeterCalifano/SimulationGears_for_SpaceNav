@@ -35,9 +35,6 @@ end
 %% DEPENDENCIES
 % [-]
 % -------------------------------------------------------------------------------------------------------------
-%% Future upgrades
-% 1) Add assert checks for input consistency
-% -------------------------------------------------------------------------------------------------------------
 %% Function code
 
 ui16Nposes = size(i_drCam_IN, 2);
@@ -81,7 +78,6 @@ for idt = 1:delta_idT:ui16Nposes
     %     Zvec(1), Zvec(2), Zvec(3), 1, 'DisplayName', 'Cam. Z', 'LineWidth', 1.05, ...
     %     'Color', cmapCam(idt,:));
 
-
     quiver3(i_drCam_IN(1, idt), i_drCam_IN(2, idt), i_drCam_IN(3, idt), ...
         Zvec(1), Zvec(2), Zvec(3), 1, 'LineWidth', 1.05, ...
         'Color', cmapCam(idt,:));
@@ -90,8 +86,5 @@ for idt = 1:delta_idT:ui16Nposes
         'LineStyle', 'none', 'MarkerSize', 5, 'LineWidth', 1.3)
 
 end
-
-
-
 
 end

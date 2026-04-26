@@ -49,13 +49,6 @@ end
 %% DEPENDENCIES
 % 1) fastRayTriangleIntersection()
 % -------------------------------------------------------------------------------------------------------------
-%% Future upgrades
-% 
-% -------------------------------------------------------------------------------------------------------------
-
-% Defaults
-
-% TARGET BODY
 assert(size(strTargetBodyData.strShapeModel.ui32triangVertexPtr, 1) == 3, "ERROR: strShapeModel.ui32triangVertexPtr must have [3xN] shape.")
 assert(size(strTargetBodyData.strShapeModel.dVerticesPos, 1) == 3, "ERROR: strShapeModel.dVerticesPos must have [3xM] shape.")
 
@@ -190,14 +183,14 @@ parfor idL = 1:i32NumOfPointsToTrace
             % Perform intersection test against mesh (1 ray 1 triangle) using one-sided test 
             % (cull computations excluding back-facing triangles)
     
+            % TODO(devDir): keep root-repo callers aligned with the 6-input
+            % RayTriangleIntersection_MollerTrumbore signature.
             [bTmpIntersectFlag, ~, ~, dIntersectDistance] = RayTriangleIntersection_MollerTrumbore(dCamPosition_TB, ...
                 [dPointDirFromCamX_TB.Value(idL); dPointDirFromCamY_TB.Value(idL); dPointDirFromCamZ_TB.Value(idL);],  ... 
                 dTmpTriangleVertices(:, 1), ...
                 dTmpTriangleVertices(:, 2), ...
                 dTmpTriangleVertices(:, 3), ...
-                bTwoSidedTest, ...
-                false); % Normal ray, one-sided test
-
+                bTwoSidedTest); % Normal ray, one-sided test
 
             if (dRayToPointsFromCamNorm(idL) - dIntersectDistance) > eps('single') && bTmpIntersectFlag == true
                 % Intersection closer than point detected --> point occluded by mesh (camera does not see it)
@@ -249,7 +242,6 @@ bAllPointsVisibilityMask = bPointsToRayTrace;
 bAllPointsVisibilityMask(bPointsToRayTrace == 1) = bPointsVisibilityMask;
 dProjectedPoints_UV = dProjectedPoints_UV(:, bAllPointsVisibilityMask);
 
-
 end
 
 % LOCAL FUNCTION for Shadow Ray check
@@ -289,8 +281,7 @@ for id = 1:ui32NumTrianglesInSubset
                                                                    dTmpTriangleVertices(:, 1), ...
                                                                    dTmpTriangleVertices(:, 2), ...
                                                                    dTmpTriangleVertices(:, 3), ...
-                                                                   false, ...
-                                                                   true); % Shadow ray, one-sided test
+                                                                   false); % Shadow ray, one-sided test
 
         if bLightOcclusion == true
             break; % Intersection detected by Shadow Ray --> light occluded by mesh, point not illuminated
@@ -301,5 +292,3 @@ for id = 1:ui32NumTrianglesInSubset
 end
 
 end
-
-

@@ -24,13 +24,11 @@ classdef CBasePlotter < handle
         % Default plotting options
     end
 
-
     methods (Access = public)
         % CONSTRUCTOR
         function self = CBasePlotter()
             arguments
             end
-
 
         end
 
@@ -41,9 +39,7 @@ classdef CBasePlotter < handle
         % METHODS
     end
 
-
     methods (Access = protected)
-
 
     end
 
@@ -125,7 +121,6 @@ classdef CBasePlotter < handle
 
         end
 
-
         function [dEntitiesColorArray] = getRandomizedColormap(handleColorMapFcn, dNumOfEntries)
             % Generate colors using colormap specified by handleColorMapFcn
 
@@ -179,7 +174,6 @@ classdef CBasePlotter < handle
                 kwargs.bEnforcePlotOpts = true; % No figure provided, enable plot opts
             end
 
-
             if kwargs.bEnforcePlotOpts == true
                 [~, charTextColor, charBackGroundColor] = CBasePlotter.DefaultPlotOpts(objSceneFig, ...
                     "charRenderer", kwargs.charRenderer, ...
@@ -189,12 +183,9 @@ classdef CBasePlotter < handle
                 charTextColor = gca().XColor;
             end
 
-
         end
 
-
     end
-
 
     methods (Static, Access = protected)
         % Internal implementation
@@ -243,7 +234,5 @@ classdef CBasePlotter < handle
 
     end
 
-
 end
-
 

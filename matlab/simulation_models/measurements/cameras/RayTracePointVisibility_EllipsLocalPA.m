@@ -253,13 +253,14 @@ parfor idL = 1:i32NumOfPointsToTrace
             % Perform intersection test against mesh (1 ray 1 triangle) using one-sided test
             % (cull computations excluding back-facing triangles)
 
+            % TODO(devDir): keep root-repo callers aligned with the 6-input
+            % RayTriangleIntersection_MollerTrumbore signature.
             [bTmpIntersectFlag, ~, ~, dIntersectDistance, ~] = RayTriangleIntersection_MollerTrumbore(dCamPosition_TB, ...
                 [dPointDirFromCamX_TB(idL); dPointDirFromCamY_TB(idL); dPointDirFromCamZ_TB(idL);],  ...
                 dTmpTriangleVertices(:, 1), ...
                 dTmpTriangleVertices(:, 2), ...
                 dTmpTriangleVertices(:, 3), ...
-                bTwoSidedTest, ...
-                false); % Normal ray, one-sided test
+                bTwoSidedTest); % Normal ray, one-sided test
 
             bNoIntersect = bNoIntersect || bTmpIntersectFlag;
 
@@ -319,7 +320,6 @@ bAllPointsVisibilityMask(bPointsToRayTrace == 1) = bPointsVisibilityMask;
 dProjectedPoints_UV = dProjectedPoints_UV(:, bAllPointsVisibilityMask);
 
 end
-
 
 
 

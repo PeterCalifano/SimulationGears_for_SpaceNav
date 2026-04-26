@@ -42,11 +42,6 @@ function [o_dUVpixCoord, o_dDCM_fromINtoCAM] = pinholeProjectArrayHP(i_dKcam, i_
 %% DEPENDENCIES
 % [-]
 % -------------------------------------------------------------------------------------------------------------
-%% Future upgrades
-% 1) Add validity check for UV pixels inside detector 
-% -------------------------------------------------------------------------------------------------------------
-
-
 %% Function code
 % Get size of input (how many points to project)
 Npoints = uint16(size(i_dPosPoint_IN, 2));
