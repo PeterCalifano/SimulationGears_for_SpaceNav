@@ -380,6 +380,52 @@ classdef CShapeModel < CBaseDatastruct
             strSHgravityData = self.strSphHarmonicsGravityData_;
         end
 
+        function [self, strSHgravityData] = BuildAndSetSphericalHarmonicsGravityData(self, ui32MaxDegree, options)
+            %% DESCRIPTION
+            % Builds spherical harmonics gravity data from the loaded mesh
+            % and stores it in the object cache. This is the mutating
+            % instance-level companion to the static compute-only
+            % BuildSphericalHarmonicsGravityData() method.
+            %
+            % ACHTUNG: CShapeModel currently has value-class semantics
+            % through CBaseDatastruct, so the updated object must be
+            % captured by the caller.
+            % -------------------------------------------------------------------------------------------------------------
+            arguments
+                self
+                ui32MaxDegree                  (1,1) uint32 = uint32(4)
+                options.dGravParam             (1,1) double = NaN
+                options.dDensity               (1,1) double = NaN
+                options.dGravConst             (1,1) double = 6.67430e-11
+                options.dBodyRadiusRef         (1,1) double = NaN
+                options.ui32MaxFitIterations   (1,1) uint32 = uint32(5)
+            end
+
+            dGravParam = options.dGravParam;
+            dDensity   = options.dDensity;
+
+            % Get gravity defaults for model and target unit if not provided as input
+            if ~isfinite(dGravParam) && ~isfinite(dDensity)
+
+                strGravityDefaults = GetShapeModelScenarioGravityDefaults( ...
+                    self.charModelName, self.charTargetUnitOutput);
+            
+                dGravParam = strGravityDefaults.dGravParam;
+                dDensity   = strGravityDefaults.dDensity;
+            end
+
+            % Build SH gravity data struct and store it in the object cache
+            strSHgravityData = CShapeModel.BuildSphericalHarmonicsGravityData(self, ui32MaxDegree, ...
+                                                                            dGravParam=dGravParam, ...
+                                                                            dDensity=dDensity, ...
+                                                                            dGravConst=options.dGravConst, ...
+                                                                            dBodyRadiusRef=options.dBodyRadiusRef, ...
+                                                                            ui32MaxFitIterations=options.ui32MaxFitIterations);
+
+            self = self.setSphericalHarmonicsGravityData(strSHgravityData);
+            strSHgravityData = self.getSphericalHarmonicsGravityData();
+        end
+
     end
 
     methods (Access = protected)
@@ -479,6 +525,7 @@ classdef CShapeModel < CBaseDatastruct
                 warning('A shape model was already loaded before and is being overwritten.')
             end
         end
+
     end
 
     methods (Static, Access = public)
@@ -535,18 +582,25 @@ classdef CShapeModel < CBaseDatastruct
                                         options.bVertFacesOnly, char(charModelName), true, ...
                                         dMeshSimplifyFactor=dMeshSimplifyFactor);
 
-            % Build SH gravity data from the loaded model
-            strSHgravityData = CShapeModel.BuildSphericalHarmonicsGravityData(objShapeModel, ui32MaxDegree, ...
-                                                                        dGravParam=options.dGravParam, ...
-                                                                        dDensity=options.dDensity, ...
-                                                                        dGravConst=options.dGravConst, ...
-                                                                        dBodyRadiusRef=options.dBodyRadiusRef, ...
-                                                                        ui32MaxFitIterations=options.ui32MaxFitIterations);
-
-            % Cache SH gravity data on the shape model if requested
             if options.bCacheOnShapeModel
-                objShapeModel = objShapeModel.setSphericalHarmonicsGravityData(strSHgravityData);
-                strSHgravityData = objShapeModel.getSphericalHarmonicsGravityData();
+
+                % Build SH gravity data and store it in the object cache
+                objShapeModel = objShapeModel.BuildAndSetSphericalHarmonicsGravityData(ui32MaxDegree, ...
+                    dGravParam=options.dGravParam, ...
+                    dDensity=options.dDensity, ...
+                    dGravConst=options.dGravConst, ...
+                    dBodyRadiusRef=options.dBodyRadiusRef, ...
+                    ui32MaxFitIterations=options.ui32MaxFitIterations);
+                
+                    strSHgravityData = objShapeModel.getSphericalHarmonicsGravityData();
+            else
+                % Just build SH gravity data without caching on the object
+                strSHgravityData = CShapeModel.BuildSphericalHarmonicsGravityData(objShapeModel, ui32MaxDegree, ...
+                                                        dGravParam=options.dGravParam, ...
+                                                        dDensity=options.dDensity, ...
+                                                        dGravConst=options.dGravConst, ...
+                                                        dBodyRadiusRef=options.dBodyRadiusRef, ...
+                                                        ui32MaxFitIterations=options.ui32MaxFitIterations);
             end
         end
 
