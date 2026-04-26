@@ -43,10 +43,12 @@ end
 %                             fixed frame [LU/TU^2].
 % -------------------------------------------------------------------------------------------------------------
 %% CHANGELOG
+% 26-04-2026    Pietro Califano     Reuse shared spherical-to-Cartesian gradient mapping.
 % 23-04-2026    Pietro Califano     Add canonical target-frame SHE evaluator.
 % -------------------------------------------------------------------------------------------------------------
 %% DEPENDENCIES
 % EvalExtSphericalHarmExpCore()
+% MapSphericalGradientToCartesian()
 % -------------------------------------------------------------------------------------------------------------
 
 %% Function code
@@ -67,26 +69,6 @@ dSCLong = atan2(dPosSC_TB(2), dPosSC_TB(1));
     dPosSCnorm, dSCLat, dSCLong, ui32MaxDegree, ...
     dCSlmCoeffCols, dGravParam, dBodyRadiusRef);
 
-dUdr = dGradU(1);
-dUdLat = dGradU(2);
-dUdLong = dGradU(3);
-
-% Check for singularity at the poles (in-plane radius tending to zero) and handle explicitly
-dRho2 = dPosSC_TB(1)^2 + dPosSC_TB(2)^2;
-if dRho2 <= (16.0 * eps(dPosSCnorm) * dPosSCnorm)^2
-    dAccPert_TB = [0.0; 0.0; dUdr * dPosSC_TB(3) / dPosSCnorm];
-    return;
-end
-
-% Compute the Cartesian acceleration components from the spherical-coordinate gradient
-dRho = sqrt(dRho2);
-dInvR = 1.0 / dPosSCnorm;
-dInvR2 = dInvR * dInvR;
-dAuxVar = dUdr * dInvR - dPosSC_TB(3) * dUdLat / (dPosSCnorm^2 * dRho);
-
-dAccPert_TB = zeros(3, 1);
-dAccPert_TB(1) = dAuxVar * dPosSC_TB(1) - dUdLong * dPosSC_TB(2) / dRho2;
-dAccPert_TB(2) = dAuxVar * dPosSC_TB(2) + dUdLong * dPosSC_TB(1) / dRho2;
-dAccPert_TB(3) = dUdr * dPosSC_TB(3) * dInvR + dUdLat * dRho * dInvR2;
+dAccPert_TB = MapSphericalGradientToCartesian(dPosSC_TB, dGradU);
 
 end

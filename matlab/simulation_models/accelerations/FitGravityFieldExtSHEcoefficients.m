@@ -55,8 +55,8 @@ end
 % 23-04-2026    Pietro Califano     Add low-level field-to-SHE least-squares fitter.
 % -------------------------------------------------------------------------------------------------------------
 %% DEPENDENCIES
-% buildSHEtrigLUT()
-% buildSHElegendreLUT()
+% BuildExtSphHarmExpBasis()
+% MapSphericalGradientToCartesian()
 % -------------------------------------------------------------------------------------------------------------
 
 %% Function code
@@ -79,7 +79,10 @@ if any(~isfinite(dSamplePos_TB), 'all') || any(~isfinite(dSamplePotentialPert)) 
 end
 
 % Build the least-squares system for the joint potential and acceleration fit
-[ui32CoeffRowIds, ui8CoeffColIds, ui32NumStorageCoefficients, ui32NumUnknowns] = BuildExtSHEfitUnknownMap(ui32MaxDegree);
+ui32NumStorageCoefficients = (ui32MaxDegree + uint32(1)) * (ui32MaxDegree + uint32(2)) / uint32(2) - uint32(2);
+ui32NumUnknowns = ui32MaxDegree * ui32MaxDegree + 2 * ui32MaxDegree - uint32(3);
+ui32CoeffRowIds = zeros(double(ui32NumUnknowns), 1, 'uint32');
+ui8CoeffColIds = zeros(double(ui32NumUnknowns), 1, 'uint8');
 
 if 4 * double(ui32NumSamples) < double(ui32NumUnknowns)
     error('FitGravityFieldExtSHEcoefficients:UnderdeterminedSystem', ...
@@ -94,10 +97,23 @@ dRowScales = zeros(4 * double(ui32NumSamples), 1);
 for idSample = 1:double(ui32NumSamples)
     dPosSample = dSamplePos_TB(:, idSample);
     dRadius = norm(dPosSample);
+    if dRadius <= 0.0
+        error('FitGravityFieldExtSHEcoefficients:ZeroSamplePosition', ...
+            'Sample positions must have strictly positive norm.');
+    end
+
+    dSCLat = asin(dPosSample(3) / dRadius);
+    dSCLong = atan2(dPosSample(2), dPosSample(1));
 
     % Compute the unscaled potential and acceleration basis vectors for this sample
-    [dPotentialBasis, dAccBasisTB] = BuildExtSHEsampleBasis( ...
-        dPosSample, ui32MaxDegree, dGravParam, dBodyRadiusRef);
+    [dPotentialBasis, dGradUBasis, ui32CoeffRowIdsSample, ui8CoeffColIdsSample] = BuildExtSphHarmExpBasis( ...
+        dRadius, dSCLat, dSCLong, ui32MaxDegree, dGravParam, dBodyRadiusRef);
+    dAccBasisTB = MapSphericalGradientToCartesian(dPosSample, dGradUBasis);
+
+    if idSample == 1
+        ui32CoeffRowIds = ui32CoeffRowIdsSample;
+        ui8CoeffColIds = ui8CoeffColIdsSample;
+    end
 
     % Scale rows to improve conditioning
     dPotRowScale = dRadius / dGravParam;
@@ -184,124 +200,4 @@ strFitInfo.dAccRMSrel = dPredAccNormErr / max(dTargetAccNorm, eps(dTargetAccNorm
 strFitInfo.ui32CoeffRowIds = ui32CoeffRowIds;
 strFitInfo.ui8CoeffColIds = ui8CoeffColIds;
 
-end
-
-%% Internal helper functions
-function [ui32CoeffRowIds, ui8CoeffColIds, ui32NumStorageCoefficients, ui32NumUnknowns] = ...
-    BuildExtSHEfitUnknownMap(ui32MaxDegree)
-% Builds the mapping between the unknown coefficient vector used in the fit and the actual
-
-ui32NumStorageCoefficients = (ui32MaxDegree + uint32(1)) * (ui32MaxDegree + uint32(2)) / uint32(2) - uint32(2);
-ui32NumUnknowns = ui32MaxDegree * ui32MaxDegree + 2 * ui32MaxDegree - uint32(3);
-
-ui32CoeffRowIds = zeros(double(ui32NumUnknowns), 1, 'uint32');
-ui8CoeffColIds = zeros(double(ui32NumUnknowns), 1, 'uint8');
-
-idPair = uint32(1);
-idUnknown = uint32(1);
-
-for idxDeg = uint32(1):ui32MaxDegree
-    for idxOrd = uint32(0):idxDeg
-        if idxDeg == uint32(1) && idxOrd == uint32(0)
-            continue;
-        end
-
-        if idxDeg >= uint32(2)
-            ui32CoeffRowIds(idUnknown) = idPair;
-            ui8CoeffColIds(idUnknown) = uint8(1);
-            idUnknown = idUnknown + uint32(1);
-
-            if idxOrd > uint32(0)
-                ui32CoeffRowIds(idUnknown) = idPair;
-                ui8CoeffColIds(idUnknown) = uint8(2);
-                idUnknown = idUnknown + uint32(1);
-            end
-        end
-
-        idPair = idPair + uint32(1);
-    end
-end
-end
-
-function [dPotentialBasis, dAccBasisTB] = BuildExtSHEsampleBasis(dPosSC_TB, ui32MaxDegree, dGravParam, dBodyRadiusRef)
-% Builds the potential and acceleration basis vectors for a single sample position, following convention consumed by evaluation functions.
-
-dPosSCnorm = norm(dPosSC_TB);
-if dPosSCnorm <= 0.0
-    error('FitGravityFieldExtSHEcoefficients:ZeroSamplePosition', ...
-        'Sample positions must have strictly positive norm.');
-end
-
-ui32NumUnknowns = ui32MaxDegree * ui32MaxDegree + 2 * ui32MaxDegree - uint32(3);
-dPotentialBasis = zeros(1, double(ui32NumUnknowns));
-dAccBasisTB = zeros(3, double(ui32NumUnknowns));
-
-dSCLat = asin(dPosSC_TB(3) / dPosSCnorm);
-dSCLong = atan2(dPosSC_TB(2), dPosSC_TB(1));
-
-dTrigLUT = buildSHEtrigLUT(ui32MaxDegree, dSCLat, dSCLong);
-[dPlm, ui32IdPlm0] = buildSHElegendreLUT(sin(dSCLat), cos(dSCLat), ui32MaxDegree);
-
-dSinMLongLUT = dTrigLUT(:, 1);
-dCosMLongLUT = dTrigLUT(:, 2);
-dMTanLatLUT = dTrigLUT(:, 3);
-
-dRadiusRatio = dBodyRadiusRef / dPosSCnorm;
-dRadiusRatioPow = dRadiusRatio * dRadiusRatio;
-idUnknown = uint32(1);
-
-for idxDeg = uint32(2):ui32MaxDegree
-    dDegree = double(idxDeg);
-    idLm0 = ui32IdPlm0(idxDeg + uint32(1));
-
-    for idxOrd = uint32(0):idxDeg
-        idm = idxOrd + uint32(1);
-
-        dPlmVal = dPlm(idLm0 + idxOrd);
-        dPlmPlus1 = dPlm(idLm0 + idm);
-        dLatFactor = dPlmPlus1 - dMTanLatLUT(idm) * dPlmVal;
-
-        dPotBase = dGravParam / dPosSCnorm * dRadiusRatioPow * dPlmVal;
-        dUdrBase = -dGravParam / (dPosSCnorm^2) * (dDegree + 1.0) * dRadiusRatioPow * dPlmVal;
-        dUdLatBase = dGravParam / dPosSCnorm * dRadiusRatioPow * dLatFactor;
-        dUdLongBase = dGravParam / dPosSCnorm * dRadiusRatioPow * double(idxOrd) * dPlmVal;
-
-        dCosTerm = dCosMLongLUT(idm);
-        dSinTerm = dSinMLongLUT(idm);
-
-        dPotentialBasis(idUnknown) = dPotBase * dCosTerm;
-        dAccBasisTB(:, idUnknown) = MapSHEsphericalGradientToCartesian( ...
-            dPosSC_TB, dPosSCnorm, dUdrBase * dCosTerm, dUdLatBase * dCosTerm, -dUdLongBase * dSinTerm);
-        idUnknown = idUnknown + uint32(1);
-
-        if idxOrd > uint32(0)
-            dPotentialBasis(idUnknown) = dPotBase * dSinTerm;
-            dAccBasisTB(:, idUnknown) = MapSHEsphericalGradientToCartesian( ...
-                dPosSC_TB, dPosSCnorm, dUdrBase * dSinTerm, dUdLatBase * dSinTerm, dUdLongBase * dCosTerm);
-            idUnknown = idUnknown + uint32(1);
-        end
-    end
-
-    dRadiusRatioPow = dRadiusRatioPow * dRadiusRatio;
-end
-end
-
-function dAccTB = MapSHEsphericalGradientToCartesian(dPosSC_TB, dPosSCnorm, dUdr, dUdLat, dUdLong)
-dRho2 = dPosSC_TB(1)^2 + dPosSC_TB(2)^2;
-
-if dRho2 <= (16.0 * eps(dPosSCnorm) * dPosSCnorm)^2
-    dAccTB = [0.0; 0.0; dUdr * dPosSC_TB(3) / dPosSCnorm];
-    return;
-end
-
-dRho = sqrt(dRho2);
-dInvR = 1.0 / dPosSCnorm;
-dInvR2 = dInvR * dInvR;
-
-dCommon = dUdr * dInvR - dPosSC_TB(3) * dUdLat / (dPosSCnorm^2 * dRho);
-
-dAccTB = zeros(3, 1);
-dAccTB(1) = dCommon * dPosSC_TB(1) - dUdLong * dPosSC_TB(2) / dRho2;
-dAccTB(2) = dCommon * dPosSC_TB(2) + dUdLong * dPosSC_TB(1) / dRho2;
-dAccTB(3) = dUdr * dPosSC_TB(3) * dInvR + dUdLat * dRho * dInvR2;
 end
