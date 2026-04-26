@@ -12,6 +12,7 @@ arguments
     options.bVertFacesOnly              (1,1) logical = true;
     options.bLoadShapeModel             (1,1) logical = true;
     options.charOutputLengthUnits       (1,:) char {mustBeMember(options.charOutputLengthUnits, ["km", "m"])} = "m"
+    options.dMeshSimplifyFactor         (1,1) double {mustBeFinite} = 1.0
     options.bLoadModifiedVariant        (1,1) logical = false;
     options.charBlenderModelPath        (1,:) string {mustBeText} = ""
     options.charShapeModelObjPath       (1,:) string {mustBeText} = ""
@@ -38,6 +39,7 @@ end
 % options.bVertFacesOnly            (1,1) logical= true;
 % options.bLoadShapeModel           (1,1) logical= true;
 % options.charOutputLengthUnits     (1,:) char {mustBeMember(options.charOutputLengthUnits, ["km", "m"])} = "m"
+% options.dMeshSimplifyFactor       (1,1) double = 1.0 % 1.0 keeps full mesh, 0.0 clears it
 % -------------------------------------------------------------------------------------------------------------
 %% OUTPUT
 % objShapeModel
@@ -49,6 +51,7 @@ end
 % 25-08-2025    Pietro Califano     Extend function to work with km and meters based on input options
 % 31-08-2025    Pietro Califano     Define ellipsoidal model for all available bodies
 % 27-01-2026    Pietro Califano     Improve overriding options management for paths, minor fixes
+% 24-04-2026    Pietro Califano     Add load-time mesh keep-fraction passthrough to CShapeModel
 % -------------------------------------------------------------------------------------------------------------
 %% DEPENDENCIES
 % [-]
@@ -76,6 +79,8 @@ elseif strcmpi(options.charOutputLengthUnits, "m")
     dInvLengthScaleCoeff     = 1/1000.0;
 end
 
+dMeshSimplifyFactor = min(max(double(options.dMeshSimplifyFactor), 0.0), 1.0);
+
 switch enumTargetName
     case "Apophis"
         % DEVNOTE: currently assumes rcs-1 simulator loader
@@ -101,7 +106,8 @@ switch enumTargetName
         charShapeModelObjPath_ = OverrideFilePathIfProvided(charShapeModelObjPath_, options.charShapeModelObjPath);
 
         objShapeModel = CShapeModel('file_obj', charShapeModelObjPath_, ...
-            'km', options.charOutputLengthUnits, options.bVertFacesOnly, char(enumTargetName), options.bLoadShapeModel);
+            'km', options.charOutputLengthUnits, options.bVertFacesOnly, char(enumTargetName), options.bLoadShapeModel, ...
+            dMeshSimplifyFactor=dMeshSimplifyFactor);
         % objShapeModel.charModelName = "Apophis";
 
         try
@@ -130,7 +136,8 @@ switch enumTargetName
             charKernelname = fullfile(charDataRootPath, 'Itokawa/dsk/hay_a_amica_5_itokawashape_v1_0_64q.bds');
 
             objShapeModel = CShapeModel('cspice', charKernelname, 'km', options.charOutputLengthUnits, ...
-                                options.bVertFacesOnly, char(enumTargetName));
+                                options.bVertFacesOnly, char(enumTargetName), true, ...
+                                dMeshSimplifyFactor=dMeshSimplifyFactor);
 
         else
             % Variant model
@@ -147,7 +154,8 @@ switch enumTargetName
                                          options.charOutputLengthUnits, ...
                                          options.bVertFacesOnly, ...
                                          char(enumTargetName), ...
-                                         false);
+                                         false, ...
+                                         dMeshSimplifyFactor=dMeshSimplifyFactor);
 
             % objShapeModel.charModelName = "Itokawa";
         end
@@ -174,7 +182,8 @@ switch enumTargetName
         % charKernelname = fullfile(charDataRootPath, 'Bennu_OREx/dsk/bennu_g_01680mm_alt_obj_0000n00000_v021.bds');
 
         objShapeModel = CShapeModel('cspice', charKernelname, 'km', options.charOutputLengthUnits, ...
-                        options.bVertFacesOnly, char(enumTargetName), options.bLoadShapeModel);
+                        options.bVertFacesOnly, char(enumTargetName), options.bLoadShapeModel, ...
+                        dMeshSimplifyFactor=dMeshSimplifyFactor);
 
         % Assign reference radius
         objShapeModel.dObjectReferenceSize = dLengthScaleCoeff * 1E-3 * 245.03 ; % [m]
@@ -199,7 +208,8 @@ switch enumTargetName
         charShapeModelObjPath_  = OverrideFilePathIfProvided(charShapeModelObjPath_, options.charShapeModelObjPath);
 
         objShapeModel = CShapeModel('file_obj', charShapeModelObjPath_, 'km', options.charOutputLengthUnits, ...
-                                options.bVertFacesOnly, char(enumTargetName), options.bLoadShapeModel);
+                                options.bVertFacesOnly, char(enumTargetName), options.bLoadShapeModel, ...
+                                dMeshSimplifyFactor=dMeshSimplifyFactor);
 
         objShapeModel.dObjectReferenceSize = dLengthScaleCoeff * 1737.42; % [m] or [km]
         objShapeModel.charTargetUnitOutput = options.charOutputLengthUnits;
@@ -215,7 +225,8 @@ switch enumTargetName
         charShapeModelObjPath_ = OverrideFilePathIfProvided(charShapeModelObjPath_, options.charShapeModelObjPath);
 
         objShapeModel = CShapeModel('file_obj', charShapeModelObjPath_, 'km', options.charOutputLengthUnits, ...
-                            options.bVertFacesOnly, char(enumTargetName), options.bLoadShapeModel);
+                            options.bVertFacesOnly, char(enumTargetName), options.bLoadShapeModel, ...
+                            dMeshSimplifyFactor=dMeshSimplifyFactor);
 
         objShapeModel.dObjectReferenceSize = dLengthScaleCoeff * 3386.2; % [m] or [km]
         objShapeModel.charTargetUnitOutput = options.charOutputLengthUnits;
@@ -230,7 +241,8 @@ switch enumTargetName
         charShapeModelObjPath_ = OverrideFilePathIfProvided(charShapeModelObjPath_, options.charShapeModelObjPath);
         
         objShapeModel = CShapeModel('file_obj', charShapeModelObjPath_, 'km', options.charOutputLengthUnits, ...
-                                options.bVertFacesOnly, char(enumTargetName), options.bLoadShapeModel);
+                                options.bVertFacesOnly, char(enumTargetName), options.bLoadShapeModel, ...
+                                dMeshSimplifyFactor=dMeshSimplifyFactor);
 
         objShapeModel.dObjectReferenceSize = dLengthScaleCoeff * 939.0/2; % [m] or [km]
         objShapeModel.charTargetUnitOutput = options.charOutputLengthUnits;
@@ -248,7 +260,8 @@ switch enumTargetName
     
     case "NotDefined"
         objShapeModel = CShapeModel('file_obj', "", 'km', options.charOutputLengthUnits, ...
-            options.bVertFacesOnly, char(enumTargetName), options.bLoadShapeModel);
+            options.bVertFacesOnly, char(enumTargetName), options.bLoadShapeModel, ...
+            dMeshSimplifyFactor=dMeshSimplifyFactor);
         objShapeModel.charTargetUnitOutput = options.charOutputLengthUnits;
         
         charBlenderModelPath = "";
@@ -259,7 +272,8 @@ switch enumTargetName
         if options.bLoadShapeModel == false
             warning('Invalid or unavailable scenario, but no loading of shape required. Returning empty shape model.');
             objShapeModel = CShapeModel('file_obj', "", 'km', options.charOutputLengthUnits, ...
-                            options.bVertFacesOnly, char(enumTargetName), options.bLoadShapeModel);
+                options.bVertFacesOnly, char(enumTargetName), options.bLoadShapeModel, ...
+                dMeshSimplifyFactor=dMeshSimplifyFactor);
         else
             error('Data for selected scenarios are either not setup or unavailable.');
         end
