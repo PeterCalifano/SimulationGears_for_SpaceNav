@@ -11,6 +11,7 @@ classdef CShapeModel < CBaseDatastruct
     % 10-11-2025    Pietro Califano     Minor bug fixes
     % 22-04-2026    Pietro Califano     Extend class with utilities to build SH and Polyhedral gravity from
     %                                   shape model with known density and mass
+    % 24-04-2026    Pietro Califano     Add mesh simplification utility and load-time keep-fraction option
     % -------------------------------------------------------------------------------------------------------------
     %% DEPENDENCIES
     % [-]
@@ -30,6 +31,7 @@ classdef CShapeModel < CBaseDatastruct
         dVerticesPos = [];        % Assumed as [3, N] array
         ui32NumOfVertices = uint32(0);
         unitScaler = 1;
+        dMeshSimplifyFactor (1,1) double {mustBeFinite} = 1.0;
 
         % Optional data
         dTexCoords = [];
@@ -44,6 +46,10 @@ classdef CShapeModel < CBaseDatastruct
         dGravEdgeDyadics       = [];  % [3 x 3 x nEdges, double]
         dGravFaceDyadics       = [];  % [3 x 3 x nFaces, double]
 
+        % Spherical harmonics gravity cache (populated explicitly through setSphericalHarmonicsGravityData)
+        bHasSpherHarmonicsGravityData_ = false;
+        strSphHarmonicsGravityData_ struct = struct()
+
     end
 
     methods (Access = public)
@@ -54,7 +60,8 @@ classdef CShapeModel < CBaseDatastruct
                 charTargetUnitOutput, ...
                 bVertFacesOnly, ...
                 charModelName, ...
-                bLoadShapeModel)
+                bLoadShapeModel, ...
+                options)
             arguments
                 enumLoadingMethod       (1,:) string {mustBeA(enumLoadingMethod, ["string", "char"]), ...
                     mustBeMember(enumLoadingMethod, ["mat", "cspice", "struct", "file_obj"])} = "file_obj"
@@ -66,6 +73,9 @@ classdef CShapeModel < CBaseDatastruct
                 charModelName           (1,:) char = ""
                 bLoadShapeModel         (1,1) logical = true;
             end
+            arguments
+                options.dMeshSimplifyFactor (1,1) double {mustBeFinite} = 1.0
+            end
 
             % For default (placeholder) construction
             if nargin < 1
@@ -74,6 +84,7 @@ classdef CShapeModel < CBaseDatastruct
 
             self.charTargetUnitOutput = charTargetUnitOutput;
             self.bDefaultConstructed  = false;
+            self.dMeshSimplifyFactor  = min(max(double(options.dMeshSimplifyFactor), 0.0), 1.0);
 
             % Determine scaling to match length unit
             if (strcmpi(charInputUnit, 'm') && strcmpi(self.charTargetUnitOutput, 'm')) || ...
@@ -118,6 +129,10 @@ classdef CShapeModel < CBaseDatastruct
             if self.ui32NumOfVertices > 0
                 % Update unit scaling
                 self.dVerticesPos = self.unitScaler * self.dVerticesPos;
+
+                if self.dMeshSimplifyFactor < 1.0
+                    [self, ~] = self.SimplifyMesh(100.0 * (1.0 - self.dMeshSimplifyFactor));
+                end
             end
         end
 
@@ -179,7 +194,92 @@ classdef CShapeModel < CBaseDatastruct
 
         end
 
-        function BuildPolyhedronGravityData(self)
+        function [self, strReductionStats] = SimplifyMesh(self, dReductionPercent)
+            %% DESCRIPTION
+            % Reduces the number of faces in the current triangular mesh
+            % using MATLAB's reducepatch. The requested input is expressed
+            % as percentage of face reduction, while the achieved vertex
+            % and face reductions are returned in the output stats struct.
+            % A value of 100 clears the mesh completely.
+            %
+            % ACHTUNG: CShapeModel currently has value-class semantics
+            % through CBaseDatastruct, so the updated object must be
+            % captured by the caller.
+            % -------------------------------------------------------------------------------------------------------------
+            arguments
+                self
+                dReductionPercent (1,1) double {mustBeFinite, mustBeGreaterThanOrEqual(dReductionPercent, 0), mustBeLessThanOrEqual(dReductionPercent, 100)}
+            end
+
+            assert(self.bHasData_, 'CShapeModel:NoData', ...
+                'Shape model must be loaded before calling SimplifyMesh().');
+
+            ui32NumFacesBefore = uint32(size(self.ui32triangVertexPtr, 2));
+            ui32NumVertsBefore = uint32(size(self.dVerticesPos, 2));
+
+            % Initialize reduction stats struct with pre-reduction values and requested reduction
+            strReductionStats = struct( ...
+                'ui32NumFacesBefore', ui32NumFacesBefore, ...
+                'ui32NumFacesAfter', ui32NumFacesBefore, ...
+                'ui32NumVerticesBefore', ui32NumVertsBefore, ...
+                'ui32NumVerticesAfter', ui32NumVertsBefore, ...
+                'dRequestedReductionPercent', dReductionPercent, ...
+                'dAppliedKeepFraction', 1.0 - dReductionPercent / 100.0, ...
+                'dAchievedFaceReductionPercent', 0.0, ...
+                'dAchievedVertexReductionPercent', 0.0);
+
+            if dReductionPercent == 0 || ui32NumFacesBefore == 0
+                return
+            end
+
+            if dReductionPercent == 100
+                self.ui32triangVertexPtr = zeros(3, 0, 'uint32');
+                self.dVerticesPos        = zeros(3, 0, 'double');
+
+            else
+                % Execute reduction and update mesh data
+                dKeepFraction = strReductionStats.dAppliedKeepFraction;
+                [dFacesReduced, dVertsReduced] = reducepatch( ...
+                    double(self.ui32triangVertexPtr'), self.dVerticesPos', dKeepFraction);
+
+                self.ui32triangVertexPtr = uint32(dFacesReduced');
+                self.dVerticesPos        = dVertsReduced';
+            end
+
+            % Fill in reduction stats with achieved reductions
+            self.ui32NumOfVertices   = uint32(size(self.dVerticesPos, 2));
+
+            strReductionStats.ui32NumFacesAfter = uint32(size(self.ui32triangVertexPtr, 2));
+            strReductionStats.ui32NumVerticesAfter = self.ui32NumOfVertices;
+            strReductionStats.dAchievedFaceReductionPercent = 100.0 * ...
+                (1.0 - double(strReductionStats.ui32NumFacesAfter) / double(ui32NumFacesBefore));
+            strReductionStats.dAchievedVertexReductionPercent = 100.0 * ...
+                (1.0 - double(strReductionStats.ui32NumVerticesAfter) / double(ui32NumVertsBefore));
+
+            if ~isempty(self.dTexCoords) || ~isempty(self.ui32TrianglesTexIndex) || ...
+                    ~isempty(self.dNormals) || ~isempty(self.ui32TrianglesNormalsIndex)
+
+                warning('CShapeModel:SimplifyMeshDropsAuxiliaryObjData', ...
+                    ['SimplifyMesh() only updates mesh geometry. Existing texture and normal ', ...
+                     'data are being cleared because their indices are no longer valid after decimation.']);
+                
+                self.dTexCoords = [];
+                self.ui32TrianglesTexIndex = [];
+                self.dNormals = [];
+                self.ui32TrianglesNormalsIndex = [];
+            end
+
+            % Geometry-dependent caches become stale after decimation.
+            self.bHasGravityData_ = false;
+            self.ui32GravEdgeVertexIds = [];
+            self.dGravEdgeDyadics = [];
+            self.dGravFaceDyadics = [];
+
+            self.bHasSpherHarmonicsGravityData_ = false;
+            self.strSphHarmonicsGravityData_ = struct();
+        end
+
+        function self = BuildPolyhedronGravityData(self)
             %% DESCRIPTION
             % Precomputes and caches the geometric data (edge vertex IDs, edge
             % dyadic tensors, face dyadic tensors) required by EvalPolyhedronGrav.
@@ -188,6 +288,10 @@ classdef CShapeModel < CBaseDatastruct
             % getPolyhedronGravityData().
             % ACHTUNG: Vertices and faces are stored internally as [3,N]. This
             % method transposes them to [N,3] for ComputePolyhedronFaceEdgeData.
+            %
+            % ACHTUNG: CShapeModel currently has value-class semantics
+            % through CBaseDatastruct, so the updated object must be
+            % captured by the caller.
             % -------------------------------------------------------------------------------------------------------------
             %% DEPENDENCIES
             % ComputePolyhedronFaceEdgeData
@@ -227,6 +331,53 @@ classdef CShapeModel < CBaseDatastruct
             dFaceDyadics      = self.dGravFaceDyadics;
             ui32FacesRows     = uint32(self.ui32triangVertexPtr');
             dVerticesRows     = self.dVerticesPos';
+        end
+
+        function self = setSphericalHarmonicsGravityData(self, strSHgravityData)
+            %% DESCRIPTION
+            % Stores previously computed spherical harmonics gravity data in
+            % the object cache. Use the static
+            % BuildSphericalHarmonicsGravityData() method to generate the
+            % struct, then call this setter explicitly.
+            %
+            % ACHTUNG: CShapeModel currently has value-class semantics
+            % through CBaseDatastruct, so the updated object must be
+            % captured by the caller.
+            % -------------------------------------------------------------------------------------------------------------
+            arguments
+                self
+                strSHgravityData (1,1) struct
+            end
+
+            % Validate that the input struct has the required fields
+            cellRequiredFields = {'dCSlmCoeffCols', 'ui32MaxDegree', 'dGravParam', ...
+                'dBodyRadiusRef', 'dDensity', 'dGravConst', 'strFitStats'};
+
+            for idField = 1:numel(cellRequiredFields)
+                assert(isfield(strSHgravityData, cellRequiredFields{idField}), ...
+                    'CShapeModel:InvalidSHGravityData', ...
+                    'Missing required field "%s" in SH gravity data struct.', ...
+                    cellRequiredFields{idField});
+            end
+
+            % Set data and flag
+            self.strSphHarmonicsGravityData_ = strSHgravityData;
+            self.bHasSpherHarmonicsGravityData_ = true;
+        end
+
+        function strSHgravityData = getSphericalHarmonicsGravityData(self)
+            %% DESCRIPTION
+            % Returns the cached spherical harmonics gravity data previously
+            % stored through setSphericalHarmonicsGravityData().
+            % -------------------------------------------------------------------------------------------------------------
+            arguments
+                self
+            end
+
+            assert(self.bHasSpherHarmonicsGravityData_, 'CShapeModel:NoSHgravityData', ...
+                'Spherical harmonics gravity data not available. Compute and set it first.');
+
+            strSHgravityData = self.strSphHarmonicsGravityData_;
         end
 
     end
@@ -331,6 +482,104 @@ classdef CShapeModel < CBaseDatastruct
     end
 
     methods (Static, Access = public)
+
+        function [objShapeModel, strSHgravityData] = BuildSphericalHarmonicsGravityDataFromObj( ...
+                charObjFilePath, ui32MaxDegree, options)
+            arguments
+                charObjFilePath                 (1,:) string {mustBeA(charObjFilePath, ["string", "char"])}
+                ui32MaxDegree                   (1,1) uint32
+                options.charInputUnit          (1,:) string {mustBeA(options.charInputUnit, ["string", "char"]), ...
+                    mustBeMember(options.charInputUnit, ["m", "km"])} = "m"
+                options.charTargetUnitOutput   (1,:) string {mustBeA(options.charTargetUnitOutput, ["string", "char"]), ...
+                    mustBeMember(options.charTargetUnitOutput, ["m", "km"])} = "m"
+                options.bVertFacesOnly         (1,1) logical = true
+                options.charModelName          (1,:) string {mustBeA(options.charModelName, ["string", "char"])} = ""
+                options.dGravParam             (1,1) double = NaN
+                options.dDensity               (1,1) double = NaN
+                options.dGravConst             (1,1) double = 6.67430e-11
+                options.dBodyRadiusRef         (1,1) double = NaN
+                options.ui32MaxFitIterations   (1,1) uint32 = uint32(5)
+                options.dMeshSimplifyFactor    (1,1) double {mustBeFinite} = 1.0
+                options.bCacheOnShapeModel     (1,1) logical = true
+            end
+            %% DESCRIPTION
+            % Static compute-only utility that loads a shape model from a
+            % Wavefront .obj file and builds spherical harmonics gravity
+            % data from it.
+            %
+            % The method mirrors the compute-only style of
+            % BuildSphericalHarmonicsGravityData(): it performs no
+            % diagnostics plots and no workflow-side reporting. Use the
+            % returned object directly, or cache the fitted SH data on it
+            % by leaving options.bCacheOnShapeModel = true.
+            % -------------------------------------------------------------------------------------------------------------
+
+            if ~isfile(charObjFilePath)
+                error('CShapeModel:ObjFileNotFound', ...
+                    'Cannot find .obj file: %s', char(charObjFilePath));
+            end
+
+            % Determine model name from input path if not provided explicitly
+            if options.charModelName == ""
+                [~, charModelStem, ~] = fileparts(char(charObjFilePath));
+                charModelName = string(charModelStem);
+            else
+                charModelName = options.charModelName;
+            end
+
+            % Clamp mesh simplification factor to [0,1]
+            dMeshSimplifyFactor = min(max(double(options.dMeshSimplifyFactor), 0.0), 1.0);
+
+            % Load shape model from obj file
+            objShapeModel = CShapeModel("file_obj", charObjFilePath, options.charInputUnit, options.charTargetUnitOutput, ...
+                                        options.bVertFacesOnly, char(charModelName), true, ...
+                                        dMeshSimplifyFactor=dMeshSimplifyFactor);
+
+            % Build SH gravity data from the loaded model
+            strSHgravityData = CShapeModel.BuildSphericalHarmonicsGravityData(objShapeModel, ui32MaxDegree, ...
+                                                                        dGravParam=options.dGravParam, ...
+                                                                        dDensity=options.dDensity, ...
+                                                                        dGravConst=options.dGravConst, ...
+                                                                        dBodyRadiusRef=options.dBodyRadiusRef, ...
+                                                                        ui32MaxFitIterations=options.ui32MaxFitIterations);
+
+            % Cache SH gravity data on the shape model if requested
+            if options.bCacheOnShapeModel
+                objShapeModel = objShapeModel.setSphericalHarmonicsGravityData(strSHgravityData);
+                strSHgravityData = objShapeModel.getSphericalHarmonicsGravityData();
+            end
+        end
+
+        function strSHgravityData = BuildSphericalHarmonicsGravityData(objShapeModel, ui32MaxDegree, options)
+            arguments
+                objShapeModel                  (1,1) CShapeModel
+                ui32MaxDegree                  (1,1) uint32
+                options.dGravParam             (1,1) double = NaN
+                options.dDensity               (1,1) double = NaN
+                options.dGravConst             (1,1) double = 6.67430e-11
+                options.dBodyRadiusRef         (1,1) double = NaN
+                options.ui32MaxFitIterations   (1,1) uint32 = uint32(5)
+            end
+            %% DESCRIPTION
+            % Static compute-only utility to build spherical harmonics
+            % gravity data from the mesh stored in a CShapeModel object.
+            % The method does not mutate the object. Store the returned
+            % struct explicitly through setSphericalHarmonicsGravityData().
+            % -------------------------------------------------------------------------------------------------------------
+
+            assert(objShapeModel.bHasData_, 'CShapeModel:NoData', ...
+                'Shape model must be loaded before building SH gravity data.');
+
+            ui32FacesRows = uint32(objShapeModel.ui32triangVertexPtr');
+            dVerticesRows = objShapeModel.dVerticesPos';
+
+            strSHgravityData = FitSpherHarmCoeffToPolyhedrGrav(ui32FacesRows, dVerticesRows, ui32MaxDegree, ...
+                                                                options.dGravParam, ...
+                                                                options.dDensity, ...
+                                                                options.dGravConst, ...
+                                                                options.dBodyRadiusRef, ...
+                                                                options.ui32MaxFitIterations);
+        end
 
         function [ui32TrianglesIndex, dVerticesCoords, dTexCoords, ...
                 ui32TrianglesTexIndex, dNormals, ui32TrianglesNormalsIndex] = LoadModelFromObj(charObjFilePath, bVertFacesOnly) %#codegen
@@ -469,4 +718,3 @@ classdef CShapeModel < CBaseDatastruct
     end
 
 end
-
