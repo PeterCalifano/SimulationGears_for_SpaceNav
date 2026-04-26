@@ -1,5 +1,13 @@
+<<<<<<<< HEAD:matlab/simulation_models/accelerations/EvalJac_ExtSphHarmExpInTargetFrame.m
 function dJacSHE_TB = EvalJac_ExtSphHarmExpInTargetFrame(dRSC_TB, ...
     ui32MaxDegree, dCSlmCoeffCols, dGravParam, dBodyRadiusRef) %#codegen
+========
+function dJacSHE_TB = EvalJac_ExtSphericalHarmExp(dRSC_TB, ...
+    ui32MaxDegree, ...
+    dCSlmCoeffCols, ...
+    dGravParam, ...
+    dBodyRadiusRef) %#codegen
+>>>>>>>> feature/upgrade_rhs_jacobians_impl:matlab/simulation_models/accelerations/EvalJac_ExtSphericalHarmExp.m
 arguments
     dRSC_TB             (3,1) double {mustBeReal, mustBeFinite}
     ui32MaxDegree       (1,1) uint32
@@ -8,8 +16,13 @@ arguments
     dBodyRadiusRef      (1,1) double {mustBeReal, mustBeFinite, mustBePositive}
 end
 %% PROTOTYPE
+<<<<<<<< HEAD:matlab/simulation_models/accelerations/EvalJac_ExtSphHarmExpInTargetFrame.m
 % dJacSHE_TB = EvalJac_ExtSphHarmExpInTargetFrame(dRSC_TB, ui32MaxDegree, ...
 %     dCSlmCoeffCols, dGravParam, dBodyRadiusRef) %#codegen
+========
+% dJacSHE_TB = EvalJac_ExtSphericalHarmExp(dRSC_TB, ui32MaxDegree, dCSlmCoeffCols, ...
+%                             dGravParam, dBodyRadiusRef) %#codegen
+>>>>>>>> feature/upgrade_rhs_jacobians_impl:matlab/simulation_models/accelerations/EvalJac_ExtSphericalHarmExp.m
 % -------------------------------------------------------------------------------------------------------------
 %% DESCRIPTION
 % Canonical target-frame Jacobian evaluator for the Exterior Spherical
@@ -64,7 +77,11 @@ end
 dPosNorm = norm(dRSC_TB);
 
 if dPosNorm <= 0.0
+<<<<<<<< HEAD:matlab/simulation_models/accelerations/EvalJac_ExtSphHarmExpInTargetFrame.m
     error('EvalJac_ExtSphHarmExpInTargetFrame:ZeroPosition', ...
+========
+    error('EvalJac_ExtSphericalHarmExp:ZeroPosition', ...
+>>>>>>>> feature/upgrade_rhs_jacobians_impl:matlab/simulation_models/accelerations/EvalJac_ExtSphericalHarmExp.m
         'Position vector must be non-zero.');
 end
 
@@ -73,7 +90,11 @@ if ui32MaxDegree >= uint32(2)
         / uint32(2) - uint32(2);
 
     if size(dCSlmCoeffCols, 1) < double(ui32RequiredRows)
+<<<<<<<< HEAD:matlab/simulation_models/accelerations/EvalJac_ExtSphHarmExpInTargetFrame.m
         error('EvalJac_ExtSphHarmExpInTargetFrame:InsufficientCoefficients', ...
+========
+        error('EvalJac_ExtSphericalHarmExp:InsufficientCoefficients', ...
+>>>>>>>> feature/upgrade_rhs_jacobians_impl:matlab/simulation_models/accelerations/EvalJac_ExtSphericalHarmExp.m
             ['dCSlmCoeffCols has %d rows, but degree %d requires at least %d ' ...
             'rows in ExtSHE column-pair format.'], ...
             size(dCSlmCoeffCols, 1), double(ui32MaxDegree), double(ui32RequiredRows));
