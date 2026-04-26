@@ -29,7 +29,7 @@ end
 % % strAccelInfo
 % -------------------------------------------------------------------------------------------------------------
 %% CHANGELOG
-% 08-07-2024    Pietro Califano   Coded from computeDynFcn and FUTURE codes for reference trajectory generation
+% 08-07-2024    Pietro Califano   Coded from ComputeDynFcn and FUTURE codes for reference trajectory generation
 % 19-07-2024    Pietro Califano   1st version completed and verified
 % 12-03-2025    Pietro Califano   Upgrade for use in CScenarioGenerator   
 % -------------------------------------------------------------------------------------------------------------
