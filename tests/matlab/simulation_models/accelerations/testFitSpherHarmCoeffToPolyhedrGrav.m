@@ -189,7 +189,7 @@ classdef testFitSpherHarmCoeffToPolyhedrGrav < matlab.unittest.TestCase
                 dDensity=2500.0, dGravConst=testCase.dGravConst, ...
                 ui32MaxFitIterations=uint32(3));
 
-            objShapeModel = objShapeModel.SetSphericalHarmonicsGravityData(strSHgravityData);
+            objShapeModel = objShapeModel.setSphericalHarmonicsGravityData(strSHgravityData);
             strCachedSHgravityData = objShapeModel.getSphericalHarmonicsGravityData();
 
             testCase.verifyEqual(strCachedSHgravityData.dCSlmCoeffCols, strSHgravityData.dCSlmCoeffCols, ...
