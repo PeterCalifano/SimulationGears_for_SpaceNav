@@ -104,14 +104,6 @@ classdef testExtSHE_CrossValidation < matlab.unittest.TestCase
             dAccPert = dAccTotal.' + dMu * dPos / norm(dPos)^3;
         end
 
-        function dParams = BuildLegacyParamStruct(dCSlmCols, dMu, dRadius)
-            dParams = struct( ...
-                'mu', dMu, ...
-                'meanRbody', dRadius, ...
-                'Clm_LUT', dCSlmCols(:, 1), ...
-                'Slm_LUT', dCSlmCols(:, 2));
-        end
-
         function dJac = FiniteDifferenceJacobian(dPos, ui32MaxDeg, dCSlmCols, dMu, dRadius)
             dStep = 1.0e-6 * max(norm(dPos), dRadius);
             dJac = zeros(3, 3);
@@ -120,14 +112,30 @@ classdef testExtSHE_CrossValidation < matlab.unittest.TestCase
                 dPerturb = zeros(3, 1);
                 dPerturb(idxAxis) = dStep;
 
-                dAccPlus = ExtSHE_AccTB(dPos + dPerturb, ui32MaxDeg, dCSlmCols, dMu, dRadius);
-                dAccMinus = ExtSHE_AccTB(dPos - dPerturb, ui32MaxDeg, dCSlmCols, dMu, dRadius);
+                [~, dAccPlus] = EvalExtSphHarmExpInTargetFrame( ...
+                    dPos + dPerturb, ui32MaxDeg, dCSlmCols, dMu, dRadius);
+                [~, dAccMinus] = EvalExtSphHarmExpInTargetFrame( ...
+                    dPos - dPerturb, ui32MaxDeg, dCSlmCols, dMu, dRadius);
 
                 dJac(:, idxAxis) = (dAccPlus - dAccMinus) / (2.0 * dStep);
             end
 
             dJac = 0.5 * (dJac + dJac.');
             dJac = dJac - trace(dJac) / 3.0 * eye(3);
+        end
+
+        function [dPotentialPert, dAccPertTB] = EvaluateCanonicalTargetFrame(dPos, ui32MaxDeg, dCSlmCols, dMu, dRadius)
+            [dPotentialPert, dAccPertTB] = EvalExtSphHarmExpInTargetFrame( ...
+                dPos, ui32MaxDeg, dCSlmCols, dMu, dRadius);
+        end
+
+        function dAccPertTB = EvaluateCanonicalAcceleration(dPos, ui32MaxDeg, dCSlmCols, dMu, dRadius)
+            [~, dAccPertTB] = testExtSHE_CrossValidation.EvaluateCanonicalTargetFrame( ...
+                dPos, ui32MaxDeg, dCSlmCols, dMu, dRadius);
+        end
+
+        function dAccPertTB = EvaluateCanonicalAccelerationMex(fcnMex, dPos, ui32MaxDeg, dCSlmCols, dMu, dRadius)
+            [~, dAccPertTB] = fcnMex(dPos, ui32MaxDeg, dCSlmCols, dMu, dRadius);
         end
 
         function sMexInfo = BuildMexTargets()
@@ -152,23 +160,20 @@ classdef testExtSHE_CrossValidation < matlab.unittest.TestCase
 
             ui32MaxDeg = uint32(8);
             ui32Count = testExtSHE_CrossValidation.GetCoeffCount(ui32MaxDeg);
-            dParams = struct( ...
-                'mu', 0.0, ...
-                'meanRbody', 0.0, ...
-                'Clm_LUT', zeros(double(ui32Count), 1), ...
-                'Slm_LUT', zeros(double(ui32Count), 1));
+            dSampleRadius = 7000.0;
+            dSampleMu = 3.986004418e5;
 
-            codegen('-config', cfg, '-d', charBuildDir, 'ExtSHE_AccTB', ...
-                '-args', {zeros(3, 1), ui32MaxDeg, zeros(double(ui32Count), 2), 0.0, 0.0});
-            codegen('-config', cfg, '-d', charBuildDir, 'ExtSHE_GradU', ...
-                '-args', {0.0, 0.0, 0.0, uint8(ui32MaxDeg), dParams});
+            codegen('-config', cfg, '-d', charBuildDir, 'EvalExtSphHarmExpInTargetFrame', ...
+                '-args', {[dSampleRadius; 0.0; 0.0], ui32MaxDeg, zeros(double(ui32Count), 2), dSampleMu, dSampleRadius});
+            codegen('-config', cfg, '-d', charBuildDir, 'EvalExtSphericalHarmExpCore', ...
+                '-args', {dSampleRadius, 0.0, 0.0, ui32MaxDeg, zeros(double(ui32Count), 2), dSampleMu, dSampleRadius});
             codegen('-config', cfg, '-d', charBuildDir, 'SphericalHarmonics', ...
-                '-args', {zeros(1, 3), double(ui32MaxDeg), double(ui32MaxDeg), 0.0, 0.0, ...
+                '-args', {[dSampleRadius, 0.0, 0.0], double(ui32MaxDeg), double(ui32MaxDeg), dSampleMu, dSampleRadius, ...
                           zeros(double(ui32MaxDeg) + 1), zeros(double(ui32MaxDeg) + 1)});
 
             sCachedInfo = struct( ...
-                'extshe_acc', 'ExtSHE_AccTB_mex', ...
-                'extshe_gradu', 'ExtSHE_GradU_mex', ...
+                'canonical_target', 'EvalExtSphHarmExpInTargetFrame_mex', ...
+                'canonical_core', 'EvalExtSphericalHarmExpCore_mex', ...
                 'legacy', 'SphericalHarmonics_mex', ...
                 'build_dir', charBuildDir);
 
@@ -198,8 +203,8 @@ classdef testExtSHE_CrossValidation < matlab.unittest.TestCase
             dCSlmCols = zeros(double(testExtSHE_CrossValidation.GetCoeffCount(ui32MaxDeg)), 2);
             dCSlmCols(2, 1) = -testCase.dJ2Earth; % Unnormalized C20
 
-            dAccSHE = ExtSHE_AccTB(dTestPosition, ui32MaxDeg, dCSlmCols, ...
-                testCase.dMuEarth, testCase.dRadiusEarth);
+            [~, dAccSHE] = testExtSHE_CrossValidation.EvaluateCanonicalTargetFrame( ...
+                dTestPosition, ui32MaxDeg, dCSlmCols, testCase.dMuEarth, testCase.dRadiusEarth);
 
             dR = norm(dTestPosition);
             dR2 = dR^2;
@@ -221,15 +226,15 @@ classdef testExtSHE_CrossValidation < matlab.unittest.TestCase
 
             dCSlmCols = testExtSHE_CrossValidation.ConvertMatrixToColPairs(dCmat, dSmat, ui32MaxDeg);
 
-            dAccExt = ExtSHE_AccTB(dTestPosition, ui32MaxDeg, dCSlmCols, ...
-                testCase.dMuEarth, testCase.dRadiusEarth);
+            [~, dAccExt] = testExtSHE_CrossValidation.EvaluateCanonicalTargetFrame( ...
+                dTestPosition, ui32MaxDeg, dCSlmCols, testCase.dMuEarth, testCase.dRadiusEarth);
             dAccLegacy = testExtSHE_CrossValidation.EvaluateLegacyPerturbation( ...
                 dTestPosition, ui32MaxDeg, testCase.dMuEarth, testCase.dRadiusEarth, dCmat, dSmat);
 
             testCase.verifyEqual(dAccExt, dAccLegacy, 'RelTol', 3e-3, 'AbsTol', 1e-13);
         end
 
-        function testStandaloneGradientMatchesSharedCore(testCase, dTestPosition)
+        function testCorePotentialMatchesLegacyMATLAB(testCase, dTestPosition)
             ui32MaxDeg = uint32(8);
             [dCmat, dSmat] = testExtSHE_CrossValidation.BuildRandomNormalizedCoeffMatrices(ui32MaxDeg, 5e-7, 7);
             dCSlmCols = testExtSHE_CrossValidation.ConvertMatrixToColPairs(dCmat, dSmat, ui32MaxDeg);
@@ -237,15 +242,19 @@ classdef testExtSHE_CrossValidation < matlab.unittest.TestCase
             dPosNorm = norm(dTestPosition);
             dLat = asin(dTestPosition(3) / dPosNorm);
             dLong = atan2(dTestPosition(2), dTestPosition(1));
-            dParams = testExtSHE_CrossValidation.BuildLegacyParamStruct( ...
-                dCSlmCols, testCase.dMuEarth, testCase.dRadiusEarth);
 
-            [dGradLegacy, dPlmLegacy] = ExtSHE_GradU(dPosNorm, dLat, dLong, uint8(ui32MaxDeg), dParams);
-            [dGradCore, dPlmCore] = ExtSHE_GradUCore(dPosNorm, dLat, dLong, ui32MaxDeg, ...
+            [dPotentialCore, dGradCore, dPlmCore] = EvalExtSphericalHarmExpCore(dPosNorm, dLat, dLong, ui32MaxDeg, ...
                 dCSlmCols, testCase.dMuEarth, testCase.dRadiusEarth);
+            [dPotentialFromTarget, ~] = testExtSHE_CrossValidation.EvaluateCanonicalTargetFrame( ...
+                dTestPosition, ui32MaxDeg, dCSlmCols, testCase.dMuEarth, testCase.dRadiusEarth);
+            [dULegacy, ~] = SphericalHarmonics(dTestPosition.', double(ui32MaxDeg), ...
+                double(ui32MaxDeg), testCase.dMuEarth, testCase.dRadiusEarth, dCmat, dSmat);
+            dPotentialLegacyPert = dULegacy - testCase.dMuEarth / dPosNorm;
 
-            testCase.verifyEqual(dGradLegacy, dGradCore, 'RelTol', 1e-13, 'AbsTol', 1e-15);
-            testCase.verifyEqual(dPlmLegacy, dPlmCore, 'RelTol', 1e-13, 'AbsTol', 1e-15);
+            testCase.verifyEqual(dPotentialCore, dPotentialFromTarget, 'RelTol', 1e-13, 'AbsTol', 1e-15);
+            testCase.verifyEqual(dPotentialCore, dPotentialLegacyPert, 'RelTol', 3e-3, 'AbsTol', 1e-13);
+            testCase.verifyGreaterThan(norm(dGradCore), 0.0);
+            testCase.verifyGreaterThan(numel(dPlmCore), 0);
         end
 
         function testEvalJacobianMatchesFiniteDifference(testCase)
@@ -255,7 +264,7 @@ classdef testExtSHE_CrossValidation < matlab.unittest.TestCase
             [dCmat, dSmat] = testExtSHE_CrossValidation.BuildRandomNormalizedCoeffMatrices(ui32MaxDeg, 1e-6, 9);
             dCSlmCols = testExtSHE_CrossValidation.ConvertMatrixToColPairs(dCmat, dSmat, ui32MaxDeg);
 
-            dJac = EvalJac_ExtSphericalHarmExp(dPos, ui32MaxDeg, dCSlmCols, testCase.dMuEarth, testCase.dRadiusEarth);
+            dJac = EvalJac_ExtSphHarmExpInTargetFrame(dPos, ui32MaxDeg, dCSlmCols, testCase.dMuEarth, testCase.dRadiusEarth);
             dJacFD = testExtSHE_CrossValidation.FiniteDifferenceJacobian( ...
                 dPos, ui32MaxDeg, dCSlmCols, testCase.dMuEarth, testCase.dRadiusEarth);
 
@@ -268,9 +277,9 @@ classdef testExtSHE_CrossValidation < matlab.unittest.TestCase
             ui32MaxDeg = uint32(4);
             dCSlmCols = zeros(double(testExtSHE_CrossValidation.GetCoeffCount(ui32MaxDeg)), 2);
 
-            testCase.verifyError(@() EvalJac_ExtSphericalHarmExp([0; 0; 0], ui32MaxDeg, ...
+            testCase.verifyError(@() EvalJac_ExtSphHarmExpInTargetFrame([0; 0; 0], ui32MaxDeg, ...
                 dCSlmCols, testCase.dMuEarth, testCase.dRadiusEarth), ...
-                'EvalJac_ExtSphericalHarmExp:ZeroPosition');
+                'EvalJac_ExtSphHarmExpInTargetFrame:ZeroPosition');
         end
 
         function testEvalJacobianRejectsInsufficientCoefficients(testCase)
@@ -278,12 +287,12 @@ classdef testExtSHE_CrossValidation < matlab.unittest.TestCase
             dCSlmCols = zeros(3, 2);
             dPos = [4000; 3000; 4500];
 
-            testCase.verifyError(@() EvalJac_ExtSphericalHarmExp(dPos, ui32MaxDeg, ...
+            testCase.verifyError(@() EvalJac_ExtSphHarmExpInTargetFrame(dPos, ui32MaxDeg, ...
                 dCSlmCols, testCase.dMuEarth, testCase.dRadiusEarth), ...
-                'EvalJac_ExtSphericalHarmExp:InsufficientCoefficients');
+                'EvalJac_ExtSphHarmExpInTargetFrame:InsufficientCoefficients');
         end
 
-        function testExtSHEAccCodegenMatchesMATLAB(testCase, dTestPosition)
+        function testTargetFrameEvaluatorCodegenMatchesMATLAB(testCase, dTestPosition)
             testCase.assumeTrue(license('test', 'MATLAB_Coder') == 1, ...
                 'MATLAB Coder not available.');
 
@@ -292,36 +301,38 @@ classdef testExtSHE_CrossValidation < matlab.unittest.TestCase
             dCSlmCols = testExtSHE_CrossValidation.ConvertMatrixToColPairs(dCmat, dSmat, ui32MaxDeg);
 
             sMexInfo = testExtSHE_CrossValidation.BuildMexTargets();
-            fcnMex = str2func(sMexInfo.extshe_acc);
+            fcnMex = str2func(sMexInfo.canonical_target);
 
-            dAccMatlab = ExtSHE_AccTB(dTestPosition, ui32MaxDeg, dCSlmCols, ...
-                testCase.dMuEarth, testCase.dRadiusEarth);
-            dAccMex = fcnMex(dTestPosition, ui32MaxDeg, dCSlmCols, ...
+            [dPotentialMatlab, dAccMatlab] = testExtSHE_CrossValidation.EvaluateCanonicalTargetFrame( ...
+                dTestPosition, ui32MaxDeg, dCSlmCols, testCase.dMuEarth, testCase.dRadiusEarth);
+            [dPotentialMex, dAccMex] = fcnMex(dTestPosition, ui32MaxDeg, dCSlmCols, ...
                 testCase.dMuEarth, testCase.dRadiusEarth);
 
+            testCase.verifyEqual(dPotentialMex, dPotentialMatlab, 'RelTol', 1e-12, 'AbsTol', 1e-15);
             testCase.verifyEqual(dAccMex, dAccMatlab, 'RelTol', 1e-12, 'AbsTol', 1e-15);
         end
 
-        function testExtSHEGradUCodegenMatchesMATLAB(testCase, dTestPosition)
+        function testCoreEvaluatorCodegenMatchesMATLAB(testCase, dTestPosition)
             testCase.assumeTrue(license('test', 'MATLAB_Coder') == 1, ...
                 'MATLAB Coder not available.');
 
             ui32MaxDeg = uint32(8);
             [dCmat, dSmat] = testExtSHE_CrossValidation.BuildRandomNormalizedCoeffMatrices(ui32MaxDeg, 5e-7, 11);
             dCSlmCols = testExtSHE_CrossValidation.ConvertMatrixToColPairs(dCmat, dSmat, ui32MaxDeg);
-            dParams = testExtSHE_CrossValidation.BuildLegacyParamStruct( ...
-                dCSlmCols, testCase.dMuEarth, testCase.dRadiusEarth);
 
             dPosNorm = norm(dTestPosition);
             dLat = asin(dTestPosition(3) / dPosNorm);
             dLong = atan2(dTestPosition(2), dTestPosition(1));
 
             sMexInfo = testExtSHE_CrossValidation.BuildMexTargets();
-            fcnMex = str2func(sMexInfo.extshe_gradu);
+            fcnMex = str2func(sMexInfo.canonical_core);
 
-            [dGradMatlab, dPlmMatlab] = ExtSHE_GradU(dPosNorm, dLat, dLong, uint8(ui32MaxDeg), dParams);
-            [dGradMex, dPlmMex] = fcnMex(dPosNorm, dLat, dLong, uint8(ui32MaxDeg), dParams);
+            [dPotentialMatlab, dGradMatlab, dPlmMatlab] = EvalExtSphericalHarmExpCore( ...
+                dPosNorm, dLat, dLong, ui32MaxDeg, dCSlmCols, testCase.dMuEarth, testCase.dRadiusEarth);
+            [dPotentialMex, dGradMex, dPlmMex] = fcnMex( ...
+                dPosNorm, dLat, dLong, ui32MaxDeg, dCSlmCols, testCase.dMuEarth, testCase.dRadiusEarth);
 
+            testCase.verifyEqual(dPotentialMex, dPotentialMatlab, 'RelTol', 1e-12, 'AbsTol', 1e-15);
             testCase.verifyEqual(dGradMex, dGradMatlab, 'RelTol', 1e-12, 'AbsTol', 1e-15);
             testCase.verifyEqual(dPlmMex, dPlmMatlab, 'RelTol', 1e-12, 'AbsTol', 1e-15);
         end
@@ -357,13 +368,13 @@ classdef testExtSHE_CrossValidation < matlab.unittest.TestCase
             dCSlmCols = testExtSHE_CrossValidation.ConvertMatrixToColPairs(dCmat, dSmat, ui32MaxDeg);
 
             sMexInfo = testExtSHE_CrossValidation.BuildMexTargets();
-            fcnExtMex = str2func(sMexInfo.extshe_acc);
+            fcnExtMex = str2func(sMexInfo.canonical_target);
             fcnLegacyMex = str2func(sMexInfo.legacy);
 
-            fcnExtMatlab = @() ExtSHE_AccTB(dPos, ui32MaxDeg, dCSlmCols, ...
-                testCase.dMuEarth, testCase.dRadiusEarth);
-            fcnExtMexTimed = @() fcnExtMex(dPos, ui32MaxDeg, dCSlmCols, ...
-                testCase.dMuEarth, testCase.dRadiusEarth);
+            fcnExtMatlab = @() testExtSHE_CrossValidation.EvaluateCanonicalAcceleration(dPos, ui32MaxDeg, ...
+                dCSlmCols, testCase.dMuEarth, testCase.dRadiusEarth);
+            fcnExtMexTimed = @() testExtSHE_CrossValidation.EvaluateCanonicalAccelerationMex(fcnExtMex, dPos, ...
+                ui32MaxDeg, dCSlmCols, testCase.dMuEarth, testCase.dRadiusEarth);
             fcnLegacyMatlab = @() SphericalHarmonics(dPos.', double(ui32MaxDeg), double(ui32MaxDeg), ...
                 testCase.dMuEarth, testCase.dRadiusEarth, dCmat, dSmat);
             fcnLegacyMexTimed = @() fcnLegacyMex(dPos.', double(ui32MaxDeg), double(ui32MaxDeg), ...
@@ -380,12 +391,12 @@ classdef testExtSHE_CrossValidation < matlab.unittest.TestCase
             dTimeLegacyMex = timeit(fcnLegacyMexTimed);
 
             fprintf('\n--- SHE timing comparison (degree %d) ---\n', ui32MaxDeg);
-            fprintf('ExtSHE_AccTB MATLAB        %.3g us/eval\n', 1e6 * dTimeExtMatlab);
-            fprintf('ExtSHE_AccTB MEX           %.3g us/eval\n', 1e6 * dTimeExtMex);
+            fprintf('EvalExtSphHarmExpInTargetFrame MATLAB  %.3g us/eval\n', 1e6 * dTimeExtMatlab);
+            fprintf('EvalExtSphHarmExpInTargetFrame MEX     %.3g us/eval\n', 1e6 * dTimeExtMex);
             fprintf('SphericalHarmonics MATLAB  %.3g us/eval\n', 1e6 * dTimeLegacyMatlab);
             fprintf('SphericalHarmonics MEX     %.3g us/eval\n', 1e6 * dTimeLegacyMex);
-            fprintf('ExtSHE MATLAB vs legacy MATLAB speedup   %.2fx\n', dTimeLegacyMatlab / dTimeExtMatlab);
-            fprintf('ExtSHE MEX vs ExtSHE MATLAB speedup      %.2fx\n', dTimeExtMatlab / dTimeExtMex);
+            fprintf('Canonical SHE MATLAB vs legacy MATLAB speedup   %.2fx\n', dTimeLegacyMatlab / dTimeExtMatlab);
+            fprintf('Canonical SHE MEX vs canonical SHE MATLAB speedup %.2fx\n', dTimeExtMatlab / dTimeExtMex);
         end
     end
 end

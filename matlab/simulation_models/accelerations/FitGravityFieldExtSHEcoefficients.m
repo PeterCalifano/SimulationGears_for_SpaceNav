@@ -28,9 +28,9 @@ end
 %
 % The solve is performed jointly on potential and acceleration through an
 % overdetermined least-squares system, using the same unnormalized storage
-% convention consumed by EvalExtSphericalHarmExpInTargetFrame().
+% convention consumed by EvalExtSphHarmExpInTargetFrame().
 %
-% This function does not know how samples were generated. Polyhedron-specific
+% This function is agnostic to how samples were generated. Polyhedron-specific
 % sample generation and adaptive shell refinement are owned by
 % FitSpherHarmCoeffToPolyhedrGrav(), which calls this routine for the actual
 % coefficient solve.
@@ -59,6 +59,8 @@ end
 % buildSHElegendreLUT()
 % -------------------------------------------------------------------------------------------------------------
 
+%% Function code
+% Input validation
 if ui32MaxDegree < uint32(2)
     error('FitGravityFieldExtSHEcoefficients:InvalidMaxDegree', ...
         'The maximum degree must be at least 2.');
@@ -76,8 +78,8 @@ if any(~isfinite(dSamplePos_TB), 'all') || any(~isfinite(dSamplePotentialPert)) 
         'All sample arrays must contain finite values only.');
 end
 
-[ui32CoeffRowIds, ui8CoeffColIds, ui32NumStorageCoefficients, ui32NumUnknowns] = ...
-    BuildExtSHEfitUnknownMap(ui32MaxDegree);
+% Build the least-squares system for the joint potential and acceleration fit
+[ui32CoeffRowIds, ui8CoeffColIds, ui32NumStorageCoefficients, ui32NumUnknowns] = BuildExtSHEfitUnknownMap(ui32MaxDegree);
 
 if 4 * double(ui32NumSamples) < double(ui32NumUnknowns)
     error('FitGravityFieldExtSHEcoefficients:UnderdeterminedSystem', ...
@@ -88,16 +90,20 @@ dDesignMatrixRaw = zeros(4 * double(ui32NumSamples), double(ui32NumUnknowns));
 dTargetVectorRaw = zeros(4 * double(ui32NumSamples), 1);
 dRowScales = zeros(4 * double(ui32NumSamples), 1);
 
+% Build regression matrix
 for idSample = 1:double(ui32NumSamples)
     dPosSample = dSamplePos_TB(:, idSample);
     dRadius = norm(dPosSample);
 
+    % Compute the unscaled potential and acceleration basis vectors for this sample
     [dPotentialBasis, dAccBasisTB] = BuildExtSHEsampleBasis( ...
         dPosSample, ui32MaxDegree, dGravParam, dBodyRadiusRef);
 
+    % Scale rows to improve conditioning
     dPotRowScale = dRadius / dGravParam;
     dAccRowScale = dRadius^2 / dGravParam;
 
+    % Store sample
     idRows = (4 * (idSample - 1) + 1):(4 * idSample);
 
     dDesignMatrixRaw(idRows(1), :) = dPotentialBasis;
@@ -110,6 +116,7 @@ for idSample = 1:double(ui32NumSamples)
     dRowScales(idRows(2:4)) = dAccRowScale;
 end
 
+% Apply normalization to design matrix and target vector
 dDesignMatrix = dDesignMatrixRaw .* dRowScales;
 dTargetVector = dTargetVectorRaw .* dRowScales;
 
@@ -119,6 +126,7 @@ if any(dColumnNorms <= 0.0)
         'The fit system contains one or more zero-norm columns.');
 end
 
+% Solve the least-squares problem through SVD
 dDesignMatrixScaled = dDesignMatrix ./ dColumnNorms;
 dSingularValues = svd(dDesignMatrixScaled, 'econ');
 
@@ -127,6 +135,7 @@ if isempty(dSingularValues) || dSingularValues(1) <= 0.0
         'Unable to build a valid fit system from the provided samples.');
 end
 
+% Apply minimum-norm regularization if the system is underdetermined after scaling
 dRankTolerance = max(size(dDesignMatrixScaled)) * eps(dSingularValues(1));
 ui32Rank = uint32(sum(dSingularValues > dRankTolerance));
 bUsedLeastNorm = ui32Rank < ui32NumUnknowns;
@@ -137,6 +146,7 @@ else
     dCoeffScaled = dDesignMatrixScaled \ dTargetVector;
 end
 
+% Rescale coefficients back to original unnormalized basis and map to storage format
 dCoeffUnknowns = dCoeffScaled ./ dColumnNorms.';
 dCSlmCoeffCols = zeros(double(ui32NumStorageCoefficients), 2);
 
@@ -144,6 +154,7 @@ for idUnknown = 1:double(ui32NumUnknowns)
     dCSlmCoeffCols(ui32CoeffRowIds(idUnknown), ui8CoeffColIds(idUnknown)) = dCoeffUnknowns(idUnknown);
 end
 
+% Compute error metrics in physical units for diagnostics
 dPredScaled = dDesignMatrixScaled * dCoeffScaled;
 dResidualScaled = dPredScaled - dTargetVector;
 
@@ -175,8 +186,11 @@ strFitInfo.ui8CoeffColIds = ui8CoeffColIds;
 
 end
 
+%% Internal helper functions
 function [ui32CoeffRowIds, ui8CoeffColIds, ui32NumStorageCoefficients, ui32NumUnknowns] = ...
     BuildExtSHEfitUnknownMap(ui32MaxDegree)
+% Builds the mapping between the unknown coefficient vector used in the fit and the actual
+
 ui32NumStorageCoefficients = (ui32MaxDegree + uint32(1)) * (ui32MaxDegree + uint32(2)) / uint32(2) - uint32(2);
 ui32NumUnknowns = ui32MaxDegree * ui32MaxDegree + 2 * ui32MaxDegree - uint32(3);
 
@@ -209,8 +223,9 @@ for idxDeg = uint32(1):ui32MaxDegree
 end
 end
 
-function [dPotentialBasis, dAccBasisTB] = BuildExtSHEsampleBasis( ...
-    dPosSC_TB, ui32MaxDegree, dGravParam, dBodyRadiusRef)
+function [dPotentialBasis, dAccBasisTB] = BuildExtSHEsampleBasis(dPosSC_TB, ui32MaxDegree, dGravParam, dBodyRadiusRef)
+% Builds the potential and acceleration basis vectors for a single sample position, following convention consumed by evaluation functions.
+
 dPosSCnorm = norm(dPosSC_TB);
 if dPosSCnorm <= 0.0
     error('FitGravityFieldExtSHEcoefficients:ZeroSamplePosition', ...

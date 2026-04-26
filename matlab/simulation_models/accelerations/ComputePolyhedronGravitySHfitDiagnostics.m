@@ -54,7 +54,7 @@ end
 % ComputeLogSpacedValues()
 % GenerateShellPointSet()
 % EvalPolyhedronGravPerturbationSamples()
-% EvalExtSphHarmInTargetFrame()
+% EvalExtSphHarmSamplesInTargetFrame()
 % ComputeGravityFieldFitMetrics()
 % -------------------------------------------------------------------------------------------------------------
 
@@ -128,7 +128,7 @@ end
     strSHgravityData.dGravConst, strSHgravityData.dGravParam);
 
 % Evaluate SH perturbation at holdout points
-[dPotentialSHEpert, dAccSHEpertTB] = EvalExtSphHarmInTargetFrame( ...
+[dPotentialSHEpert, dAccSHEpertTB] = EvalExtSphHarmSamplesInTargetFrame( ...
     dHoldoutPos_TB, strSHgravityData.ui32MaxDegree, strSHgravityData.dCSlmCoeffCols, ...
     strSHgravityData.dGravParam, strSHgravityData.dBodyRadiusRef);
 

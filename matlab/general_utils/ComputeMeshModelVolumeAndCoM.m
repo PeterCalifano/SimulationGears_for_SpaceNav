@@ -1,4 +1,4 @@
-function [dVolume, dCoM] = ComputeMeshModelVolumeAndCoM(ui32FaceVertexIds, dVerticesPos)
+function [dVolume, dCoM] = ComputeMeshModelVolumeAndCoM(ui32FaceVertexIds, dVerticesPos) %#codegen
 %% PROTOTYPE
 % [dVolume, dCoM] = ComputeMeshModelVolumeAndCoM(ui32FaceVertexIds, dVerticesPos)
 % -------------------------------------------------------------------------------------------------------------

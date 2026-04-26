@@ -65,7 +65,7 @@ function strSHgravityData = FitSpherHarmCoeffToPolyhedrGrav( ...
 % ComputeLogSpacedValues()
 % GenerateShellPointSet()
 % EvalPolyhedronGravPerturbationSamples()
-% EvalExtSphHarmInTargetFrame()
+% EvalExtSphHarmSamplesInTargetFrame()
 % ComputeGravityFieldFitMetrics()
 % -------------------------------------------------------------------------------------------------------------
 
@@ -186,7 +186,8 @@ dValidationShellRadii = ComputeLogSpacedValues(1.10 * dBodyRadiusRef, 3.5 * dBod
 ui32TrainPtsPerShell = repmat(uint32(max(256, 3 * double(ui32NumUnknowns))), size(dTrainShellRadii));
 ui32ValidationPtsPerShell = repmat(uint32(max(512, 6 * double(ui32NumUnknowns))), size(dValidationShellRadii));
 
-% Sample the perturbative polyhedron gravity field at the training and holdout points for the initial iteration
+% Build fixed validation samples once; each adaptive iteration reuses this
+% holdout set to compare the fitted SHE field against the polyhedron field.
 [dValidationPos_TB, ui32ValidationShellIds] = GenerateShellPointSet( ...
     dValidationShellRadii, ui32ValidationPtsPerShell, 0.25);
 
@@ -240,10 +241,10 @@ for idIter = 1:double(ui32MaxIter)
         ui32MaxDegree, dGravParam, dBodyRadiusRef);
 
     % Evaluate the fitted field at the training and validation points for diagnostics
-    [dTrainPotentialPred, dTrainAccPredTB] = EvalExtSphHarmInTargetFrame( ...
+    [dTrainPotentialPred, dTrainAccPredTB] = EvalExtSphHarmSamplesInTargetFrame( ...
         dTrainPos_TB, ui32MaxDegree, dCoeffColsIter, dGravParam, dBodyRadiusRef);
 
-    [dValidationPotentialPred, dValidationAccPredTB] = EvalExtSphHarmInTargetFrame( ...
+    [dValidationPotentialPred, dValidationAccPredTB] = EvalExtSphHarmSamplesInTargetFrame( ...
         dValidationPos_TB, ui32MaxDegree, dCoeffColsIter, dGravParam, dBodyRadiusRef);
 
     % Compute error metrics for this iteration
