@@ -18,7 +18,7 @@
 - [x] Add synthetic exact-recovery tests for the fitter using known SH coefficients.
 - [x] Add end-to-end polyhedron-to-SH validation tests on representative meshes and verify error reduction with increasing degree.
 - [x] Add a static `CShapeModel.BuildSphericalHarmonicsGravityData(...)` compute method returning a `strSHgravityData` struct.
-- [x] Add `CShapeModel.SetSphericalHarmonicsGravityData(...)` and `CShapeModel.getSphericalHarmonicsGravityData()` for explicit caching and retrieval.
+- [x] Add `CShapeModel.setSphericalHarmonicsGravityData(...)` and `CShapeModel.getSphericalHarmonicsGravityData()` for explicit caching and retrieval.
 - [x] Verify that the returned coefficients feed `EvalExtSphericalHarmExpInTargetFrame(...)` directly with no reshaping and document the expected storage format.
 - [x] Keep the new fitting APIs free of `varargin` and aligned with the repo naming and documentation conventions.
 - [x] Harmonize the SH evaluator stack around canonical target-frame and world-frame wrappers while preserving legacy `ExtSHE_*` entry points.

@@ -394,7 +394,7 @@ classdef CScenarioGenerator < CGeneralPropagator
                 CScenarioGenerator.LoadSpherHarmCoefficients(enumScenarioName, kwargs.charSpherHarmCoeffInputFileName);
 
                 strDynParams.strMainData.ui16MaxSHdegree = ui16MaxSHdegree;
-                dScaleFactors = ExtSHE_normFactors(strDynParams.strMainData.ui16MaxSHdegree);
+                dScaleFactors = GetSphHarmNormalizationFactors(strDynParams.strMainData.ui16MaxSHdegree);
 
                 % Compute unnormalized coefficients
                 strDynParams.strMainData.dSHcoeff = dClmSlm_normalized./dScaleFactors;
@@ -445,7 +445,7 @@ classdef CScenarioGenerator < CGeneralPropagator
                     else
 
                         % TODO: modify to use: [o_dCSlmCoeffCols, o_dlmPairs] = loadSHEcoeffModel(modelCoeffDataPath, ui16lMax, bENABLE_UNSCALING)
-                        % Normalized coefficients from l=1, m=1 as required by ExtSHE_AccTB function
+                        % Normalized coefficients from l=1, m=1 as required by the canonical SHE evaluator
 
                         % Load Spherical Harmonics coeffs from file
                         error('Not implemented yet >.<')
@@ -455,7 +455,7 @@ classdef CScenarioGenerator < CGeneralPropagator
                     % REFERENCE source: TODO
 
                     % TODO: modify to use: [o_dCSlmCoeffCols, o_dlmPairs] = loadSHEcoeffModel(modelCoeffDataPath, ui16lMax, bENABLE_UNSCALING)
-                    % Normalized coefficients from l=1, m=1 as required by ExtSHE_AccTB function
+                    % Normalized coefficients from l=1, m=1 as required by the canonical SHE evaluator
 
                     if strcmpi(charSpherHarmCoeffInputFileName, "")
                         % Use hardcoded values
@@ -465,7 +465,7 @@ classdef CScenarioGenerator < CGeneralPropagator
                     else
 
                         % TODO: modify to use: [o_dCSlmCoeffCols, o_dlmPairs] = loadSHEcoeffModel(modelCoeffDataPath, ui16lMax, bENABLE_UNSCALING)
-                        % Normalized coefficients from l=1, m=1 as required by ExtSHE_AccTB function
+                        % Normalized coefficients from l=1, m=1 as required by the canonical SHE evaluator
 
                         % Load Spherical Harmonics coeffs from file
                         error('Not implemented yet >.<')
@@ -481,7 +481,7 @@ classdef CScenarioGenerator < CGeneralPropagator
                     else
 
                         % TODO: modify to use: [o_dCSlmCoeffCols, o_dlmPairs] = loadSHEcoeffModel(modelCoeffDataPath, ui16lMax, bENABLE_UNSCALING)
-                        % Normalized coefficients from l=1, m=1 as required by ExtSHE_AccTB function
+                        % Normalized coefficients from l=1, m=1 as required by the canonical SHE evaluator
 
                         % Load Spherical Harmonics coeffs from file
                         error('Not implemented yet >.<')
@@ -581,4 +581,3 @@ classdef CScenarioGenerator < CGeneralPropagator
 
 
 end
-
