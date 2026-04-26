@@ -135,17 +135,15 @@ dAccTot(1:3) = - (dMainGM/dPosNorm3) * dxState_IN(ui16posVelIdx(1:3));
 %% Spherical Harmonics acceleration
 dAccNonSphr_IN = zeros(3,1);
 
-if not(isempty(dMainCSlmCoeffCols)) && all(dDCMmainAtt_INfromTF ~= 0, 'all')
-    
-    % Rotate inertial position to target frame
-    dxPos_TB = dDCMmainAtt_INfromTF' * dxState_IN(ui16posVelIdx(1:3));
-    % Compute Non-spherical acceleration in target frame
+if coder.const(not(isempty(dMainCSlmCoeffCols))) && all(dDCMmainAtt_INfromTF ~= 0, 'all')
 
-    dAccNonSphr_TB = ExtSHE_AccTB(dxPos_TB, ui32MaxSHdegree, ...
-        dMainCSlmCoeffCols, dMainGM, dRefRmain); 
+    [~, dAccNonSphr_IN] = EvalExtSphHarmExpInWorldFrame(dxState_IN(ui16posVelIdx(1:3)), ...
+                                                        dDCMmainAtt_INfromTF, ...
+                                                        ui32MaxSHdegree, ...
+                                                        dMainCSlmCoeffCols, ...
+                                                        dMainGM, ...
+                                                        dRefRmain);
 
-    % Rotate Non-spherical acceleration to inertial frame
-    dAccNonSphr_IN(:) = dDCMmainAtt_INfromTF * dAccNonSphr_TB;
 end
 
 %% 3rd Body accelerations

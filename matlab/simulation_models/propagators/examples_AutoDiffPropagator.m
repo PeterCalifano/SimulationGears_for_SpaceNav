@@ -277,7 +277,7 @@ fprintf('STM error wrt ode45 (ode): %5.10f \n', errLoopSTM);
 
 %% Test casadi and symbolic toolbox for for computation of Obseration partials
 %         pinholeProject;
-%         ExtSHE_AccTB;
+%         EvalExtSphHarmExpInTargetFrame;
 
 % Using Casadi
 

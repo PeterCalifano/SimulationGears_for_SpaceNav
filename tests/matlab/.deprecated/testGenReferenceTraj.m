@@ -128,7 +128,7 @@ switch scenario_name
         % Compute "un-normalization" factors
         i_strDynParams.strMainData.ui16MaxSHdegree = uint16(4);
 
-        scaleFactors = ExtSHE_normFactors(i_strDynParams.strMainData.ui16MaxSHdegree);
+        scaleFactors = GetSphHarmNormalizationFactors(i_strDynParams.strMainData.ui16MaxSHdegree);
         % Compute unnormalized coefficients
         i_strDynParams.strMainData.dSHcoeff = ClmSlm_normalized./scaleFactors;
          
