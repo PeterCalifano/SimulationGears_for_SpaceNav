@@ -86,6 +86,7 @@ dQuadsNormals_SCB = dQuadsNormals_SCB ./ dQuadNormalNorm;
 dSRPtorque_SCB = zeros(3, 1);
 dQuadsCosSunPhaseAngle = zeros(nQuads, 1);
 dForcePerQuad_SCB = zeros(3, nQuads);
+bComputeTorque = nargout >= 2;
 
 for idQ = 1:nQuads
     dQuadsCosSunPhaseAngle(idQ) = dot(dQuadsNormals_SCB(:, idQ), dSunDir_SCB);
@@ -98,7 +99,9 @@ for idQ = 1:nQuads
         (2 * (dDiffSpecQuadsCoeffs(idQ, 1) / 3 + dDiffSpecQuadsCoeffs(idQ, 2) * dQuadsCosSunPhaseAngle(idQ)) * dQuadsNormals_SCB(:, idQ) + ...
         (1 - dDiffSpecQuadsCoeffs(idQ, 2)) * dSunDir_SCB);
 
-    dSRPtorque_SCB = dSRPtorque_SCB + cross(dQuadsPressCentre_SCB(:, idQ) - dCoMpos_SCB, dForcePerQuad_SCB(:, idQ));
+    if bComputeTorque
+        dSRPtorque_SCB = dSRPtorque_SCB + cross(dQuadsPressCentre_SCB(:, idQ) - dCoMpos_SCB, dForcePerQuad_SCB(:, idQ));
+    end
 end
 
 % Compute accelerations
