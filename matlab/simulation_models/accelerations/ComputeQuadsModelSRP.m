@@ -74,8 +74,8 @@ assert(all(dDiffSpecQuadsCoeffs(:) <= 1), ...
     'ComputeQuadsModelSRP:CoeffRange', ...
     'Diffuse and specular coefficients must lie in the [0, 1] interval.');
 
-dSunDir_SCB = NormalizeVector(dDirSCtoSun_SCB, 'Sun direction must be non-zero.');
-dqSCBwrtIN = NormalizeVector(dqSCBwrtIN, 'Input quaternion must be non-zero.');
+dSunDir_SCB = NormalizeVector(dDirSCtoSun_SCB, eps);
+dqSCBwrtIN = NormalizeVector(dqSCBwrtIN, eps);
 
 dQuadNormalNorm = sqrt(sum(dQuadsNormals_SCB.^2, 1));
 assert(all(dQuadNormalNorm > 0), ...
@@ -106,12 +106,4 @@ dSRPaccel_SCB = sum(dForcePerQuad_SCB, 2) / dMassSC;
 dDCM_INfromSCB = Quat2DCM(dqSCBwrtIN);
 dSRPaccel_IN = dDCM_INfromSCB * dSRPaccel_SCB;
 
-end
-
-%% Internal helpers
-function dUnitVector = NormalizeVector(dVector, charErrorMessage)
-coder.inline('always')
-dNorm = norm(dVector);
-assert(dNorm > 0, 'ComputeQuadsModelSRP:ZeroVector', charErrorMessage);
-dUnitVector = dVector / dNorm;
 end
