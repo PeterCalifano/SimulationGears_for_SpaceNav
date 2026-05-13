@@ -30,23 +30,9 @@ methods (Static, Access = public)
             enumOrName (1,:) {mustBeA(enumOrName, ["string", "char", "EnumScenarioName"])}
             options.charLengthUnits (1,:) string {mustBeA(options.charLengthUnits, ["string", "char"]), ...
                 mustBeMember(options.charLengthUnits, ["m", "km"])} = "m"
-                
-            options.bLoadModifiedVariant (1,1) logical = false
         end
 
         [enumScenarioName, charCanonicalName] = CScenarioRegistry.ResolveScenario(enumOrName);
-        if options.bLoadModifiedVariant
-            
-            if charCanonicalName == "Apophis"
-                charCanonicalName = "ApophisElongated";
-                enumScenarioName = EnumScenarioName.ApophisElongated;
-
-            elseif charCanonicalName == "Itokawa"
-                charCanonicalName = "ItokawaModified";
-                enumScenarioName = EnumScenarioName.ItokawaModified;
-            end
-        
-        end
 
         strSpec = CScenarioRegistry.EmptyScenarioSpec_();
         strSpec.enumScenarioName = enumScenarioName;
@@ -273,7 +259,7 @@ methods (Static, Access = private)
                 charCanonicalName = "ItokawaModified";
             case {'bennu', 'bennuorex'}
                 charCanonicalName = "Bennu";
-            case {'didymos', 'didymoshera'}
+            case {'didymos', 'dydimos', 'didymoshera'}
                 charCanonicalName = "Didymos";
             case {'eros'}
                 charCanonicalName = "Eros";

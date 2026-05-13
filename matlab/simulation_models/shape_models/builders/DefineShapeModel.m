@@ -15,7 +15,6 @@ arguments
     options.bLoadShapeModel             (1,1) logical = true;
     options.charOutputLengthUnits       (1,:) char {mustBeMember(options.charOutputLengthUnits, ["km", "m"])} = "m"
     options.dMeshSimplifyFactor         (1,1) double {mustBeFinite} = 1.0
-    options.bLoadModifiedVariant        (1,1) logical = false;
     options.charBlenderModelPath        (1,:) string {mustBeText} = ""
     options.charShapeModelObjPath       (1,:) string {mustBeText} = ""
     options.dObjectReferenceSizeInKm    (1,1) double = -1.0

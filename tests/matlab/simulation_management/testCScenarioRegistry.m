@@ -25,6 +25,22 @@ classdef testCScenarioRegistry < matlab.unittest.TestCase
             testCase.verifyEqual(strMoonKm.dReferenceRadius, 1.7374e3, RelTol=1e-15);
         end
 
+        function testModifiedVariantsAreExplicitScenarios(testCase)
+            strApophis = CScenarioRegistry.GetScenarioSpec("Apophis", charLengthUnits="m");
+            strApophisElongated = CScenarioRegistry.GetScenarioSpec(EnumScenarioName.ApophisElongated, ...
+                charLengthUnits="m");
+            strItokawaModified = CScenarioRegistry.GetScenarioSpec("ItokawaModified", charLengthUnits="m");
+
+            testCase.verifyEqual(strApophis.enumScenarioName, EnumScenarioName.Apophis);
+            testCase.verifyEqual(strApophis.charCanonicalName, "Apophis");
+            testCase.verifyEqual(strApophisElongated.enumScenarioName, EnumScenarioName.ApophisElongated);
+            testCase.verifyEqual(strApophisElongated.charCanonicalName, "ApophisElongated");
+            testCase.verifyTrue(contains(strApophisElongated.charDefaultShapeRelativePath, "Elongated"));
+            testCase.verifyEqual(strItokawaModified.enumScenarioName, EnumScenarioName.ItokawaModified);
+            testCase.verifyEqual(strItokawaModified.charCanonicalName, "ItokawaModified");
+            testCase.verifyEqual(strItokawaModified.charShapeSourceType, "obj");
+        end
+
         function testRegistrySHDegreeLimits(testCase)
             strEros = CScenarioRegistry.GetScenarioSpec("Eros", charLengthUnits="m");
             testCase.verifyEqual(strEros.strSphericalHarmonics.ui32SourceMaxDegree, uint32(15));
