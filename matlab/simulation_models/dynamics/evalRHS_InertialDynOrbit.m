@@ -23,7 +23,7 @@ arguments
     ui16StatesIdx       uint16 = []
     dResidualAccel      double = zeros(3,1)
     bIsInEclipse        logical = false
-end %#codegen
+end
 %% PROTOTYPE
 % [dPosVeldt, strAccelInfo] = evalRHS_InertialDynOrbit( dxState_IN, ...
 %                                                                 dDCMmainAtt_INfromTF, ...
@@ -35,7 +35,8 @@ end %#codegen
 %                                                                 dMainCSlmCoeffCols, ...
 %                                                                 ui32MaxSHdegree, ...
 %                                                                 ui16StatesIdx, ...
-%                                                                 dResidualAccel) %#codegen
+%                                                                 dResidualAccel, ...
+%                                                                 bIsInEclipse) %#codegen
 % -------------------------------------------------------------------------------------------------------------
 %% DESCRIPTION
 % ACHTUNG: Sun is always assumed to be the first body in the list of d3rdBodiesGM and processed in this way.
@@ -52,6 +53,7 @@ end %#codegen
 % ui32MaxSHdegree     uint32 = []
 % ui32StatesIdx       uint32 = []
 % dResidualAccel      double = zeros(3,1)
+% bIsInEclipse        logical = false
 % -------------------------------------------------------------------------------------------------------------
 %% OUTPUT
 % dPosVeldt
@@ -63,6 +65,7 @@ end %#codegen
 % 12-07-2024    Pietro Califano     Function debugging and verification completed.
 % 17-08-2024    Pietro Califano     Improved robustness, flexibility for filters, fixed design errors.
 % 20-06-2025    Pietro Califano     Major fix: incorrect 3rd bodies acceleration computation (sign)
+% 30-04-2026    Pietro Califano, Codex 5.5      Routed cannonball SRP through standalone acceleration kernel.
 % -------------------------------------------------------------------------------------------------------------
 %% DEPENDENCIES
 % [-]
@@ -135,7 +138,7 @@ dAccTot(1:3) = - (dMainGM/dPosNorm3) * dxState_IN(ui16posVelIdx(1:3));
 %% Spherical Harmonics acceleration
 dAccNonSphr_IN = zeros(3,1);
 
-if coder.const(not(isempty(dMainCSlmCoeffCols))) && all(dDCMmainAtt_INfromTF ~= 0, 'all')
+if ~isempty(dMainCSlmCoeffCols) && any(abs(dDCMmainAtt_INfromTF) > eps('single'), 'all')
 
     [~, dAccNonSphr_IN] = EvalExtSphHarmExpInWorldFrame(dxState_IN(ui16posVelIdx(1:3)), ...
                                                         dDCMmainAtt_INfromTF, ...
@@ -151,6 +154,8 @@ dTotAcc3rdBody = zeros(3,1);
 dAcc3rdSun     = zeros(3,1);
 dPosSunToSC    = zeros(3,1);
 dSCdistToSun    = 0.0;
+dSRPdistToSun    = 0.0;
+bIsSRPActive     = false;
 
 if ~isempty(dBodyEphemerides)
     if bHasValidEphemerides
@@ -192,34 +197,34 @@ if ~isempty(dBodyEphemerides)
 
         end
 
-        if bSunPosValid
-            % Compute SC position relative to bodies
-            dPosSunToSC(:) = dxState_IN(ui16posVelIdx(1:3)) - dSunPos_IN;
-            dPosSunFromMain_IN = dSunPos_IN - dMainBodyPos_IN;
+    if bSunPosValid
+        % Compute SC position relative to bodies
+        dPosSunToSC(:) = dxState_IN(ui16posVelIdx(1:3)) - dSunPos_IN;
+        dPosSunFromMain_IN = dSunPos_IN - dMainBodyPos_IN;
 
-            dSCdistToSun(:) = norm(dPosSunToSC);
+        dSCdistToSun(:) = norm(dPosSunToSC);
 
-            if coder.target('MATLAB') || coder.target('MEX')
-                assert(any(abs(dSunPos_IN) > eps('single')), 'ERROR: Sun position cannot be near zero!')
-                assert(any(abs(dSCdistToSun) > eps('single')), 'ERROR: distance to the Sun cannot be zero!')
-                assert(any(abs(dPosSunFromMain_IN) > eps('single')), 'ERROR: distance from main body to the Sun cannot be near zero!')
-            end
+        if coder.target('MATLAB') || coder.target('MEX')
+            assert(any(abs(dSunPos_IN) > eps('single')), 'ERROR: Sun position cannot be near zero!')
+            assert(any(abs(dSCdistToSun) > eps('single')), 'ERROR: distance to the Sun cannot be zero!')
+            assert(any(abs(dPosSunFromMain_IN) > eps('single')), 'ERROR: distance from main body to the Sun cannot be near zero!')
+        end
 
-            % DEVNOTE: replace with more accurate formula to handle it in double precision
-            % Current solution only bypasses the issue caused by the difference.
-            dAuxTerm1 = dPosSunToSC./(dSCdistToSun)^3;
-            dAuxTerm2 = dPosSunFromMain_IN./( norm(dPosSunFromMain_IN)^3);
+        % DEVNOTE: replace with more accurate formula to handle it in double precision
+        % Current solution only bypasses the issue caused by the difference.
+        dAuxTerm1 = dPosSunToSC./(dSCdistToSun)^3;
+        dAuxTerm2 = dPosSunFromMain_IN./( norm(dPosSunFromMain_IN)^3);
 
-            if all(dAuxTerm1 < 1E-23, 'all') && all(dAuxTerm2 < 1e-23, 'all')
-                dAuxTerm3 = zeros(3,1);
-            else
-                dAuxTerm3 = dAuxTerm1 + dAuxTerm2;
-            end
+        if all(dAuxTerm1 < 1E-23, 'all') && all(dAuxTerm2 < 1e-23, 'all')
+            dAuxTerm3 = zeros(3,1);
+        else
+            dAuxTerm3 = dAuxTerm1 + dAuxTerm2;
+        end
 
-            % Sun 3rd Body acceleration
-            if d3rdBodiesGM(1) > 0.0
-                dAcc3rdSun(1:3) = d3rdBodiesGM(1) * dAuxTerm3;
-            end
+        % Sun 3rd Body acceleration
+        if d3rdBodiesGM(1) > 0.0
+            dAcc3rdSun(1:3) = d3rdBodiesGM(1) * dAuxTerm3;
+        end
 
     else
         if coder.target('MATLAB')
@@ -233,8 +238,11 @@ if ~isempty(dBodyEphemerides)
 end
 
 %% Cannonball SRP acceleration
-if ~isempty(dBodyEphemerides) && bSunPosValid && not(bIsInEclipse)
-    dAccCannonBallSRP = dCoeffSRP * dPosSunToSC./dSCdistToSun;
+if ~isempty(dBodyEphemerides) && bSunPosValid && ~isempty(dCoeffSRP)
+    [dAccCannonBallSRP, dSRPdistToSun, bIsSRPActive] = ComputeCannonballSRP( ...
+        dPosSunToSC, ...
+        dCoeffSRP, ...
+        bIsInEclipse);
 else
     dAccCannonBallSRP = zeros(3,1);
 end
@@ -247,7 +255,10 @@ if nargout > 1
     strAccelInfo.dTotAcc3rdBody     = dTotAcc3rdBody;
     strAccelInfo.dAcc3rdSun         = dAcc3rdSun;
     strAccelInfo.dAccCannonBallSRP  = dAccCannonBallSRP;
+    strAccelInfo.dSRPdistToSun      = dSRPdistToSun;
+    strAccelInfo.bIsSRPActive       = bIsSRPActive;
     strAccelInfo.dAccNonSphr_IN     = dAccNonSphr_IN;
+    strAccelInfo.dAccPolyhedronPert_IN = zeros(3, 1);
 end
 
 dAccTot = dAccTot + dTotAcc3rdBody + dAcc3rdSun + dAccCannonBallSRP + dAccNonSphr_IN + dResidualAccel;
