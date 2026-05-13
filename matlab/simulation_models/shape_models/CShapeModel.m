@@ -404,6 +404,52 @@ classdef CShapeModel < CBaseDatastruct
                 options.dGravConst             (1,1) double = 6.67430e-11
                 options.dBodyRadiusRef         (1,1) double = NaN
                 options.ui32MaxFitIterations   (1,1) uint32 = uint32(5)
+                options.charMode               (1,:) string {mustBeA(options.charMode, ["string", "char"]), ...
+                    mustBeMember(options.charMode, ["auto", "registry", "compute", "none"])} = "auto"
+            end
+
+            if strcmpi(options.charMode, "none")
+                strSHgravityData = struct();
+                return
+            end
+
+            bHasExplicitPhysicalInputs = isfinite(options.dGravParam) || ...
+                isfinite(options.dDensity) || isfinite(options.dBodyRadiusRef);
+
+            if any(strcmpi(options.charMode, ["auto", "registry"])) && ...
+                    (~bHasExplicitPhysicalInputs || strcmpi(options.charMode, "registry"))
+                
+                try
+                    % Try to get registry data first
+                    [strRegistrySHgravityData, strRegistrySHmeta] = CScenarioRegistry.GetSphericalHarmonicsGravityData( ...
+                        self.charModelName, ui32MaxDegree, string(self.charTargetUnitOutput));
+                
+                catch objException
+                    
+                    if strcmp(objException.identifier, 'CScenarioRegistry:UnsupportedScenario') && strcmpi(options.charMode, "auto")
+                        
+                        strRegistrySHmeta = struct('bHasHardcodedCoefficients', false, 'ui32HardcodedMaxDegree', uint32(0));
+                        strRegistrySHgravityData = struct();
+                    else
+                        rethrow(objException)
+                    end
+                end
+
+                if strRegistrySHmeta.bHasHardcodedCoefficients && ...
+                        ui32MaxDegree <= strRegistrySHmeta.ui32HardcodedMaxDegree
+                    
+                    % Cache registry data on the object and return it
+                    self = self.setSphericalHarmonicsGravityData(strRegistrySHgravityData);
+                    strSHgravityData = self.getSphericalHarmonicsGravityData();
+                    return
+                end
+
+                if strcmpi(options.charMode, "registry")
+                    error('CShapeModel:RegistrySHUnavailable', ...
+                        ['Registry SH data for %s are unavailable at requested degree %u. ' ...
+                         'Available hardcoded max degree is %u.'], ...
+                        string(self.charModelName), ui32MaxDegree, strRegistrySHmeta.ui32HardcodedMaxDegree);
+                end
             end
 
             dGravParam = options.dGravParam;
@@ -663,14 +709,14 @@ classdef CShapeModel < CBaseDatastruct
         end
 
         function [ui32TrianglesIndex, dVerticesCoords, dTexCoords, ...
-                ui32TrianglesTexIndex, dNormals, ui32TrianglesNormalsIndex] = LoadModelFromObj(charObjFilePath, bVertFacesOnly) %#codegen
+                ui32TrianglesTexIndex, dNormals, ui32TrianglesNormalsIndex] = LoadModelFromObj(charObjFilePath, bVertFacesOnly)
             arguments
                 charObjFilePath (1,1) string {mustBeA(charObjFilePath, ["string", "char"])}
                 bVertFacesOnly  (1,1) logical = true;
             end
             %% SIGNATURE
             % [ui32TrianglesIndex, dVerticesCoords, dTexCoords, ...
-            %  ui32TrianglesTexIndex, dNormals, ui32TrianglesNormalsIndex] = LoadModelFromObj(charObjFilePath, bVertFacesOnly) %#codegen
+            %  ui32TrianglesTexIndex, dNormals, ui32TrianglesNormalsIndex] = LoadModelFromObj(charObjFilePath, bVertFacesOnly)
             % -------------------------------------------------------------------------------------------------------------
             %% DESCRIPTION
             % [ui32TrianglesIndex, dVerticesCoords] = LoadModelFromObj(charObjFilePath) reads the vertices and the
