@@ -1,19 +1,19 @@
 function [dSRPaccel_IN, dSRPtorque_SCB, dQuadsCosSunPhaseAngle] = ComputeQuadsModelSRP(dDirSCtoSun_SCB, ...
-                                                                                        dqSCBwrtIN, ...
+                                                                                        dQuat_INfromSCB, ...
                                                                                         dMassSC, ...
                                                                                         dCoMpos_SCB, ...
                                                                                         dSolarPressure, ...
-                                                                                        dSCquadsArea, ...
+                                                                                        dSpacecraftQuadsArea, ...
                                                                                         dDiffSpecQuadsCoeffs, ...
                                                                                         dQuadsNormals_SCB, ...
                                                                                         dQuadsPressCentre_SCB) %#codegen
 arguments (Input)
     dDirSCtoSun_SCB        (3,1) double {mustBeFinite}
-    dqSCBwrtIN             (4,1) double {mustBeFinite}
+    dQuat_INfromSCB             (4,1) double {mustBeFinite}
     dMassSC                (1,1) double {mustBeFinite, mustBePositive}
     dCoMpos_SCB            (3,1) double {mustBeFinite}
     dSolarPressure         (1,1) double {mustBeFinite, mustBeNonnegative}
-    dSCquadsArea                    {mustBeVector, mustBeFinite, mustBeNonnegative}
+    dSpacecraftQuadsArea   {mustBeVector, mustBeFinite, mustBeNonnegative}
     dDiffSpecQuadsCoeffs   (:,2) double {mustBeFinite, mustBeNonnegative}
     dQuadsNormals_SCB      (3,:) double {mustBeFinite}
     dQuadsPressCentre_SCB  (3,:) double {mustBeFinite}
@@ -25,7 +25,7 @@ arguments (Output)
 end
 %% PROTOTYPE
 % [dSRPaccel_IN, dSRPtorque_SCB, dQuadsCosSunPhaseAngle] = ComputeQuadsModelSRP(dDirSCtoSun_SCB, ...
-%     dqSCBwrtIN, dMassSC, dCoMpos_SCB, dSolarPressure, dSCquadsArea, dDiffSpecQuadsCoeffs, ...
+%     dQuat_INfromSCB, dMassSC, dCoMpos_SCB, dSolarPressure, dSpacecraftQuadsArea, dDiffSpecQuadsCoeffs, ...
 %     dQuadsNormals_SCB, dQuadsPressCentre_SCB) %#codegen
 % -------------------------------------------------------------------------------------------------------------
 %% DESCRIPTION
@@ -35,11 +35,11 @@ end
 % -------------------------------------------------------------------------------------------------------------
 %% INPUT
 % dDirSCtoSun_SCB        (3,1) double   Spacecraft-to-Sun direction in SC body frame [-]
-% dqSCBwrtIN             (4,1) double   Quaternion rotating SC body vectors into inertial frame (SVRP+, scalar first)
+% dQuat_INfromSCB        (4,1) double   Quaternion rotating SC body vectors into inertial frame (SVRP+, scalar first)
 % dMassSC                (1,1) double   Spacecraft mass [kg]
 % dCoMpos_SCB            (3,1) double   Spacecraft center-of-mass position in SC body frame [m]
 % dSolarPressure         (1,1) double   Solar radiation pressure at spacecraft distance [N/m^2]
-% dSCquadsArea           (N,1) double   Surface-element areas [m^2]
+% dSpacecraftQuadsArea   (N,1) double   Surface-element areas [m^2]
 % dDiffSpecQuadsCoeffs   (N,2) double   [diffuse, specular] optical coefficients per surface element [-]
 % dQuadsNormals_SCB      (3,N) double   Surface outward normals in SC body frame [-]
 % dQuadsPressCentre_SCB  (3,N) double   Surface pressure-center positions in SC body frame [m]
@@ -58,10 +58,11 @@ end
 % Quat2DCM()   [MathCore_for_SpaceNav]
 % -------------------------------------------------------------------------------------------------------------
 
-dSCquadsArea = dSCquadsArea(:);
+%% Function code
+dSpacecraftQuadsArea = dSpacecraftQuadsArea(:);
 nQuads = size(dQuadsNormals_SCB, 2);
 
-assert(numel(dSCquadsArea) == nQuads, ...
+assert(numel(dSpacecraftQuadsArea) == nQuads, ...
     'ComputeQuadsModelSRP:AreaSizeMismatch', ...
     'The areas vector must contain one value per quadrilateral.');
 assert(size(dDiffSpecQuadsCoeffs, 1) == nQuads, ...
@@ -75,8 +76,9 @@ assert(all(dDiffSpecQuadsCoeffs(:) <= 1), ...
     'Diffuse and specular coefficients must lie in the [0, 1] interval.');
 
 dSunDir_SCB = NormalizeVector(dDirSCtoSun_SCB, eps);
-dqSCBwrtIN = NormalizeVector(dqSCBwrtIN, eps);
+dQuat_INfromSCB = dQuat_INfromSCB / max(norm(dQuat_INfromSCB), eps);
 
+% Normalize quadrilateral normals and check for zero vectors
 dQuadNormalNorm = sqrt(sum(dQuadsNormals_SCB.^2, 1));
 assert(all(dQuadNormalNorm > 0), ...
     'ComputeQuadsModelSRP:ZeroNormal', ...
@@ -88,25 +90,31 @@ dQuadsCosSunPhaseAngle = zeros(nQuads, 1);
 dForcePerQuad_SCB = zeros(3, nQuads);
 bComputeTorque = nargout >= 2;
 
+% Process each quadrilateral surface element separately
 for idQ = 1:nQuads
+    
+    % Compute cosine of Sun phase angle for current quadrilateral
     dQuadsCosSunPhaseAngle(idQ) = dot(dQuadsNormals_SCB(:, idQ), dSunDir_SCB);
 
-    if dQuadsCosSunPhaseAngle(idQ) <= 0 || dSCquadsArea(idQ) == 0
+    % Skip shadowed or zero-area quadrilaterals
+    if dQuadsCosSunPhaseAngle(idQ) <= 0 || dSpacecraftQuadsArea(idQ) == 0
         continue;
     end
 
-    dForcePerQuad_SCB(:, idQ) = -dSolarPressure * dSCquadsArea(idQ) * dQuadsCosSunPhaseAngle(idQ) * ...
+    % Compute SRP force on current quadrilateral using flat-plate model with diffuse and specular reflection
+    dForcePerQuad_SCB(:, idQ) = -dSolarPressure * dSpacecraftQuadsArea(idQ) * dQuadsCosSunPhaseAngle(idQ) * ...
         (2 * (dDiffSpecQuadsCoeffs(idQ, 1) / 3 + dDiffSpecQuadsCoeffs(idQ, 2) * dQuadsCosSunPhaseAngle(idQ)) * dQuadsNormals_SCB(:, idQ) + ...
         (1 - dDiffSpecQuadsCoeffs(idQ, 2)) * dSunDir_SCB);
 
     if bComputeTorque
+        % Compute contribution of current quadrilateral to total SRP torque about spacecraft center of mass
         dSRPtorque_SCB = dSRPtorque_SCB + cross(dQuadsPressCentre_SCB(:, idQ) - dCoMpos_SCB, dForcePerQuad_SCB(:, idQ));
     end
 end
 
 % Compute accelerations
 dSRPaccel_SCB = sum(dForcePerQuad_SCB, 2) / dMassSC;
-dDCM_INfromSCB = Quat2DCM(dqSCBwrtIN);
+dDCM_INfromSCB = Quat2DCM(dQuat_INfromSCB);
 dSRPaccel_IN = dDCM_INfromSCB * dSRPaccel_SCB;
 
 end
