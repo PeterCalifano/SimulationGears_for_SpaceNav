@@ -46,7 +46,7 @@ classdef SReferenceImagesDataset < SReferenceMissionDesign % TODO the name of th
             arguments
                 % Reference definition
                 objCamera                    (1,1)     {mustBeA(objCamera, ["CCameraIntrinsics", "cameraIntrinsics", "CProjectiveCamera"])} = CCameraIntrinsics();
-                enumWorldFrame               (1,:) char {mustBeA(enumWorldFrame, ["SEnumFrameName", "string", "char"])} = EnumFrameName.IN  % Enumeration class indicating the W frame to which the data are attached
+                enumWorldFrame               (1,:) char {mustBeA(enumWorldFrame, ["EnumFrameName", "string", "char"])} = EnumFrameName.IN  % Enumeration class indicating the W frame to which the data are attached
                 dTimestamps                  (1,:)     {mustBeNumeric} = [];
                 dStateSC_W                   (6,:)    {mustBeNumeric} = [];
                 dDCM_TBfromW                 (3,3,:)  {mustBeNumeric} = [];

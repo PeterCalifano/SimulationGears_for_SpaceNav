@@ -3,7 +3,7 @@ classdef CScenarioGenerator < CGeneralPropagator
     % Generator class constructing dataset object to define 3D scene over time, with spacecraft trajectory and 
     % attitude, Sun position, target position and attitude, ephemerides of additional bodies. Acceleration
     % info and plots are enabled based on settings. Dynamics can be arbitrarily defined assigning it as
-    % function handle. By default it uses the function "computeRefDynFcn", which expects data in the
+    % function handle. By default it uses the function "ComputeRefDynFcn", which expects data in the
     % strDynParams struct format (for interoperability with EstimationGears library functions).
     % Ephemerides are evaluated using Chebyshev polynomials data stored in strDynParams or using SPICE
     % kernels (TODO).
@@ -57,7 +57,7 @@ classdef CScenarioGenerator < CGeneralPropagator
                 strDynParams      (1,1) struct  = struct();
             end
             arguments
-                kwargs.enumWorldFrameName (1,:) {mustBeA(kwargs.enumWorldFrameName, "SEnumFrameName")} = EnumFrameName.J2000
+                kwargs.enumWorldFrameName (1,:) {mustBeA(kwargs.enumWorldFrameName, ["EnumFrameName", "string", "char"])} = EnumFrameName.J2000
                 kwargs.dEphemerisTimegrid (1,:) double {mustBeNumeric} = 0.0
                 kwargs.objOrbitDynamicFcnHandle = [] % Assign if not empty
             end
@@ -91,7 +91,7 @@ classdef CScenarioGenerator < CGeneralPropagator
             if not(isempty(kwargs.objOrbitDynamicFcnHandle))
                 self.objOrbitDynamicFcnHandle = kwargs.objOrbitDynamicFcnHandle;
             else
-                self.objOrbitDynamicFcnHandle = @(dTimestamp, dxState) computeRefDynFcn(dTimestamp,...
+                self.objOrbitDynamicFcnHandle = @(dTimestamp, dxState) ComputeRefDynFcn(dTimestamp,...
                                                                                         dxState,...
                                                                                         self.strDynParams);
             end
@@ -516,7 +516,7 @@ classdef CScenarioGenerator < CGeneralPropagator
             arguments
                 % Reference definition
                 objCamera                    (1,1)      {mustBeA(objCamera, ["CCameraIntrinsics", "cameraIntrinsics", "CProjectiveCamera"])} = CCameraIntrinsics();
-                enumWorldFrame               (1,1)      {mustBeA(enumWorldFrame, ["SEnumFrameName", "string", "char"])} = EnumFrameName.IN  % Enumeration class indicating the W frame to which the data are attached
+                enumWorldFrame               (1,1)      {mustBeA(enumWorldFrame, ["EnumFrameName", "string", "char"])} = EnumFrameName.IN  % Enumeration class indicating the W frame to which the data are attached
                 dTimestamps                  (1,:)      double {mustBeNumeric} = [];
                 dStateSC_W                   (6,:)      double {mustBeNumeric} = [];
                 dDCM_SCfromW                 (3,3,:)    double {mustBeNumeric} = [];
