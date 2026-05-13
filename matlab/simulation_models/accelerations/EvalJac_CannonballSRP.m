@@ -26,9 +26,9 @@ end
 % -------------------------------------------------------------------------------------------------------------
 %% INPUT
 % dPosSunToSC_IN                 (3,1) double   Sun-to-spacecraft vector in inertial frame [LU]
-% dCoeffSRP                      (1,1) double   SRP coefficient, mode-dependent [LU/TU^2] or [LU^3/TU^2]
+% dCoeffSRP                      (1,1) double   Current SRP acceleration coefficient [LU/TU^2]
 % bIsInEclipse                   (1,1) logical  If true, SRP Jacobian is zero
-% bRecomputePressureFromDistance (1,1) logical  If true, include inverse-square pressure variation
+% bRecomputePressureFromDistance (1,1) logical  If true, include the derivative of inverse-square pressure
 % dCachedDistSunToSC             (1,1) double   Optional precomputed Sun-spacecraft distance [LU]
 % bCachedIsSRPActive             (1,1) logical  Optional activity flag returned by ComputeCannonballSRP
 % -------------------------------------------------------------------------------------------------------------
@@ -75,12 +75,11 @@ dSunLineOuter = dPosSunToSC_IN * dPosSunToSC_IN.';
 dInvDist = 1.0 / dDistSunToSC;
 
 if coder.const(bRecomputePressureFromDistance)
-    % Inverse-square pressure mode: a_SRP = -dCoeffSRP * dSunLine / dDist^3, so Jacobian includes both 1/d^3 and 3*dSunLine/d^5 terms
+    % dCoeffSRP already contains current pressure. Only the second term changes because pressure varies as 1/r^2.
     dInvDist3 = dInvDist^3;
-    dInvDist5 = dInvDist3 * dInvDist^2;
-    dJacAccSRP_IN(:,:) = dCoeffSRP * (dInvDist3 * eye(3) - 3.0 * dInvDist5 * dSunLineOuter);
+    dJacAccSRP_IN(:,:) = dCoeffSRP * (dInvDist * eye(3) - 3.0 * dInvDist3 * dSunLineOuter);
 else
-    % Fixed-pressure mode: a_SRP = -dCoeffSRP * dSunLine / dDist, so Jacobian includes both 1/d and dSunLine/d^3 terms
+    % Fixed-pressure mode: pressure is treated as constant during this RHS evaluation.
     dInvDist3 = dInvDist^3;
     dJacAccSRP_IN(:,:) = dCoeffSRP * (dInvDist * eye(3) - dInvDist3 * dSunLineOuter);
 end
