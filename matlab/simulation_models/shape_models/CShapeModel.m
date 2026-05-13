@@ -29,6 +29,7 @@ classdef CShapeModel < CBaseDatastruct
         bHasData_ = false;
         ui32triangVertexPtr = []; % Assumed as [3, N] array
         dVerticesPos = [];        % Assumed as [3, N] array
+        dShapeRadius (1,1) double {mustBeNumeric, mustBeFinite} = 0.0;
         ui32NumOfVertices = uint32(0);
         unitScaler = 1;
         dMeshSimplifyFactor (1,1) double {mustBeFinite} = 1.0;
@@ -134,6 +135,8 @@ classdef CShapeModel < CBaseDatastruct
                     [self, ~] = self.SimplifyMesh(100.0 * (1.0 - self.dMeshSimplifyFactor));
                 end
             end
+
+            self = self.UpdateDerivedGeometry_();
         end
 
         %% GETTERS
@@ -144,6 +147,7 @@ classdef CShapeModel < CBaseDatastruct
             if self.bHasData_ == true
                 strData.ui32triangVertexPtr = self.ui32triangVertexPtr;
                 strData.dVerticesPos = self.dVerticesPos;
+                strData.dShapeRadius = self.dShapeRadius;
             else
                 warning('No model was loaded. Returning empty struct.')
             end
@@ -229,6 +233,7 @@ classdef CShapeModel < CBaseDatastruct
                 'dAchievedVertexReductionPercent', 0.0);
 
             if dReductionPercent == 0 || ui32NumFacesBefore == 0
+                self = self.UpdateDerivedGeometry_();
                 return
             end
 
@@ -247,7 +252,7 @@ classdef CShapeModel < CBaseDatastruct
             end
 
             % Fill in reduction stats with achieved reductions
-            self.ui32NumOfVertices   = uint32(size(self.dVerticesPos, 2));
+            self = self.UpdateDerivedGeometry_();
 
             strReductionStats.ui32NumFacesAfter = uint32(size(self.ui32triangVertexPtr, 2));
             strReductionStats.ui32NumVerticesAfter = self.ui32NumOfVertices;
@@ -463,6 +468,7 @@ classdef CShapeModel < CBaseDatastruct
             % Assign data to object attributes
             self.ui32triangVertexPtr = ui32TrianglesVertices;
             self.dVerticesPos        = dModelVertices;
+            self = self.UpdateDerivedGeometry_();
 
             self.bHasData_ = true;
         end
@@ -477,6 +483,7 @@ classdef CShapeModel < CBaseDatastruct
 
             self.ui32triangVertexPtr = uint32(strShapeModel.(cellFieldnames{contains(cellFieldnames, '32')} ));
             self.dVerticesPos        = double(strShapeModel.(cellFieldnames{contains(cellFieldnames, 'dVert')} ));
+            self = self.UpdateDerivedGeometry_();
 
             self.bHasData_ = true;
         end
@@ -516,8 +523,28 @@ classdef CShapeModel < CBaseDatastruct
                 self.ui32TrianglesNormalsIndex = transpose(self.ui32TrianglesNormalsIndex);
             end
 
+            self = self.UpdateDerivedGeometry_();
             self.bHasData_ = true;
 
+        end
+
+        function [self] = UpdateDerivedGeometry_(self)
+            % Method to update geometry-dependent attributes (number of vertices, shape radius) after loading or modifying the mesh. Called internally at the end of loading and simplification methods.
+            self.ui32NumOfVertices = uint32(size(self.dVerticesPos, 2));
+
+            if isempty(self.dVerticesPos)
+                self.dShapeRadius = 0.0;
+                return
+            end
+
+            dVertexNorms = vecnorm(self.dVerticesPos, 2, 1);
+            dVertexNorms = dVertexNorms(isfinite(dVertexNorms));
+
+            if isempty(dVertexNorms)
+                self.dShapeRadius = 0.0;
+            else
+                self.dShapeRadius = mean(dVertexNorms);
+            end
         end
 
         function checkIfModelAlreadyLoaded(self)
