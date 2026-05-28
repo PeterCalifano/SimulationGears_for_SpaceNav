@@ -1,23 +1,46 @@
 function dDynMatrix = evalJac_InertialDynMaxFidelity(dStateTimetag, ...
                                                      dxState_IN, ...
                                                      strDynParams, ...
-                                                     strTruthFlags, ...
+                                                     strModelConfigFlags, ...
                                                      strAccelInfo) %#codegen
 arguments
     dStateTimetag (1,1) double
     dxState_IN    (:,1) double
     strDynParams  (1,1) struct
-    strTruthFlags (1,1) struct = struct()
+    strModelConfigFlags (1,1) struct = struct()
     strAccelInfo  (1,1) struct = struct()
 end
-%% SIGNATURE
-% dDynMatrix = evalJac_InertialDynMaxFidelity(dStateTimetag, dxState_IN, strDynParams, strTruthFlags, strAccelInfo)
+%% PROTOTYPE
+% dDynMatrix = evalJac_InertialDynMaxFidelity(dStateTimetag, dxState_IN, strDynParams, strModelConfigFlags, strAccelInfo)
 % -------------------------------------------------------------------------------------------------------------
 %% DESCRIPTION
-% Analytical orbit-state Jacobian matching the default truth/reference terms in evalRHS_InertialDynMaxFidelity.
-% Panel SRP is intentionally rejected until a matching analytical Jacobian is available.
+% Model-configured max-fidelity inertial orbit-state Jacobian matching evalRHS_InertialDynMaxFidelity.
+% Point-mass, third-body, cannonball SRP, and polyhedron partials are analytical; the spherical-harmonics partial
+% is the finite-difference target-frame partial returned by EvalJac_ExtSphHarmExpInTargetFrame.
+% Panel SRP is intentionally rejected until a matching Jacobian is available.
+% -------------------------------------------------------------------------------------------------------------
+%% INPUT
+% dStateTimetag:       (1,1) double   Dynamics evaluation time.
+% dxState_IN:          (:,1) double   Inertial state; first six entries are Cartesian orbit states.
+% strDynParams:        (1,1) struct   Dynamics payload with enabled force-model data.
+% strModelConfigFlags: (1,1) struct   Optional compile-time model-configuration overrides.
+% strAccelInfo:        (1,1) struct   Optional RHS diagnostic metadata for cached SRP state.
+% -------------------------------------------------------------------------------------------------------------
+%% OUTPUT
+% dDynMatrix:          (6,6) double   Orbit-state Jacobian matrix.
+% -------------------------------------------------------------------------------------------------------------
+%% CHANGELOG
+% 13-05-2026    Pietro Califano, Codex 5.5      Add max-fidelity Jacobian matching the RHS force model.
+% 28-05-2026    Pietro Califano, Codex 5.5      Centralize model configuration and document finite-difference SH partial.
+% -------------------------------------------------------------------------------------------------------------
+%% DEPENDENCIES
+% ResolveInertialDynMaxFidelityConfig()
+% EvalJac_ExtSphHarmExpInTargetFrame()
+% EvalJac_CannonballSRP()
+% EvalPolyhedronGrav()
 % -------------------------------------------------------------------------------------------------------------
 
+%% Function code
 assert(numel(dxState_IN) >= 6, ...
     'evalJac_InertialDynMaxFidelity:InvalidStateSize', ...
     'dxState_IN must contain at least the six inertial orbit states.');
@@ -26,63 +49,44 @@ assert(numel(dxState_IN) >= 6, ...
 dxOrbitState = dxState_IN(1:6);
 dPosSC_IN = dxOrbitState(1:3);
 
-% Resolve truth-model feature flags to match max-fidelity RHS configuration.
-bIncludeMainGravity = GetFlag_(strTruthFlags, 'bIncludeMainGravity', true);
-bIncludeSphericalHarmonics = GetFlag_(strTruthFlags, 'bIncludeSphericalHarmonics', true);
-bIncludeThirdBodies = GetFlag_(strTruthFlags, 'bIncludeThirdBodies', true);
-bIncludeSunThirdBody = GetFlag_(strTruthFlags, 'bIncludeSunThirdBody', bIncludeThirdBodies);
-bIncludeEarthThirdBody = GetFlag_(strTruthFlags, 'bIncludeEarthThirdBody', bIncludeThirdBodies);
-bIncludeSRP = GetFlag_(strTruthFlags, 'bIncludeSRP', true);
-bIncludeEclipse = GetFlag_(strTruthFlags, 'bIncludeEclipse', true);
-bUsePanelSRP = GetFlag_(strTruthFlags, 'bUsePanelSRP', true);
-bIncludePolyhedronGravity = GetFlag_(strTruthFlags, 'bIncludePolyhedronGravity', true);
-bRecomputeSRPpressureFromDistance = ResolveRecomputeSRPFlag_(strDynParams, strTruthFlags);
-
-% Resolve main-body point mass and spherical-harmonic payload.
+% Resolve static model configuration to match max-fidelity RHS configuration.
+strModelConfig = ResolveInertialDynMaxFidelityConfig(strDynParams, strModelConfigFlags);
 dMainGM = 0.0;
-if bIncludeMainGravity
+if strModelConfig.bIncludeMainGravity
     dMainGM = strDynParams.strMainData.dGM;
 end
-
 dMainCSlmCoeffCols = [];
-ui32MaxSHdegree = uint32(0);
-
-if bIncludeSphericalHarmonics && dMainGM > 0.0 && coder.const(isfield(strDynParams.strMainData, 'dSHcoeff')) && ...
-        any(abs(strDynParams.strMainData.dSHcoeff) > 0.0, 'all')
-        
+if strModelConfig.bHasSphericalHarmonicsData
     dMainCSlmCoeffCols = strDynParams.strMainData.dSHcoeff;
 end
-
-if ~isempty(dMainCSlmCoeffCols) && coder.const(isfield(strDynParams.strMainData, 'ui16MaxSHdegree'))
-    ui32MaxSHdegree = uint32(strDynParams.strMainData.ui16MaxSHdegree);
-end
+ui32MaxSHdegree = strModelConfig.ui32MaxSHdegree;
 
 % Resolve target attitude and third-body ephemerides used by position partials.
-bHasPolyhedronGravity = bIncludePolyhedronGravity && HasPolyhedronGravityData_(strDynParams);
+bHasPolyhedronGravity = strModelConfig.bHasPolyhedronGravity;
 dDCMmainAtt_INfromTF = ResolveMainAttitude_(dStateTimetag, ...
                                             strDynParams, ...
-                                            ~isempty(dMainCSlmCoeffCols) || bHasPolyhedronGravity);
+                                            strModelConfig.bNeedMainAttitude);
 [dBodyEphemerides, d3rdBodiesGM] = ResolveThirdBodyData_(dStateTimetag, ...
                                                          strDynParams, ...
-                                                         bIncludeSunThirdBody, ...
-                                                         bIncludeEarthThirdBody, ...
-                                                         bIncludeThirdBodies, ...
-                                                         bIncludeSRP);
+                                                         strModelConfig.bIncludeSunThirdBody, ...
+                                                         strModelConfig.bIncludeEarthThirdBody, ...
+                                                         strModelConfig.bIncludeThirdBodies, ...
+                                                         strModelConfig.bIncludeSRP);
 
 % Resolve cannonball SRP coefficient and eclipse state; panel SRP Jacobian is unsupported.
 [dCoeffSRP, bHasSunEphemeris] = ResolveCannonballSRP_(dxOrbitState, ...
                                                        strDynParams, ...
                                                        dBodyEphemerides, ...
-                                                       bIncludeSRP, ...
-                                                       bRecomputeSRPpressureFromDistance);
+                                                       strModelConfig.bIncludeSRP, ...
+                                                       strModelConfig.bRecomputeSRPpressureFromDistance);
 bIsInEclipse = false;
-if bIncludeSRP && bIncludeEclipse && bHasSunEphemeris
+if strModelConfig.bIncludeSRP && strModelConfig.bIncludeEclipse && bHasSunEphemeris
     bIsInEclipse = IsInCylindricalTargetShadow_(dPosSC_IN, ...
                                                 dBodyEphemerides(1:3), ...
                                                 strDynParams.strMainData.dRefRadius);
 end
 
-bHasPanelSRP = bIncludeSRP && bUsePanelSRP && HasPanelSRPData_(strDynParams);
+bHasPanelSRP = strModelConfig.bHasPanelSRP;
 assert(~bHasPanelSRP, ...
     'evalJac_InertialDynMaxFidelity:PanelSRPJacobianUnsupported', ...
     'Panel SRP Jacobian is not implemented for the max-fidelity reference dynamics.');
@@ -132,9 +136,11 @@ end
 
 % Add cannonball SRP partial using RHS diagnostic state when available.
 if ~isempty(dBodyEphemerides) && ~isempty(dCoeffSRP) && ~bHasPanelSRP
-    dPosSunToSC_IN = dPosSC_IN - dBodyEphemerides(1:3);
+    dPosSunToSC_IN = zeros(3, 1);
+    dPosSunToSC_IN(1:3) = dPosSC_IN(1:3) - dBodyEphemerides(1:3);
     dSRPdistToSun = 0.0;
     bIsSRPActive = false;
+
     if coder.const(isfield(strAccelInfo, 'dSRPdistToSun'))
         dSRPdistToSun = strAccelInfo.dSRPdistToSun;
     end
@@ -146,44 +152,11 @@ if ~isempty(dBodyEphemerides) && ~isempty(dCoeffSRP) && ~bHasPanelSRP
         EvalJac_CannonballSRP(dPosSunToSC_IN, ...
                               dCoeffSRP, ...
                               bIsInEclipse, ...
-                              bRecomputeSRPpressureFromDistance, ...
+                              strModelConfig.bRecomputeSRPpressureFromDistance, ...
                               dSRPdistToSun, ...
                               bIsSRPActive);
 end
 
-end
-
-function bFlag = GetFlag_(strFlags, charFieldName, bDefault)
-% Return optional truth flag value or caller-provided default.
-bFlag = bDefault;
-if coder.const(isfield(strFlags, charFieldName))
-    bFlag = logical(strFlags.(charFieldName));
-end
-end
-
-function bRecompute = ResolveRecomputeSRPFlag_(strDynParams, strTruthFlags)
-% Resolve SRP pressure-distance scaling precedence from payload then truth flags.
-bRecompute = true;
-if coder.const(isfield(strDynParams, 'strSRPdata')) && ...
-        coder.const(isfield(strDynParams.strSRPdata, 'bRecomputePressureFromDistance'))
-    bRecompute = logical(strDynParams.strSRPdata.bRecomputePressureFromDistance);
-end
-if coder.const(isfield(strTruthFlags, 'bRecomputeSRPpressureFromDistance'))
-    bRecompute = logical(strTruthFlags.bRecomputeSRPpressureFromDistance);
-end
-end
-
-function bHasPolyhedronGravity = HasPolyhedronGravityData_(strDynParams)
-% Check whether truth payload carries polyhedron gravity data.
-bHasPolyhedronGravity = coder.const(isfield(strDynParams.strMainData, 'strPolyhedronGravityData')) && ...
-    ~isempty(strDynParams.strMainData.strPolyhedronGravityData);
-end
-
-function bHasPanelSRP = HasPanelSRPData_(strDynParams)
-% Check whether truth payload carries panel SRP geometry and optical data.
-bHasPanelSRP = coder.const(isfield(strDynParams, 'strSCdata')) && ...
-    coder.const(isfield(strDynParams.strSCdata, 'strSRPpanelData')) && ...
-    ~isempty(strDynParams.strSCdata.strSRPpanelData);
 end
 
 function dDCMmainAtt_INfromTF = ResolveMainAttitude_(dStateTimetag, strDynParams, bNeedMainAttitude)
@@ -223,7 +196,7 @@ function [dBodyEphemerides, d3rdBodiesGM] = ResolveThirdBodyData_(dStateTimetag,
                                                                   bIncludeEarthThirdBody, ...
                                                                   bIncludeThirdBodies, ...
                                                                   bNeedSunEphemeris)
-% Evaluate third-body positions and GM vector according to enabled truth flags.
+% Evaluate third-body positions and GM vector according to enabled model config flags.
 if ~coder.const(isfield(strDynParams, 'strBody3rdData')) || isempty(strDynParams.strBody3rdData)
     dBodyEphemerides = [];
     d3rdBodiesGM = [];
@@ -290,14 +263,17 @@ function [dCoeffSRP, bHasSunEphemeris] = ResolveCannonballSRP_(dxOrbitState, ...
                                                                bRecomputePressureFromDistance)
 % Compute cannonball SRP coefficient from Sun-spacecraft range.
 dCoeffSRP = [];
-bHasSunEphemeris = ~isempty(dBodyEphemerides) && any(abs(dBodyEphemerides(1:3)) > eps('single'));
+bHasSunEphemeris = ~isempty(dBodyEphemerides) && norm(dBodyEphemerides(1:3)) > eps('single');
+
 if ~bIncludeSRP || ~bHasSunEphemeris || ~coder.const(isfield(strDynParams, 'strSRPdata')) || ...
         ~coder.const(isfield(strDynParams, 'strSCdata'))
     return
 end
 
 if bRecomputePressureFromDistance
-    dPosSunToSC_IN = dxOrbitState(1:3) - dBodyEphemerides(1:3);
+    dPosSunToSC_IN = zeros(3, 1);
+    dPosSunToSC_IN(1:3) = dxOrbitState(1:3) - dBodyEphemerides(1:3);
+
     dDistSunToSC2 = dot(dPosSunToSC_IN, dPosSunToSC_IN);
     assert(dDistSunToSC2 > 0.0, ...
         'evalJac_InertialDynMaxFidelity:ZeroSunSpacecraftDistance', ...

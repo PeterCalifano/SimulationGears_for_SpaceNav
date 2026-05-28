@@ -1,27 +1,49 @@
 function [dDxDt, strAccelInfo] = evalRHS_InertialDynMaxFidelity(dStateTimetag, ...
                                                                  dxState_IN, ...
                                                                  strDynParams, ...
-                                                                 strTruthFlags) %#codegen
+                                                                 strModelConfigFlags) %#codegen
 arguments
     dStateTimetag (1,1) double
     dxState_IN    (:,1) double
     strDynParams  (1,1) struct
-    strTruthFlags (1,1) struct = struct()
+    strModelConfigFlags (1,1) struct = struct()
 end
-%% SIGNATURE
-% [dDxDt, strAccelInfo] = evalRHS_InertialDynMaxFidelity(dStateTimetag, dxState_IN, strDynParams, strTruthFlags)
+%% PROTOTYPE
+% [dDxDt, strAccelInfo] = evalRHS_InertialDynMaxFidelity(dStateTimetag, dxState_IN, strDynParams, strModelConfigFlags)
 % -------------------------------------------------------------------------------------------------------------
 %% DESCRIPTION
-% Simulator-truth inertial orbit RHS. The first six state entries are [r; v] in the inertial frame.
+% Model-configured max-fidelity inertial orbit RHS. The first six state entries are [r; v] in the inertial frame.
 % strDynParams follows the SimulationGears/Nav-System dynamics payload:
 %   strMainData       target GM, radius, optional SH/polyhedron gravity, optional attitude ephemeris
 %   strBody3rdData    Sun first, Earth second by convention, each with GM and orbit ephemeris
 %   strSRPdata        SRP pressure/reference-distance data
 %   strSCdata         cannonball data and optional strSRPpanelData
 %
-% This entry point owns truth-only options while preserving evalRHS_InertialDynOrbit for estimator paths.
+% This entry point owns compile-time model-configuration options while preserving evalRHS_InertialDynOrbit for
+% estimator paths.
+% -------------------------------------------------------------------------------------------------------------
+%% INPUT
+% dStateTimetag:       (1,1) double   Dynamics evaluation time.
+% dxState_IN:          (:,1) double   Inertial state; first six entries are Cartesian orbit states.
+% strDynParams:        (1,1) struct   Dynamics payload with enabled force-model data.
+% strModelConfigFlags: (1,1) struct   Optional compile-time model-configuration overrides.
+% -------------------------------------------------------------------------------------------------------------
+%% OUTPUT
+% dDxDt:               (:,1) double   State derivative for the inertial orbit state.
+% strAccelInfo:        (1,1) struct   Diagnostic acceleration metadata used by tests and Jacobian evaluation.
+% -------------------------------------------------------------------------------------------------------------
+%% CHANGELOG
+% 13-05-2026    Pietro Califano, Codex 5.5      Add max-fidelity RHS wrapper around shared orbit dynamics.
+% 28-05-2026    Pietro Califano, Codex 5.5      Centralize model configuration and schema-driven SH activation.
+% -------------------------------------------------------------------------------------------------------------
+%% DEPENDENCIES
+% ResolveInertialDynMaxFidelityConfig()
+% evalRHS_InertialDynOrbit()
+% EvalPolyhedronGrav()
+% ComputeQuadsModelSRP()
 % -------------------------------------------------------------------------------------------------------------
 
+%% Function code
 assert(numel(dxState_IN) >= 6, ...
     'evalRHS_InertialDynMaxFidelity:InvalidStateSize', ...
     'dxState_IN must contain at least the six inertial orbit states.');
@@ -29,60 +51,44 @@ assert(numel(dxState_IN) >= 6, ...
 % Extract orbit state handled by shared inertial dynamics kernels.
 dxOrbitState = dxState_IN(1:6);
 
-% Resolve truth-model feature flags once before building force-model inputs.
-bIncludeMainGravity = GetFlag_(strTruthFlags, 'bIncludeMainGravity', true);
-bIncludeSphericalHarmonics = GetFlag_(strTruthFlags, 'bIncludeSphericalHarmonics', true);
-bIncludeThirdBodies = GetFlag_(strTruthFlags, 'bIncludeThirdBodies', true);
-bIncludeSunThirdBody = GetFlag_(strTruthFlags, 'bIncludeSunThirdBody', bIncludeThirdBodies);
-bIncludeEarthThirdBody = GetFlag_(strTruthFlags, 'bIncludeEarthThirdBody', bIncludeThirdBodies);
-bIncludeSRP = GetFlag_(strTruthFlags, 'bIncludeSRP', true);
-bIncludeEclipse = GetFlag_(strTruthFlags, 'bIncludeEclipse', true);
-bUsePanelSRP = GetFlag_(strTruthFlags, 'bUsePanelSRP', true);
-bIncludePolyhedronGravity = GetFlag_(strTruthFlags, 'bIncludePolyhedronGravity', true);
-bRecomputeSRPpressureFromDistance = ResolveRecomputeSRPFlag_(strDynParams, strTruthFlags);
-
-% Resolve main-body point mass and spherical-harmonic payload.
+% Resolve static model configuration once before building force-model inputs.
+strModelConfig = ResolveInertialDynMaxFidelityConfig(strDynParams, strModelConfigFlags);
 dMainGM = 0.0;
-if bIncludeMainGravity
+if strModelConfig.bIncludeMainGravity
     dMainGM = strDynParams.strMainData.dGM;
 end
-
 dMainCSlmCoeffCols = [];
-ui32MaxSHdegree = uint32(0);
-if bIncludeSphericalHarmonics && dMainGM > 0.0 && coder.const(isfield(strDynParams.strMainData, 'dSHcoeff')) && ...
-        any(abs(strDynParams.strMainData.dSHcoeff) > 0.0, 'all')
+if strModelConfig.bHasSphericalHarmonicsData
     dMainCSlmCoeffCols = strDynParams.strMainData.dSHcoeff;
 end
-if ~isempty(dMainCSlmCoeffCols) && coder.const(isfield(strDynParams.strMainData, 'ui16MaxSHdegree'))
-    ui32MaxSHdegree = uint32(strDynParams.strMainData.ui16MaxSHdegree);
-end
+ui32MaxSHdegree = strModelConfig.ui32MaxSHdegree;
 
 % Resolve target attitude and third-body ephemerides required by gravity, SRP, and eclipse.
-bHasPolyhedronGravity = bIncludePolyhedronGravity && HasPolyhedronGravityData_(strDynParams);
+bHasPolyhedronGravity = strModelConfig.bHasPolyhedronGravity;
 dDCMmainAtt_INfromTF = ResolveMainAttitude_(dStateTimetag, ...
                                             strDynParams, ...
-                                            ~isempty(dMainCSlmCoeffCols) || bHasPolyhedronGravity);
+                                            strModelConfig.bNeedMainAttitude);
 [dBodyEphemerides, d3rdBodiesGM] = ResolveThirdBodyData_(dStateTimetag, ...
                                                          strDynParams, ...
-                                                         bIncludeSunThirdBody, ...
-                                                         bIncludeEarthThirdBody, ...
-                                                         bIncludeThirdBodies, ...
-                                                         bIncludeSRP);
+                                                         strModelConfig.bIncludeSunThirdBody, ...
+                                                         strModelConfig.bIncludeEarthThirdBody, ...
+                                                         strModelConfig.bIncludeThirdBodies, ...
+                                                         strModelConfig.bIncludeSRP);
 
 % Resolve cannonball SRP coefficient and eclipse state; panel SRP is handled separately.
 [dCoeffSRP, dSolarPressure, bHasSunEphemeris] = ResolveCannonballSRP_(dxOrbitState, ...
                                                                        strDynParams, ...
                                                                        dBodyEphemerides, ...
-                                                                       bIncludeSRP, ...
-                                                                       bRecomputeSRPpressureFromDistance);
+                                                                       strModelConfig.bIncludeSRP, ...
+                                                                       strModelConfig.bRecomputeSRPpressureFromDistance);
 bIsInEclipse = false;
-if bIncludeSRP && bIncludeEclipse && bHasSunEphemeris
+if strModelConfig.bIncludeSRP && strModelConfig.bIncludeEclipse && bHasSunEphemeris
     bIsInEclipse = IsInCylindricalTargetShadow_(dxOrbitState(1:3), ...
                                                 dBodyEphemerides(1:3), ...
                                                 strDynParams.strMainData.dRefRadius);
 end
 
-bHasPanelSRP = bIncludeSRP && bUsePanelSRP && HasPanelSRPData_(strDynParams);
+bHasPanelSRP = strModelConfig.bHasPanelSRP;
 if bHasPanelSRP
     dCoeffForOrbit = [];
 else
@@ -131,7 +137,7 @@ if nargout > 1
     strAccelInfo.dAccPanelSRP_IN = dAccPanelSRP_IN;
     strAccelInfo.dSRPtorque_SCB = dSRPtorque_SCB;
     strAccelInfo.bPanelSRPActive = bPanelSRPActive;
-    strAccelInfo.bCannonballSRPSelected = bIncludeSRP && ~bHasPanelSRP;
+    strAccelInfo.bCannonballSRPSelected = strModelConfig.bIncludeSRP && ~bHasPanelSRP;
     strAccelInfo.bPanelSRPSelected = bHasPanelSRP;
     strAccelInfo.bIsInEclipse = bIsInEclipse;
     strAccelInfo.dSolarPressure = dSolarPressure;
@@ -139,26 +145,6 @@ if nargout > 1
     strAccelInfo.d3rdBodiesGM = d3rdBodiesGM;
 end
 
-end
-
-function bFlag = GetFlag_(strFlags, charFieldName, bDefault)
-% Return optional truth flag value or caller-provided default.
-bFlag = bDefault;
-if coder.const(isfield(strFlags, charFieldName))
-    bFlag = logical(strFlags.(charFieldName));
-end
-end
-
-function bRecompute = ResolveRecomputeSRPFlag_(strDynParams, strTruthFlags)
-% Resolve SRP pressure-distance scaling precedence from payload then truth flags.
-bRecompute = true;
-if coder.const(isfield(strDynParams, 'strSRPdata')) && ...
-        coder.const(isfield(strDynParams.strSRPdata, 'bRecomputePressureFromDistance'))
-    bRecompute = logical(strDynParams.strSRPdata.bRecomputePressureFromDistance);
-end
-if coder.const(isfield(strTruthFlags, 'bRecomputeSRPpressureFromDistance'))
-    bRecompute = logical(strTruthFlags.bRecomputeSRPpressureFromDistance);
-end
 end
 
 function dDCMmainAtt_INfromTF = ResolveMainAttitude_(dStateTimetag, strDynParams, bNeedMainAttitude)
@@ -198,7 +184,7 @@ function [dBodyEphemerides, d3rdBodiesGM] = ResolveThirdBodyData_(dStateTimetag,
                                                                   bIncludeEarthThirdBody, ...
                                                                   bIncludeThirdBodies, ...
                                                                   bNeedSunEphemeris)
-% Evaluate third-body positions and GM vector according to enabled truth flags.
+% Evaluate third-body positions and GM vector according to enabled model config flags.
 if ~coder.const(isfield(strDynParams, 'strBody3rdData')) || isempty(strDynParams.strBody3rdData)
     dBodyEphemerides = [];
     d3rdBodiesGM = [];
@@ -268,14 +254,15 @@ function [dCoeffSRP, dSolarPressure, bHasSunEphemeris] = ResolveCannonballSRP_(d
 % Compute cannonball SRP coefficient and solar pressure from Sun-spacecraft range.
 dCoeffSRP = [];
 dSolarPressure = 0.0;
-bHasSunEphemeris = ~isempty(dBodyEphemerides) && any(abs(dBodyEphemerides(1:3)) > eps('single'));
+bHasSunEphemeris = ~isempty(dBodyEphemerides) && norm(dBodyEphemerides(1:3)) > eps('single');
 if ~bIncludeSRP || ~bHasSunEphemeris || ~coder.const(isfield(strDynParams, 'strSRPdata')) || ...
         ~coder.const(isfield(strDynParams, 'strSCdata'))
     return
 end
 
 if bRecomputePressureFromDistance
-    dPosSunToSC_IN = dxOrbitState(1:3) - dBodyEphemerides(1:3);
+    dPosSunToSC_IN = zeros(3, 1);
+    dPosSunToSC_IN(1:3) = dxOrbitState(1:3) - dBodyEphemerides(1:3);
     dDistSunToSC2 = dot(dPosSunToSC_IN, dPosSunToSC_IN);
     assert(dDistSunToSC2 > 0.0, ...
         'evalRHS_InertialDynMaxFidelity:ZeroSunSpacecraftDistance', ...
@@ -288,19 +275,6 @@ end
 
 dCoeffSRP = dSolarPressure * strDynParams.strSCdata.dReflCoeff * ...
     strDynParams.strSCdata.dA_SRP / strDynParams.strSCdata.dSCmass;
-end
-
-function bHasPolyhedronGravity = HasPolyhedronGravityData_(strDynParams)
-% Check whether truth payload carries polyhedron gravity data.
-bHasPolyhedronGravity = coder.const(isfield(strDynParams.strMainData, 'strPolyhedronGravityData')) && ...
-    ~isempty(strDynParams.strMainData.strPolyhedronGravityData);
-end
-
-function bHasPanelSRP = HasPanelSRPData_(strDynParams)
-% Check whether truth payload carries panel SRP geometry and optical data.
-bHasPanelSRP = coder.const(isfield(strDynParams, 'strSCdata')) && ...
-    coder.const(isfield(strDynParams.strSCdata, 'strSRPpanelData')) && ...
-    ~isempty(strDynParams.strSCdata.strSRPpanelData);
 end
 
 function bIsInEclipse = IsInCylindricalTargetShadow_(dPosSC_IN, dSunPos_IN, dTargetRadius)
@@ -330,9 +304,15 @@ dqSCBwrtIN = ResolveSCQuaternion_(strDynParams);
 dCoMpos_SCB = ResolveSCCenterOfMass_(strDynParams);
 
 dSCtoSun_IN = dSunPos_IN - dPosSC_IN;
-dDirSCtoSun_IN = dSCtoSun_IN / norm(dSCtoSun_IN);
+dDirSCtoSun_IN = zeros(3, 1);
+dDirSCtoSun_IN(:) = dSCtoSun_IN(1:3) / norm(dSCtoSun_IN);
+
+% Compute direction to Sun in spacecraft body frame
 dDCM_INfromSCB = Quat2DCM(dqSCBwrtIN);
-dDirSCtoSun_SCB = dDCM_INfromSCB.' * dDirSCtoSun_IN;
+
+dDirSCtoSun_SCB = zeros(3, 1);
+dDirSCtoSun_SCB = transpose(dDCM_INfromSCB) * dDirSCtoSun_IN;
+
 
 [dArea, dPressCentre, dCoMpos, dPressureSI, dOutputScale] = NormalizePanelUnits_(strPanel, ...
                                                                                  dCoMpos_SCB, ...
