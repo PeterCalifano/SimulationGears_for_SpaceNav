@@ -8,7 +8,7 @@ arguments (Input)
     dPosSunToSC_IN                  (3,1) double {mustBeFinite}
     dCoeffSRP                       (1,1) double {mustBeFinite, mustBeNonnegative}
     bIsInEclipse                    (1,1) logical = false
-    bRecomputePressureFromDistance  (1,1) logical {coder.mustBeConst} = false
+    bRecomputePressureFromDistance  (1,1) logical = false
     dCachedDistSunToSC              (1,1) double {mustBeFinite, mustBeNonnegative} = 0.0
     bCachedIsSRPActive              (1,1) logical = false
 end
@@ -74,7 +74,7 @@ end
 dSunLineOuter = dPosSunToSC_IN * dPosSunToSC_IN.';
 dInvDist = 1.0 / dDistSunToSC;
 
-if coder.const(bRecomputePressureFromDistance)
+if bRecomputePressureFromDistance
     % dCoeffSRP already contains current pressure. Only the second term changes because pressure varies as 1/r^2.
     dInvDist3 = dInvDist^3;
     dJacAccSRP_IN(:,:) = dCoeffSRP * (dInvDist * eye(3) - 3.0 * dInvDist3 * dSunLineOuter);

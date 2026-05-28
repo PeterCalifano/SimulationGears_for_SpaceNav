@@ -2,9 +2,9 @@ function [dAccSRP_IN, dDistSunToSC, bIsSRPActive] = ComputeCannonballSRP(dPosSun
                                                                         dCoeffSRP, ...
                                                                         bIsInEclipse) %#codegen
 arguments (Input)
-    dPosSunToSC_IN double {mustBeFinite}
-    dCoeffSRP      double {mustBeFinite, mustBeNonnegative}
-    bIsInEclipse   logical
+    dPosSunToSC_IN (3,1) double {mustBeFinite}
+    dCoeffSRP      (1,1) double {mustBeFinite, mustBeNonnegative}
+    bIsInEclipse   (1,1) logical
 end
 arguments (Output)
     dAccSRP_IN   (3,1) double
