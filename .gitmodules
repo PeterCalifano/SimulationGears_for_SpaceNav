@@ -1,4 +1,3 @@
-[submodule "lib/MathCore_for_SpaceNav"]
-	path = lib/MathCore_for_SpaceNav
-	url = git@github.com:PeterCalifano/MathCore_for_SpaceNav.git
-	branch = dev_main
+[submodule "lib/MathCore_for_ComputerVision"]
+	path = lib/MathCore_for_ComputerVision
+	url = git@github.com:PeterCalifano/MathCore_for_ComputerVision.git
