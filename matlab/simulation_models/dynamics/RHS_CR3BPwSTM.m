@@ -26,7 +26,7 @@ end
 %% CHANGELOG
 % 31-07-2023    Pietro Califano     Function reviewed from codes used in
 %                                   the SGN 1st assignment (October 2022)
-% 22-04-2026    OpenAI Codex        Modernized interface/documentation and inlined shared STM algebra.
+% 22-04-2026    Pietro Califano     Modernized interface/documentation and inlined shared STM algebra.
 % -------------------------------------------------------------------------------------------------------------
 %% DEPENDENCIES
 % [-]

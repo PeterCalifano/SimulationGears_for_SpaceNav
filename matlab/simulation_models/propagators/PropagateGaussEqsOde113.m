@@ -67,7 +67,7 @@ end
 % -------------------------------------------------------------------------------------------------------------
 %% CHANGELOG
 % 01-01-2022    Tommaso Robbiani, Maria Laura Santangelo, Pietro Califano, Gennaro Rizzo   Initial version.
-% 22-04-2026    OpenAI Codex      Modernized header, naming, validation, and wrapper interface.
+% 22-04-2026    Pietro Califano   Modernized header, naming, validation, and wrapper interface.
 % -------------------------------------------------------------------------------------------------------------
 %% DEPENDENCIES
 % EvalRHS_GaussPlanetary()

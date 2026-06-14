@@ -44,7 +44,7 @@ end
 %% CHANGELOG
 % 01-01-2022    Tommaso Robbiani, Maria Laura Santangelo, Pietro Califano, Gennaro Rizzo   Initial version.
 % 28-03-2026    Pietro Califano, Claude Code    Modernized header, arguments block, naming.
-% 22-04-2026    Pietro Califano, OpenAI Codex   Optimized hot path: no per-call validation, lazy perturbation evaluation,
+% 22-04-2026    Pietro Califano                 Optimized hot path: no per-call validation, lazy perturbation evaluation,
 %                                               inlined J2 computation, reduced redundant algebra.
 % -------------------------------------------------------------------------------------------------------------
 %% DEPENDENCIES

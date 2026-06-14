@@ -16,6 +16,14 @@ set(TESTS_LIST "")
 
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 
+# Add subdirectories
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/template_test/CMakeLists.txt")
+  add_subdirectory(template_test)
+endif()
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/template_fixtures/CMakeLists.txt")
+  add_subdirectory(template_fixtures)
+endif()
+
 # Add tests to build
 add_tests(${project_name} EXCLUDED_LIST TESTS_LIST ${CUDA_COMPILE_TARGET} CATCH2_TEST_PROPERTIES Catch2::Catch2WithMain)
 

@@ -1,15 +1,16 @@
-function scaleFactors = ExtSHE_normFactors(lMax) %#codegen
+function scaleFactors = GetSphHarmNormalizationFactors(lMax) %#codegen
 arguments
     lMax (1,1) double
 end
 %% PROTOTYPE
-% [scaleFactors] = ExtSHE_normFactors(lMax)
+% [scaleFactors] = GetSphHarmNormalizationFactors(lMax)
 % -------------------------------------------------------------------------------------------------------------
 %% DESCRIPTION
 % Function computing the scaling factors of the SHE model coefficients to convert between Normalized
 % and Non-normalized (scaled) coefficients, typically indicated as (Clm-bar, Slm-bar) and (Clm, Slm)
-% respectively. A 1D array containing the scaling coefficients for each entry of the Clm and Slm as
-% required by function ExtSHE_GradU(), is produced.
+% respectively. A 1D array containing the scaling coefficients for each
+% entry of the Clm and Slm in the repo-native column-pair ordering is
+% produced.
 % The function returns the scaling coefficients from (1,1) to (lMax, lMax) (degree, order).
 % REFERENCE:
 % 1) Fundamentals Of Astrodynamics And Applications, Vallado (chapters 8.6, 8.7)
@@ -59,4 +60,3 @@ else
 end
 
 end
-

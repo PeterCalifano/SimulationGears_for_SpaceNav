@@ -48,7 +48,7 @@ end
 %% CHANGELOG
 % 01-01-2022    Tommaso Robbiani, Maria Laura Santangelo, Pietro Califano, Gennaro Rizzo   Initial version.
 % 28-03-2026    Claude Code     Modernized: lookup table, header, arguments, naming.
-% 22-04-2026    OpenAI Codex    Extended exponential table to 1300 km and cached reusable constants.
+% 22-04-2026    Pietro Califano Extended exponential table to 1300 km and cached reusable constants.
 % -------------------------------------------------------------------------------------------------------------
 %% DEPENDENCIES
 % kepl2rv()   [MathCore_for_SpaceNav]
