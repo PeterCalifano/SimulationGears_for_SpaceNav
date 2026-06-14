@@ -1,6 +1,6 @@
 # SimulationGears_for_SpaceNav {#mainpage}
 
-See the [README](../../README.md) for full usage documentation, or read on for the condensed reference.
+See @ref md__r_e_a_d_m_e "README" for full usage documentation, or read on for the condensed reference.
 
 ## Installation
 

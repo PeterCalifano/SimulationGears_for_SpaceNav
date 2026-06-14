@@ -1,4 +1,4 @@
-set(lib_name ${project_name}) # Default name for the library is project_name
+set(lib_name ${LIB_TARGET_NAME}) # Override lets nested consumers avoid target name collisions.
 
 # Add config.h file to build
 configure_file(config.h.in config.h)
@@ -6,18 +6,16 @@ configure_file(config.h.in config.h)
 # Add src files to library
 set(SRC_PATTERN "*.cpp; *.cu")
 file(GLOB srcLibFiles RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} ${SRC_PATTERN})
-
-# Define INCLUDE_DIRECTORIES (subdirectories append to this)
-set(lib_name_INCLUDE_DIRS ${lib_name_INCLUDE_DIRS} ${CMAKE_CURRENT_SOURCE_DIR})
+file(GLOB srcCudaFilesToPTX "*.ptx.cu")
 
 # Get current folder name
 get_filename_component(CURRENT_FOLDER_NAME ${CMAKE_CURRENT_SOURCE_DIR} NAME)
 message(STATUS "Library src files found in ${CURRENT_FOLDER_NAME}: ${srcLibFiles}")
 
 # Add subdirectories with src files
-if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/template_folder/CMakeLists.txt")
-  message(STATUS "Adding module: template_folder")
-  add_subdirectory(template_folder)
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/attitude/CMakeLists.txt")
+  message(STATUS "Adding module: attitude")
+  add_subdirectory(attitude)
 endif()
 
 if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/wrapped_impl/CMakeLists.txt")
@@ -50,8 +48,9 @@ if(src_lib_files_count EQUAL 0)
 else()
   set(lib_is_header_only FALSE)
   set(lib_link_scope PUBLIC)
-  set(lib_target_type "SHARED")
-  if(DEFINED BUILD_SHARED_LIBS AND NOT BUILD_SHARED_LIBS)
+  if (BUILD_SHARED_LIBS)
+    set(lib_target_type "SHARED")
+  else()
     set(lib_target_type "STATIC")
   endif()
   add_library(${lib_name} ${lib_target_type}
@@ -59,8 +58,14 @@ else()
   set_target_properties(${lib_name} PROPERTIES POSITION_INDEPENDENT_CODE ON)
 endif()
 
+set_target_properties(${lib_name} PROPERTIES EXPORT_NAME ${project_name})
+
 message(STATUS "Configured ${lib_name} as a ${lib_target_type} library target")
 set(PROJECT_LIBRARY_KIND "${lib_target_type}" PARENT_SCOPE)
+
+if(NOT TARGET ${LIB_NAMESPACE}::${project_name})
+  add_library(${LIB_NAMESPACE}::${project_name} ALIAS ${lib_name})
+endif()
 
 if(SPDLOG_ENABLED)
   target_compile_definitions(${lib_name} ${lib_link_scope} SPDLOG_UTILS_ENABLED=1)
@@ -70,6 +75,34 @@ endif()
 
 if(NOT lib_is_header_only AND SANITIZE_BUILD AND SANITIZER_TARGET AND TARGET ${SANITIZER_TARGET})
   target_link_libraries(${lib_name} PRIVATE ${SANITIZER_TARGET})
+endif()
+
+if (ENABLE_OPTIX)
+  if (lib_is_header_only)
+    message(FATAL_ERROR
+      "Internal configuration error: ENABLE_OPTIX passed the root preflight, "
+      "but ${lib_name} resolved to a header-only target in src/CMakeLists.txt.")
+  endif()
+
+  if (NOT srcCudaFilesToPTX)
+    message(FATAL_ERROR
+      "Internal configuration error: ENABLE_OPTIX passed the root preflight, "
+      "but no PTX kernel sources reached src/CMakeLists.txt.")
+  endif()
+
+  message("Library .cu kernels files to compile as PTX: ${srcCudaFilesToPTX}")
+
+  get_target_property(project_interface_INCLUDE_DIRS ${project_name}_include INTERFACE_INCLUDE_DIRECTORIES)
+  if (NOT project_interface_INCLUDE_DIRS)
+    set(project_interface_INCLUDE_DIRS "")
+  endif()
+
+  set(PTX_INCLUDE_DIRS ${CUDAToolkit_INCLUDE_DIRS}
+                       ${OptiX_INCLUDE_DIRS}
+                       ${project_interface_INCLUDE_DIRS})
+
+  cuda_compile_and_embed(embedded_ptx_code ${sm_version} "${PTX_INCLUDE_DIRS}" ${srcCudaFilesToPTX})
+  target_sources(${lib_name} PRIVATE ${embedded_ptx_code})
 endif()
 
 target_link_libraries(${lib_name} ${lib_link_scope}
@@ -83,6 +116,10 @@ endif()
 
 if(ENABLE_CUDA)
   target_link_libraries(${lib_name} ${lib_link_scope} ${CUDA_COMPILE_TARGET})
+endif()
+
+if(ENABLE_OPTIX)
+  target_link_libraries(${lib_name} ${lib_link_scope} ${OPTIX_COMPILE_TARGET})
 endif()
 
 if(ENABLE_OPENGL)
@@ -111,11 +148,15 @@ if(TARGET ${PROFILING_COMPILE_TARGET})
 endif()
 if(ENABLE_CUDA)
   list(APPEND installable_targets ${CUDA_COMPILE_TARGET})
+  if(ENABLE_OPTIX)
+    list(APPEND installable_targets ${OPTIX_COMPILE_TARGET})
+  endif()
 endif()
 if(ENABLE_OPENGL)
   list(APPEND installable_targets ${OPENGL_COMPILE_TARGET})
 endif()
 set(installable_targets ${installable_targets} PARENT_SCOPE)
+message(NOTICE "Added target to installable list: ${installable_targets}")
 
 if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/global_includes.h")
   install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/global_includes.h"
