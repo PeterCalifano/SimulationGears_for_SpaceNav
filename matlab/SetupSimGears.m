@@ -1,8 +1,8 @@
 function SetupSimGears()
 %% DESCRIPTION
 % Add all SimulationGears MATLAB source directories to the MATLAB path.
-% Can be called from any working directory. Excludes .deprecated/, codegen/mex/,
-% and experimental/ folders.
+% Can be called from any working directory. Excludes .deprecated/, generated
+% MEX artifacts, codegen/mex/, and experimental/ folders.
 % -------------------------------------------------------------------------------------------------------------
 %% CHANGELOG
 % 28-03-2026    Pietro Califano     Initial version
@@ -16,6 +16,7 @@ charMatlabRoot = fileparts(mfilename('fullpath'));
 
 % Generate all subdirectories
 cellAllPaths = strsplit(genpath(charMatlabRoot), pathsep);
+charGeneratedMexRoot = fullfile(charMatlabRoot, 'mex');
 
 % Filter out unwanted directories
 cellExcludePatterns = {'.deprecated', ...
@@ -31,6 +32,10 @@ for idP = 1:length(cellAllPaths)
     end
 
     bExclude = false;
+    if strcmp(charPath, charGeneratedMexRoot) || startsWith(charPath, [charGeneratedMexRoot filesep])
+        bExclude = true;
+    end
+
     for idE = 1:length(cellExcludePatterns)
         if contains(charPath, cellExcludePatterns{idE})
             bExclude = true;
@@ -45,12 +50,23 @@ end
 
 fprintf('SimulationGears MATLAB paths added from: %s\n', charMatlabRoot);
 
-% Add MathCore_for_SpaceNav library (sibling of matlab/ under repo root)
+% Add MathCore MATLAB library (sibling of matlab/ under repo root)
 charRepoRoot    = fileparts(charMatlabRoot);
-charMathCoreRoot = fullfile(charRepoRoot, 'lib', 'MathCore_for_SpaceNav', 'matlab');
+cellMathCoreRootCandidates = { ...
+    fullfile(charRepoRoot, 'lib', 'MathCore_for_ComputerVision', 'matlab'), ...
+    fullfile(charRepoRoot, 'lib', 'MathCore_for_SpaceNav', 'matlab')};
 
-if exist(charMathCoreRoot, 'dir')
-    cellMathCorePaths = strsplit(genpath(charMathCoreRoot), pathsep);
+charMathCoreRoot = "";
+for idCandidate = 1:numel(cellMathCoreRootCandidates)
+    charCandidateRoot = cellMathCoreRootCandidates{idCandidate};
+    if exist(charCandidateRoot, 'dir')
+        charMathCoreRoot = string(charCandidateRoot);
+        break;
+    end
+end
+
+if strlength(charMathCoreRoot) > 0
+    cellMathCorePaths = strsplit(genpath(char(charMathCoreRoot)), pathsep);
 
     cellMathCoreExclude = {'.deprecated', fullfile('codegen', 'mex'), 'experimental'};
 
@@ -70,9 +86,9 @@ if exist(charMathCoreRoot, 'dir')
             addpath(charPath);
         end
     end
-    fprintf('MathCore_for_SpaceNav MATLAB paths added from: %s\n', charMathCoreRoot);
+    fprintf('MathCore MATLAB paths added from: %s\n', char(charMathCoreRoot));
 else
     warning('SetupSimGears:MathCoreNotFound', ...
-        'MathCore_for_SpaceNav not found at expected location: %s', charMathCoreRoot);
+        'MathCore MATLAB sources not found under expected lib/MathCore submodules.');
 end
 end

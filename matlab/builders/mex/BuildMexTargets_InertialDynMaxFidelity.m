@@ -1,6 +1,6 @@
-function strMexInfo = BuildInertialDynMaxFidelityMexTargets(charBuildDir)
+function strMexInfo = BuildMexTargets_InertialDynMaxFidelity(charBuildDir)
 %% PROTOTYPE
-% strMexInfo = BuildInertialDynMaxFidelityMexTargets(charBuildDir)
+% strMexInfo = BuildMexTargets_InertialDynMaxFidelity(charBuildDir)
 % -------------------------------------------------------------------------------------------------------------
 %% DESCRIPTION
 % Builds MEX targets for the max-fidelity inertial dynamics RHS and matching Jacobian.
@@ -15,7 +15,8 @@ function strMexInfo = BuildInertialDynMaxFidelityMexTargets(charBuildDir)
 % strMexInfo:          struct    Build directory, generated target names, and representative interface metadata.
 % -------------------------------------------------------------------------------------------------------------
 %% CHANGELOG
-% 13-05-2026    Pietro Califano     Add fail-fast MEX build utility for max-fidelity RHS and Jacobian.
+% 13-05-2026    Pietro Califano                 Add fail-fast MEX build utility for max-fidelity RHS and Jacobian.
+% 28-05-2026    Pietro Califano, Codex 5.5      Move to codegen builders and standardize builder name.
 % -------------------------------------------------------------------------------------------------------------
 %% DEPENDENCIES
 % evalRHS_InertialDynMaxFidelity()
@@ -29,16 +30,15 @@ function strMexInfo = BuildInertialDynMaxFidelityMexTargets(charBuildDir)
 BootstrapRepositoryPaths_();
 
 % Set default build directory if not provided, and validate inputs.
-if nargin < 1 || strlength(string(charBuildDir)) == 0
-    charBuildDir = fullfile(tempdir, 'simgears_max_fidelity_dyn_codegen');
+if nargin < 1
+    charBuildDir = "";
 end
-charBuildDir = char(string(charBuildDir));
-
-if ~exist(charBuildDir, 'dir')
-    mkdir(charBuildDir);
-end
+charBuildDir = ResolveMexBuildDirectory(charBuildDir, 'simulation_models', 'dynamics');
 
 addpath(charBuildDir);
+charCallDir = pwd;
+objCleanup = onCleanup(@() cd(charCallDir));
+cd(charBuildDir);
 
 cfg = coder.config('mex');
 cfg.GenerateReport = true;
@@ -151,8 +151,8 @@ end
 
 function BootstrapRepositoryPaths_()
 % Reuse the repository path bootstrap so codegen sees SimulationGears and MathCore sources.
-charDynamicsDir = fileparts(mfilename('fullpath'));
-charMatlabRoot = fileparts(fileparts(charDynamicsDir));
+charBuilderDir = fileparts(mfilename('fullpath'));
+charMatlabRoot = fileparts(fileparts(charBuilderDir));
 addpath(charMatlabRoot, '-begin');
 
 SetupSimGears();

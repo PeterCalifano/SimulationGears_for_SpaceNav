@@ -2,6 +2,7 @@
 /*debug*/
 /*install*/
 **/codegen*/
+/matlab/mex/
 
 *.mexa64
 

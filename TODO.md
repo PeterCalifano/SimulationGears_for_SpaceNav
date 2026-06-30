@@ -27,7 +27,7 @@
 - [x] Convert `FitSpherHarmCoeffToPolyhedrGrav(...)` to positional inputs for codegen compatibility and update callers.
 - [x] Extract mesh volume and center-of-mass computation into `ComputeMeshModelVolumeAndCoM(...)`.
 - [x] Share the ExtSHE basis and spherical-gradient mapping implementation between fitting and evaluation instead of maintaining a duplicated fit-only model.
-- [x] Add `BuildMexTargets_GravityModels(...)` to build the ExtSHE and polyhedron gravity MEX targets.
+- [x] Add `BuildMexTargets_GravityModels(...)` to build the ExtSHE and polyhedron gravity MEX targets under the mirrored `matlab/mex` artifact tree.
 - [x] Validate polyhedron gravity against the actual `/home/peterc/devDir/simulationUtils` implementation, including acceleration, Jacobian, potential, and Laplacian.
 - [x] Add `CShapeModel.BuildAndSetSphericalHarmonicsGravityData(...)` as the instance-level build-and-cache API with default SH degree 4.
 - [x] Add a shared shape-model scenario gravity-default registry for known-scenario `dGravParam` lookup.
