@@ -70,7 +70,8 @@ options.charShapeModelInputUnits = EnumLengthUnits.toString(options.charShapeMod
 % 31-08-2025    Pietro Califano     Define ellipsoidal model for all available bodies
 % 27-01-2026    Pietro Califano     Improve overriding options management for paths, minor fixes
 % 24-04-2026    Pietro Califano     Add load-time mesh keep-fraction passthrough to CShapeModel
-% 01-07-2026    Pietro Califano     Add SimGears data-root routing, physical metadata, and default SH initialization
+% 01-07-2026    Pietro Califano     Add SimGears data-root routing, physical metadata, registry-backed shape
+%                                   defaults, and default SH initialization
 % -------------------------------------------------------------------------------------------------------------
 %% DEPENDENCIES
 % [-]

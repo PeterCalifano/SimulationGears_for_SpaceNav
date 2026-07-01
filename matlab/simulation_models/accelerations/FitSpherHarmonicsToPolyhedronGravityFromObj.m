@@ -52,6 +52,8 @@ end
 % -------------------------------------------------------------------------------------------------------------
 %% CHANGELOG
 % 24-04-2026    Pietro Califano     Add end-to-end OBJ-to-SH example entry point using builder-style utility.
+% 01-07-2026    Pietro Califano     Accept EnumLengthUnits and require explicit gravity inputs unless
+%                                   provided by caller or registry-backed builder paths.
 % -------------------------------------------------------------------------------------------------------------
 %% DEPENDENCIES
 % CShapeModel()

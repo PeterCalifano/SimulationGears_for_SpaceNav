@@ -10,10 +10,36 @@ arguments
     options.dLegacyDensity (1,1) double = NaN
     options.dGravConstSI (1,1) double {mustBeFinite, mustBePositive} = 6.67430e-11
 end
+%% SIGNATURE
+% [strPhysicalMetadata, strSHinputs] = BuildShapeModelPhysicalMetadata(objShapeModel, options)
+% -------------------------------------------------------------------------------------------------------------
 %% DESCRIPTION
 % Resolves shape physical metadata from the explicit SI custom-shape
 % contract plus legacy SH-native aliases. Returned SH inputs are expressed
 % in the active shape-model length units.
+% -------------------------------------------------------------------------------------------------------------
+%% INPUT
+% objShapeModel:                  CShapeModel  Shape model used for mesh-volume derivation when needed.
+% options.charLengthUnits:        [1]          Active length units ('m' or 'km').
+% options.dMass_kg:               [1]          Optional mass in kg.
+% options.dDensity_kgm3:          [1]          Optional density in kg/m^3.
+% options.dVolume_m3:             [1]          Optional volume in m^3.
+% options.dGravParam_m3mps2:      [1]          Optional gravitational parameter in m^3/s^2.
+% options.dLegacyGravParam:       [1]          Optional gravitational parameter in active length units.
+% options.dLegacyDensity:         [1]          Optional density in active length units.
+% options.dGravConstSI:           [1]          Gravitational constant in SI units.
+% -------------------------------------------------------------------------------------------------------------
+%% OUTPUT
+% strPhysicalMetadata: struct with normalized SI physical metadata and availability flags.
+% strSHinputs:         struct with SH-native gravitational parameter, density, and gravity constant.
+% -------------------------------------------------------------------------------------------------------------
+%% CHANGELOG
+% 01-07-2026    Pietro Califano     Add physical metadata normalization for custom shape-model SH setup.
+% -------------------------------------------------------------------------------------------------------------
+%% DEPENDENCIES
+% CShapeModel()
+% EnumLengthUnits
+% ComputeMeshModelVolumeAndCoM()
 % -------------------------------------------------------------------------------------------------------------
 
 charLengthUnits = EnumLengthUnits.toString(options.charLengthUnits);

@@ -9,7 +9,8 @@ classdef CScenarioRegistry
 % unnormalized [Clm, Slm] column pairs.
 % -------------------------------------------------------------------------------------------------------------
 %% CHANGELOG
-% 01-07-2026    Pietro Califano     Add first-class scenario manifests and tagged small-body scenarios.
+% 01-07-2026    Pietro Califano     Add first-class scenario manifests, tagged small-body scenarios, shape
+%                                   metadata, and registry-backed gravity defaults.
 % -------------------------------------------------------------------------------------------------------------
 
 methods (Static, Access = public)

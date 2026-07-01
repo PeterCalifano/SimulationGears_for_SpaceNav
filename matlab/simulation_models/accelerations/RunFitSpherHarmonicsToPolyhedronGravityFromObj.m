@@ -85,6 +85,8 @@ end
 % -------------------------------------------------------------------------------------------------------------
 %% CHANGELOG
 % 24-04-2026    Pietro Califano     Add user-facing run entry point for OBJ-to-SH workflow.
+% 01-07-2026    Pietro Califano     Accept EnumLengthUnits and require explicit gravity inputs unless
+%                                   provided by caller or registry-backed builder paths.
 % -------------------------------------------------------------------------------------------------------------
 %% DEPENDENCIES
 % FitSpherHarmonicsToPolyhedronGravityFromObj()
