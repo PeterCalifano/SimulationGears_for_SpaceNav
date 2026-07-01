@@ -25,20 +25,42 @@ classdef testCScenarioRegistry < matlab.unittest.TestCase
             testCase.verifyEqual(strMoonKm.dReferenceRadius, 1.7374e3, RelTol=1e-15);
         end
 
-        function testModifiedVariantsAreExplicitScenarios(testCase)
+        function testApophisElongatedIsFirstClassAndItokawaModifiedIsUnsupported(testCase)
             strApophis = CScenarioRegistry.GetScenarioSpec("Apophis", charLengthUnits="m");
             strApophisElongated = CScenarioRegistry.GetScenarioSpec(EnumScenarioName.ApophisElongated, ...
                 charLengthUnits="m");
-            strItokawaModified = CScenarioRegistry.GetScenarioSpec("ItokawaModified", charLengthUnits="m");
 
             testCase.verifyEqual(strApophis.enumScenarioName, EnumScenarioName.Apophis);
             testCase.verifyEqual(strApophis.charCanonicalName, "Apophis");
             testCase.verifyEqual(strApophisElongated.enumScenarioName, EnumScenarioName.ApophisElongated);
             testCase.verifyEqual(strApophisElongated.charCanonicalName, "ApophisElongated");
             testCase.verifyTrue(contains(strApophisElongated.charDefaultShapeRelativePath, "Elongated"));
-            testCase.verifyEqual(strItokawaModified.enumScenarioName, EnumScenarioName.ItokawaModified);
-            testCase.verifyEqual(strItokawaModified.charCanonicalName, "ItokawaModified");
-            testCase.verifyEqual(strItokawaModified.charShapeSourceType, "obj");
+            testCase.verifyEqual(strApophisElongated.charScenarioTag, "ApophisElongated");
+
+            testCase.verifyError(@() CScenarioRegistry.ResolveScenario("ItokawaModified"), ...
+                "CScenarioRegistry:UnsupportedScenario");
+            testCase.verifyError(@() CScenarioRegistry.ResolveScenario("ModifiedItokawa"), ...
+                "CScenarioRegistry:UnsupportedScenario");
+        end
+
+        function testNewTaggedScenarioAliasesResolve(testCase)
+            [enumScenarioName, charCanonicalName] = CScenarioRegistry.ResolveScenario("67P");
+            testCase.verifyEqual(enumScenarioName, EnumScenarioName.Comet67P);
+            testCase.verifyEqual(charCanonicalName, "Comet67P");
+
+            [enumScenarioName, charCanonicalName] = CScenarioRegistry.ResolveScenario("433 Eros");
+            testCase.verifyEqual(enumScenarioName, EnumScenarioName.Eros);
+            testCase.verifyEqual(charCanonicalName, "Eros");
+
+            testCase.verifyEqual(CScenarioRegistry.ResolveScenario("Arrokoth"), EnumScenarioName.Arrokoth);
+            testCase.verifyEqual(CScenarioRegistry.ResolveScenario("Toutatis"), EnumScenarioName.Toutatis);
+        end
+
+        function testLengthUnitsAcceptEnum(testCase)
+            strMoonKm = CScenarioRegistry.GetScenarioSpec("Moon", charLengthUnits=EnumLengthUnits.km);
+
+            testCase.verifyEqual(strMoonKm.charLengthUnits, "km");
+            testCase.verifyEqual(strMoonKm.dReferenceRadius, 1.7374e3, RelTol=1e-15);
         end
 
         function testRegistrySHDegreeLimits(testCase)
@@ -76,7 +98,7 @@ classdef testCScenarioRegistry < matlab.unittest.TestCase
 
             testCase.verifyEqual(strDynParams.strMainData.ui16MaxSHdegree, uint16(4));
             testCase.verifySize(strDynParams.strMainData.dSHcoeff, [13 2]);
-            testCase.verifyTrue(strDynParams.strMainData.strSHmetadata.bHasHardcodedCoefficients);
+            testCase.verifyFalse(isfield(strDynParams.strMainData, "strSHmetadata"));
         end
 
         function testScenarioDatasetBuilderSmoke(testCase)
