@@ -12,18 +12,18 @@ classdef testComputeCannonballSRP < matlab.unittest.TestCase
             dCoeffSRP = 2.5e-7;
 
             [dAccSRP_IN, dDistSunToSC, bIsSRPActive] = ComputeCannonballSRP( ...
-                dPosSunToSC_IN, dCoeffSRP, false, false);
+                dPosSunToSC_IN, dCoeffSRP, false);
 
             testCase.verifyEqual(dDistSunToSC, 3.0, 'AbsTol', 0.0);
             testCase.verifyTrue(bIsSRPActive);
             testCase.verifyEqual(dAccSRP_IN, [dCoeffSRP; 0; 0], 'AbsTol', 1e-18);
         end
 
-        function testInverseSquarePressureAccelerationMagnitude(testCase)
+        function testCurrentPressureCoefficientIsNotDistanceScaled(testCase)
             dPosSunToSC_IN = [3; 0; 0];
-            dCoeffSRP = 18.0;
+            dCoeffSRP = 2.0;
 
-            dAccSRP_IN = ComputeCannonballSRP(dPosSunToSC_IN, dCoeffSRP, false, true);
+            dAccSRP_IN = ComputeCannonballSRP(dPosSunToSC_IN, dCoeffSRP, false);
 
             testCase.verifyEqual(dAccSRP_IN, [2.0; 0; 0], 'AbsTol', 1e-14);
         end
@@ -33,7 +33,7 @@ classdef testComputeCannonballSRP < matlab.unittest.TestCase
             dCoeffSRP = 3.0;
 
             [dAccSRP_IN, dDistSunToSC, bIsSRPActive] = ComputeCannonballSRP( ...
-                dPosSunToSC_IN, dCoeffSRP, true, true);
+                dPosSunToSC_IN, dCoeffSRP, true);
             dJacSRP_IN = EvalJac_CannonballSRP( ...
                 dPosSunToSC_IN, dCoeffSRP, true, true, dDistSunToSC, bIsSRPActive);
 
@@ -54,7 +54,7 @@ classdef testComputeCannonballSRP < matlab.unittest.TestCase
 
         function testInverseSquarePressureJacobianMatchesFiniteDifference(testCase)
             dPosSunToSC_IN = [2.5; -3.0; 5.0];
-            dCoeffSRP = 18.0;
+            dCoeffSRP = 2.0;
 
             dJacAnalytical = EvalJac_CannonballSRP(dPosSunToSC_IN, dCoeffSRP, false, true);
             dJacFD = testCase.finiteDifferenceJacobian(dPosSunToSC_IN, dCoeffSRP, true);
@@ -66,7 +66,7 @@ classdef testComputeCannonballSRP < matlab.unittest.TestCase
             dPosSunToSC_IN = [-7.0; 4.0; 2.0];
             dCoeffSRP = 9.0;
 
-            [~, dDistSunToSC, bIsSRPActive] = ComputeCannonballSRP(dPosSunToSC_IN, dCoeffSRP, false, true);
+            [~, dDistSunToSC, bIsSRPActive] = ComputeCannonballSRP(dPosSunToSC_IN, dCoeffSRP, false);
             dJacCachedDistanceOnly = EvalJac_CannonballSRP( ...
                 dPosSunToSC_IN, dCoeffSRP, false, true, dDistSunToSC);
             dJacCached = EvalJac_CannonballSRP( ...
@@ -78,10 +78,19 @@ classdef testComputeCannonballSRP < matlab.unittest.TestCase
         end
 
         function testZeroSunSpacecraftDistanceRejected(testCase)
-            testCase.verifyError(@() ComputeCannonballSRP([0; 0; 0], 1.0, false, false), ...
+            testCase.verifyError(@() ComputeCannonballSRP([0; 0; 0], 1.0, false), ...
                 'ComputeCannonballSRP:ZeroDistance');
             testCase.verifyError(@() EvalJac_CannonballSRP([0; 0; 0], 1.0, false, false), ...
                 'EvalJac_CannonballSRP:ZeroDistance');
+        end
+
+        function testEmptyInputsRejectedByInternalValidation(testCase)
+            testCase.verifyError(@() ComputeCannonballSRP([], 1.0, false), ...
+                'MATLAB:validation:IncompatibleSize');
+            testCase.verifyError(@() ComputeCannonballSRP([1; 0; 0], [], false), ...
+                'MATLAB:validation:IncompatibleSize');
+            testCase.verifyError(@() ComputeCannonballSRP([1; 0; 0], 1.0, false(0, 1)), ...
+                'MATLAB:validation:IncompatibleSize');
         end
 
     end
@@ -96,10 +105,16 @@ classdef testComputeCannonballSRP < matlab.unittest.TestCase
                 dPerturb = zeros(3, 1);
                 dPerturb(idxAxis) = dStep;
 
-                dAccPlus = ComputeCannonballSRP( ...
-                    dPosSunToSC_IN + dPerturb, dCoeffSRP, false, bRecomputePressureFromDistance);
-                dAccMinus = ComputeCannonballSRP( ...
-                    dPosSunToSC_IN - dPerturb, dCoeffSRP, false, bRecomputePressureFromDistance);
+                dCoeffPlus = dCoeffSRP;
+                dCoeffMinus = dCoeffSRP;
+                if bRecomputePressureFromDistance
+                    dReferenceCoeff = dCoeffSRP * dot(dPosSunToSC_IN, dPosSunToSC_IN);
+                    dCoeffPlus = dReferenceCoeff / dot(dPosSunToSC_IN + dPerturb, dPosSunToSC_IN + dPerturb);
+                    dCoeffMinus = dReferenceCoeff / dot(dPosSunToSC_IN - dPerturb, dPosSunToSC_IN - dPerturb);
+                end
+
+                dAccPlus = ComputeCannonballSRP(dPosSunToSC_IN + dPerturb, dCoeffPlus, false);
+                dAccMinus = ComputeCannonballSRP(dPosSunToSC_IN - dPerturb, dCoeffMinus, false);
 
                 dJacFD(:, idxAxis) = (dAccPlus - dAccMinus) / (2.0 * dStep);
             end

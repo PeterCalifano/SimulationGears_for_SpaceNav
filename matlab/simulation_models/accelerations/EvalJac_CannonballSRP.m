@@ -37,6 +37,8 @@ end
 % -------------------------------------------------------------------------------------------------------------
 %% CHANGELOG
 % 30-04-2026    Pietro Califano, Codex 5.5      Added standalone cannonball SRP acceleration Jacobian.
+% 01-07-2026    Pietro Califano, Codex 5.5      Document current-pressure coefficient handling and optional
+%                                               inverse-square pressure partial.
 % -------------------------------------------------------------------------------------------------------------
 %% DEPENDENCIES
 % [-]

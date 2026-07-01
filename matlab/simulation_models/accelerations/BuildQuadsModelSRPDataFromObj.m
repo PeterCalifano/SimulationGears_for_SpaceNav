@@ -38,6 +38,7 @@ end
 % -------------------------------------------------------------------------------------------------------------
 %% CHANGELOG
 % 30-04-2026    Pietro Califano, Codex 5      Add OBJ-to-panel SRP preprocessing utility.
+% 01-07-2026    Pietro Califano, Codex 5.5    Document generated panel payload used by SRP preprocessing tests.
 % -------------------------------------------------------------------------------------------------------------
 %% DEPENDENCIES
 % CShapeModel

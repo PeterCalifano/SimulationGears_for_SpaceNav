@@ -35,6 +35,8 @@ end
 % -------------------------------------------------------------------------------------------------------------
 %% CHANGELOG
 % 30-04-2026    Pietro Califano, Codex 5.5      Added standalone cannonball SRP acceleration kernel.
+% 01-07-2026    Pietro Califano, Codex 5.5      Clarify current-pressure coefficient contract; distance scaling is
+%                                               owned by the caller.
 % -------------------------------------------------------------------------------------------------------------
 %% DEPENDENCIES
 % [-]
