@@ -207,6 +207,43 @@ classdef testFitSpherHarmCoeffToPolyhedrGrav < matlab.unittest.TestCase
             testCase.verifyTrue(isfinite(dPotentialEval));
         end
 
+        function testCShapeModelInstanceBuildsAndCachesDefaultDegree(testCase)
+            [ui32Faces, dVerts] = testFitSpherHarmCoeffToPolyhedrGrav.BuildRegularTetrahedron();
+            strShape = struct( ...
+                'ui32triangVertexPtr', ui32Faces.', ...
+                'dVerticesPos', dVerts.');
+
+            objShapeModel = CShapeModel("struct", strShape, "m", "m", true, 'unit_test_shape', true);
+            [objShapeModel, strSHgravityData] = objShapeModel.BuildAndSetSphericalHarmonicsGravityData( ...
+                dDensity=2500.0, ...
+                dGravConst=testCase.dGravConst, ...
+                ui32MaxFitIterations=uint32(3));
+
+            strCachedSHgravityData = objShapeModel.getSphericalHarmonicsGravityData();
+
+            testCase.verifyEqual(strCachedSHgravityData.ui32MaxDegree, uint32(4));
+            testCase.verifyEqual(strSHgravityData.ui32MaxDegree, uint32(4));
+            testCase.verifyEqual(strCachedSHgravityData.dCSlmCoeffCols, ...
+                strSHgravityData.dCSlmCoeffCols, 'RelTol', 0.0, 'AbsTol', 0.0);
+            testCase.verifyEqual(strCachedSHgravityData.dDensity, 2500.0, 'RelTol', 1e-14);
+        end
+
+        function testCShapeModelDefaultGravConstScalesWithLengthUnits(testCase)
+            [ui32Faces, dVerts] = testFitSpherHarmCoeffToPolyhedrGrav.BuildRegularTetrahedron();
+            strShape = struct( ...
+                'ui32triangVertexPtr', ui32Faces.', ...
+                'dVerticesPos', dVerts.');
+
+            objShapeModel = CShapeModel("struct", strShape, "km", "km", true, 'unit_test_shape', true);
+            strSHgravityData = CShapeModel.BuildSphericalHarmonicsGravityData( ...
+                objShapeModel, uint32(2), ...
+                dDensity=2500.0e9, ...
+                ui32MaxFitIterations=uint32(3));
+
+            testCase.verifyEqual(strSHgravityData.dGravConst, 6.67430e-20, 'RelTol', 1e-14);
+            testCase.verifyLessThan(strSHgravityData.dGravParam, 1.0e-5);
+        end
+
         function testExampleFitPolyhedronGravitySHfromObjSmoke(testCase)
             [ui32Faces, dVerts] = testFitSpherHarmCoeffToPolyhedrGrav.BuildRegularTetrahedron();
             charObjFilePath = testFitSpherHarmCoeffToPolyhedrGrav.WriteObjFileToTempDir( ...

@@ -1,8 +1,7 @@
 function strGravityDefaults = GetShapeModelScenarioGravityDefaults(enumTargetName, charLengthUnits)
 arguments
     enumTargetName  (1,:) {mustBeA(enumTargetName, ["string", "char", "EnumScenarioName"])}
-    charLengthUnits (1,:) string {mustBeA(charLengthUnits, ["string", "char"]), ...
-        mustBeMember(charLengthUnits, ["m", "km"])} = "m"
+    charLengthUnits {mustBeA(charLengthUnits, ["string", "char", "EnumLengthUnits"])} = "m"
 end
 %% DESCRIPTION
 % Compatibility wrapper around CScenarioRegistry.GetGravityDefaults().

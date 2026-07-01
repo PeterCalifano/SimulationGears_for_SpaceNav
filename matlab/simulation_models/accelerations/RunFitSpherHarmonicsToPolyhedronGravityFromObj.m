@@ -2,15 +2,13 @@ function strRunOutputs = RunFitSpherHarmonicsToPolyhedronGravityFromObj(charObjF
 arguments
     charObjFilePath                 (1,:) string {mustBeA(charObjFilePath, ["string", "char"])}
     ui32MaxDegree                   (1,1) uint32
-    options.charInputUnit           (1,:) string {mustBeA(options.charInputUnit, ["string", "char"]), ...
-        mustBeMember(options.charInputUnit, ["m", "km"])} = "m"
-    options.charTargetUnitOutput    (1,:) string {mustBeA(options.charTargetUnitOutput, ["string", "char"]), ...
-        mustBeMember(options.charTargetUnitOutput, ["m", "km"])} = "m"
+    options.charInputUnit           {mustBeA(options.charInputUnit, ["string", "char", "EnumLengthUnits"])} = "m"
+    options.charTargetUnitOutput    {mustBeA(options.charTargetUnitOutput, ["string", "char", "EnumLengthUnits"])} = "m"
     options.bVertFacesOnly          (1,1) logical = true
     options.charModelName           (1,:) string {mustBeA(options.charModelName, ["string", "char"])} = ""
     options.dGravParam              (1,1) double = NaN
     options.dDensity                (1,1) double = NaN
-    options.dGravConst              (1,1) double = 6.67430e-11
+    options.dGravConst              (1,1) double = NaN
     options.dBodyRadiusRef          (1,1) double = NaN
     options.ui32MaxFitIterations    (1,1) uint32 = uint32(5)
     options.bCacheOnShapeModel      (1,1) logical = true
@@ -61,7 +59,7 @@ end
 % options.charModelName:          [1]         Optional model name.
 % options.dGravParam:             [1]         Optional gravitational parameter.
 % options.dDensity:               [1]         Optional density.
-% options.dGravConst:             [1]         Gravitational constant.
+% options.dGravConst:             [1]         Optional gravitational constant in target output length units.
 % options.dBodyRadiusRef:         [1]         Optional SH reference radius override.
 % options.ui32MaxFitIterations:   [1]         Maximum adaptive fit iterations.
 % options.bCacheOnShapeModel:     [1]         Store the SH fit on the returned CShapeModel object.

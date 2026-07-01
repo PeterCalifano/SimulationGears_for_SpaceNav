@@ -68,7 +68,7 @@ methods (Static, Access = public)
                 strSpec.dGravParam_m3s2 = 3.003435675000000e+00;
                 strSpec.dReferenceRadius_m = 1.759303440000000e+02;
                 strSpec.dShapeReferenceSize_m = 1.759303440000000e+02;
-                strSpec.dEllipsoidAxes_m = [1.988439105395617e+02, 1.592144221662182e+02, 1.482274527278826e+02];
+                strSpec.dEllipsoidAxes_m = [2.414219664400000e+02, 1.522873312000000e+02, 1.474234799100000e+02];
                 strSpec.charShapeSourceType = "obj";
                 strSpec.charDefaultShapeAssetId = "apophis_elongated_550m_obj";
                 strSpec.charDefaultShapeRelativePath = fullfile("scenarios", "ApophisElongated", "assets", "shape", "Apophis_RGB_Centered_Elongated_550m.obj");
@@ -180,7 +180,7 @@ methods (Static, Access = public)
                 strSpec.dShapeReferenceSize_m = 1.737420000000000e+06;
                 strSpec.dEllipsoidAxes_m = strSpec.dShapeReferenceSize_m * ones(1, 3);
                 strSpec.charShapeSourceType = "obj";
-                strSpec.charDefaultShapeRelativePath = "data/scenarios/S6_Moon/Moon.obj";
+                strSpec.charDefaultShapeRelativePath = fullfile("scenarios", "S6_Moon", "Moon.obj");
                 strSpec.charDefaultBlenderRelativePath = "data/scenarios/S6_Moon/S6_Moon.blend";
                 strSpec.bHasGravityDefaults = true;
             case "Mars"

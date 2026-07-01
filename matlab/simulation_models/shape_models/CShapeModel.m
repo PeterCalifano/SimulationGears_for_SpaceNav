@@ -68,9 +68,8 @@ classdef CShapeModel < CBaseDatastruct
                 enumLoadingMethod       (1,:) string {mustBeA(enumLoadingMethod, ["string", "char"]), ...
                     mustBeMember(enumLoadingMethod, ["mat", "cspice", "struct", "file_obj"])} = "file_obj"
                 varInputData            (1,:) = []
-                charInputUnit           (1,:) string {mustBeA(charInputUnit       , ["string", "char"]), ...
-                    mustBeMember(charInputUnit, ["m", "km"])} = 'km'
-                charTargetUnitOutput    (1,:) string {mustBeA(charTargetUnitOutput, ["string", "char"]), mustBeMember(charTargetUnitOutput, ["m", "km"])} = 'm' % TODO add enumaration
+                charInputUnit           {mustBeA(charInputUnit, ["string", "char", "EnumLengthUnits"])} = 'km'
+                charTargetUnitOutput    {mustBeA(charTargetUnitOutput, ["string", "char", "EnumLengthUnits"])} = 'm'
                 bVertFacesOnly          (1,1) logical = true;
                 charModelName           (1,:) char = ""
                 bLoadShapeModel         (1,1) logical = true;
@@ -84,7 +83,8 @@ classdef CShapeModel < CBaseDatastruct
                 return
             end
 
-            self.charTargetUnitOutput = charTargetUnitOutput;
+            charInputUnit = char(EnumLengthUnits.toString(charInputUnit));
+            self.charTargetUnitOutput = char(EnumLengthUnits.toString(charTargetUnitOutput));
             self.bDefaultConstructed  = false;
             self.dMeshSimplifyFactor  = min(max(double(options.dMeshSimplifyFactor), 0.0), 1.0);
 
@@ -402,7 +402,7 @@ classdef CShapeModel < CBaseDatastruct
                 ui32MaxDegree                  (1,1) uint32 = uint32(4)
                 options.dGravParam             (1,1) double = NaN
                 options.dDensity               (1,1) double = NaN
-                options.dGravConst             (1,1) double = 6.67430e-11
+                options.dGravConst             (1,1) double = NaN
                 options.dBodyRadiusRef         (1,1) double = NaN
                 options.ui32MaxFitIterations   (1,1) uint32 = uint32(5)
                 options.charMode               (1,:) string {mustBeA(options.charMode, ["string", "char"]), ...
@@ -619,15 +619,13 @@ classdef CShapeModel < CBaseDatastruct
             arguments
                 charObjFilePath                 (1,:) string {mustBeA(charObjFilePath, ["string", "char"])}
                 ui32MaxDegree                   (1,1) uint32
-                options.charInputUnit          (1,:) string {mustBeA(options.charInputUnit, ["string", "char"]), ...
-                    mustBeMember(options.charInputUnit, ["m", "km"])} = "m"
-                options.charTargetUnitOutput   (1,:) string {mustBeA(options.charTargetUnitOutput, ["string", "char"]), ...
-                    mustBeMember(options.charTargetUnitOutput, ["m", "km"])} = "m"
+                options.charInputUnit          {mustBeA(options.charInputUnit, ["string", "char", "EnumLengthUnits"])} = "m"
+                options.charTargetUnitOutput   {mustBeA(options.charTargetUnitOutput, ["string", "char", "EnumLengthUnits"])} = "m"
                 options.bVertFacesOnly         (1,1) logical = true
                 options.charModelName          (1,:) string {mustBeA(options.charModelName, ["string", "char"])} = ""
                 options.dGravParam             (1,1) double = NaN
                 options.dDensity               (1,1) double = NaN
-                options.dGravConst             (1,1) double = 6.67430e-11
+                options.dGravConst             (1,1) double = NaN
                 options.dBodyRadiusRef         (1,1) double = NaN
                 options.ui32MaxFitIterations   (1,1) uint32 = uint32(5)
                 options.dMeshSimplifyFactor    (1,1) double {mustBeFinite} = 1.0
@@ -694,7 +692,7 @@ classdef CShapeModel < CBaseDatastruct
                 ui32MaxDegree                  (1,1) uint32
                 options.dGravParam             (1,1) double = NaN
                 options.dDensity               (1,1) double = NaN
-                options.dGravConst             (1,1) double = 6.67430e-11
+                options.dGravConst             (1,1) double = NaN
                 options.dBodyRadiusRef         (1,1) double = NaN
                 options.ui32MaxFitIterations   (1,1) uint32 = uint32(5)
             end
@@ -710,11 +708,13 @@ classdef CShapeModel < CBaseDatastruct
 
             ui32FacesRows = uint32(objShapeModel.ui32triangVertexPtr');
             dVerticesRows = objShapeModel.dVerticesPos';
+            dGravConst = CShapeModel.ResolveGravConstForLengthUnit_( ...
+                objShapeModel.charTargetUnitOutput, options.dGravConst);
 
             strSHgravityData = FitSpherHarmCoeffToPolyhedrGrav(ui32FacesRows, dVerticesRows, ui32MaxDegree, ...
                                                                 options.dGravParam, ...
                                                                 options.dDensity, ...
-                                                                options.dGravConst, ...
+                                                                dGravConst, ...
                                                                 options.dBodyRadiusRef, ...
                                                                 options.ui32MaxFitIterations);
         end
@@ -891,6 +891,19 @@ classdef CShapeModel < CBaseDatastruct
             end
 
             cellMiceRootCandidates = unique(cellMiceRootCandidates, "stable");
+        end
+
+        function dGravConst = ResolveGravConstForLengthUnit_(charLengthUnits, dExplicitGravConst)
+            if isfinite(dExplicitGravConst)
+                dGravConst = dExplicitGravConst;
+                return
+            end
+
+            if strcmpi(charLengthUnits, "km")
+                dGravConst = 6.67430e-20;
+            else
+                dGravConst = 6.67430e-11;
+            end
         end
 
     end

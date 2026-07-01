@@ -36,6 +36,11 @@ classdef testCScenarioRegistry < matlab.unittest.TestCase
             testCase.verifyEqual(strApophisElongated.charCanonicalName, "ApophisElongated");
             testCase.verifyTrue(contains(strApophisElongated.charDefaultShapeRelativePath, "Elongated"));
             testCase.verifyEqual(strApophisElongated.charScenarioTag, "ApophisElongated");
+            testCase.verifyNotEqual(strApophisElongated.dEllipsoidAxes_m, strApophis.dEllipsoidAxes_m);
+            testCase.verifyEqual(strApophisElongated.dEllipsoidAxes_m, ...
+                [241.42196644, 152.28733120, 147.42347991], RelTol=1e-10);
+            testCase.verifyEqual(strApophisElongated.dTargetShapeMatrix_OF, ...
+                diag(1.0 ./ (strApophisElongated.dEllipsoidAxes_m .^ 2)), RelTol=1e-14);
 
             testCase.verifyError(@() CScenarioRegistry.ResolveScenario("ItokawaModified"), ...
                 "CScenarioRegistry:UnsupportedScenario");
