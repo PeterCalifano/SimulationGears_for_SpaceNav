@@ -19,6 +19,7 @@ end
 % -------------------------------------------------------------------------------------------------------------
 %% CHANGELOG
 % 28-05-2026    Pietro Califano, Codex 5.5      Extract max-fidelity model configuration resolution.
+% 01-07-2026    Pietro Califano, Codex 5.5      Add optional stochastic residual acceleration availability flag.
 % -------------------------------------------------------------------------------------------------------------
 %% DEPENDENCIES
 % [-]
@@ -34,6 +35,7 @@ bIncludeSRP = GetConfigFlag_(strModelConfigFlags, 'bIncludeSRP', true);
 bIncludeEclipse = GetConfigFlag_(strModelConfigFlags, 'bIncludeEclipse', true);
 bUsePanelSRP = GetConfigFlag_(strModelConfigFlags, 'bUsePanelSRP', true);
 bIncludePolyhedronGravity = GetConfigFlag_(strModelConfigFlags, 'bIncludePolyhedronGravity', true);
+bIncludeStochasticAcceleration = GetConfigFlag_(strModelConfigFlags, 'bIncludeStochasticAcceleration', false);
 
 bRecomputeSRPpressureFromDistance = true;
 if coder.const(isfield(strModelConfigFlags, 'bRecomputeSRPpressureFromDistance'))
@@ -80,6 +82,10 @@ bHasPanelSRP = bIncludeSRP && bUsePanelSRP && ...
     coder.const(isfield(strDynParams.strSCdata, 'strSRPpanelData')) && ...
     ~isempty(strDynParams.strSCdata.strSRPpanelData);
 
+bHasStochasticAccelData = bIncludeStochasticAcceleration && ...
+    coder.const(isfield(strDynParams, 'strStochasticAccelData')) && ...
+    ~isempty(strDynParams.strStochasticAccelData);
+
 bNeedMainAttitude = bHasSphericalHarmonicsData || bHasPolyhedronGravity;
 
 % Construct typed structure
@@ -95,11 +101,13 @@ strModelConfig.bIncludeSRP = bIncludeSRP;
 strModelConfig.bIncludeEclipse = bIncludeEclipse;
 strModelConfig.bUsePanelSRP = bUsePanelSRP;
 strModelConfig.bIncludePolyhedronGravity = bIncludePolyhedronGravity;
+strModelConfig.bIncludeStochasticAcceleration = bIncludeStochasticAcceleration;
 strModelConfig.bRecomputeSRPpressureFromDistance = bRecomputeSRPpressureFromDistance;
 strModelConfig.bHasSphericalHarmonicsData = bHasSphericalHarmonicsData;
 strModelConfig.ui32MaxSHdegree = ui32MaxSHdegree;
 strModelConfig.bHasPolyhedronGravity = bHasPolyhedronGravity;
 strModelConfig.bHasPanelSRP = bHasPanelSRP;
+strModelConfig.bHasStochasticAccelData = bHasStochasticAccelData;
 strModelConfig.bNeedMainAttitude = bNeedMainAttitude;
 
 
@@ -112,4 +120,3 @@ if coder.const(isfield(strModelConfigFlags, charFieldName))
     bFlag = coder.const(logical(strModelConfigFlags.(charFieldName)));
 end
 end
-

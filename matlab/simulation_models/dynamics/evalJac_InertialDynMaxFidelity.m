@@ -32,6 +32,7 @@ end
 %% CHANGELOG
 % 13-05-2026    Pietro Califano, Codex 5.5      Add max-fidelity Jacobian matching the RHS force model.
 % 28-05-2026    Pietro Califano, Codex 5.5      Centralize model configuration and document finite-difference SH partial.
+% 01-07-2026    Pietro Califano, Codex 5.5      Document zero state partial for time-indexed stochastic acceleration.
 % -------------------------------------------------------------------------------------------------------------
 %% DEPENDENCIES
 % ResolveInertialDynMaxFidelityConfig()
@@ -137,7 +138,9 @@ end
 % Add cannonball SRP partial using RHS diagnostic state when available.
 if ~isempty(dBodyEphemerides) && ~isempty(dCoeffSRP) && ~bHasPanelSRP
     dPosSunToSC_IN = zeros(3, 1);
-    dPosSunToSC_IN(1:3) = dPosSC_IN(1:3) - dBodyEphemerides(1:3);
+    dPosSunToSC_IN(1) = dPosSC_IN(1) - dBodyEphemerides(1);
+    dPosSunToSC_IN(2) = dPosSC_IN(2) - dBodyEphemerides(2);
+    dPosSunToSC_IN(3) = dPosSC_IN(3) - dBodyEphemerides(3);
     dSRPdistToSun = 0.0;
     bIsSRPActive = false;
 
@@ -156,6 +159,8 @@ if ~isempty(dBodyEphemerides) && ~isempty(dCoeffSRP) && ~bHasPanelSRP
                               dSRPdistToSun, ...
                               bIsSRPActive);
 end
+
+% Stochastic residual acceleration is evaluated from a time-only pre-generated profile, so v1 has no state partial.
 
 end
 
@@ -272,9 +277,11 @@ end
 
 if bRecomputePressureFromDistance
     dPosSunToSC_IN = zeros(3, 1);
-    dPosSunToSC_IN(1:3) = dxOrbitState(1:3) - dBodyEphemerides(1:3);
+    dPosSunToSC_IN(1) = dxOrbitState(1) - dBodyEphemerides(1);
+    dPosSunToSC_IN(2) = dxOrbitState(2) - dBodyEphemerides(2);
+    dPosSunToSC_IN(3) = dxOrbitState(3) - dBodyEphemerides(3);
 
-    dDistSunToSC2 = dot(dPosSunToSC_IN, dPosSunToSC_IN);
+    dDistSunToSC2 = dPosSunToSC_IN(1)^2 + dPosSunToSC_IN(2)^2 + dPosSunToSC_IN(3)^2;
     assert(dDistSunToSC2 > 0.0, ...
         'evalJac_InertialDynMaxFidelity:ZeroSunSpacecraftDistance', ...
         'Sun-spacecraft distance must be positive when SRP pressure is recomputed from distance.');

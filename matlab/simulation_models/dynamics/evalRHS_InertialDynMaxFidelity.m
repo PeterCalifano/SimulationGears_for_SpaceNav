@@ -35,10 +35,12 @@ end
 %% CHANGELOG
 % 13-05-2026    Pietro Califano, Codex 5.5      Add max-fidelity RHS wrapper around shared orbit dynamics.
 % 28-05-2026    Pietro Califano, Codex 5.5      Centralize model configuration and schema-driven SH activation.
+% 01-07-2026    Pietro Califano, Codex 5.5      Add optional pre-generated stochastic residual acceleration hook.
 % -------------------------------------------------------------------------------------------------------------
 %% DEPENDENCIES
 % ResolveInertialDynMaxFidelityConfig()
 % evalRHS_InertialDynOrbit()
+% EvalGaussMarkovAccel()
 % EvalPolyhedronGrav()
 % ComputeQuadsModelSRP()
 % -------------------------------------------------------------------------------------------------------------
@@ -131,10 +133,18 @@ if bHasPanelSRP && bHasSunEphemeris && ~bIsInEclipse
     bPanelSRPActive = any(abs(dAccPanelSRP_IN) > 0.0);
 end
 
+% Add truth-only stochastic residual acceleration when a pre-generated profile is present.
+dAccStochastic_IN = zeros(3, 1);
+if strModelConfig.bHasStochasticAccelData
+    dAccStochastic_IN = EvalGaussMarkovAccel(dStateTimetag, strDynParams.strStochasticAccelData);
+    dDxDt(4:6) = dDxDt(4:6) + dAccStochastic_IN;
+end
+
 % Return diagnostic acceleration metadata for tests and matching Jacobian logic.
 if nargout > 1
     strAccelInfo.dAccPolyhedronPert_IN = dAccPolyhedronPert_IN;
     strAccelInfo.dAccPanelSRP_IN = dAccPanelSRP_IN;
+    strAccelInfo.dAccStochastic_IN = dAccStochastic_IN;
     strAccelInfo.dSRPtorque_SCB = dSRPtorque_SCB;
     strAccelInfo.bPanelSRPActive = bPanelSRPActive;
     strAccelInfo.bCannonballSRPSelected = strModelConfig.bIncludeSRP && ~bHasPanelSRP;
@@ -262,8 +272,10 @@ end
 
 if bRecomputePressureFromDistance
     dPosSunToSC_IN = zeros(3, 1);
-    dPosSunToSC_IN(1:3) = dxOrbitState(1:3) - dBodyEphemerides(1:3);
-    dDistSunToSC2 = dot(dPosSunToSC_IN, dPosSunToSC_IN);
+    dPosSunToSC_IN(1) = dxOrbitState(1) - dBodyEphemerides(1);
+    dPosSunToSC_IN(2) = dxOrbitState(2) - dBodyEphemerides(2);
+    dPosSunToSC_IN(3) = dxOrbitState(3) - dBodyEphemerides(3);
+    dDistSunToSC2 = dPosSunToSC_IN(1)^2 + dPosSunToSC_IN(2)^2 + dPosSunToSC_IN(3)^2;
     assert(dDistSunToSC2 > 0.0, ...
         'evalRHS_InertialDynMaxFidelity:ZeroSunSpacecraftDistance', ...
         'Sun-spacecraft distance must be positive when SRP pressure is recomputed from distance.');
