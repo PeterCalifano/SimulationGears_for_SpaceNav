@@ -8,6 +8,9 @@ classdef CScenarioRegistry
 % Checked-in spherical harmonics payloads are stored as repo-native
 % unnormalized [Clm, Slm] column pairs.
 % -------------------------------------------------------------------------------------------------------------
+%% CHANGELOG
+% 01-07-2026    Pietro Califano     Add first-class scenario manifests and tagged small-body scenarios.
+% -------------------------------------------------------------------------------------------------------------
 
 methods (Static, Access = public)
 
@@ -21,26 +24,30 @@ methods (Static, Access = public)
     end
 
     function cellScenarioNames = ListSupportedScenarios()
-        cellScenarioNames = ["Apophis", "ApophisElongated", "Itokawa", "ItokawaModified", ...
-            "Bennu", "Didymos", "Eros", "Moon", "Mars", "Ceres", "Earth", "FromShape", "NotDefined"];
+        cellScenarioNames = ["Apophis", "ApophisElongated", "Itokawa", ...
+            "Bennu", "Didymos", "Eros", "Arrokoth", "Comet67P", "Toutatis", ...
+            "Moon", "Mars", "Ceres", "Earth", "FromShape", "NotDefined"];
     end
 
     function strSpec = GetScenarioSpec(enumOrName, options)
         arguments
             enumOrName (1,:) {mustBeA(enumOrName, ["string", "char", "EnumScenarioName"])}
-            options.charLengthUnits (1,:) string {mustBeA(options.charLengthUnits, ["string", "char"]), ...
-                mustBeMember(options.charLengthUnits, ["m", "km"])} = "m"
+            options.charLengthUnits {mustBeA(options.charLengthUnits, ["string", "char", "EnumLengthUnits"])} = "m"
         end
 
+        charLengthUnits = EnumLengthUnits.toString(options.charLengthUnits);
         [enumScenarioName, charCanonicalName] = CScenarioRegistry.ResolveScenario(enumOrName);
 
         strSpec = CScenarioRegistry.EmptyScenarioSpec_();
         strSpec.enumScenarioName = enumScenarioName;
         strSpec.charCanonicalName = charCanonicalName;
+        strSpec.charScenarioTag = charCanonicalName;
 
         switch charCanonicalName
             case "Apophis"
                 strSpec.cellAliases = {"Apophis"};
+                strSpec.cellTags = {"shape_runnable", "synthetic_texture"};
+                strSpec.charConfidence = "high";
                 strSpec.charSPICETargetName = "APOPHIS";
                 strSpec.charTargetFixedFrame = "APOPHIS_FIXED";
                 strSpec.dGravParam_m3s2 = 3.003435675000000e+00;
@@ -48,11 +55,14 @@ methods (Static, Access = public)
                 strSpec.dShapeReferenceSize_m = 1.601100000000000e+02;
                 strSpec.dEllipsoidAxes_m = [1.988439105395617e+02, 1.592144221662182e+02, 1.482274527278826e+02];
                 strSpec.charShapeSourceType = "obj";
-                strSpec.charDefaultShapeRelativePath = "rcs-1/phase-C/shape_models/Apophis_RGB_Centered_MeanSize_NoTexture.obj";
+                strSpec.charDefaultShapeAssetId = "apophis_centered_mean_size_obj";
+                strSpec.charDefaultShapeRelativePath = fullfile("scenarios", "Apophis", "assets", "shape", "Apophis_RGB_Centered_MeanSize_NoTexture.obj");
                 strSpec.charDefaultBlenderRelativePath = "rcs-1/phase-C/blender/Apophis_RGB_Centered_MeanSize.blend";
                 strSpec.bHasGravityDefaults = true;
             case "ApophisElongated"
                 strSpec.cellAliases = {"ApophisElongated", "ApophisModified"};
+                strSpec.cellTags = {"shape_runnable", "synthetic_texture", "alternate_body_model"};
+                strSpec.charConfidence = "medium";
                 strSpec.charSPICETargetName = "APOPHIS";
                 strSpec.charTargetFixedFrame = "APOPHIS_FIXED";
                 strSpec.dGravParam_m3s2 = 3.003435675000000e+00;
@@ -60,11 +70,14 @@ methods (Static, Access = public)
                 strSpec.dShapeReferenceSize_m = 1.759303440000000e+02;
                 strSpec.dEllipsoidAxes_m = [1.988439105395617e+02, 1.592144221662182e+02, 1.482274527278826e+02];
                 strSpec.charShapeSourceType = "obj";
-                strSpec.charDefaultShapeRelativePath = "rcs-1/phase-C/shape_models/Apophis_RGB_Centered_Elongated_550m.obj";
+                strSpec.charDefaultShapeAssetId = "apophis_elongated_550m_obj";
+                strSpec.charDefaultShapeRelativePath = fullfile("scenarios", "ApophisElongated", "assets", "shape", "Apophis_RGB_Centered_Elongated_550m.obj");
                 strSpec.charDefaultBlenderRelativePath = "rcs-1/phase-C/blender/Apophis_RGB_Centered_Elongated_550m.blend";
                 strSpec.bHasGravityDefaults = true;
             case "Itokawa"
                 strSpec.cellAliases = {"Itokawa"};
+                strSpec.cellTags = {"shape_runnable", "spice_dsk"};
+                strSpec.charConfidence = "high";
                 strSpec.charSPICETargetName = "ITOKAWA";
                 strSpec.charTargetFixedFrame = "ITOKAWA_FIXED";
                 strSpec.dGravParam_m3s2 = 2.360000000000000e+00;
@@ -72,23 +85,14 @@ methods (Static, Access = public)
                 strSpec.dShapeReferenceSize_m = 1.619150000000000e+02;
                 strSpec.dEllipsoidAxes_m = 0.5 * [5.350000000000000e+02, 2.940000000000000e+02, 2.090000000000000e+02];
                 strSpec.charShapeSourceType = "dsk";
-                strSpec.charDefaultShapeRelativePath = "Itokawa/dsk/hay_a_amica_5_itokawashape_v1_0_64q.bds";
+                strSpec.charDefaultShapeAssetId = "hayabusa_itokawa_64q_dsk";
+                strSpec.charDefaultShapeRelativePath = fullfile("scenarios", "Itokawa", "assets", "shape", "hay_a_amica_5_itokawashape_v1_0_64q.bds");
                 strSpec.charDefaultBlenderRelativePath = "data/scenarios/S2_Itokawa/S2_Itokawa.blend";
-                strSpec.bHasGravityDefaults = true;
-            case "ItokawaModified"
-                strSpec.cellAliases = {"ItokawaModified", "ModifiedItokawa"};
-                strSpec.charSPICETargetName = "ITOKAWA";
-                strSpec.charTargetFixedFrame = "ITOKAWA_FIXED";
-                strSpec.dGravParam_m3s2 = 2.360000000000000e+00;
-                strSpec.dReferenceRadius_m = 1.619150000000000e+02;
-                strSpec.dShapeReferenceSize_m = 1.619150000000000e+02;
-                strSpec.dEllipsoidAxes_m = 0.5 * [5.350000000000000e+02, 2.940000000000000e+02, 2.090000000000000e+02];
-                strSpec.charShapeSourceType = "obj";
-                strSpec.charDefaultShapeRelativePath = "data/scenarios/S2_Itokawa/S2_Itokawa_modified.obj";
-                strSpec.charDefaultBlenderRelativePath = "data/scenarios/S2_Itokawa/S2_Itokawa_modified.blend";
                 strSpec.bHasGravityDefaults = true;
             case "Bennu"
                 strSpec.cellAliases = {"Bennu", "Bennu_OREx", "BennuOREx"};
+                strSpec.cellTags = {"shape_runnable", "spice_dsk"};
+                strSpec.charConfidence = "high";
                 strSpec.charSPICETargetName = "BENNU";
                 strSpec.charTargetFixedFrame = "IAU_BENNU";
                 strSpec.dGravParam_m3s2 = 4.892000000000000e+00;
@@ -96,7 +100,8 @@ methods (Static, Access = public)
                 strSpec.dShapeReferenceSize_m = 2.450300000000000e+02;
                 strSpec.dEllipsoidAxes_m = [2.527800000000000e+02, 2.462000000000000e+02, 2.286900000000000e+02];
                 strSpec.charShapeSourceType = "dsk";
-                strSpec.charDefaultShapeRelativePath = "Bennu_OREx/dsk/bennu_g_03170mm_spc_obj_0000n00000_v020.bds";
+                strSpec.charDefaultShapeAssetId = "orex_bennu_spc_03170mm_dsk";
+                strSpec.charDefaultShapeRelativePath = fullfile("scenarios", "Bennu", "assets", "shape", "bennu_g_03170mm_spc_obj_0000n00000_v020.bds");
                 strSpec.charDefaultBlenderRelativePath = "data/scenarios/S4_Bennu/S4_Bennu.blend";
                 strSpec.bHasGravityDefaults = true;
                 strSpec.strSphericalHarmonics = CScenarioRegistry.EmptySphericalHarmonicsSpec_();
@@ -107,24 +112,65 @@ methods (Static, Access = public)
                 strSpec.strSphericalHarmonics.charSourceUrl = "https://zenodo.org/records/6622625";
             case "Didymos"
                 strSpec.cellAliases = {"Didymos", "Dydimos", "Didymos_Hera", "DidymosHera"};
+                strSpec.cellTags = {"shape_runnable", "spice_dsk"};
+                strSpec.charConfidence = "medium";
                 strSpec.charSPICETargetName = "DIDYMOS";
                 strSpec.charTargetFixedFrame = "IAU_DIDYMOS";
                 strSpec.dGravParam_m3s2 = 3.540000000000000e+01;
                 strSpec.dReferenceRadius_m = 3.551500000000000e+02;
                 strSpec.dShapeReferenceSize_m = 3.551500000000000e+02;
                 strSpec.dEllipsoidAxes_m = [3.951000000000000e+02, 3.951000000000000e+02, 3.551500000000000e+02];
-                strSpec.charShapeSourceType = "none";
+                strSpec.charShapeSourceType = "dsk";
+                strSpec.charDefaultShapeAssetId = "hera_didymain_06650mm_dsk";
+                strSpec.charDefaultShapeRelativePath = fullfile("scenarios", "Didymos", "assets", "shape", "g_06650mm_rad_obj_didb_0000n00000_v001.bds");
                 strSpec.bHasGravityDefaults = true;
             case "Eros"
-                strSpec.cellAliases = {"Eros"};
+                strSpec.cellAliases = {"Eros", "433 Eros", "(433) Eros"};
+                strSpec.cellTags = {"shape_runnable", "scientific_texture_available", "feature_tracking"};
+                strSpec.charConfidence = "high";
                 strSpec.charSPICETargetName = "EROS";
                 strSpec.charTargetFixedFrame = "IAU_EROS";
                 strSpec.dGravParam_m3s2 = 4.462754720040000e+05;
                 strSpec.dReferenceRadius_m = 1.600000000000000e+04;
                 strSpec.dShapeReferenceSize_m = 1.600000000000000e+04;
                 strSpec.dEllipsoidAxes_m = [1.700000000000000e+04, 5.500000000000000e+03, 5.500000000000000e+03];
-                strSpec.charShapeSourceType = "none";
+                strSpec.charShapeSourceType = "dsk";
+                strSpec.charDefaultShapeAssetId = "naif_eros_dsk_q64";
+                strSpec.charDefaultShapeRelativePath = fullfile("scenarios", "Eros", "assets", "shape", "near-a-msi-5-erosshape-v1_0_64q.bds");
                 strSpec.bHasGravityDefaults = true;
+            case "Arrokoth"
+                strSpec.cellAliases = {"Arrokoth", "486958 Arrokoth", "2014 MU69", "Ultima Thule"};
+                strSpec.cellTags = {"shape_runnable", "pds_new_horizons"};
+                strSpec.charConfidence = "high";
+                strSpec.charSPICETargetName = "ARROKOTH";
+                strSpec.charTargetFixedFrame = "ARROKOTH_FIXED";
+                strSpec.dShapeReferenceSize_m = 1.000000000000000e+04;
+                strSpec.dEllipsoidAxes_m = [1.800000000000000e+04, 1.000000000000000e+04, 8.000000000000000e+03];
+                strSpec.charShapeSourceType = "obj";
+                strSpec.charDefaultShapeAssetId = "pds_new_horizons_arrokoth_obj";
+                strSpec.charDefaultShapeRelativePath = fullfile("scenarios", "Arrokoth", "assets", "shape", "mu69_fr2kf_hipoly.obj");
+            case "Comet67P"
+                strSpec.cellAliases = {"67P", "67P/Churyumov-Gerasimenko", "Churyumov-Gerasimenko", "Comet67P"};
+                strSpec.cellTags = {"shape_runnable", "pds_rosetta"};
+                strSpec.charConfidence = "high";
+                strSpec.charSPICETargetName = "CHURYUMOV-GERASIMENKO";
+                strSpec.charTargetFixedFrame = "67P_FIXED";
+                strSpec.dShapeReferenceSize_m = 2.000000000000000e+03;
+                strSpec.dEllipsoidAxes_m = [2.400000000000000e+03, 1.800000000000000e+03, 1.600000000000000e+03];
+                strSpec.charShapeSourceType = "dsk";
+                strSpec.charDefaultShapeAssetId = "rosetta_67p_shape_high_fidelity";
+                strSpec.charDefaultShapeRelativePath = fullfile("scenarios", "Comet67P", "assets", "shape", "cg_spc_shap5_788k_cart.bds");
+            case "Toutatis"
+                strSpec.cellAliases = {"Toutatis", "4179 Toutatis"};
+                strSpec.cellTags = {"shape_runnable", "radar_shape", "procedural_texture"};
+                strSpec.charConfidence = "medium";
+                strSpec.charSPICETargetName = "TOUTATIS";
+                strSpec.charTargetFixedFrame = "TOUTATIS_FIXED";
+                strSpec.dShapeReferenceSize_m = 1.350000000000000e+03;
+                strSpec.dEllipsoidAxes_m = [2.300000000000000e+03, 1.200000000000000e+03, 9.000000000000000e+02];
+                strSpec.charShapeSourceType = "obj";
+                strSpec.charDefaultShapeAssetId = "jpl_pds_toutatis_radar_shape";
+                strSpec.charDefaultShapeRelativePath = fullfile("scenarios", "Toutatis", "assets", "shape", "4179toutatis2.obj");
             case "Moon"
                 strSpec.cellAliases = {"Moon"};
                 strSpec.charSPICETargetName = "MOON";
@@ -184,14 +230,14 @@ methods (Static, Access = public)
             strSpec.strSphericalHarmonics = CScenarioRegistry.BuildSphericalHarmonicsSpec_(charCanonicalName);
         end
 
-        strSpec = CScenarioRegistry.ApplyLengthUnitScaling_(strSpec, options.charLengthUnits);
+        strSpec = CScenarioRegistry.AttachDataManifestPathIfTracked_(strSpec);
+        strSpec = CScenarioRegistry.ApplyLengthUnitScaling_(strSpec, charLengthUnits);
     end
 
     function strGravityDefaults = GetGravityDefaults(enumOrName, charLengthUnits)
         arguments
             enumOrName (1,:) {mustBeA(enumOrName, ["string", "char", "EnumScenarioName"])}
-            charLengthUnits (1,:) string {mustBeA(charLengthUnits, ["string", "char"]), ...
-                mustBeMember(charLengthUnits, ["m", "km"])} = "m"
+            charLengthUnits {mustBeA(charLengthUnits, ["string", "char", "EnumLengthUnits"])} = "m"
         end
 
         strSpec = CScenarioRegistry.GetScenarioSpec(enumOrName, charLengthUnits=charLengthUnits);
@@ -210,9 +256,10 @@ methods (Static, Access = public)
         arguments
             enumOrName (1,:) {mustBeA(enumOrName, ["string", "char", "EnumScenarioName"])}
             ui32RequestedDegree (1,1) uint32
-            charLengthUnits (1,:) string {mustBeA(charLengthUnits, ["string", "char"]), ...
-                mustBeMember(charLengthUnits, ["m", "km"])} = "m"
+            charLengthUnits {mustBeA(charLengthUnits, ["string", "char", "EnumLengthUnits"])} = "m"
         end
+
+        charLengthUnits = EnumLengthUnits.toString(charLengthUnits);
 
         strSpec = CScenarioRegistry.GetScenarioSpec(enumOrName, charLengthUnits=charLengthUnits);
         strSHmeta = strSpec.strSphericalHarmonics;
@@ -255,14 +302,18 @@ methods (Static, Access = private)
                 charCanonicalName = "ApophisElongated";
             case {'itokawa'}
                 charCanonicalName = "Itokawa";
-            case {'itokawamodified', 'modifieditokawa'}
-                charCanonicalName = "ItokawaModified";
             case {'bennu', 'bennuorex'}
                 charCanonicalName = "Bennu";
             case {'didymos', 'dydimos', 'didymoshera'}
                 charCanonicalName = "Didymos";
-            case {'eros'}
+            case {'eros', '433eros'}
                 charCanonicalName = "Eros";
+            case {'arrokoth', '486958arrokoth', '2014mu69', 'ultimathule'}
+                charCanonicalName = "Arrokoth";
+            case {'67p', '67pchuryumovgerasimenko', 'churyumovgerasimenko', 'comet67p'}
+                charCanonicalName = "Comet67P";
+            case {'toutatis', '4179toutatis'}
+                charCanonicalName = "Toutatis";
             case {'moon'}
                 charCanonicalName = "Moon";
             case {'mars'}
@@ -289,14 +340,18 @@ methods (Static, Access = private)
                 enumScenarioName = EnumScenarioName.ApophisElongated;
             case "Itokawa"
                 enumScenarioName = EnumScenarioName.Itokawa;
-            case "ItokawaModified"
-                enumScenarioName = EnumScenarioName.ItokawaModified;
             case "Bennu"
                 enumScenarioName = EnumScenarioName.Bennu;
             case "Didymos"
                 enumScenarioName = EnumScenarioName.Didymos;
             case "Eros"
                 enumScenarioName = EnumScenarioName.Eros;
+            case "Arrokoth"
+                enumScenarioName = EnumScenarioName.Arrokoth;
+            case "Comet67P"
+                enumScenarioName = EnumScenarioName.Comet67P;
+            case "Toutatis"
+                enumScenarioName = EnumScenarioName.Toutatis;
             case "Moon"
                 enumScenarioName = EnumScenarioName.Moon;
             case "Mars"
@@ -318,7 +373,11 @@ methods (Static, Access = private)
         strSpec = struct( ...
             'enumScenarioName', EnumScenarioName.NotDefined, ...
             'charCanonicalName', "NotDefined", ...
+            'charScenarioTag', "NotDefined", ...
             'cellAliases', {{}}, ...
+            'cellTags', {{}}, ...
+            'charConfidence', "", ...
+            'charDataManifestRelativePath', "", ...
             'charSPICETargetName', "", ...
             'charTargetFixedFrame', "", ...
             'dGravParam_m3s2', NaN, ...
@@ -333,12 +392,22 @@ methods (Static, Access = private)
             'dTargetShapeMatrix_OF', zeros(3, 3), ...
             'charLengthUnits', "m", ...
             'charShapeSourceType', "none", ...
+            'charDefaultShapeAssetId', "", ...
             'charDefaultShapeRelativePath', "", ...
             'charDefaultBlenderRelativePath', "", ...
             'bHasGravityDefaults', false, ...
             'bIsCustomShapeScenario', false, ...
             'bIsPassthroughScenario', false, ...
             'strSphericalHarmonics', CScenarioRegistry.EmptySphericalHarmonicsSpec_());
+    end
+
+    function strSpec = AttachDataManifestPathIfTracked_(strSpec)
+        cellManifestBackedScenarios = ["Apophis", "ApophisElongated", "Itokawa", "Bennu", ...
+            "Didymos", "Eros", "Arrokoth", "Comet67P", "Toutatis"];
+        if any(string(strSpec.charCanonicalName) == cellManifestBackedScenarios)
+            strSpec.charDataManifestRelativePath = fullfile("scenarios", ...
+                string(strSpec.charCanonicalName), "manifest.json");
+        end
     end
 
     function strSH = EmptySphericalHarmonicsSpec_()
@@ -415,7 +484,7 @@ methods (Static, Access = private)
     function strSH = BuildSphericalHarmonicsSpec_(charCanonicalName)
         strSH = CScenarioRegistry.EmptySphericalHarmonicsSpec_();
         switch charCanonicalName
-            case {"Itokawa", "ItokawaModified"}
+            case "Itokawa"
                 strSH.bHasOnlineSource = true;
                 strSH.bHasHardcodedCoefficients = true;
                 strSH.bUseByDefault = true;

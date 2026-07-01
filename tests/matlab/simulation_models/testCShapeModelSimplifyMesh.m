@@ -60,6 +60,25 @@ classdef testCShapeModelSimplifyMesh < matlab.unittest.TestCase
             testCase.verifyGreaterThan(strReductionStats.dAchievedVertexReductionPercent, 5.0);
         end
 
+        function testObjLoaderParsesNormalOnlyFaceSyntaxWhenVertexFaceOnly(testCase)
+            fixture = testCase.applyFixture(matlab.unittest.fixtures.TemporaryFolderFixture);
+            charObjPath = fullfile(string(fixture.Folder), "normal_only_faces.obj");
+
+            fileId = fopen(charObjPath, "w");
+            objCleanup = onCleanup(@() fclose(fileId));
+            fprintf(fileId, "v 0 0 0\n");
+            fprintf(fileId, "v 1 0 0\n");
+            fprintf(fileId, "v 0 1 0\n");
+            fprintf(fileId, "vn 0 0 1\n");
+            fprintf(fileId, "f 1//1 2//1 3//1\n");
+            clear objCleanup
+
+            objShapeModel = CShapeModel("file_obj", charObjPath, "m", "m", true, "normal_only_faces", true);
+
+            testCase.verifyEqual(objShapeModel.ui32triangVertexPtr, uint32([1; 2; 3]));
+            testCase.verifyEqual(objShapeModel.ui32NumOfVertices, uint32(3));
+        end
+
         function testSimplifyMeshInvalidatesPolyhedronGravityCache(testCase)
             fixture = testCase.applyFixture(matlab.unittest.fixtures.TemporaryFolderFixture);
             charObjPath = fullfile(string(fixture.Folder), "icosphere_mesh.obj");
@@ -101,9 +120,98 @@ classdef testCShapeModelSimplifyMesh < matlab.unittest.TestCase
             testCase.verifyLessThan(size(objShapeModelReduced.dVerticesPos, 2), ...
                 size(objShapeModelFull.dVerticesPos, 2));
         end
+
+        function testCspiceShapeLoadFailsClearlyWhenMiceIsUnavailable(testCase)
+            charOriginalPath = path;
+            objPathCleanup = onCleanup(@() path(charOriginalPath)); %#ok<NASGU>
+            testCShapeModelSimplifyMesh.removeMicePathEntries_();
+            objEnvCleanup = testCShapeModelSimplifyMesh.preserveWorkspaceEnv_(); %#ok<NASGU>
+            setenv("WS_SIMGEARS", "");
+            setenv("WS_NAVSYS", "");
+
+            testCase.verifyError(@() CShapeModel("cspice", "missing_shape.bds", "km", "m", ...
+                true, "missing_shape", true), "CShapeModel:CSPICEUnavailable");
+        end
+
+        function testCspiceShapeLoadPrefersWsSimGearsMiceWhenAvailable(testCase)
+            fixture = testCase.applyFixture(matlab.unittest.fixtures.TemporaryFolderFixture);
+            charSimGearsRoot = fullfile(string(fixture.Folder), "simgears_root");
+            charNavSysRoot = fullfile(string(fixture.Folder), "navsys_root");
+            testCShapeModelSimplifyMesh.writeFakeMiceInstall_(charSimGearsRoot, "FakeMice:FromSimGears");
+            testCShapeModelSimplifyMesh.writeFakeMiceInstall_(charNavSysRoot, "FakeMice:FromNavSys");
+
+            charOriginalPath = path;
+            objPathCleanup = onCleanup(@() path(charOriginalPath)); %#ok<NASGU>
+            testCShapeModelSimplifyMesh.removeMicePathEntries_();
+            objEnvCleanup = testCShapeModelSimplifyMesh.preserveWorkspaceEnv_(); %#ok<NASGU>
+            setenv("WS_SIMGEARS", char(charSimGearsRoot));
+            setenv("WS_NAVSYS", char(charNavSysRoot));
+
+            testCase.verifyError(@() CShapeModel("cspice", "fake_shape.bds", "km", "m", ...
+                true, "fake_shape", true), "FakeMice:FromSimGears");
+            testCase.verifyEqual(string(which("cspice_furnsh")), ...
+                string(fullfile(charSimGearsRoot, "mice", "src", "mice", "cspice_furnsh.m")));
+        end
+
+        function testCspiceShapeLoadFallsBackToWsNavsysMice(testCase)
+            fixture = testCase.applyFixture(matlab.unittest.fixtures.TemporaryFolderFixture);
+            charNavSysRoot = fullfile(string(fixture.Folder), "navsys_root");
+            testCShapeModelSimplifyMesh.writeFakeMiceInstall_(charNavSysRoot, "FakeMice:FromNavSys");
+
+            charOriginalPath = path;
+            objPathCleanup = onCleanup(@() path(charOriginalPath)); %#ok<NASGU>
+            testCShapeModelSimplifyMesh.removeMicePathEntries_();
+            objEnvCleanup = testCShapeModelSimplifyMesh.preserveWorkspaceEnv_(); %#ok<NASGU>
+            setenv("WS_SIMGEARS", "");
+            setenv("WS_NAVSYS", char(charNavSysRoot));
+
+            testCase.verifyError(@() CShapeModel("cspice", "fake_shape.bds", "km", "m", ...
+                true, "fake_shape", true), "FakeMice:FromNavSys");
+            testCase.verifyEqual(string(which("cspice_furnsh")), ...
+                string(fullfile(charNavSysRoot, "mice", "src", "mice", "cspice_furnsh.m")));
+        end
     end
 
     methods (Static, Access = private)
+        function objCleanup = preserveWorkspaceEnv_()
+            charOriginalSimGears = getenv("WS_SIMGEARS");
+            charOriginalNavsys = getenv("WS_NAVSYS");
+            objCleanup = onCleanup(@() testCShapeModelSimplifyMesh.restoreWorkspaceEnv_( ...
+                charOriginalSimGears, charOriginalNavsys));
+        end
+
+        function restoreWorkspaceEnv_(charOriginalSimGears, charOriginalNavsys)
+            setenv("WS_SIMGEARS", charOriginalSimGears);
+            setenv("WS_NAVSYS", charOriginalNavsys);
+        end
+
+        function removeMicePathEntries_()
+            cellPathEntries = string(strsplit(path, pathsep));
+            for idxPath = 1:numel(cellPathEntries)
+                charPathEntry = cellPathEntries(idxPath);
+                if contains(charPathEntry, filesep + "mice" + filesep + "src" + filesep + "mice") || ...
+                        contains(charPathEntry, filesep + "mice" + filesep + "lib")
+                    rmpath(charPathEntry);
+                end
+            end
+        end
+
+        function writeFakeMiceInstall_(charWorkspaceRoot, charErrorId)
+            charMiceSrcPath = fullfile(string(charWorkspaceRoot), "mice", "src", "mice");
+            charMiceLibPath = fullfile(string(charWorkspaceRoot), "mice", "lib");
+            mkdir(charMiceSrcPath);
+            mkdir(charMiceLibPath);
+
+            fileId = fopen(fullfile(charMiceSrcPath, "cspice_furnsh.m"), "w");
+            assert(fileId ~= -1, "testCShapeModelSimplifyMesh:FileOpenFailed", ...
+                "Failed to create fake cspice_furnsh.m");
+            objCleanup = onCleanup(@() fclose(fileId));
+            fprintf(fileId, "function cspice_furnsh(varargin)\n");
+            fprintf(fileId, "error('%s', 'fake MICE reached');\n", charErrorId);
+            fprintf(fileId, "end\n");
+            clear objCleanup
+        end
+
         function [ui32Faces, dVerts] = buildIcosphere_(nSubdivisions)
             arguments
                 nSubdivisions (1,1) uint32 = uint32(2)

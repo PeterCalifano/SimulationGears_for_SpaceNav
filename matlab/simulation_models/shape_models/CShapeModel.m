@@ -12,6 +12,7 @@ classdef CShapeModel < CBaseDatastruct
     % 22-04-2026    Pietro Califano     Extend class with utilities to build SH and Polyhedral gravity from
     %                                   shape model with known density and mass
     % 24-04-2026    Pietro Califano     Add mesh simplification utility and load-time keep-fraction option
+    % 01-07-2026    Pietro Califano     Add workspace MICE resolution and support OBJ v//vn face syntax.
     % -------------------------------------------------------------------------------------------------------------
     %% DEPENDENCIES
     % [-]
@@ -489,7 +490,17 @@ classdef CShapeModel < CBaseDatastruct
             end
 
             % Check if SPICE is available
-            % TODO
+            if isempty(which('cspice_furnsh'))
+                CShapeModel.TryAddMiceFromWorkspace_();
+            end
+
+            if isempty(which('cspice_furnsh'))
+                error('CShapeModel:CSPICEUnavailable', ...
+                    ['SPICE DSK shape loading requires NAIF MICE on the MATLAB path. ' ...
+                     'Set WS_SIMGEARS or WS_NAVSYS to a workspace containing mice/, ' ...
+                     'install/add MICE before loading %s, or set bLoadShapeModel=false for metadata-only use.'], ...
+                    string(charKernelName));
+            end
 
             % Check that kernel is loaded else, try to load it
             % TODO
@@ -789,50 +800,37 @@ classdef CShapeModel < CBaseDatastruct
             ui32TrianglesTexIndex       = zeros(0,3,'uint32');
             ui32TrianglesNormalsIndex   = zeros(0,3,'uint32');
 
-            % Determine face format by presence of vt/vn
-            bHasVT = ~isempty(dTexCoords);
-            bHasVN = ~isempty(dNormals);
+            fMatch = regexp(charFileText, '^f\s+.*$', 'match', 'lineanchors');
+            if ~isempty(fMatch)
+                charFBlock = sprintf('%s\n', fMatch{:});
+                charFirstFace = string(strtrim(fMatch{1}));
 
-            % Build regex and index maps
-            if bHasVT && bHasVN && not(bVertFacesOnly)
-                % Case to handle both texture and normals
-                fMatch = regexp(charFileText, '^f\s+\d+/\d+/\d+.*$', 'match', 'lineanchors');
-                if ~isempty(fMatch)
-                    charFBlock = sprintf('%s\n', fMatch{:});
+                if ~isempty(regexp(charFirstFace, '^f\s+\d+//\d+', 'once'))
+                    ui32AllFaceLines = sscanf(charFBlock, 'f %u//%u %u//%u %u//%u\n', [6, Inf]);
+                    ui32AllFaceLines = uint32(ui32AllFaceLines);
+                    ui32TrianglesIndex = ui32AllFaceLines(1:2:end, :);
+                    if ~bVertFacesOnly
+                        ui32TrianglesNormalsIndex = ui32AllFaceLines(2:2:end, :);
+                    end
+
+                elseif ~isempty(regexp(charFirstFace, '^f\s+\d+/\d+/\d+', 'once'))
                     ui32AllFaceLines = sscanf(charFBlock, 'f %u/%u/%u %u/%u/%u %u/%u/%u\n', [9, Inf]);
-                    ui32AllFaceLines = uint32(ui32AllFaceLines);              % 9-by-N
-                    ui32TrianglesIndex        = ui32AllFaceLines(1:3:end, :);
-                    ui32TrianglesTexIndex     = ui32AllFaceLines(2:3:end, :);
-                    ui32TrianglesNormalsIndex = ui32AllFaceLines(3:3:end, :);
-                end
+                    ui32AllFaceLines = uint32(ui32AllFaceLines);
+                    ui32TrianglesIndex = ui32AllFaceLines(1:3:end, :);
+                    if ~bVertFacesOnly
+                        ui32TrianglesTexIndex = ui32AllFaceLines(2:3:end, :);
+                        ui32TrianglesNormalsIndex = ui32AllFaceLines(3:3:end, :);
+                    end
 
-            elseif bHasVT && not(bVertFacesOnly)
-                % Case to handle only texture
-                fMatch = regexp(charFileText, '^f\s+\d+/\d+.*$', 'match', 'lineanchors');
-                if ~isempty(fMatch)
-                    charFBlock = sprintf('%s\n', fMatch{:});
+                elseif ~isempty(regexp(charFirstFace, '^f\s+\d+/\d+', 'once'))
                     ui32AllFaceLines = sscanf(charFBlock, 'f %u/%u %u/%u %u/%u\n', [6, Inf]);
                     ui32AllFaceLines = uint32(ui32AllFaceLines);
-                    ui32TrianglesIndex    = ui32AllFaceLines(1:2:end, :);
-                    ui32TrianglesTexIndex = ui32AllFaceLines(2:2:end, :);
-                end
+                    ui32TrianglesIndex = ui32AllFaceLines(1:2:end, :);
+                    if ~bVertFacesOnly
+                        ui32TrianglesTexIndex = ui32AllFaceLines(2:2:end, :);
+                    end
 
-            elseif bHasVN && not(bVertFacesOnly)
-                % Case to handle only normals
-                fMatch = regexp(charFileText, '^f\s+\d+//\d+.*$', 'match', 'lineanchors');
-                if ~isempty(fMatch)
-                    charFBlock = sprintf('%s\n', fMatch{:});
-                    ui32AllFaceLines = sscanf(charFBlock, 'f %u//%u %u//%u %u//%u', [6, Inf]);
-                    ui32AllFaceLines = uint32(ui32AllFaceLines);
-                    ui32TrianglesIndex        = ui32AllFaceLines(1:2:end, :);
-                    ui32TrianglesNormalsIndex = ui32AllFaceLines(2:2:end, :);
-                end
-
-            else
-                % No normals, no texture, indices only
-                fMatch = regexp(charFileText, '^f\s+.*$', 'match', 'lineanchors');
-                if ~isempty(fMatch)
-                    charFBlock = sprintf('%s\n', fMatch{:});
+                else
                     ui32AllFaceLines = sscanf(charFBlock, 'f %u %u %u\n', [3, Inf]);
                     ui32TrianglesIndex = uint32(ui32AllFaceLines);
                 end
@@ -840,6 +838,59 @@ classdef CShapeModel < CBaseDatastruct
 
             dElapsedTime = toc;
             fprintf("\nFile obj loaded in %.5g seconds\n", dElapsedTime);
+        end
+
+    end
+
+    methods (Static, Access = private)
+
+        function TryAddMiceFromWorkspace_()
+            cellWorkspaceEnvNames = ["WS_SIMGEARS", "WS_NAVSYS"];
+
+            for idxEnv = 1:numel(cellWorkspaceEnvNames)
+                charWorkspaceRoot = string(getenv(cellWorkspaceEnvNames(idxEnv)));
+                if strlength(strtrim(charWorkspaceRoot)) == 0
+                    continue
+                end
+
+                cellMiceRootCandidates = CShapeModel.BuildMiceRootCandidates_(charWorkspaceRoot);
+                for idxCandidate = 1:numel(cellMiceRootCandidates)
+                    charMiceRoot = cellMiceRootCandidates(idxCandidate);
+                    charMiceSrcPath = fullfile(charMiceRoot, "src", "mice");
+                    charMiceLibPath = fullfile(charMiceRoot, "lib");
+                    if ~isfile(fullfile(charMiceSrcPath, "cspice_furnsh.m"))
+                        continue
+                    end
+
+                    if isfolder(charMiceLibPath)
+                        addpath(char(charMiceLibPath));
+                    end
+                    addpath(char(charMiceSrcPath));
+
+                    if ~isempty(which('cspice_furnsh'))
+                        return
+                    end
+                end
+            end
+        end
+
+        function cellMiceRootCandidates = BuildMiceRootCandidates_(charWorkspaceRoot)
+            charWorkspaceRoot = string(charWorkspaceRoot);
+            cellMiceRootCandidates = strings(1, 0);
+
+            if strlength(strtrim(charWorkspaceRoot)) == 0
+                return
+            end
+
+            cellMiceRootCandidates(end + 1) = fullfile(charWorkspaceRoot, "mice");
+            cellMiceRootCandidates(end + 1) = charWorkspaceRoot;
+
+            charParentRoot = string(fileparts(charWorkspaceRoot));
+            if strlength(charParentRoot) > 0
+                cellMiceRootCandidates(end + 1) = fullfile(charParentRoot, "mice");
+            end
+
+            cellMiceRootCandidates = unique(cellMiceRootCandidates, "stable");
         end
 
     end

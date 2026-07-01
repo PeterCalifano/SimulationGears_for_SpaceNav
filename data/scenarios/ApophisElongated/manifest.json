@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "scenario_name": "ApophisElongated",
+  "canonical_name": "ApophisElongated",
+  "aliases": ["ApophisElongated", "ApophisModified"],
+  "confidence": "medium",
+  "tags": ["shape_runnable", "synthetic_texture", "alternate_body_model"],
+  "default_shape_asset_id": "apophis_elongated_550m_obj",
+  "assets": [
+    {
+      "asset_id": "apophis_elongated_550m_obj",
+      "asset_type": "shape",
+      "local_path": "scenarios/ApophisElongated/assets/shape/Apophis_RGB_Centered_Elongated_550m.obj",
+      "source_url": "local projects-DART rcs-1 phase-C elongated shape model",
+      "download_url": "",
+      "sha256": "",
+      "size_gb": 0.01,
+      "fidelity": "project_reference",
+      "required_for_shape_runnable": true
+    }
+  ]
+}

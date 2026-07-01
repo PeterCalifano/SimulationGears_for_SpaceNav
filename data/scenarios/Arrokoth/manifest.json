@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "scenario_name": "Arrokoth",
+  "canonical_name": "Arrokoth",
+  "aliases": ["Arrokoth", "486958 Arrokoth", "2014 MU69", "Ultima Thule"],
+  "confidence": "high",
+  "tags": ["shape_runnable", "pds_new_horizons"],
+  "default_shape_asset_id": "pds_new_horizons_arrokoth_obj",
+  "assets": [
+    {
+      "asset_id": "pds_new_horizons_arrokoth_obj",
+      "asset_type": "shape",
+      "local_path": "scenarios/Arrokoth/assets/shape/mu69_fr2kf_hipoly.obj",
+      "source_url": "https://pds.nasa.gov/ds-view/pds/viewCollection.jsp?identifier=urn:nasa:pds:nh_derived:arrokoth_geophysics&version=1.0",
+      "download_url": "https://pdssbn.astro.umd.edu/holdings/pds4-nh_derived%3Aarrokoth_geophysics-v1.0/shape_models/mu69_fr2kf_hipoly.obj",
+      "sha256": "",
+      "size_gb": 0.01,
+      "fidelity": "pds_high_poly_obj",
+      "required_for_shape_runnable": true
+    },
+    {
+      "asset_id": "new_horizons_ca06_reflectance",
+      "asset_type": "albedo",
+      "local_path": "scenarios/Arrokoth/assets/albedo/ca06_stack_normal_reflect.img",
+      "source_url": "New Horizons PDS KEM geophysical archive",
+      "download_url": "",
+      "sha256": "",
+      "size_gb": 0.1,
+      "fidelity": "science_texture",
+      "required_for_shape_runnable": false
+    }
+  ]
+}

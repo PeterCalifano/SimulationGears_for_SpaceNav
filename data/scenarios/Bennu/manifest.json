@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "scenario_name": "Bennu",
+  "canonical_name": "Bennu",
+  "aliases": ["Bennu", "Bennu_OREx", "BennuOREx"],
+  "confidence": "high",
+  "tags": ["shape_runnable", "spice_dsk"],
+  "default_shape_asset_id": "orex_bennu_spc_03170mm_dsk",
+  "assets": [
+    {
+      "asset_id": "orex_bennu_spc_03170mm_dsk",
+      "asset_type": "shape",
+      "local_path": "scenarios/Bennu/assets/shape/bennu_g_03170mm_spc_obj_0000n00000_v020.bds",
+      "source_url": "OSIRIS-REx Bennu SPC DSK",
+      "download_url": "",
+      "sha256": "",
+      "size_gb": 0.01,
+      "fidelity": "public_dsk",
+      "required_for_shape_runnable": true
+    }
+  ]
+}

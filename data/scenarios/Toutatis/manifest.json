@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "scenario_name": "Toutatis",
+  "canonical_name": "Toutatis",
+  "aliases": ["Toutatis", "4179 Toutatis"],
+  "confidence": "medium",
+  "tags": ["shape_runnable", "radar_shape", "procedural_texture"],
+  "default_shape_asset_id": "jpl_pds_toutatis_radar_shape",
+  "assets": [
+    {
+      "asset_id": "jpl_pds_toutatis_radar_shape",
+      "asset_type": "shape",
+      "local_path": "scenarios/Toutatis/assets/shape/4179toutatis2.obj",
+      "source_url": "https://pds.nasa.gov/ds-view/pds/viewBundle.jsp?identifier=urn:nasa:pds:compil.ast.radar.shape-models&version=1.0",
+      "download_url": "https://sbnarchive.psi.edu/pds4/non_mission/compil.ast.radar.shape-models/data/4179toutatis2.tab",
+      "sha256": "",
+      "size_gb": 0.0027,
+      "fidelity": "pds_high_resolution_radar_table",
+      "required_for_shape_runnable": true
+    }
+  ]
+}

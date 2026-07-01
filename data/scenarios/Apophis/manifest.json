@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "scenario_name": "Apophis",
+  "canonical_name": "Apophis",
+  "aliases": ["Apophis"],
+  "confidence": "high",
+  "tags": ["shape_runnable", "synthetic_texture"],
+  "default_shape_asset_id": "apophis_centered_mean_size_obj",
+  "assets": [
+    {
+      "asset_id": "apophis_centered_mean_size_obj",
+      "asset_type": "shape",
+      "local_path": "scenarios/Apophis/assets/shape/Apophis_RGB_Centered_MeanSize_NoTexture.obj",
+      "source_url": "local projects-DART rcs-1 phase-C shape model",
+      "download_url": "",
+      "sha256": "",
+      "size_gb": 0.01,
+      "fidelity": "project_reference",
+      "required_for_shape_runnable": true
+    }
+  ]
+}
