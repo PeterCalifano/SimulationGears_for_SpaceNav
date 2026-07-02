@@ -41,8 +41,9 @@ end
 % ResolveInertialDynMaxFidelityConfig()
 % evalRHS_InertialDynOrbit()
 % EvalGaussMarkovAccel()
-% EvalPolyhedronGrav()
-% ComputeQuadsModelSRP()
+% IsInCylindricalTargetShadow()
+% ComputePolyhedronGravityCorrection()
+% ComputePanelSRPFromDynParams()
 % -------------------------------------------------------------------------------------------------------------
 
 %% Function code
@@ -85,9 +86,9 @@ dDCMmainAtt_INfromTF = ResolveMainAttitude_(dStateTimetag, ...
                                                                        strModelConfig.bRecomputeSRPpressureFromDistance);
 bIsInEclipse = false;
 if strModelConfig.bIncludeSRP && strModelConfig.bIncludeEclipse && bHasSunEphemeris
-    bIsInEclipse = IsInCylindricalTargetShadow_(dxOrbitState(1:3), ...
-                                                dBodyEphemerides(1:3), ...
-                                                strDynParams.strMainData.dRefRadius);
+    bIsInEclipse = IsInCylindricalTargetShadow(dxOrbitState(1:3), ...
+                                               dBodyEphemerides(1:3), ...
+                                               strDynParams.strMainData.dRefRadius);
 end
 
 bHasPanelSRP = strModelConfig.bHasPanelSRP;
@@ -100,10 +101,10 @@ end
 % Compute polyhedron perturbation as correction over central gravity before shared orbit RHS call.
 dAccPolyhedronPert_IN = zeros(3, 1);
 if bHasPolyhedronGravity
-    dAccPolyhedronPert_IN = ComputePolyhedronGravityCorrection_(dxOrbitState(1:3), ...
-                                                                dDCMmainAtt_INfromTF, ...
-                                                                dMainGM, ...
-                                                                strDynParams.strMainData.strPolyhedronGravityData);
+    dAccPolyhedronPert_IN = ComputePolyhedronGravityCorrection(dxOrbitState(1:3), ...
+                                                               dDCMmainAtt_INfromTF, ...
+                                                               dMainGM, ...
+                                                               strDynParams.strMainData.strPolyhedronGravityData);
 end
 
 % Evaluate shared inertial orbit RHS for point mass, SH, third bodies, cannonball SRP, and external acceleration.
@@ -125,10 +126,10 @@ dAccPanelSRP_IN = zeros(3, 1);
 dSRPtorque_SCB = zeros(3, 1);
 bPanelSRPActive = false;
 if bHasPanelSRP && bHasSunEphemeris && ~bIsInEclipse
-    [dAccPanelSRP_IN, dSRPtorque_SCB] = ComputePanelSRP_(dxOrbitState(1:3), ...
-                                                         dBodyEphemerides(1:3), ...
-                                                         dSolarPressure, ...
-                                                         strDynParams);
+    [dAccPanelSRP_IN, dSRPtorque_SCB] = ComputePanelSRPFromDynParams(dxOrbitState(1:3), ...
+                                                                     dBodyEphemerides(1:3), ...
+                                                                     dSolarPressure, ...
+                                                                     strDynParams);
     dDxDt(4:6) = dDxDt(4:6) + dAccPanelSRP_IN;
     bPanelSRPActive = any(abs(dAccPanelSRP_IN) > 0.0);
 end
@@ -287,123 +288,4 @@ end
 
 dCoeffSRP = dSolarPressure * strDynParams.strSCdata.dReflCoeff * ...
     strDynParams.strSCdata.dA_SRP / strDynParams.strSCdata.dSCmass;
-end
-
-function bIsInEclipse = IsInCylindricalTargetShadow_(dPosSC_IN, dSunPos_IN, dTargetRadius)
-% Test cylindrical target shadow using anti-Sun axis and target radius.
-bIsInEclipse = false;
-if dTargetRadius <= 0.0 || ~any(abs(dSunPos_IN) > 0.0)
-    return
-end
-
-dSunDir_IN = dSunPos_IN / norm(dSunPos_IN);
-dProjectionOnAntiSun = dot(dPosSC_IN, -dSunDir_IN);
-if dProjectionOnAntiSun <= 0.0
-    return
-end
-
-dPerpFromShadowAxis = norm(dPosSC_IN + dProjectionOnAntiSun * dSunDir_IN);
-bIsInEclipse = dPerpFromShadowAxis <= dTargetRadius;
-end
-
-function [dAccPanelSRP_IN, dSRPtorque_SCB] = ComputePanelSRP_(dPosSC_IN, ...
-                                                              dSunPos_IN, ...
-                                                              dSolarPressure, ...
-                                                              strDynParams)
-% Compute panelled SRP acceleration and torque from spacecraft-panel data.
-strPanel = strDynParams.strSCdata.strSRPpanelData;
-dqSCBwrtIN = ResolveSCQuaternion_(strDynParams);
-dCoMpos_SCB = ResolveSCCenterOfMass_(strDynParams);
-
-dSCtoSun_IN = dSunPos_IN - dPosSC_IN;
-dDirSCtoSun_IN = zeros(3, 1);
-dDirSCtoSun_IN(:) = dSCtoSun_IN(1:3) / norm(dSCtoSun_IN);
-
-% Compute direction to Sun in spacecraft body frame
-dDCM_INfromSCB = Quat2DCM(dqSCBwrtIN);
-
-dDirSCtoSun_SCB = zeros(3, 1);
-dDirSCtoSun_SCB = transpose(dDCM_INfromSCB) * dDirSCtoSun_IN;
-
-
-[dArea, dPressCentre, dCoMpos, dPressureSI, dOutputScale] = NormalizePanelUnits_(strPanel, ...
-                                                                                 dCoMpos_SCB, ...
-                                                                                 dSolarPressure, ...
-                                                                                 strDynParams);
-[dAccelPanel, dSRPtorque_SCB] = ComputeQuadsModelSRP(dDirSCtoSun_SCB, ...
-                                                     dqSCBwrtIN, ...
-                                                     strDynParams.strSCdata.dSCmass, ...
-                                                     dCoMpos, ...
-                                                     dPressureSI, ...
-                                                     dArea, ...
-                                                     strPanel.dDiffSpecQuadsCoeffs, ...
-                                                     strPanel.dQuadsNormals_SCB, ...
-                                                     dPressCentre);
-dAccPanelSRP_IN = dOutputScale * dAccelPanel;
-end
-
-function dAccPolyhedronPert_IN = ComputePolyhedronGravityCorrection_(dPosSC_IN, ...
-                                                                     dDCMmainAtt_INfromTF, ...
-                                                                     dMainGM, ...
-                                                                     strPoly)
-% Compute polyhedron gravity perturbation by subtracting central gravity from total polyhedron gravity.
-dPosSC_TB = dDCMmainAtt_INfromTF.' * dPosSC_IN;
-[dAccPolyhedronTotal_TB, ~] = EvalPolyhedronGrav(dPosSC_TB, ...
-                                                 strPoly.ui32FaceVertexIds, ...
-                                                 strPoly.dVerticesPos, ...
-                                                 strPoly.dDensity, ...
-                                                 strPoly.ui32EdgeVertexIds, ...
-                                                 strPoly.dEdgeDyadics, ...
-                                                 strPoly.dFaceDyadics, ...
-                                                 strPoly.dGravConst);
-
-dRadius = norm(dPosSC_TB);
-dAccCentral_TB = -dMainGM * dPosSC_TB / dRadius^3;
-dAccPolyhedronPert_IN = dDCMmainAtt_INfromTF * (dAccPolyhedronTotal_TB - dAccCentral_TB);
-end
-
-function dqSCBwrtIN = ResolveSCQuaternion_(strDynParams)
-% Return spacecraft body-to-inertial quaternion, defaulting to identity attitude.
-dqSCBwrtIN = [1; 0; 0; 0];
-if coder.const(isfield(strDynParams.strSCdata, 'dqSCBwrtIN'))
-    dqSCBwrtIN = strDynParams.strSCdata.dqSCBwrtIN(:);
-end
-end
-
-function dCoMpos_SCB = ResolveSCCenterOfMass_(strDynParams)
-% Return spacecraft center of mass in spacecraft body frame, defaulting to origin.
-dCoMpos_SCB = zeros(3, 1);
-if coder.const(isfield(strDynParams.strSCdata, 'dCoMpos_SCB'))
-    dCoMpos_SCB = strDynParams.strSCdata.dCoMpos_SCB(:);
-end
-end
-
-function [dArea, dPressCentre, dCoMpos, dPressureSI, dOutputScale] = NormalizePanelUnits_(strPanel, ...
-                                                                                          dCoMpos_SCB, ...
-                                                                                          dSolarPressure, ...
-                                                                                          strDynParams)
-% Normalize panel geometry, pressure, and acceleration units for ComputeQuadsModelSRP.
-charPanelUnit = "m";
-if coder.const(isfield(strPanel, 'charLengthUnit'))
-    charPanelUnit = string(strPanel.charLengthUnit);
-end
-
-dArea = strPanel.dSCquadsArea;
-dPressCentre = strPanel.dQuadsPressCentre_SCB;
-dCoMpos = dCoMpos_SCB;
-if charPanelUnit == "km"
-    dArea = dArea * 1e6;
-    dPressCentre = dPressCentre * 1e3;
-    dCoMpos = dCoMpos * 1e3;
-end
-
-bDynamicsInKm = coder.const(isfield(strDynParams.strSRPdata, 'dReferenceDistance')) && ...
-    strDynParams.strSRPdata.dReferenceDistance < 1.0e10;
-if bDynamicsInKm
-    dPressureSI = dSolarPressure / 1e3;
-    dOutputScale = 1e-3;
-else
-    dPressureSI = dSolarPressure;
-    dOutputScale = 1.0;
-end
 end
