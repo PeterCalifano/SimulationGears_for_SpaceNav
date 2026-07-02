@@ -40,6 +40,7 @@ if dEvalTime >= dTimeGrid(double(ui32NumSamples))
 end
 
 dRawSegmentIdx = floor((dEvalTime - dTimeGrid(1)) / strProfile.dTimeStep) + 1.0;
+
 if dRawSegmentIdx < 1.0
     dRawSegmentIdx = 1.0;
 elseif dRawSegmentIdx > double(ui32NumSamples - 1)
@@ -47,10 +48,14 @@ elseif dRawSegmentIdx > double(ui32NumSamples - 1)
 end
 ui32SegmentIdx = uint32(dRawSegmentIdx);
 
+% Compute state transition matrix
 dElapsed = dEvalTime - dTimeGrid(double(ui32SegmentIdx));
 dPhi = exp(-dElapsed ./ strProfile.dTimeConst);
+
+% Evaluate acceleration
 dAccel_IN = strProfile.dMeanAccel + ...
     dPhi .* (dAccelGrid(:,double(ui32SegmentIdx)) - strProfile.dMeanAccel) + ...
     strProfile.dSigmaAccel .* sqrt(max(0.0, 1.0 - dPhi.^2)) .* ...
     strProfile.dStandardNormalInnovation(:,double(ui32SegmentIdx));
+
 end
