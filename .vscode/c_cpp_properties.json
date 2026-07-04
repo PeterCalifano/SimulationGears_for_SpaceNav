@@ -1,27 +1,43 @@
 {
-    "configurations": [
-        {
-            "name": "Linux_ARM64",
-            "includePath": [
-                "${workspaceFolder}/**",
-                "/usr/include/**",
-                "/usr/local/include/**"
-            ],
-            "defines": [],
-            "compilerPath": "/usr/bin/gcc",
-            "intelliSenseMode": "linux-gcc-arm64"
-        },
-        {
-            "name": "Linux_AMD64",
-            "includePath": [
-                "${workspaceFolder}/**",
-                "/usr/include/**",
-                "/usr/local/include/**"
-            ],
-            "defines": [],
-            "compilerPath": "/usr/bin/gcc",
-            "intelliSenseMode": "linux-gcc-x64"
-        }
-    ],
-    "version": 4
+  "configurations": [
+    {
+      "name": "Linux_ARM64",
+      "includePath": [
+        "${workspaceFolder}/src",
+        "${workspaceFolder}/lib",
+        "${workspaceFolder}/tests"
+      ],
+      "defines": [],
+      "compilerPath": "/usr/bin/gcc",
+      "intelliSenseMode": "linux-gcc-arm64",
+      "browse": {
+        "path": [
+          "${workspaceFolder}/src",
+          "${workspaceFolder}/lib",
+          "${workspaceFolder}/tests"
+        ],
+        "limitSymbolsToIncludedHeaders": true
+      }
+    },
+    {
+      "name": "Linux_AMD64",
+      "includePath": [
+        "${workspaceFolder}/src",
+        "${workspaceFolder}/lib",
+        "${workspaceFolder}/tests"
+      ],
+      "defines": [],
+      "compilerPath": "/usr/bin/gcc",
+      "intelliSenseMode": "linux-gcc-x64",
+      "browse": {
+        "path": [
+          "${workspaceFolder}/src",
+          "${workspaceFolder}/lib",
+          "${workspaceFolder}/tests"
+        ],
+        "limitSymbolsToIncludedHeaders": true
+      }
+    }
+  ],
+  "version": 4
 }
