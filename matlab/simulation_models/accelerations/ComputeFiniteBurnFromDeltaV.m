@@ -35,6 +35,7 @@ end
 %% CHANGELOG
 % 02-07-2026    Pietro Califano, Codex 5.5      Add deterministic finite-burn profile builder.
 % 02-07-2026    Pietro Califano, Codex 5.5      Generalize DeltaV and acceleration units through EnumLengthUnits.
+% 18-07-2026    Pietro Califano, Codex 5.5      Permit zero thrust for zero-DeltaV profiles while requiring positive thrust for active burns.
 % -------------------------------------------------------------------------------------------------------------
 %% DEPENDENCIES
 % EnumLengthUnits
@@ -47,10 +48,6 @@ dLengthUnitInMeters = coder.const(ResolveLengthUnitInMeters_(charLengthUnits));
 
 dDeltaVNorm = norm(dDeltaV_IN);
 
-assert(dThrust > 0.0, ...
-    'ComputeFiniteBurnFromDeltaV:InvalidThrust', ...
-    'Nonzero DeltaV finite burns require strictly positive thrust.');
-
 if dDeltaVNorm < eps('single')
     % No burn is required; keep a zero-duration profile with no propellant consumption.
     dBurnDirection_IN = zeros(3,1);
@@ -59,6 +56,10 @@ if dDeltaVNorm < eps('single')
     dMassFlowRate = 0.0;
     dBurnDuration = 0.0;
 else
+    assert(dThrust > 0.0, ...
+        'ComputeFiniteBurnFromDeltaV:InvalidThrust', ...
+        'Nonzero DeltaV finite burns require strictly positive thrust.');
+
     % Convert DeltaV to m/s for the rocket equation, while preserving the
     % caller-facing direction and magnitude in the selected length unit.
     dBurnDirection_IN = dDeltaV_IN ./ dDeltaVNorm;

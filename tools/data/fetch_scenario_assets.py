@@ -54,6 +54,7 @@ REQUIRED_ASSET_FIELDS = {
     "fidelity",
     "required_for_shape_runnable",
 }
+SUPPORTED_CONTENT_FORMATS = {"wavefront_obj"}
 
 
 class FetchError(RuntimeError):
@@ -315,6 +316,14 @@ def validate_manifest_schema(payload: dict, manifest_path: Path) -> None:
                 + ", ".join(missing_asset_fields)
             )
 
+        if "content_format" in asset and asset["content_format"] not in SUPPORTED_CONTENT_FORMATS:
+            asset_id = asset.get("asset_id", "<unknown>")
+            supported_formats = ", ".join(sorted(SUPPORTED_CONTENT_FORMATS))
+            raise FetchError(
+                f"Invalid manifest {manifest_path}: asset {asset_id} declares unsupported "
+                f"content_format {asset['content_format']!r}. Supported values: {supported_formats}."
+            )
+
 
 def manifest_aliases(payload: dict) -> set[str]:
     """Return case-folded names that can identify a scenario manifest.
@@ -457,7 +466,7 @@ def process_asset_plan(plan: AssetPlan, dry_run: bool, verify_only: bool, overwr
         return
 
     if exists and not overwrite:
-        verify_asset_checksum(plan)
+        verify_asset(plan)
         print(f"EXISTS {plan.scenario_name} {plan.asset_id} {plan.local_path}")
         return
 
@@ -473,7 +482,7 @@ def process_asset_plan(plan: AssetPlan, dry_run: bool, verify_only: bool, overwr
         )
 
     fetch_asset(plan, overwrite=overwrite)
-    verify_asset_checksum(plan)
+    verify_asset(plan)
     print(f"FETCHED {plan.scenario_name} {plan.asset_id} {plan.local_path}")
 
 
@@ -496,7 +505,7 @@ def verify_existing_asset(plan: AssetPlan) -> None:
             "Fetch it with:\n"
             f"  {fetch_command}"
         )
-    verify_asset_checksum(plan)
+    verify_asset(plan)
 
 
 def cli_command_for_plan(plan: AssetPlan, *extra_args: str) -> str:
@@ -522,27 +531,100 @@ def cli_command_for_plan(plan: AssetPlan, *extra_args: str) -> str:
     return " ".join(command_parts)
 
 
-def verify_asset_checksum(plan: AssetPlan) -> None:
-    """Verify a declared final-asset SHA-256 checksum.
+def verify_asset(plan: AssetPlan, candidate_path: Path | None = None) -> None:
+    """Verify checksum and declared content for an asset candidate.
 
     Args:
         plan: Resolved asset work item.
+        candidate_path: Optional file to verify instead of the final local path.
 
     Raises:
-        FetchError: If a declared checksum does not match the local file.
+        FetchError: If checksum or declared-content validation fails.
     """
 
-    if not plan.sha256 or plan.local_path.is_dir():
+    verify_asset_checksum(plan, candidate_path)
+    verify_asset_content(plan, candidate_path)
+
+
+def verify_asset_checksum(plan: AssetPlan, candidate_path: Path | None = None) -> None:
+    """Verify a declared asset SHA-256 checksum.
+
+    Args:
+        plan: Resolved asset work item.
+        candidate_path: Optional file to verify instead of the final local path.
+
+    Raises:
+        FetchError: If a declared checksum does not match the candidate file.
+    """
+
+    asset_path = candidate_path if candidate_path is not None else plan.local_path
+    if not plan.sha256 or asset_path.is_dir():
         return
 
-    actual_sha256 = sha256_file(plan.local_path)
+    actual_sha256 = sha256_file(asset_path)
     if actual_sha256.casefold() != plan.sha256.casefold():
         raise FetchError(
             f"Checksum mismatch for asset {plan.asset_id}.\n"
             f"Expected sha256: {plan.sha256}\n"
             f"Actual sha256:   {actual_sha256}\n"
-            f"Local path:      {plan.local_path}\n"
+            f"Candidate path:  {asset_path}\n"
             f"Manifest:        {plan.manifest_path}"
+        )
+
+
+def verify_asset_content(plan: AssetPlan, candidate_path: Path | None = None) -> None:
+    """Verify an asset's optional declared content format.
+
+    Args:
+        plan: Resolved asset work item.
+        candidate_path: Optional file to verify instead of the final local path.
+
+    Raises:
+        FetchError: If the candidate does not match its declared content format.
+    """
+
+    content_format = plan.payload.get("content_format")
+    if content_format is None:
+        return
+
+    asset_path = candidate_path if candidate_path is not None else plan.local_path
+    if content_format == "wavefront_obj":
+        verify_wavefront_obj_content(plan, asset_path)
+
+
+def verify_wavefront_obj_content(plan: AssetPlan, candidate_path: Path) -> None:
+    """Require exact vertex and face record tokens in UTF-8 OBJ text."""
+
+    has_vertex = False
+    has_face = False
+    try:
+        with candidate_path.open("r", encoding="utf-8") as file_obj:
+            for line in file_obj:
+                fields = line.split(maxsplit=1)
+                if not fields:
+                    continue
+                has_vertex = has_vertex or fields[0] == "v"
+                has_face = has_face or fields[0] == "f"
+    except (OSError, UnicodeError) as exc:
+        raise FetchError(
+            f"Content validation failed for asset {plan.asset_id}: could not read candidate as UTF-8 OBJ text.\n"
+            f"Candidate path:   {candidate_path}\n"
+            "Declared format: wavefront_obj\n"
+            f"Manifest:         {plan.manifest_path}"
+        ) from exc
+
+    if not has_vertex or not has_face:
+        missing_records = []
+        if not has_vertex:
+            missing_records.append("vertex (v)")
+        if not has_face:
+            missing_records.append("face (f)")
+        raise FetchError(
+            f"Content validation failed for asset {plan.asset_id}: missing required "
+            f"OBJ record(s): {', '.join(missing_records)}.\n"
+            f"Candidate path:   {candidate_path}\n"
+            "Declared format: wavefront_obj\n"
+            f"Manifest:         {plan.manifest_path}"
         )
 
 
@@ -602,6 +684,7 @@ def fetch_direct_file(plan: AssetPlan, overwrite: bool) -> None:
 
     try:
         download_to_path(plan.download_url, tmp_path)
+        verify_asset(plan, tmp_path)
         tmp_path.replace(plan.local_path)
     except Exception:
         tmp_path.unlink(missing_ok=True)

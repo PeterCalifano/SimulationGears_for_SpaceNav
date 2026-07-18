@@ -13,6 +13,13 @@ classdef testFiniteBurnThrustModel < matlab.unittest.TestCase
             testCase.verifyEqual(dMassKg, strBurnData.dInitialMass, 'AbsTol', 0.0);
         end
 
+        function testNonzeroDeltaVRequiresPositiveThrust(testCase)
+            dDeltaV_IN = [0.0; 0.012; 0.0];
+
+            testCase.verifyError(@() ComputeFiniteBurnFromDeltaV(dDeltaV_IN, 500.0, 0.0, 220.0), ...
+                                 'ComputeFiniteBurnFromDeltaV:InvalidThrust');
+        end
+
         function testRocketEquationMassBudgetAndDuration(testCase)
             dDeltaV_IN = [0.0; 0.012; 0.0];
             dInitialMass = 500.0;

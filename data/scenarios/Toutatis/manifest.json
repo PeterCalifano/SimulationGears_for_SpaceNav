@@ -11,11 +11,12 @@
       "asset_id": "jpl_pds_toutatis_radar_shape",
       "asset_type": "shape",
       "local_path": "scenarios/Toutatis/assets/shape/4179toutatis2.obj",
-      "source_url": "https://pds.nasa.gov/ds-view/pds/viewBundle.jsp?identifier=urn:nasa:pds:compil.ast.radar.shape-models&version=1.0",
+      "source_url": "https://sbnarchive.psi.edu/pds4/non_mission/compil.ast.radar.shape-models/data/4179toutatis2.xml",
       "download_url": "https://sbnarchive.psi.edu/pds4/non_mission/compil.ast.radar.shape-models/data/4179toutatis2.tab",
-      "sha256": "",
-      "size_gb": 0.0027,
-      "fidelity": "pds_high_resolution_radar_table",
+      "content_format": "wavefront_obj",
+      "sha256": "28c94e3c5c4fadab97c6f1fc78dbb3800a4248b86302681cf1c629e48df5f00a",
+      "size_gb": 0.002879779,
+      "fidelity": "pds_high_resolution_radar_wavefront_obj",
       "required_for_shape_runnable": true
     }
   ]

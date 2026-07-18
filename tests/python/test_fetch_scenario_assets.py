@@ -1,3 +1,4 @@
+import hashlib
 import json
 import subprocess
 import sys
@@ -125,6 +126,80 @@ class FetchScenarioAssetsCliTest(unittest.TestCase):
             self.assertIn("outside data root", result.stderr)
             self.assertIn("bad_shape", result.stderr)
 
+    def test_wavefront_obj_content_format_rejects_non_obj_download(self):
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            data_root = tmp_path / "data"
+            source_path = tmp_path / "toutatis.tab"
+            source_path.write_text("vertex 1 2 3\nface 1 2 3\n", encoding="utf-8")
+            local_path = "scenarios/Toutatis/assets/shape/toutatis.obj"
+            manifest_path = self.write_manifest(
+                data_root,
+                "Toutatis",
+                [
+                    self.asset(
+                        "toutatis_shape",
+                        "shape",
+                        local_path,
+                        download_url=source_path.as_uri(),
+                        content_format="wavefront_obj",
+                    )
+                ],
+                default_shape_asset_id="toutatis_shape",
+            )
+            destination_path = data_root / local_path
+
+            result = self.run_script("--data-root", data_root, "--scenario", "Toutatis")
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("toutatis_shape", result.stderr)
+            self.assertIn("wavefront_obj", result.stderr)
+            self.assertIn(str(manifest_path), result.stderr)
+            self.assertFalse(destination_path.exists())
+
+    def test_tab_named_wavefront_obj_download_is_installed_as_obj(self):
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            data_root = tmp_path / "data"
+            source_path = tmp_path / "toutatis.tab"
+            source_bytes = b"v 0 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 3\n"
+            source_path.write_bytes(source_bytes)
+            local_path = "scenarios/Toutatis/assets/shape/toutatis.obj"
+            self.write_manifest(
+                data_root,
+                "Toutatis",
+                [
+                    self.asset(
+                        "toutatis_shape",
+                        "shape",
+                        local_path,
+                        download_url=source_path.as_uri(),
+                        content_format="wavefront_obj",
+                        sha256=hashlib.sha256(source_bytes).hexdigest(),
+                    )
+                ],
+                default_shape_asset_id="toutatis_shape",
+            )
+            destination_path = data_root / local_path
+
+            result = self.run_script("--data-root", data_root, "--scenario", "Toutatis")
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(destination_path.read_bytes(), source_bytes)
+
+    def test_tracked_toutatis_manifest_pins_pds_wavefront_obj(self):
+        manifest_path = REPO_ROOT / "data" / "scenarios" / "Toutatis" / "manifest.json"
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        asset = next(asset for asset in manifest["assets"] if asset["asset_id"] == "jpl_pds_toutatis_radar_shape")
+
+        self.assertEqual(asset.get("content_format"), "wavefront_obj")
+        self.assertEqual(asset["sha256"], "28c94e3c5c4fadab97c6f1fc78dbb3800a4248b86302681cf1c629e48df5f00a")
+        self.assertEqual(
+            asset["download_url"],
+            "https://sbnarchive.psi.edu/pds4/non_mission/compil.ast.radar.shape-models/data/4179toutatis2.tab",
+        )
+        self.assertEqual(asset["local_path"], "scenarios/Toutatis/assets/shape/4179toutatis2.obj")
+
     def run_script(self, *args):
         return subprocess.run(
             [sys.executable, str(SCRIPT_PATH), *map(str, args)],
@@ -141,20 +216,25 @@ class FetchScenarioAssetsCliTest(unittest.TestCase):
         download_url="https://example.test/asset.bin",
         size_gb=0.1,
         required_for_shape_runnable=None,
+        content_format=None,
+        sha256="",
     ):
         if required_for_shape_runnable is None:
             required_for_shape_runnable = asset_type == "shape"
-        return {
+        asset = {
             "asset_id": asset_id,
             "asset_type": asset_type,
             "local_path": local_path,
             "source_url": "https://example.test/source",
             "download_url": download_url,
-            "sha256": "",
+            "sha256": sha256,
             "size_gb": size_gb,
             "fidelity": "test",
             "required_for_shape_runnable": required_for_shape_runnable,
         }
+        if content_format is not None:
+            asset["content_format"] = content_format
+        return asset
 
     @staticmethod
     def write_manifest(data_root, scenario_name, assets, default_shape_asset_id=None):

@@ -20,6 +20,8 @@ end
 %% CHANGELOG
 % 28-05-2026    Pietro Califano, Codex 5.5      Extract max-fidelity model configuration resolution.
 % 01-07-2026    Pietro Califano, Codex 5.5      Add optional stochastic residual acceleration availability flag.
+% 18-07-2026    Pietro Califano, Codex 5.5      Restore fixed SRP pressure as the compatibility default; make
+%                                               distance-based pressure recomputation opt-in.
 % -------------------------------------------------------------------------------------------------------------
 %% DEPENDENCIES
 % [-]
@@ -37,7 +39,7 @@ bUsePanelSRP = GetConfigFlag_(strModelConfigFlags, 'bUsePanelSRP', true);
 bIncludePolyhedronGravity = GetConfigFlag_(strModelConfigFlags, 'bIncludePolyhedronGravity', true);
 bIncludeStochasticAcceleration = GetConfigFlag_(strModelConfigFlags, 'bIncludeStochasticAcceleration', false);
 
-bRecomputeSRPpressureFromDistance = true;
+bRecomputeSRPpressureFromDistance = false;
 if coder.const(isfield(strModelConfigFlags, 'bRecomputeSRPpressureFromDistance'))
 
     bRecomputeSRPpressureFromDistance = ...
