@@ -1,6 +1,6 @@
-function strMexInfo = BuildGravityModelMexTargets(charBuildDir, ui32MaxSHdegree)
+function strMexInfo = BuildMexTargets_GravityModels(charBuildDir, ui32MaxSHdegree)
 %% PROTOTYPE
-% strMexInfo = BuildGravityModelMexTargets(charBuildDir, ui32MaxSHdegree)
+% strMexInfo = BuildMexTargets_GravityModels(charBuildDir, ui32MaxSHdegree)
 % -------------------------------------------------------------------------------------------------------------
 %% DESCRIPTION
 % Builds MEX targets for the codegen-oriented gravity evaluators:
@@ -19,7 +19,8 @@ function strMexInfo = BuildGravityModelMexTargets(charBuildDir, ui32MaxSHdegree)
 % strMexInfo:          struct    Build directory, target names, and representative dimensions.
 % -------------------------------------------------------------------------------------------------------------
 %% CHANGELOG
-% 26-04-2026    Pietro Califano     Add focused MEX build utility for gravity evaluators.
+% 26-04-2026    Pietro Califano                 Add focused MEX build utility for gravity evaluators.
+% 28-05-2026    Pietro Califano, Codex 5.5      Move to codegen builders and standardize builder name.
 % -------------------------------------------------------------------------------------------------------------
 %% DEPENDENCIES
 % EvalExtSphHarmExpInTargetFrame()
@@ -35,25 +36,24 @@ function strMexInfo = BuildGravityModelMexTargets(charBuildDir, ui32MaxSHdegree)
 
 %% Function code
 % Set default build directory if not provided, and validate inputs
-if nargin < 1 || strlength(string(charBuildDir)) == 0
-    charBuildDir = fullfile(tempdir, 'simgears_gravity_codegen');
+if nargin < 1
+    charBuildDir = "";
 end
-charBuildDir = char(string(charBuildDir));
+charBuildDir = ResolveMexBuildDirectory(charBuildDir, 'simulation_models', 'accelerations');
 
 if nargin < 2
     ui32MaxSHdegree = uint32(8);
 end
 
 if ~isa(ui32MaxSHdegree, 'uint32') || ~isscalar(ui32MaxSHdegree) || ui32MaxSHdegree < uint32(2)
-    error('BuildGravityModelMexTargets:InvalidMaxDegree', ...
+    error('BuildMexTargets_GravityModels:InvalidMaxDegree', ...
         'ui32MaxSHdegree must be a uint32 scalar greater than or equal to 2.');
 end
 
-if ~exist(charBuildDir, 'dir')
-    mkdir(charBuildDir);
-end
-
 addpath(charBuildDir);
+charCallDir = pwd;
+objCleanup = onCleanup(@() cd(charCallDir));
+cd(charBuildDir);
 
 % Sample data for codegen target signatures
 cfg = coder.config('mex');

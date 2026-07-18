@@ -29,7 +29,7 @@ classdef SReferenceMissionDesign < CBaseDatastructWithTimes
     properties (SetAccess = public, GetAccess = public)
         
         % Reference definition
-        enumWorldFrame                  (1,:) char {mustBeA(enumWorldFrame, ["SEnumFrameName", "string", "char"])} = "IN"  % Enumeration class indicating the W frame to which the data are attached
+        enumWorldFrame                  (1,:) char {mustBeA(enumWorldFrame, ["EnumFrameName", "string", "char"])} = "IN"  % Enumeration class indicating the W frame to which the data are attached
 
         % Orbit and attitude data
         dPosSC_W                        (3, :) double {mustBeNumeric} = zeros(3,0);
@@ -77,7 +77,7 @@ classdef SReferenceMissionDesign < CBaseDatastructWithTimes
                                                 optional)
             arguments
                 % Reference definition
-                enumWorldFrame               (1,:)      {mustBeA(enumWorldFrame, ["SEnumFrameName", "string", "char"])} = EnumFrameName.IN  % Enumeration class indicating the W frame to which the data are attached
+                enumWorldFrame               (1,:)      {mustBeA(enumWorldFrame, ["EnumFrameName", "string", "char"])} = EnumFrameName.IN  % Enumeration class indicating the W frame to which the data are attached
                 dTimestamps                  (1,:)     {isnumeric, isvector} = [];
                 dStateSC_W                   (6,:)     {mustBeNumeric} = [];
                 dDCM_TBfromW                 (3,3, :)  {mustBeNumeric} = [];

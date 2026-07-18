@@ -1,4 +1,4 @@
-classdef EnumFrameName < SEnumFrameName
+classdef EnumFrameName
     enumeration
         IN
         TB
@@ -10,4 +10,3 @@ classdef EnumFrameName < SEnumFrameName
         ECLIPJ2000
     end
 end
-

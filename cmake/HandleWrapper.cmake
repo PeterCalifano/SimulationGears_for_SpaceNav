@@ -791,6 +791,18 @@ namespace py = pybind11;
   set(GTWRAP_PYTHON_GENERATED_CPP_DIR "python")
 
   # Call pybind wrapper generation function from gtwrap
+  if(DEFINED GTWRAP_ADD_DOCSTRINGS AND GTWRAP_ADD_DOCSTRINGS)
+    if(DEFINED BUILD_DOC_XML AND BUILD_DOC_XML AND DEFINED ${PROJECT_NAME}_DOXYGEN_XML_DIR)
+      set(GTWRAP_PYTHON_DOCS_SOURCE "${${PROJECT_NAME}_DOXYGEN_XML_DIR}" CACHE PATH
+          "Doxygen XML directory used for gtwrap Python docstrings." FORCE)
+      message(STATUS "Python wrapper docstrings use project Doxygen XML: ${GTWRAP_PYTHON_DOCS_SOURCE}")
+    else()
+      message(WARNING
+          "GTWRAP_ADD_DOCSTRINGS=ON but BUILD_DOC_XML is not enabled or Doxygen XML is unavailable. "
+          "Generated Python wrappers will not receive project Doxygen docstrings.")
+    endif()
+  endif()
+
   pybind_wrap(${PROJECT_PYTHON_TARGET_NAME}
             "${GTWRAP_INTERFACE_FILES}"
             "${_main_interface_cpp}"
@@ -802,6 +814,11 @@ namespace py = pybind11;
             "${_wrapper_dependencies}"
             ${ENABLE_BOOST_SERIALIZATION}
           )
+
+  if(DEFINED GTWRAP_ADD_DOCSTRINGS AND GTWRAP_ADD_DOCSTRINGS AND
+     TARGET "pybind_wrap_${PROJECT_NAME}" AND TARGET "${LIB_NAMESPACE}_doc")
+    add_dependencies("pybind_wrap_${PROJECT_NAME}" "${LIB_NAMESPACE}_doc")
+  endif()
 
   # Set python target properties, include directories, and installation rules
   set_python_target_properties(

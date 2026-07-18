@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "scenario_name": "Eros",
+  "canonical_name": "Eros",
+  "aliases": ["433 Eros", "(433) Eros", "Eros"],
+  "confidence": "high",
+  "tags": ["shape_runnable", "scientific_texture_available", "feature_tracking"],
+  "default_shape_asset_id": "naif_eros_dsk_q64",
+  "assets": [
+    {
+      "asset_id": "gaskell_eros_shape_v1_1",
+      "asset_type": "shape",
+      "local_path": "scenarios/Eros/assets/shape/gaskell_eros_shape_v1_1",
+      "source_url": "https://arcnav.psi.edu/urn:nasa:pds:gaskell.ast-eros.shape-model",
+      "download_url": "https://arcnav.psi.edu/urn:nasa:pds:gaskell.ast-eros.shape-model",
+      "sha256": "",
+      "size_gb": 0.08,
+      "fidelity": "max_public_source",
+      "required_for_shape_runnable": false
+    },
+    {
+      "asset_id": "naif_eros_dsk_q64",
+      "asset_type": "shape",
+      "local_path": "scenarios/Eros/assets/shape/near-a-msi-5-erosshape-v1_0_64q.bds",
+      "source_url": "https://naif.jpl.nasa.gov/pub/naif/generic_kernels/dsk/asteroids/eros/near-a-msi-5-erosshape-v1_0_64q.cmt",
+      "download_url": "https://naif.jpl.nasa.gov/pub/naif/generic_kernels/dsk/asteroids/eros/near-a-msi-5-erosshape-v1_0_64q.bds",
+      "sha256": "",
+      "size_gb": 0.005,
+      "fidelity": "loadable_fast_fallback",
+      "required_for_shape_runnable": true
+    },
+    {
+      "asset_id": "usgs_msi_albedo_2023",
+      "asset_type": "albedo",
+      "local_path": "scenarios/Eros/assets/albedo/eros_global-albedo-maps_golish_2023",
+      "source_url": "https://astrogeology.usgs.gov/search/map/near_msi_albedo_mosaics",
+      "download_url": "https://asc-pds-individual-investigations.s3.us-west-2.amazonaws.com/eros_global-albedo-maps_golish_2023/eros_global-albedo-maps_golish_2023.zip",
+      "sha256": "",
+      "size_gb": 2.5,
+      "fidelity": "science_texture",
+      "required_for_shape_runnable": false
+    }
+  ]
+}

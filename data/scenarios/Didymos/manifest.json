@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "scenario_name": "Didymos",
+  "canonical_name": "Didymos",
+  "aliases": ["Didymos", "Dydimos", "Didymos_Hera", "DidymosHera"],
+  "confidence": "medium",
+  "tags": ["shape_runnable", "spice_dsk"],
+  "default_shape_asset_id": "hera_didymain_06650mm_dsk",
+  "assets": [
+    {
+      "asset_id": "hera_didymain_06650mm_dsk",
+      "asset_type": "shape",
+      "local_path": "scenarios/Didymos/assets/shape/g_06650mm_rad_obj_didb_0000n00000_v001.bds",
+      "source_url": "ESA Hera Didymos DSK bundle",
+      "download_url": "",
+      "sha256": "",
+      "size_gb": 0.001,
+      "fidelity": "public_dsk",
+      "required_for_shape_runnable": true
+    }
+  ]
+}

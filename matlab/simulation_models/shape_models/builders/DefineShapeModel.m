@@ -1,27 +1,39 @@
-function [objShapeModel, strBpyCommManagerPaths] = DefineShapeModel(enumTargetName, ...
+function [objShapeModel, strBpyCommManagerPaths, strShapeModelMetadata] = DefineShapeModel(enumTargetName, ...
                                                                     charDataRootPath, ...
                                                                     charBpyRootPath, ...
                                                                     options)
 arguments
-    enumTargetName      (1,:) {mustBeA(enumTargetName, ["string", "char", "EnumScenarioName"]), ...
-        mustBeMember(enumTargetName, ["Apophis", "Itokawa", "Bennu", "Moon", "Mars", "Ceres", "Dydimos", "Eros", "NotDefined"])}
+    enumTargetName      (1,:) {mustBeA(enumTargetName, ["string", "char", "EnumScenarioName"])}
     charDataRootPath    (1,:) string = ""
     charBpyRootPath     (1,:) string = fullfile(getenv("WS_RENDER"), "corto_PeterCdev")
 end
 arguments
     options.bVertFacesOnly              (1,1) logical = true;
     options.bLoadShapeModel             (1,1) logical = true;
-    options.charOutputLengthUnits       (1,:) char {mustBeMember(options.charOutputLengthUnits, ["km", "m"])} = "m"
-    options.bLoadModifiedVariant        (1,1) logical = false;
+    options.charOutputLengthUnits       {mustBeA(options.charOutputLengthUnits, ["string", "char", "EnumLengthUnits"])} = "m"
+    options.charShapeModelInputUnits    {mustBeA(options.charShapeModelInputUnits, ["string", "char", "EnumLengthUnits"])} = "m"
+    options.dMeshSimplifyFactor         (1,1) double {mustBeFinite} = 1.0
     options.charBlenderModelPath        (1,:) string {mustBeText} = ""
     options.charShapeModelObjPath       (1,:) string {mustBeText} = ""
     options.dObjectReferenceSizeInKm    (1,1) double = -1.0
     options.dTargetShapeMatrix_OF       (3,3) double = zeros(3,3);
+    options.dMass_kg                    (1,1) double = NaN;
+    options.dDensity_kgm3               (1,1) double = NaN;
+    options.dVolume_m3                  (1,1) double = NaN;
+    options.dGravParam_m3mps2           (1,1) double = NaN;
+    options.bInitSphericalHarmonicsGravityData       (1,1) logical = true;
+    options.charSphericalHarmonicsGravityMode        (1,:) string {mustBeA(options.charSphericalHarmonicsGravityMode, ["string", "char"]), ...
+        mustBeMember(options.charSphericalHarmonicsGravityMode, ["auto", "registry", "compute", "none"])} = "auto";
+    options.ui32SphericalHarmonicsGravityMaxDegree   (1,1) uint32 = uint32(4);
+    options.dSphericalHarmonicsGravityGravParam      (1,1) double = NaN;
+    options.dSphericalHarmonicsGravityDensity        (1,1) double = NaN;
+    options.dSphericalHarmonicsGravityBodyRadiusRef  (1,1) double = NaN;
+    options.ui32SphericalHarmonicsGravityMaxFitIterations (1,1) uint32 = uint32(5);
 end
-charResolvedDataRootPath = ResolveNavBackendDataRoot_();
-if strlength(charDataRootPath) == 0 && strlength(charResolvedDataRootPath) > 0
-    charDataRootPath = charResolvedDataRootPath;
-end
+
+charDataRootPath = ResolveSimGearsDataRoot(charDataRootPath=charDataRootPath);
+options.charOutputLengthUnits = char(EnumLengthUnits.toString(options.charOutputLengthUnits));
+options.charShapeModelInputUnits = EnumLengthUnits.toString(options.charShapeModelInputUnits);
 %% SIGNATURE
 % [objShapeModel, strBpyCommManagerPaths] = DefineShapeModel(enumTargetName, charDataRootPath, options)
 % -------------------------------------------------------------------------------------------------------------
@@ -31,17 +43,25 @@ end
 % Paths to models for BlenderPyCommManager class are also defined (ACHTUNG: currently HARDCODED).
 % -------------------------------------------------------------------------------------------------------------
 %% INPUT
-% enumTargetName                    (1,:) {mustBeA(enumTargetName, ["string", "char", "EnumScenarioName"]), ...
-%                                          mustBeMember(enumTargetName, ["Apophis", "Itokawa", "Bennu", "Moon"])}
-% charDataRootPath                  (1,:) string = fullfile(getenv("HOME"), "devDir/nav-backend/simulationCodes/data/SPICE_kernels")
+% enumTargetName                    (1,:) Known scenario name, alias, or EnumScenarioName
+% charDataRootPath                  (1,:) string = SimulationGears data root; defaults to repo data/ or SIMGEARS_DATA_ROOT.
 % charBpyRootPath                   (1,:) string = fullfile(getenv("HOME"), "devDir/rendering-sw/corto_PeterCdev")
 % options.bVertFacesOnly            (1,1) logical= true;
 % options.bLoadShapeModel           (1,1) logical= true;
 % options.charOutputLengthUnits     (1,:) char {mustBeMember(options.charOutputLengthUnits, ["km", "m"])} = "m"
+% options.charShapeModelInputUnits  (1,:) string = "m" for FromShape and explicit OBJ overrides
+% options.dMeshSimplifyFactor       (1,1) double = 1.0 % 1.0 keeps full mesh, 0.0 clears it
+% options.dMass_kg                  (1,1) double = NaN % FromShape/custom SI physical input
+% options.dDensity_kgm3             (1,1) double = NaN % FromShape/custom SI physical input
+% options.dVolume_m3                (1,1) double = NaN % Optional FromShape/custom volume override
+% options.dGravParam_m3mps2         (1,1) double = NaN % FromShape/custom SI gravitational parameter
+% options.bInitSphericalHarmonicsGravityData     (1,1) logical = true
+% options.ui32SphericalHarmonicsGravityMaxDegree (1,1) uint32 = uint32(4)
 % -------------------------------------------------------------------------------------------------------------
 %% OUTPUT
 % objShapeModel
 % strBpyCommManagerPaths
+% strShapeModelMetadata
 % -------------------------------------------------------------------------------------------------------------
 %% CHANGELOG
 % 10-04-2025    Pietro Califano     Update of paths definition
@@ -49,15 +69,15 @@ end
 % 25-08-2025    Pietro Califano     Extend function to work with km and meters based on input options
 % 31-08-2025    Pietro Califano     Define ellipsoidal model for all available bodies
 % 27-01-2026    Pietro Califano     Improve overriding options management for paths, minor fixes
+% 24-04-2026    Pietro Califano     Add load-time mesh keep-fraction passthrough to CShapeModel
+% 01-07-2026    Pietro Califano     Add SimGears data-root routing, physical metadata, registry-backed shape
+%                                   defaults, and default SH initialization
 % -------------------------------------------------------------------------------------------------------------
 %% DEPENDENCIES
 % [-]
 % -------------------------------------------------------------------------------------------------------------
 
 %% Function code
-
-% Assert path existent
-assert(isfolder(charDataRootPath), sprintf("ERROR: input data path %s not found", charDataRootPath));
 
 % [~, charUsrName] = system("whoami"); % Get user
 % assert(contains(charUsrName, "peter") || contains(string(charUsrName(1:end-1)), "peterc-flip\pietr"), ...
@@ -69,186 +89,94 @@ charShapeModelObjPath_  = "";
 
 if strcmpi(options.charOutputLengthUnits, "km")
     dLengthScaleCoeff       = 1.0;
-    dInvLengthScaleCoeff    = 1000.0;
 
 elseif strcmpi(options.charOutputLengthUnits, "m")
     dLengthScaleCoeff        = 1000.0;
-    dInvLengthScaleCoeff     = 1/1000.0;
 end
 
-switch enumTargetName
-    case "Apophis"
-        % DEVNOTE: currently assumes rcs-1 simulator loader
-        charPathToShapeModels = fullfile(getenv("HOME"), "devDir/projects-DART/data/rcs-1/phase-C/shape_models/");
+dMeshSimplifyFactor = min(max(double(options.dMeshSimplifyFactor), 0.0), 1.0);
+[enumScenarioName, charCanonicalTargetName] = CScenarioRegistry.ResolveScenario(enumTargetName);
+strScenarioSpec = CScenarioRegistry.GetScenarioSpec( ...
+    enumScenarioName, ...
+    charLengthUnits=string(options.charOutputLengthUnits));
+charShapeModelName = char(strScenarioSpec.charCanonicalName);
+charScenarioTag = string(strScenarioSpec.charCanonicalName);
 
-        % Define shape model object
-        if not(options.bLoadModifiedVariant)
-            % charBlenderModelPath   = fullfile(getenv("HOME"), "devDir/projects-DART/data/rcs-1/phase-C/blender/Apophis_RGB_smoothed.blend");
-            % charShapeModelObjPath_ = fullfile(path_to_shape_models, "apophis_v233s7_vert2_new.mod.obj");
-            charBlenderModelPath   = fullfile(getenv("HOME"), "devDir/projects-DART/data/rcs-1/phase-C/blender/Apophis_RGB_Centered_MeanSize.blend");
-            % charShapeModelObjPath_ = fullfile(path_to_shape_models, "Apophis_RGB_Centered_MeanSize.obj");
-            charShapeModelObjPath_ = fullfile(charPathToShapeModels, "Apophis_RGB_Centered_MeanSize_NoTexture.obj");
-            dObjectReferenceSize_  = dLengthScaleCoeff * 0.16011;
-        else
-            charBlenderModelPath   = fullfile(getenv("HOME"), "devDir/projects-DART/data/rcs-1/phase-C/blender/Apophis_RGB_Centered_Elongated_550m.blend");
-            charShapeModelObjPath_ = fullfile(charPathToShapeModels, "Apophis_RGB_Centered_Elongated_550m.obj");
-            dObjectReferenceSize_  = dLengthScaleCoeff * 0.175930344;
+switch charScenarioTag
+    case { ...
+            "Apophis", ...
+            "ApophisElongated", ...
+            "Itokawa", ...
+            "Bennu", ...
+            "Moon", ...
+            "Mars", ...
+            "Ceres", ...
+            "Didymos", ...
+            "Eros", ...
+            "Arrokoth", ...
+            "Comet67P", ...
+            "Toutatis" ...
+         }
+
+        [objShapeModel, charBlenderModelPath, charShapeModelObjPath_] = BuildRegistryBackedShapeModel_( ...
+            strScenarioSpec, ...
+            charDataRootPath, ...
+            charBpyRootPath, ...
+            options, ...
+            charShapeModelName, ...
+            dMeshSimplifyFactor);
+
+    case "Earth"
+        if options.bLoadShapeModel
+            error('DefineShapeModel:NoShapeSource', ...
+                '%s has registry metadata but no configured shape-model source. Set bLoadShapeModel=false or provide a supported loader path.', ...
+                charScenarioTag);
         end
 
+        objShapeModel = CShapeModel( ...
+            'file_obj', ...
+            "", ...
+            'km', ...
+            options.charOutputLengthUnits, ...
+            options.bVertFacesOnly, ...
+            charShapeModelName, ...
+            false, ...
+            dMeshSimplifyFactor=dMeshSimplifyFactor);
 
-        % Override paths to model, shape and reference size if provided
-        charBlenderModelPath   = OverrideFilePathIfProvided(charBlenderModelPath, options.charBlenderModelPath);
-        charShapeModelObjPath_ = OverrideFilePathIfProvided(charShapeModelObjPath_, options.charShapeModelObjPath);
-
-        objShapeModel = CShapeModel('file_obj', charShapeModelObjPath_, ...
-            'km', options.charOutputLengthUnits, options.bVertFacesOnly, char(enumTargetName), options.bLoadShapeModel);
-        % objShapeModel.charModelName = "Apophis";
-
-        try
-            ui32ID = 20099942;
-            objShapeModel.dObjectReferenceSize  = dLengthScaleCoeff * mean(cspice_bodvrd(num2str(ui32ID),'RADII',3)); % [m] ACHTUNG: Value used for Gravity SH expansion!
-        catch
-            warning('Fetch of Apophis data from kernels failed. Fallback to hardcoded data...')
-            objShapeModel.dObjectReferenceSize  = dObjectReferenceSize_; 
-        end
-        
+        objShapeModel.dObjectReferenceSize = strScenarioSpec.dShapeReferenceSize;
         objShapeModel.charTargetUnitOutput = options.charOutputLengthUnits;
+        objShapeModel.dTargetShapeMatrix_OF = strScenarioSpec.dTargetShapeMatrix_OF;
 
-        dEllipsoidABC = dLengthScaleCoeff * [0.19884391053956174, 0.15921442216621817, 0.14822745272788257]; % [m] or [km]
-        % DEVNOTE: From Paolo's fitting + conversion from Inertia Tensor with unitary density to semi-axes
-        objShapeModel.dTargetShapeMatrix_OF = diag([1/dEllipsoidABC(1)^2, 1/dEllipsoidABC(2)^2, 1/dEllipsoidABC(3)^2]); % Ellipsoid inverse shape matrix entries [1/a2, 1/b2, 1/c2];        
+    case "FromShape"
+        assert(strlength(options.charShapeModelObjPath) > 0, ...
+            'DefineShapeModel:FromShapeMissingMesh', ...
+            'FromShape requires options.charShapeModelObjPath to point to one mesh source.');
+        charShapeModelObjPath_ = options.charShapeModelObjPath;
 
-    case "Itokawa"
+        objShapeModel = CShapeModel( ...
+            'file_obj', ...
+            charShapeModelObjPath_, ...
+            options.charShapeModelInputUnits, ...
+            options.charOutputLengthUnits, ...
+            options.bVertFacesOnly, ...
+            charShapeModelName, ...
+            options.bLoadShapeModel, ...
+            dMeshSimplifyFactor=dMeshSimplifyFactor);
 
-        % Define blender model path
-        if not(options.bLoadModifiedVariant)
-
-            charBlenderModelPath = fullfile(charBpyRootPath, "data/scenarios/S2_Itokawa/S2_Itokawa.blend");
-            charBlenderModelPath = OverrideFilePathIfProvided(charBlenderModelPath, options.charBlenderModelPath);
-
-            % Define shape model object
-            charKernelname = fullfile(charDataRootPath, 'Itokawa/dsk/hay_a_amica_5_itokawashape_v1_0_64q.bds');
-
-            objShapeModel = CShapeModel('cspice', charKernelname, 'km', options.charOutputLengthUnits, ...
-                                options.bVertFacesOnly, char(enumTargetName));
-
-        else
-            % Variant model
-            charBlenderModelPath   = fullfile(charBpyRootPath, "data/scenarios/S2_Itokawa/S2_Itokawa_modified.blend");
-            charShapeModelObjPath_ = fullfile(charBpyRootPath, "data/scenarios/S2_Itokawa/S2_Itokawa_modified.obj");
-
-            % Override paths to model, shape and reference size if provided
-            charBlenderModelPath   = OverrideFilePathIfProvided(charBlenderModelPath, options.charBlenderModelPath);
-            charShapeModelObjPath_ = OverrideFilePathIfProvided(charShapeModelObjPath_, options.charShapeModelObjPath);
-
-            % Define shape model object
-            objShapeModel = CShapeModel('file_obj', charShapeModelObjPath_, ...
-                                         'km', ...
-                                         options.charOutputLengthUnits, ...
-                                         options.bVertFacesOnly, ...
-                                         char(enumTargetName), ...
-                                         false);
-
-            % objShapeModel.charModelName = "Itokawa";
-        end
-
-
-        objShapeModel.dObjectReferenceSize = dLengthScaleCoeff * 0.161915; % [m] or [km]
         objShapeModel.charTargetUnitOutput = options.charOutputLengthUnits;
-
-        dEllipsoidABC = dLengthScaleCoeff * 1E-3 * 0.5 * [535, 294, 209]; % [m] or [km]
-        objShapeModel.dTargetShapeMatrix_OF = diag([1/dEllipsoidABC(1)^2, 1/dEllipsoidABC(2)^2, 1/dEllipsoidABC(3)^2]); % Ellipsoid inverse shape matrix entries [1/a2, 1/b2, 1/c2];
-
-    case "Bennu"
-
-        % Define blender model path
-        charBlenderModelPath = fullfile(charBpyRootPath, "data/scenarios/S4_Bennu/S4_Bennu.blend");
-        % charShapeModelObjPath_ = fullfile(charBpyRootPath, "data/scenarios/S2_Itokawa/S2_Itokawa_modified.obj");
-
-        % Override paths to model, shape and reference size if provided
         charBlenderModelPath = OverrideFilePathIfProvided(charBlenderModelPath, options.charBlenderModelPath);
-
-        % Define shape model object
-        % charKernelname = fullfile(charDataRootPath, 'Bennu_OREx/dsk/bennu_l_00050mm_alt_ptm_5595n04217_v021.bds'); %  Too large!
-        charKernelname = fullfile(charDataRootPath, 'Bennu_OREx/dsk/bennu_g_03170mm_spc_obj_0000n00000_v020.bds');
-        % charKernelname = fullfile(charDataRootPath, 'Bennu_OREx/dsk/bennu_g_01680mm_alt_obj_0000n00000_v021.bds');
-
-        objShapeModel = CShapeModel('cspice', charKernelname, 'km', options.charOutputLengthUnits, ...
-                        options.bVertFacesOnly, char(enumTargetName), options.bLoadShapeModel);
-
-        % Assign reference radius
-        objShapeModel.dObjectReferenceSize = dLengthScaleCoeff * 1E-3 * 245.03 ; % [m]
-        objShapeModel.charTargetUnitOutput = options.charOutputLengthUnits;
-
-        % Define shape matrix in principal TF
-        dEllipsoidABC = dLengthScaleCoeff * [0.25278, 0.24620, 0.22869]; % [m] or [km]
-        objShapeModel.dTargetShapeMatrix_OF = diag([1/dEllipsoidABC(1)^2, 1/dEllipsoidABC(2)^2, 1/dEllipsoidABC(3)^2]);
-        % objShapeModel.charModelName = "Bennu";
-
-
-    case "Moon"
-
-        % Define blender model path
-        charBlenderModelPath   = fullfile(charBpyRootPath, "data/scenarios/S6_Moon/S6_Moon.blend");
-
-        % Define shape model object
-        charShapeModelObjPath_ = fullfile(charBpyRootPath, "data/scenarios/S6_Moon/Moon.obj");
-
-        % Override paths to model, shape and reference size if provided
-        charBlenderModelPath    = OverrideFilePathIfProvided(charBlenderModelPath, options.charBlenderModelPath);
-        charShapeModelObjPath_  = OverrideFilePathIfProvided(charShapeModelObjPath_, options.charShapeModelObjPath);
-
-        objShapeModel = CShapeModel('file_obj', charShapeModelObjPath_, 'km', options.charOutputLengthUnits, ...
-                                options.bVertFacesOnly, char(enumTargetName), options.bLoadShapeModel);
-
-        objShapeModel.dObjectReferenceSize = dLengthScaleCoeff * 1737.42; % [m] or [km]
-        objShapeModel.charTargetUnitOutput = options.charOutputLengthUnits;
-
-        % Define shape matrix in principal TF
-        dEllipsoidABC = objShapeModel.dObjectReferenceSize * ones(1,3); % [m] or [km]
-        objShapeModel.dTargetShapeMatrix_OF = diag([1/dEllipsoidABC(1)^2, 1/dEllipsoidABC(2)^2, 1/dEllipsoidABC(3)^2]);
-        % objShapeModel.charModelName = ;
-
-    case "Mars"
-
-        charShapeModelObjPath_ = ""; % None for now
-        charShapeModelObjPath_ = OverrideFilePathIfProvided(charShapeModelObjPath_, options.charShapeModelObjPath);
-
-        objShapeModel = CShapeModel('file_obj', charShapeModelObjPath_, 'km', options.charOutputLengthUnits, ...
-                            options.bVertFacesOnly, char(enumTargetName), options.bLoadShapeModel);
-
-        objShapeModel.dObjectReferenceSize = dLengthScaleCoeff * 3386.2; % [m] or [km]
-        objShapeModel.charTargetUnitOutput = options.charOutputLengthUnits;
-
-        % Define shape matrix in principal TF
-        dEllipsoidABC = dLengthScaleCoeff * 1E-3 * [3395428, 3395428, 3377678]; % [m] or [km]
-        objShapeModel.dTargetShapeMatrix_OF = diag([1/dEllipsoidABC(1)^2, 1/dEllipsoidABC(2)^2, 1/dEllipsoidABC(3)^2]);
-        % objShapeModel.charModelName = "Mars";
-        
-    case "Ceres" 
-        charShapeModelObjPath_ = ""; % None for now
-        charShapeModelObjPath_ = OverrideFilePathIfProvided(charShapeModelObjPath_, options.charShapeModelObjPath);
-        
-        objShapeModel = CShapeModel('file_obj', charShapeModelObjPath_, 'km', options.charOutputLengthUnits, ...
-                                options.bVertFacesOnly, char(enumTargetName), options.bLoadShapeModel);
-
-        objShapeModel.dObjectReferenceSize = dLengthScaleCoeff * 939.0/2; % [m] or [km]
-        objShapeModel.charTargetUnitOutput = options.charOutputLengthUnits;
-            
-        % Define shape matrix in principal TF
-        dEllipsoidABC = dLengthScaleCoeff * 1E-3 * [483.1, 481.0, 445.9]; % [m] or [km]
-        objShapeModel.dTargetShapeMatrix_OF = diag([1/dEllipsoidABC(1)^2, 1/dEllipsoidABC(2)^2, 1/dEllipsoidABC(3)^2]);
-        % objShapeModel.charModelName = "Ceres";
-
-    case "Dydimos"
-        error('Not implemented yet')
-
-    case "Eros"
-        error('Not implemented yet')
     
     case "NotDefined"
-        objShapeModel = CShapeModel('file_obj', "", 'km', options.charOutputLengthUnits, ...
-            options.bVertFacesOnly, char(enumTargetName), options.bLoadShapeModel);
+        objShapeModel = CShapeModel( ...
+            'file_obj', ...
+            "", ...
+            'km', ...
+            options.charOutputLengthUnits, ...
+            options.bVertFacesOnly, ...
+            charShapeModelName, ...
+            options.bLoadShapeModel, ...
+            dMeshSimplifyFactor=dMeshSimplifyFactor);
+
         objShapeModel.charTargetUnitOutput = options.charOutputLengthUnits;
         
         charBlenderModelPath = "";
@@ -258,8 +186,15 @@ switch enumTargetName
     otherwise
         if options.bLoadShapeModel == false
             warning('Invalid or unavailable scenario, but no loading of shape required. Returning empty shape model.');
-            objShapeModel = CShapeModel('file_obj', "", 'km', options.charOutputLengthUnits, ...
-                            options.bVertFacesOnly, char(enumTargetName), options.bLoadShapeModel);
+            objShapeModel = CShapeModel( ...
+                'file_obj', ...
+                "", ...
+                'km', ...
+                options.charOutputLengthUnits, ...
+                options.bVertFacesOnly, ...
+                charShapeModelName, ...
+                options.bLoadShapeModel, ...
+                dMeshSimplifyFactor=dMeshSimplifyFactor);
         else
             error('Data for selected scenarios are either not setup or unavailable.');
         end
@@ -274,6 +209,54 @@ if any(options.dTargetShapeMatrix_OF > 0, 'all')
     objShapeModel.dTargetShapeMatrix_OF = options.dTargetShapeMatrix_OF;
 end
 
+% Resolve optional custom physical metadata before SH initialization.
+[strPhysicalMetadata, strSHinputs] = BuildShapeModelPhysicalMetadata(objShapeModel, ...
+    charLengthUnits=string(options.charOutputLengthUnits), ...
+    dMass_kg=options.dMass_kg, ...
+    dDensity_kgm3=options.dDensity_kgm3, ...
+    dVolume_m3=options.dVolume_m3, ...
+    dGravParam_m3mps2=options.dGravParam_m3mps2, ...
+    dLegacyGravParam=options.dSphericalHarmonicsGravityGravParam, ...
+    dLegacyDensity=options.dSphericalHarmonicsGravityDensity);
+
+if options.bInitSphericalHarmonicsGravityData && objShapeModel.hasData()
+    
+    charSHmode = string(options.charSphericalHarmonicsGravityMode);
+    if strScenarioSpec.bIsCustomShapeScenario && any(strcmpi(charSHmode, ["auto", "compute"])) && ...
+            ~strPhysicalMetadata.bHasPhysicalMetadata
+        error('DefineShapeModel:MissingPhysicalInputs', ...
+            ['FromShape SH initialization requires mass, density, or gravitational parameter inputs. ' ...
+             'Pass dMass_kg, dDensity_kgm3, dGravParam_m3mps2, or disable SH initialization.']);
+    end
+
+    if strcmpi(charSHmode, "auto") && ~strScenarioSpec.bIsCustomShapeScenario && ...
+            ~strPhysicalMetadata.bHasPhysicalMetadata && ...
+            ~HasRegistrySphericalHarmonics_(charShapeModelName, options.ui32SphericalHarmonicsGravityMaxDegree, options.charOutputLengthUnits)
+        charSHmode = "none";
+    end
+
+    dSHGravParam = options.dSphericalHarmonicsGravityGravParam;
+    dSHDensity = options.dSphericalHarmonicsGravityDensity;
+    dSHGravConst = NaN;
+
+    if strPhysicalMetadata.bHasPhysicalMetadata
+        dSHGravParam = strSHinputs.dGravParam;
+        dSHDensity = strSHinputs.dDensity;
+        dSHGravConst = strSHinputs.dGravConst;
+    end
+
+    objShapeModel = objShapeModel.BuildAndSetSphericalHarmonicsGravityData( ...
+        options.ui32SphericalHarmonicsGravityMaxDegree, ...
+        dGravParam=dSHGravParam, ...
+        dDensity=dSHDensity, ...
+        dGravConst=dSHGravConst, ...
+        dBodyRadiusRef=options.dSphericalHarmonicsGravityBodyRadiusRef, ...
+        ui32MaxFitIterations=options.ui32SphericalHarmonicsGravityMaxFitIterations, ...
+        charMode=charSHmode);
+
+    strPhysicalMetadata.bHasSphericalHarmonicsGravityData = objShapeModel.bHasSpherHarmonicsGravityData_;
+end
+
 % Set paths to scripts
 charBlenderPyInterfacePath          = fullfile(charBpyRootPath, "server_api/BlenderPy_UDP_TCP_interface_withCaching.py" );
 charStartBlenderServerScriptPath    = fullfile(charBpyRootPath, "server_api/StartBlenderServer.sh");
@@ -284,9 +267,23 @@ if nargout > 1
     strBpyCommManagerPaths.charBlenderPyInterfacePath = charBlenderPyInterfacePath;
     strBpyCommManagerPaths.charStartBlenderServerScriptPath = charStartBlenderServerScriptPath;
 end
+
+if nargout > 2
+    strShapeModelMetadata = struct( ...
+        'enumScenarioName', enumScenarioName, ...
+        'charCanonicalTargetName', charCanonicalTargetName, ...
+        'strScenarioSpec', strScenarioSpec, ...
+        'charShapeModelObjPath', charShapeModelObjPath_, ...
+        'charBlenderModelPath', charBlenderModelPath, ...
+        'charShapeModelInputUnits', string(options.charShapeModelInputUnits), ...
+        'charOutputLengthUnits', string(options.charOutputLengthUnits), ...
+        'strPhysicalMetadata', strPhysicalMetadata);
+end
 cd(charCallDir);
 
-assert(objShapeModel.bHasData_ || options.bLoadShapeModel == false, 'ERROR: loading of mesh model has failed. Check input path first; report issue if it persists.')
+assert( ...
+    objShapeModel.bHasData_ || options.bLoadShapeModel == false, ...
+    'ERROR: loading of mesh model has failed. Check input path first; report issue if it persists.')
 end
 
 %%% Local helper function
@@ -297,24 +294,138 @@ if strlength(charOverridePath) > 0
 end
 end
 
-%% Helper functions
-function charDataRootPath = ResolveNavBackendDataRoot_()
+function charObjInputUnits = ResolveObjInputUnits_(charDefaultInputUnits, charShapeModelObjPath, charOverrideInputUnits)
+charObjInputUnits = charDefaultInputUnits;
+if strlength(charShapeModelObjPath) > 0
+    charObjInputUnits = charOverrideInputUnits;
+end
+end
 
-charDataRootPath = "";
-charWorkspaceRoot = getenv("WS_NAVSYS");
-if strlength(charWorkspaceRoot) == 0 || ~isfolder(charWorkspaceRoot)
+function [objShapeModel, charBlenderModelPath, charShapeModelObjPath] = BuildRegistryBackedShapeModel_( ...
+    strScenarioSpec, ...
+    charDataRootPath, ...
+    charBpyRootPath, ...
+    options, ...
+    charShapeModelName, ...
+    dMeshSimplifyFactor)
+
+charBlenderModelPath = ResolveDefaultDataPath_( ...
+    charBpyRootPath, ...
+    strScenarioSpec.charDefaultBlenderRelativePath);
+charBlenderModelPath = OverrideFilePathIfProvided( ...
+    charBlenderModelPath, ...
+    options.charBlenderModelPath);
+
+charShapeModelObjPath = ResolveDefaultDataPath_( ...
+    charDataRootPath, ...
+    strScenarioSpec.charDefaultShapeRelativePath);
+charShapeModelObjPath = OverrideFilePathIfProvided( ...
+    charShapeModelObjPath, ...
+    options.charShapeModelObjPath);
+RequireShapeAssetIfNeeded_( ...
+    charShapeModelObjPath, ...
+    options.bLoadShapeModel, ...
+    strScenarioSpec, ...
+    charDataRootPath);
+
+switch lower(string(strScenarioSpec.charShapeSourceType))
+    case "dsk"
+        objShapeModel = CShapeModel( ...
+            'cspice', ...
+            charShapeModelObjPath, ...
+            'km', ...
+            options.charOutputLengthUnits, ...
+            options.bVertFacesOnly, ...
+            charShapeModelName, ...
+            options.bLoadShapeModel, ...
+            dMeshSimplifyFactor=dMeshSimplifyFactor);
+
+    case "obj"
+        charObjInputUnits = ResolveObjInputUnits_( ...
+            "km", ...
+            options.charShapeModelObjPath, ...
+            options.charShapeModelInputUnits);
+        objShapeModel = CShapeModel( ...
+            'file_obj', ...
+            charShapeModelObjPath, ...
+            charObjInputUnits, ...
+            options.charOutputLengthUnits, ...
+            options.bVertFacesOnly, ...
+            charShapeModelName, ...
+            options.bLoadShapeModel, ...
+            dMeshSimplifyFactor=dMeshSimplifyFactor);
+
+    otherwise
+        error('DefineShapeModel:UnsupportedShapeSourceType', ...
+            'Scenario "%s" has unsupported shape source type "%s".', ...
+            string(strScenarioSpec.charCanonicalName), ...
+            string(strScenarioSpec.charShapeSourceType));
+end
+
+objShapeModel.dObjectReferenceSize = strScenarioSpec.dShapeReferenceSize;
+objShapeModel.charTargetUnitOutput = options.charOutputLengthUnits;
+objShapeModel.dTargetShapeMatrix_OF = strScenarioSpec.dTargetShapeMatrix_OF;
+end
+
+function bHasRegistrySH = HasRegistrySphericalHarmonics_(charModelName, ui32RequestedDegree, charLengthUnits)
+[~, strSHmeta] = CScenarioRegistry.GetSphericalHarmonicsGravityData( ...
+    charModelName, ui32RequestedDegree, string(charLengthUnits));
+bHasRegistrySH = strSHmeta.bHasHardcodedCoefficients && ui32RequestedDegree <= strSHmeta.ui32HardcodedMaxDegree;
+end
+
+function charResolvedPath = ResolveDefaultDataPath_(charDataRootPath, charRelativePath)
+charResolvedPath = "";
+if strlength(charRelativePath) == 0
     return
 end
 
-cellCandidates = {
-    fullfile(charWorkspaceRoot, "space-nav-backend", "data", "SPICE_kernels"), ...
-    fullfile(charWorkspaceRoot, "nav-backend", "data", "SPICE_kernels")
-    };
+if isfile(charRelativePath) || startsWith(string(charRelativePath), filesep)
+    charResolvedPath = string(charRelativePath);
+else
+    charResolvedPath = string(fullfile(charDataRootPath, charRelativePath));
+end
+end
 
-for idx = 1:numel(cellCandidates)
-    if isfolder(cellCandidates{idx})
-        charDataRootPath = string(cellCandidates{idx});
-        return
-    end
+function RequireShapeAssetIfNeeded_(charShapePath, bLoadShapeModel, strScenarioSpec, charDataRootPath)
+%% DESCRIPTION
+% Fail early when a manifest-backed shape asset is required but absent.
+%
+% The diagnostic is intentionally actionable: it reports the scenario name,
+% asset id, expected local path, manifest path, resolved data root, and the
+% optional Python fetch command. The function never triggers an automatic
+% download from MATLAB.
+% -------------------------------------------------------------------------------------------------------------
+if ~bLoadShapeModel
+    return
+end
+
+if strlength(charShapePath) == 0
+    error('DefineShapeModel:NoShapeSource', ...
+        ['%s has no configured default shape source. Provide charShapeModelObjPath, ' ...
+         'set bLoadShapeModel=false, or add a manifest-backed shape asset.'], ...
+        string(strScenarioSpec.charCanonicalName));
+end
+
+if ~isfile(charShapePath)
+    charManifestPath = fullfile(charDataRootPath, strScenarioSpec.charDataManifestRelativePath);
+    charFetchCommand = sprintf('python3 tools/data/fetch_scenario_assets.py --scenario %s --asset-id %s', ...
+        string(strScenarioSpec.charCanonicalName), string(strScenarioSpec.charDefaultShapeAssetId));
+    error('DefineShapeModel:MissingShapeAsset', ...
+        ['Missing shape asset for scenario "%s".\n' ...
+         'Asset id: %s\n' ...
+         'Expected: %s\n' ...
+         'Manifest: %s\n' ...
+         'Data root: %s\n\n' ...
+         'Fetch it with:\n' ...
+         '  %s\n\n' ...
+         'Or set a different data root with:\n' ...
+         '  export SIMGEARS_DATA_ROOT=/path/to/simgears-data\n\n' ...
+         'Provide charShapeModelObjPath explicitly to bypass manifest lookup.'], ...
+        string(strScenarioSpec.charCanonicalName), ...
+        string(strScenarioSpec.charDefaultShapeAssetId), ...
+        string(charShapePath), ...
+        string(charManifestPath), ...
+        string(charDataRootPath), ...
+        string(charFetchCommand));
 end
 end

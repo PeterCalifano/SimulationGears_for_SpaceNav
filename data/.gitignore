@@ -1,0 +1,5 @@
+/scenarios/*/assets/**
+/scenarios/*/derived/**
+/common/spice/assets/**
+!/scenarios/*/manifest.json
+!/common/spice/manifest.json

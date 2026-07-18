@@ -3,7 +3,7 @@ classdef CScenarioGenerator < CGeneralPropagator
     % Generator class constructing dataset object to define 3D scene over time, with spacecraft trajectory and 
     % attitude, Sun position, target position and attitude, ephemerides of additional bodies. Acceleration
     % info and plots are enabled based on settings. Dynamics can be arbitrarily defined assigning it as
-    % function handle. By default it uses the function "computeRefDynFcn", which expects data in the
+    % function handle. By default it uses the function "ComputeRefDynFcn", which expects data in the
     % strDynParams struct format (for interoperability with EstimationGears library functions).
     % Ephemerides are evaluated using Chebyshev polynomials data stored in strDynParams or using SPICE
     % kernels (TODO).
@@ -57,7 +57,7 @@ classdef CScenarioGenerator < CGeneralPropagator
                 strDynParams      (1,1) struct  = struct();
             end
             arguments
-                kwargs.enumWorldFrameName (1,:) {mustBeA(kwargs.enumWorldFrameName, "SEnumFrameName")} = EnumFrameName.J2000
+                kwargs.enumWorldFrameName (1,:) {mustBeA(kwargs.enumWorldFrameName, ["EnumFrameName", "string", "char"])} = EnumFrameName.J2000
                 kwargs.dEphemerisTimegrid (1,:) double {mustBeNumeric} = 0.0
                 kwargs.objOrbitDynamicFcnHandle = [] % Assign if not empty
             end
@@ -68,6 +68,32 @@ classdef CScenarioGenerator < CGeneralPropagator
                 settings.bEnablePlots               (1,1) logical = false % TODO
                 settings.bProvideAccelerationData   (1,1) logical = false 
             end
+            %% SIGNATURE
+            % self = CScenarioGenerator(dPosVelState0, dRelativeTimegrid, strDynParams, kwargs, settings)
+            % -------------------------------------------------------------------------------------------------------------
+            %% DESCRIPTION
+            % Construct a scenario generator from initial spacecraft state, time grids, dynamics parameters,
+            % and generation settings. If no custom dynamics function is provided, the generator uses
+            % ComputeRefDynFcn with strDynParams.
+            % -------------------------------------------------------------------------------------------------------------
+            %% INPUT
+            % dPosVelState0: Initial spacecraft position/velocity state in the selected world frame.
+            % dRelativeTimegrid: Relative propagation timestamps.
+            % strDynParams: Dynamics-parameter structure consumed by ComputeRefDynFcn-compatible models.
+            % kwargs.enumWorldFrameName: World-frame enum/name attached to generated state data.
+            % kwargs.dEphemerisTimegrid: Time grid used for ephemeris evaluation; scalar defaults to dRelativeTimegrid.
+            % kwargs.objOrbitDynamicFcnHandle: Optional custom orbit-dynamics function handle.
+            % settings.enumGenerationMode: Generation mode, currently OrbitDyn or OrbitPointing.
+            % settings.enumEphemerisMode: Ephemeris source mode, currently interpolants or SPICE placeholder.
+            % settings.bEnablePlots: Plot-enable flag reserved for future use.
+            % settings.bProvideAccelerationData: Request acceleration component traces in the output dataset.
+            % -------------------------------------------------------------------------------------------------------------
+            %% OUTPUT
+            % self: Initialized CScenarioGenerator object.
+            % -------------------------------------------------------------------------------------------------------------
+            %% DEPENDENCIES
+            % ComputeRefDynFcn
+            % -------------------------------------------------------------------------------------------------------------
 
             if nargin > 1
                 self.bDefaultConstructed = false;
@@ -91,7 +117,7 @@ classdef CScenarioGenerator < CGeneralPropagator
             if not(isempty(kwargs.objOrbitDynamicFcnHandle))
                 self.objOrbitDynamicFcnHandle = kwargs.objOrbitDynamicFcnHandle;
             else
-                self.objOrbitDynamicFcnHandle = @(dTimestamp, dxState) computeRefDynFcn(dTimestamp,...
+                self.objOrbitDynamicFcnHandle = @(dTimestamp, dxState) ComputeRefDynFcn(dTimestamp,...
                                                                                         dxState,...
                                                                                         self.strDynParams);
             end
@@ -109,6 +135,23 @@ classdef CScenarioGenerator < CGeneralPropagator
         
         % MAIN ENTRY POINT FUNCTION
         function [objReferenceMissionData] = generateData(self)
+            %% SIGNATURE
+            % objReferenceMissionData = generateData(self)
+            % -------------------------------------------------------------------------------------------------------------
+            %% DESCRIPTION
+            % Generate reference mission data by evaluating target/Sun ephemerides, propagating the spacecraft
+            % trajectory, optionally generating pointing, and packaging the result as SReferenceImagesDataset.
+            % -------------------------------------------------------------------------------------------------------------
+            %% INPUT
+            % self: Configured CScenarioGenerator object with non-empty strDynParams.
+            % -------------------------------------------------------------------------------------------------------------
+            %% OUTPUT
+            % objReferenceMissionData: Reference image dataset containing trajectory, pointing, target, Sun,
+            % Earth, and optional acceleration data.
+            % -------------------------------------------------------------------------------------------------------------
+            %% DEPENDENCIES
+            % CAttitudePointingGenerator, CScenarioGenerator.packageDataset, SReferenceImagesDataset
+            % -------------------------------------------------------------------------------------------------------------
         
             % TODO add code to write ephemerides to strDynParams if scenario generator is set to generate
             % attitudes as well!
@@ -270,18 +313,27 @@ classdef CScenarioGenerator < CGeneralPropagator
                 strDynParams (1,1) struct = struct()
             end
             arguments
-                % TODO load from file if specified
                 kwargs.charSpherHarmCoeffInputFileName (1,:) string {mustBeA(kwargs.charSpherHarmCoeffInputFileName, ["string", "char"])} = ""
                 kwargs.bUseKilometersScale             (1,1) logical = false;
+                kwargs.ui16MaxSHdegree                 (1,1) uint16 = uint16(4);
             end
             arguments
                 settings.bAddNonSphericalGravityCoeffs (1,1) logical = false;
             end
+            %% SIGNATURE
+            % [charTargetName, charTargetFixedFrame, strDynParams] = LoadDefaultScenarioData(enumScenarioName, ...
+            %     strDynParams, kwargs, settings)
+            % -------------------------------------------------------------------------------------------------------------
+            %% DESCRIPTION
+            % Resolve registry-backed default target dynamics data for a scenario and optionally attach
+            % spherical-harmonics gravity coefficients from either the scenario registry or a schema-backed file.
+            % -------------------------------------------------------------------------------------------------------------
             %% INPUT
             % enumScenarioName EnumScenarioName {mustBeA(enumScenarioName, ["EnumScenarioName", "string", "char"])}
             % strDynParams (1,1) struct = struct()
             % kwargs.charSpherHarmCoeffInputFileName (1,:) string {mustBeA(kwargs.charSpherHarmCoeffInputFileName, ["string", "char"])} = ""
             % kwargs.bUseKilometersScale             (1,1) logical = false;
+            % kwargs.ui16MaxSHdegree                 (1,1) uint16 = uint16(4); % Set to 0 to disable SH data.
             % settings.bAddNonSphericalGravityCoeffs (1,1) logical = false;
             % -------------------------------------------------------------------------------------------------------------
             %% OUTPUT
@@ -293,15 +345,16 @@ classdef CScenarioGenerator < CGeneralPropagator
             % 14-03-2025    Pietro Califano     First version implemented from legacy codes
             % 15-06-2025    Pietro Califano     Fix incorrect measurement unit for Apophis radius
             % 22-07-2025    Pietro Califano     Add new scenarios, updates to support future-nav simulations
+            % 01-07-2026    Pietro Califano     Add support for user-defined Spherical Harmonics coefficients
             % -------------------------------------------------------------------------------------------------------------
             %% DEPENDENCIES
             % [-]
             % -------------------------------------------------------------------------------------------------------------
 
             if kwargs.bUseKilometersScale
-                dLengthUnitsScale = 1/1000;
+                charLengthUnits = "km";
             else
-                dLengthUnitsScale = 1;
+                charLengthUnits = "m";
             end
 
             % Define empty fields if not provided
@@ -314,70 +367,22 @@ classdef CScenarioGenerator < CGeneralPropagator
                     strDynParams.strMainData.ui16MaxSHdegree = [];
                 end
             else
+                % Define empty fields
                 strDynParams.strMainData.dSHcoeff = [];
                 strDynParams.strMainData.ui16MaxSHdegree = [];
             end
 
-            switch enumScenarioName
-                case EnumScenarioName.Itokawa
-                    % REFERENCE source: (Scheeres, 2006)
-                    charTargetName = 'ITOKAWA';
-                    charTargetFixedFrame = "ITOKAWA_FIXED";
-
-                    try
-                        ui32ID = 2025143;
-                        dTargetReferenceRadius  = dLengthUnitsScale     * mean(cspice_bodvrd(num2str(ui32ID),'RADII',3)) * 1E3; % [m] ACHTUNG: Value used for Gravity SH expansion!
-                        dTargetGravityParameter = (dLengthUnitsScale)^3 * cspice_bodvrd(num2str(ui32ID),'GM',1) * 1E9;            % [m^3/(s^2)]
-                    catch
-                        warning('Fetch of Itokawa data from kernels failed. Fallback to hardcoded data...')
-                        dTargetReferenceRadius  = dLengthUnitsScale * 0.161915 * 1E3; % [m] ACHTUNG: Value used for Gravity SH expansion!
-                        dTargetGravityParameter = (dLengthUnitsScale^3) * 2.36; % m^3/s^2
-                    end
-
-                case EnumScenarioName.Apophis
-                    % REFERENCE source: TODO
-                    charTargetName = 'APOPHIS';
-                    charTargetFixedFrame = "APOPHIS_FIXED";
-
-                    try
-                        ui32ID = 20099942;
-                        dTargetReferenceRadius  = dLengthUnitsScale     * mean(cspice_bodvrd(num2str(ui32ID),'RADII',3)) * 1E3; % [m] ACHTUNG: Value used for Gravity SH expansion!
-                        dTargetGravityParameter = (dLengthUnitsScale)^3 * cspice_bodvrd(num2str(ui32ID),'GM',1) * 1E9;         % [m^3/(s^2)]
-                    catch
-                        warning('Fetch of Apophis data from kernels failed. Fallback to hardcoded data...')
-                        dTargetReferenceRadius  = dLengthUnitsScale      * 0.175930344 * 1E3; % [m] ACHTUNG: Value used for Gravity SH expansion!
-                        dTargetGravityParameter = (dLengthUnitsScale)^3  * 3.003435675;         % [m^3/(s^2)]
-                    end
-
-                case EnumScenarioName.Bennu
-
-                    charTargetName = 'BENNU';
-                    charTargetFixedFrame = 'IAU_BENNU'; % Check corresponding tf file
-                    dTargetReferenceRadius  = dLengthUnitsScale * 245; % [m] ACHTUNG: Value used for Gravity SH expansion!
-                    dTargetGravityParameter = (dLengthUnitsScale)^3 * 4.892;
-
-                case EnumScenarioName.Didymos
-
-                    charTargetName = 'DIDYMOS';
-                    charTargetFixedFrame = 'IAU_DIDYMOS'; 
-                    dTargetReferenceRadius = dLengthUnitsScale * 355.15; % [m]
-                    dTargetGravityParameter = (dLengthUnitsScale)^3 * 34.3;   % m^3/s^2 
-
-                case EnumScenarioName.Earth
-                    charTargetName = 'EARTH';
-                    charTargetFixedFrame = 'IAU_EARTH'; 
-                    dTargetReferenceRadius  = dLengthUnitsScale * 6371.0E3; % [m] ACHTUNG: Value used for Gravity SH expansion!
-                    dTargetGravityParameter = (dLengthUnitsScale)^3 * 3.986004418E+14; % [m^3/s^2]
-
-                case EnumScenarioName.Moon
-                    charTargetName = 'MOON';
-                    charTargetFixedFrame = 'IAU_MOON'; 
-                    dTargetReferenceRadius  = dLengthUnitsScale * 1737.4E+03; % [m] ACHTUNG: Value used for Gravity SH expansion!
-                    dTargetGravityParameter = (dLengthUnitsScale)^3 * 4.9028695E+12; % [m^3/s^2]
-                
-                otherwise
-                    error('Invalid scenario name. See EnumScenarioName enum class for supported ones.')
+            % Get specification of scenario from registry for tagged scenario name
+            strScenarioSpec = CScenarioRegistry.GetScenarioSpec(enumScenarioName, charLengthUnits=charLengthUnits);
+            if ~strScenarioSpec.bHasGravityDefaults
+                error('CScenarioGenerator:MissingScenarioDefaults', ...
+                    'Scenario %s does not define registry-backed default dynamics data.', string(enumScenarioName));
             end
+
+            charTargetName = char(strScenarioSpec.charSPICETargetName);
+            charTargetFixedFrame = strScenarioSpec.charTargetFixedFrame;
+            dTargetReferenceRadius = strScenarioSpec.dReferenceRadius;
+            dTargetGravityParameter = strScenarioSpec.dGravParam;
 
             % Store basic data
             strDynParams.strMainData.dGM        = dTargetGravityParameter;
@@ -387,118 +392,229 @@ classdef CScenarioGenerator < CGeneralPropagator
             if settings.bAddNonSphericalGravityCoeffs == true
                 
                 % Check input values
-                mustBeNonnegative(kwargs.ui16MaxSHdegree, ...
-                    "ERROR: Maximum SH degree must be a non-negative integer.")
+                mustBeNonnegative(kwargs.ui16MaxSHdegree)
 
-                % Get data depending on scenario
-                CScenarioGenerator.LoadSpherHarmCoefficients(enumScenarioName, kwargs.charSpherHarmCoeffInputFileName);
+                ui32RequestedDegree = uint32(kwargs.ui16MaxSHdegree);
 
-                strDynParams.strMainData.ui16MaxSHdegree = ui16MaxSHdegree;
-                dScaleFactors = ExtSHE_normFactors(strDynParams.strMainData.ui16MaxSHdegree);
+                if ui32RequestedDegree > uint32(0)
+                    % Get data depending on scenario
+                    if strlength(kwargs.charSpherHarmCoeffInputFileName) > 0
 
-                % Compute unnormalized coefficients
-                strDynParams.strMainData.dSHcoeff = dClmSlm_normalized./dScaleFactors;
+                        objSHdata = SSphericalHarmonicsGravityData.fromFile(kwargs.charSpherHarmCoeffInputFileName);
+                        objSHdata.validate(ui32RequestedDegree, ...
+                            "strScenarioSpec", strScenarioSpec, ...
+                            "bRequireScenarioMatch", true);
+
+                        strSHgravityData = objSHdata.toGravityDataStruct(ui32RequestedDegree);
+                        strSHmeta = objSHdata.toMetadataStruct();
+                        fprintf(['Loaded file-backed spherical harmonics for %s: degree %u/%u, ' ...
+                            'units %s, normalization %s, source %s, %s\n'], ...
+                            char(string(enumScenarioName)), ui32RequestedDegree, strSHmeta.ui32FileMaxDegree, ...
+                            char(strSHmeta.charLengthUnits), char(strSHmeta.charNormalization), ...
+                            char(strSHmeta.charSource), char(strSHmeta.charSourceUrl));
+
+                        dTargetGravityParameter = strSHgravityData.dGravParam;
+                        dTargetReferenceRadius = strSHgravityData.dBodyRadiusRef;
+                        strDynParams.strMainData.dGM = dTargetGravityParameter;
+                        strDynParams.strMainData.dRefRadius = dTargetReferenceRadius;
+                    else
+                        % Load registry-backed spherical harmonics data
+                        [strSHgravityData, strSHmeta] = CScenarioRegistry.GetSphericalHarmonicsGravityData( ...
+                            enumScenarioName, ui32RequestedDegree, charLengthUnits);
+
+                        if ~strSHmeta.bHasHardcodedCoefficients || ui32RequestedDegree > strSHmeta.ui32HardcodedMaxDegree
+                            error('CScenarioGenerator:RegistrySHUnavailable', ...
+                                ['Registry SH data for %s are unavailable at requested degree %u. ' ...
+                                 'Available hardcoded max degree is %u.'], ...
+                                string(enumScenarioName), ui32RequestedDegree, strSHmeta.ui32HardcodedMaxDegree);
+                        end
+                        fprintf(['Loaded registry spherical harmonics for %s: degree %u/%u, ' ...
+                            'units %s, normalization %s, source %s, %s\n'], ...
+                            char(string(enumScenarioName)), ui32RequestedDegree, strSHmeta.ui32HardcodedMaxDegree, ...
+                            char(charLengthUnits), char(strSHmeta.charNormalization), ...
+                            char(strSHmeta.charSource), char(strSHmeta.charSourceUrl));
+                    end
+
+                    strDynParams.strMainData.ui16MaxSHdegree = uint16(strSHgravityData.ui32MaxDegree);
+                    strDynParams.strMainData.dSHcoeff = strSHgravityData.dCSlmCoeffCols;
+                end
 
             end
 
         end
     
 
-        function [dClmSlm_normalized, ui16MaxSHdegree] = LoadSpherHarmCoefficients(enumScenarioName, charSpherHarmCoeffInputFileName)
+        function [dCSlmCoeffCols, ui16MaxSHdegree] = LoadSpherHarmCoefficients(enumScenarioName, charSpherHarmCoeffInputFileName)
             arguments
-                enumScenarioName EnumScenarioName {mustBeA(enumScenarioName, ["EnumScenarioName", "string", "char"])}
+                enumScenarioName {mustBeA(enumScenarioName, ["EnumScenarioName", "string", "char"])}
                 charSpherHarmCoeffInputFileName (1,:) string {mustBeA(charSpherHarmCoeffInputFileName, ["string", "char"])} = ""
             end
-            
-            if strcmpi(charSpherHarmCoeffInputFileName, "") % If empty, use hardcoded values if available else throw error
-                enumScenarioName = "from_file";
-                % Check inputs
-                assert(not(isempty(kwargs.charSpherHarmCoeffInputFileName)), ...
-                    "ERROR: Spherical Harmonics coefficients input file name cannot be empty if bAddNonSphericalGravityCoeffs is true.")
+            %% SIGNATURE
+            % [dCSlmCoeffCols, ui16MaxSHdegree] = LoadSpherHarmCoefficients(enumScenarioName, charSpherHarmCoeffInputFileName)
+            % -------------------------------------------------------------------------------------------------------------
+            %% DESCRIPTION
+            % Load unnormalized [Clm, Slm] spherical-harmonics coefficient columns for a scenario from a
+            % schema-backed file when provided, otherwise from hardcoded registry metadata when available.
+            % -------------------------------------------------------------------------------------------------------------
+            %% INPUT
+            % enumScenarioName: Scenario enum/name used to validate registry or file-backed coefficients.
+            % charSpherHarmCoeffInputFileName: Optional SSphericalHarmonicsGravityData MAT/JSON file path.
+            % -------------------------------------------------------------------------------------------------------------
+            %% OUTPUT
+            % dCSlmCoeffCols: Unnormalized [Clm, Slm] coefficient columns.
+            % ui16MaxSHdegree: Maximum spherical-harmonics degree represented by dCSlmCoeffCols.
+            % -------------------------------------------------------------------------------------------------------------
+            %% DEPENDENCIES
+            % CScenarioRegistry, SSphericalHarmonicsGravityData
+            % -------------------------------------------------------------------------------------------------------------
 
-                mustBeFile(kwargs.charSpherHarmCoeffInputFileName, ...
-                            "Spherical Harmonics coefficients input file not found. Provide a valid file name.")
+            if strlength(charSpherHarmCoeffInputFileName) > 0
+                % Load spherical harmonics coefficients from user-provided file
+                objSHdata = SSphericalHarmonicsGravityData.fromFile(charSpherHarmCoeffInputFileName);
+                strScenarioSpec = CScenarioRegistry.GetScenarioSpec(enumScenarioName, ...
+                                                    charLengthUnits=string(objSHdata.charLengthUnits));
+
+                objSHdata.validate(objSHdata.ui32MaxDegree, ...
+                    "strScenarioSpec", strScenarioSpec, ...
+                    "bRequireScenarioMatch", true);
+
+                strSHgravityData = objSHdata.toGravityDataStruct(objSHdata.ui32MaxDegree);
+                dCSlmCoeffCols = strSHgravityData.dCSlmCoeffCols;
+                ui16MaxSHdegree = uint16(strSHgravityData.ui32MaxDegree);
+                return
             end
 
-            switch enumScenarioName
-                case EnumScenarioName.Itokawa
-                    % REFERENCE source: (Scheeres, 2006)
-                    % Itokawa Spherical harmonics expansion coefficients (Scheeres, 2006)
+            % Else, load registry-backed spherical harmonics data
+            strScenarioSpec = CScenarioRegistry.GetScenarioSpec(enumScenarioName);
+            strSHmeta = strScenarioSpec.strSphericalHarmonics;
 
-                    if strcmpi(charSpherHarmCoeffInputFileName, "")
-                        % Use hardcoded values
-                        dClmSlm_normalized = [0.0,       0.0;
-                            -0.145216,  0.0;
-                            0.0,        0.0;
-                            0.219420,   0.0;
-                            0.036115,   0.0;
-                            -0.028139,  -0.006137;
-                            -0.046894,  -0.046894;
-                            0.069022,   0.033976;
-                            0.087852,   0.0;
-                            0.034069,   0.004870;
-                            -0.123263,  0.000098;
-                            -0.030673,  -0.015026;
-                            0.150282,   0.011627];
-
-                        ui16MaxSHdegree = 4;
-                    else
-
-                        % TODO: modify to use: [o_dCSlmCoeffCols, o_dlmPairs] = loadSHEcoeffModel(modelCoeffDataPath, ui16lMax, bENABLE_UNSCALING)
-                        % Normalized coefficients from l=1, m=1 as required by ExtSHE_AccTB function
-
-                        % Load Spherical Harmonics coeffs from file
-                        error('Not implemented yet >.<')
-                    end
-
-                case EnumScenarioName.Apophis
-                    % REFERENCE source: TODO
-
-                    % TODO: modify to use: [o_dCSlmCoeffCols, o_dlmPairs] = loadSHEcoeffModel(modelCoeffDataPath, ui16lMax, bENABLE_UNSCALING)
-                    % Normalized coefficients from l=1, m=1 as required by ExtSHE_AccTB function
-
-                    if strcmpi(charSpherHarmCoeffInputFileName, "")
-                        % Use hardcoded values
-                        dClmSlm_normalized = [];
-                        ui16MaxSHdegree = 0;
-                        warning('Unavailable hardcoded data')
-                    else
-
-                        % TODO: modify to use: [o_dCSlmCoeffCols, o_dlmPairs] = loadSHEcoeffModel(modelCoeffDataPath, ui16lMax, bENABLE_UNSCALING)
-                        % Normalized coefficients from l=1, m=1 as required by ExtSHE_AccTB function
-
-                        % Load Spherical Harmonics coeffs from file
-                        error('Not implemented yet >.<')
-                    end
-
-
-                case EnumScenarioName.Bennu_OREx
-
-                    if strcmpi(charSpherHarmCoeffInputFileName, "")
-                        % Use hardcoded values
-                        dClmSlm_normalized = [];
-                        ui16MaxSHdegree = 0;
-                    else
-
-                        % TODO: modify to use: [o_dCSlmCoeffCols, o_dlmPairs] = loadSHEcoeffModel(modelCoeffDataPath, ui16lMax, bENABLE_UNSCALING)
-                        % Normalized coefficients from l=1, m=1 as required by ExtSHE_AccTB function
-
-                        % Load Spherical Harmonics coeffs from file
-                        error('Not implemented yet >.<')
-                    end
-
-                    warning('Unavailable hardcoded data')
-
-                case EnumScenarioName.Didymos_Hera
-                    error('To implement')
-
-                case "from_file"
-                    % TODO implement loading from file
-                    error('Not implemented yet >.<')
-                otherwise
-                    error('Invalid scenario name or filename! See EnumScenarioName enum class for supported ones (with default values) or provide a valid input file).')
+            if ~strSHmeta.bHasHardcodedCoefficients
+                dCSlmCoeffCols = zeros(0, 2);
+                ui16MaxSHdegree = uint16(0);
+                return
             end
 
+            dCSlmCoeffCols = strSHmeta.dCSlmCoeffCols;
+            ui16MaxSHdegree = uint16(strSHmeta.ui32HardcodedMaxDegree);
+        end
+
+        function [objReferenceMissionData, strEnvironmentData, strDynParams, strScenarioMetadata] = BuildReferenceScenarioDataset(enumScenarioName, ...
+                                    dStateSC_W, ...
+                                    dTimestamps, ...
+                                    options)
+            arguments
+                enumScenarioName (1,:) {mustBeA(enumScenarioName, ["EnumScenarioName", "string", "char"])}
+                dStateSC_W       (6,:) double {mustBeNumeric}
+                dTimestamps      (1,:) double {mustBeNumeric}
+                options.objCamera (1,1) {mustBeA(options.objCamera, ["CCameraIntrinsics", "cameraIntrinsics", "CProjectiveCamera"])} = CCameraIntrinsics()
+                options.enumWorldFrame (1,:) {mustBeA(options.enumWorldFrame, ["EnumFrameName", "string", "char"])} = EnumFrameName.J2000
+                options.dDCM_SCfromW (3,3,:) double {mustBeNumeric} = []
+                options.dDCM_TBfromW (3,3,:) double {mustBeNumeric} = []
+                options.dTargetPosition_W (3,:) double {mustBeNumeric} = []
+                options.dSunPosition_W (3,:) double {mustBeNumeric} = []
+                options.dEarthPosition_W (3,:) double {mustBeNumeric} = []
+                options.dRelativeTimestamps (1,:) double {mustBeNumeric} = []
+                options.bCompleteFromReferences (1,1) logical = false
+                options.bUseKilometersScale (1,1) logical = false
+                options.bAddNonSphericalGravityCoeffs (1,1) logical = false
+                options.charSpherHarmCoeffInputFileName (1,:) string {mustBeA(options.charSpherHarmCoeffInputFileName, ["string", "char"])} = ""
+                options.ui16MaxSHdegree (1,1) uint16 = uint16(4)
+            end
+            %% SIGNATURE
+            % [objReferenceMissionData, strEnvironmentData, strDynParams, strScenarioMetadata] = ...
+            %     BuildReferenceScenarioDataset(enumScenarioName, dStateSC_W, dTimestamps, options)
+            % -------------------------------------------------------------------------------------------------------------
+            %% DESCRIPTION
+            % Build a reference scenario dataset directly from supplied spacecraft states and timestamps,
+            % resolving default environment/dynamics metadata from the scenario registry.
+            % -------------------------------------------------------------------------------------------------------------
+            %% INPUT
+            % enumScenarioName: Scenario enum/name used for registry metadata and target defaults.
+            % dStateSC_W: Spacecraft position/velocity state history, one column per timestamp.
+            % dTimestamps: Absolute timestamps associated with dStateSC_W.
+            % options.objCamera: Camera intrinsics object attached to the reference dataset.
+            % options.enumWorldFrame: World frame associated with the state and vector data.
+            % options.dDCM_SCfromW: Optional spacecraft attitude DCM history.
+            % options.dDCM_TBfromW: Optional target-body attitude DCM history.
+            % options.dTargetPosition_W: Optional target position history.
+            % options.dSunPosition_W: Optional Sun position history.
+            % options.dEarthPosition_W: Optional Earth position history.
+            % options.dRelativeTimestamps: Optional relative timestamps; packageDataset derives them when empty.
+            % options.bCompleteFromReferences: Fill missing reference arrays with identity/zero defaults.
+            % options.bUseKilometersScale: Resolve registry distances and GM in kilometers-based units.
+            % options.bAddNonSphericalGravityCoeffs: Attach spherical-harmonics gravity data to strDynParams.
+            % options.charSpherHarmCoeffInputFileName: Optional SSphericalHarmonicsGravityData MAT/JSON file path.
+            % options.ui16MaxSHdegree: Requested SH degree; 0 disables SH data.
+            % -------------------------------------------------------------------------------------------------------------
+            %% OUTPUT
+            % objReferenceMissionData: Packaged SReferenceImagesDataset.
+            % strEnvironmentData: Target/environment metadata for downstream scenario builders.
+            % strDynParams: Dynamics parameters initialized from the scenario registry.
+            % strScenarioMetadata: Registry scenario spec and generation metadata.
+            % -------------------------------------------------------------------------------------------------------------
+            %% DEPENDENCIES
+            % CScenarioRegistry, CScenarioGenerator.LoadDefaultScenarioData, CScenarioGenerator.packageDataset
+            % -------------------------------------------------------------------------------------------------------------
+
+            if size(dStateSC_W, 2) ~= numel(dTimestamps)
+                error('CScenarioGenerator:InvalidScenarioDatasetInput', ...
+                    'dStateSC_W must have one column per timestamp.');
+            end
+
+            [charTargetName, charTargetFixedFrame, strDynParams] = CScenarioGenerator.LoadDefaultScenarioData( ...
+                enumScenarioName, struct(), ...
+                "bUseKilometersScale", options.bUseKilometersScale, ...
+                "charSpherHarmCoeffInputFileName", options.charSpherHarmCoeffInputFileName, ...
+                "ui16MaxSHdegree", options.ui16MaxSHdegree, ...
+                "bAddNonSphericalGravityCoeffs", options.bAddNonSphericalGravityCoeffs);
+
+            if options.bUseKilometersScale
+                charLengthUnits = "km";
+            else
+                charLengthUnits = "m";
+            end
+
+            strScenarioSpec = CScenarioRegistry.GetScenarioSpec(enumScenarioName, charLengthUnits=charLengthUnits);
+            ui32NumSamples = uint32(numel(dTimestamps));
+
+            dDCM_TBfromW = options.dDCM_TBfromW;
+            dTargetPosition_W = options.dTargetPosition_W;
+            dSunPosition_W = options.dSunPosition_W;
+            dEarthPosition_W = options.dEarthPosition_W;
+
+            if options.bCompleteFromReferences
+                if isempty(dDCM_TBfromW)
+                    dDCM_TBfromW = repmat(eye(3), 1, 1, double(ui32NumSamples));
+                end
+                if isempty(dTargetPosition_W)
+                    dTargetPosition_W = zeros(3, double(ui32NumSamples));
+                end
+                if isempty(dSunPosition_W)
+                    dSunPosition_W = zeros(3, double(ui32NumSamples));
+                end
+                if isempty(dEarthPosition_W)
+                    dEarthPosition_W = zeros(3, double(ui32NumSamples));
+                end
+            end
+
+            % Make reference mission datastruct
+            objReferenceMissionData = CScenarioGenerator.packageDataset( ...
+                options.objCamera, options.enumWorldFrame, dTimestamps, dStateSC_W, ...
+                options.dDCM_SCfromW, dDCM_TBfromW, dTargetPosition_W, dSunPosition_W, ...
+                dEarthPosition_W, options.dRelativeTimestamps);
+
+            strEnvironmentData = struct( ...
+                'charTargetName', charTargetName, ...
+                'charTargetFixedFrame', charTargetFixedFrame, ...
+                'enumScenarioName', strScenarioSpec.enumScenarioName, ...
+                'charCanonicalName', strScenarioSpec.charCanonicalName, ...
+                'dReferenceRadius', strScenarioSpec.dReferenceRadius, ...
+                'dGravParam', strScenarioSpec.dGravParam);
+
+            strScenarioMetadata = struct( ...
+                'strScenarioSpec', strScenarioSpec, ...
+                'bCompleteFromReferences', options.bCompleteFromReferences, ...
+                'charLengthUnits', charLengthUnits);
         end
 
 
@@ -516,7 +632,7 @@ classdef CScenarioGenerator < CGeneralPropagator
             arguments
                 % Reference definition
                 objCamera                    (1,1)      {mustBeA(objCamera, ["CCameraIntrinsics", "cameraIntrinsics", "CProjectiveCamera"])} = CCameraIntrinsics();
-                enumWorldFrame               (1,1)      {mustBeA(enumWorldFrame, ["SEnumFrameName", "string", "char"])} = EnumFrameName.IN  % Enumeration class indicating the W frame to which the data are attached
+                enumWorldFrame               (1,1)      {mustBeA(enumWorldFrame, ["EnumFrameName", "string", "char"])} = EnumFrameName.IN  % Enumeration class indicating the W frame to which the data are attached
                 dTimestamps                  (1,:)      double {mustBeNumeric} = [];
                 dStateSC_W                   (6,:)      double {mustBeNumeric} = [];
                 dDCM_SCfromW                 (3,3,:)    double {mustBeNumeric} = [];
@@ -534,6 +650,39 @@ classdef CScenarioGenerator < CGeneralPropagator
                 optional.dManoeuvresStartTimestamps   (1,:)    double {mustBeNumeric} = [];
                 optional.dManoeuvresDeltaV_SC         (3,:)    double {mustBeNumeric} = [];
             end
+            %% SIGNATURE
+            % objReferenceMissionData = packageDataset(objCamera, enumWorldFrame, dTimestamps, dStateSC_W, ...
+            %     dDCM_SCfromW, dDCM_TBfromW, dTargetPosition_W, dSunPosition_W, dEarthPosition_W, ...
+            %     dRelativeTimestamps, optional)
+            % -------------------------------------------------------------------------------------------------------------
+            %% DESCRIPTION
+            % Package state, attitude, ephemeris, and optional acceleration data into the standard
+            % SReferenceImagesDataset container used by scenario and rendering workflows.
+            % -------------------------------------------------------------------------------------------------------------
+            %% INPUT
+            % objCamera: Camera intrinsics object attached to the dataset.
+            % enumWorldFrame: Frame enum/name associated with the world-frame quantities.
+            % dTimestamps: Absolute dataset timestamps.
+            % dStateSC_W: Spacecraft position/velocity state history in the world frame.
+            % dDCM_SCfromW: Optional spacecraft attitude DCM history.
+            % dDCM_TBfromW: Target-body attitude DCM history.
+            % dTargetPosition_W: Target position history in the world frame.
+            % dSunPosition_W: Sun position history in the world frame.
+            % dEarthPosition_W: Earth position history in the world frame.
+            % dRelativeTimestamps: Optional relative timestamps; derived from dTimestamps when empty.
+            % optional.strAccelInfoData: Optional acceleration component histories.
+            % optional.dPrimaryPointingWhileMan_W: Optional primary pointing vectors during manoeuvres.
+            % optional.dSecondPointingWhileMan_W: Optional secondary pointing vectors during manoeuvres.
+            % optional.dManoeuvresTimegrids: Optional manoeuvre-relative time grids.
+            % optional.dManoeuvresStartTimestamps: Optional manoeuvre start timestamps.
+            % optional.dManoeuvresDeltaV_SC: Optional manoeuvre delta-V vectors in spacecraft frame.
+            % -------------------------------------------------------------------------------------------------------------
+            %% OUTPUT
+            % objReferenceMissionData: Packaged reference image dataset.
+            % -------------------------------------------------------------------------------------------------------------
+            %% DEPENDENCIES
+            % SReferenceImagesDataset
+            % -------------------------------------------------------------------------------------------------------------
 
             % Determine relative timegrid if not provided
             if isempty(dRelativeTimestamps)
@@ -581,4 +730,3 @@ classdef CScenarioGenerator < CGeneralPropagator
 
 
 end
-

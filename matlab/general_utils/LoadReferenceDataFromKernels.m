@@ -9,9 +9,9 @@ arguments (Input)
     varTargetID             {mustBeA(varTargetID, ["string", "char", "double", "int32", "uint32", "single"])} 
     enumTrajectKernelName   (1,:) {mustBeA(enumTrajectKernelName, ["string", "char", "EnumTrajectoryNames", "EnumTrajectKernelName"])}
     dTimegridVect_kernelTimeScale           (1,:) double {mustBeNumeric}
-    enumWorldFrame          (1,1) {mustBeA(enumWorldFrame, ["SEnumFrameName", "string", "char"])}  % Enumeration class indicating the W frame in which the data are expressed
-    varReferenceCentre      (1,1) {mustBeA(varReferenceCentre, ["SEnumFrameName", "string", "char", "double", "int32", "uint32"])}
-    enumTargetFrame         (1,1) {mustBeA(enumTargetFrame, ["SEnumFrameName", "string", "char"])} = enumWorldFrame
+    enumWorldFrame          (1,1) {mustBeA(enumWorldFrame, ["EnumFrameName", "string", "char"])}  % Enumeration class indicating the W frame in which the data are expressed
+    varReferenceCentre      (1,1) {mustBeA(varReferenceCentre, ["EnumFrameName", "string", "char", "double", "int32", "uint32"])}
+    enumTargetFrame         (1,1) {mustBeA(enumTargetFrame, ["EnumFrameName", "string", "char"])} = enumWorldFrame
 end
 arguments (Input)
     kwargs.bIsTimeGridRelative      (1,1) logical {mustBeScalarOrEmpty} = true
@@ -501,4 +501,3 @@ elseif strcmpi(kwargs.charOutputLengthUnits, 'km') && strcmpi(kwargs.charKernelL
     end
 end
 end
-

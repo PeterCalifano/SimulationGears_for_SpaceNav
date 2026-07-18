@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "scenario_name": "Itokawa",
+  "canonical_name": "Itokawa",
+  "aliases": ["Itokawa"],
+  "confidence": "high",
+  "tags": ["shape_runnable", "spice_dsk"],
+  "default_shape_asset_id": "hayabusa_itokawa_64q_dsk",
+  "assets": [
+    {
+      "asset_id": "hayabusa_itokawa_64q_dsk",
+      "asset_type": "shape",
+      "local_path": "scenarios/Itokawa/assets/shape/hay_a_amica_5_itokawashape_v1_0_64q.bds",
+      "source_url": "PDS Hayabusa Itokawa shape DSK",
+      "download_url": "",
+      "sha256": "",
+      "size_gb": 0.005,
+      "fidelity": "public_dsk_q64",
+      "required_for_shape_runnable": true
+    }
+  ]
+}

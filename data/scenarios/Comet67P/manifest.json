@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "scenario_name": "Comet67P",
+  "canonical_name": "Comet67P",
+  "aliases": ["67P", "67P/Churyumov-Gerasimenko", "Churyumov-Gerasimenko", "Comet67P"],
+  "confidence": "high",
+  "tags": ["shape_runnable", "pds_rosetta"],
+  "default_shape_asset_id": "rosetta_67p_shape_high_fidelity",
+  "assets": [
+    {
+      "asset_id": "rosetta_67p_shape_high_fidelity",
+      "asset_type": "shape",
+      "local_path": "scenarios/Comet67P/assets/shape/cg_spc_shap5_788k_cart.bds",
+      "source_url": "https://pds-smallbodies.astro.umd.edu/holdings/ro-c-multi-5-67p-shape-v2.0/dataset.shtml",
+      "download_url": "https://pds-smallbodies.astro.umd.edu/holdings/ro-c-multi-5-67p-shape-v2.0/data/spice_dsk/spc_lam_psi/shap5/cg_spc_shap5_788k_cart.bds",
+      "sha256": "",
+      "size_gb": 0.035,
+      "fidelity": "pds_shap5_788k_dsk_under_1gb",
+      "required_for_shape_runnable": true
+    }
+  ]
+}

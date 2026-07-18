@@ -19,6 +19,7 @@ classdef (Abstract) CBaseDatastruct % < matlab.mixin.Copyable
     % 05-01-2026    Pietro Califano     [MAJOR] Implement new methods to handle yaml files (statically),
     %                                   move assignField_ method to instance methods
     % 07-01-2026    Pietro Califano     Minor fixes before pull request
+    % 29-06-2026    Pietro Califano     Harden export of non-datastruct runtime objects.
     % -------------------------------------------------------------------------------------------------------------
     %% METHODS
     % [-]
@@ -1278,32 +1279,38 @@ classdef (Abstract) CBaseDatastruct % < matlab.mixin.Copyable
         end
 
         function outValue = convertValue_(inVal)
-            % Private helper function to recurse fields when converting objects
-            if isobject(inVal) && not(isstring(inVal))
-                % Recurse on OBJECTS
-                if numel(inVal) > 1
-                    % Array of objects → struct array
+            % Private helper function to recurse fields when converting objects.
+            if isenum(inVal)
+                % Handle enumeration classes by conversion to strings.
+                outValue = string(inVal);
+                return;
+            end
+
+            if isa(inVal, "CBaseDatastruct")
+                % Only CBaseDatastruct-derived objects own the recursive export contract.
+                if isempty(inVal)
+                    outValue = [];
+
+                elseif numel(inVal) > 1
                     tmpConvertedArray = arrayfun(@(out) out.toStruct(), inVal);
                     outValue = reshape(tmpConvertedArray, size(inVal));
 
-                elseif ismethod(inVal, 'toStruct')
-                    % If object has method "toStruct" (base is this class, call it)
-                    outValue = inVal.toStruct();
-
-                elseif isenum(inVal)
-                    % Handle enumeration classes by convertion to strings
-                    outValue = string(inVal);
                 else
-                    % Else, fallback to casting
-                    outValue = struct(inVal);
-                    if isempty(outValue) && not(isempty(inVal))
-                        warning('Fallback method "cast using struct()" on type %s returned empty. Field will be lost.', class(inVal));
-                    end
+                    outValue = inVal.toStruct();
                 end
 
-            elseif iscell(inVal)
+                return;
+            end
+
+            if istable(inVal) || isa(inVal, 'timetable') || isa(inVal, 'containers.Map') || (isobject(inVal) && not(isstring(inVal)))
+                % Runtime payloads are intentionally omitted from struct/YAML export.
+                outValue = [];
+                return;
+            end
+
+            if iscell(inVal)
                 % Recurse on CELLS
-                outValue = cellfun(@CBaseDatastruct.convertValue_, inVal, 'UniformOutput',false);
+                outValue = cellfun(@CBaseDatastruct.convertValue_, inVal, 'UniformOutput', false);
  
             elseif isstruct(inVal)
                 % Recurse on STRUCTS
@@ -1352,8 +1359,12 @@ classdef (Abstract) CBaseDatastruct % < matlab.mixin.Copyable
             strUnwrappedField = strValueIn;
         end
 
-       function [bIsObject] = validateObjectOrStruct_(objDatastruct)
-            bIsObject = isobject(objDatastruct) || isstruct(objDatastruct) || isa(objDatastruct, "CBaseDatastruct");
+        function validateObjectOrStruct_(objDatastruct)
+            if not(isstruct(objDatastruct) || isa(objDatastruct, "CBaseDatastruct"))
+                error("CBaseDatastruct:InvalidRootType", ...
+                    "CBaseDatastruct export root must be a struct or derive from CBaseDatastruct. Received %s.", ...
+                    class(objDatastruct));
+            end
         end
     end
 

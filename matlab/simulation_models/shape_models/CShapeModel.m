@@ -11,6 +11,8 @@ classdef CShapeModel < CBaseDatastruct
     % 10-11-2025    Pietro Califano     Minor bug fixes
     % 22-04-2026    Pietro Califano     Extend class with utilities to build SH and Polyhedral gravity from
     %                                   shape model with known density and mass
+    % 24-04-2026    Pietro Califano     Add mesh simplification utility and load-time keep-fraction option
+    % 01-07-2026    Pietro Califano     Add workspace MICE resolution and support OBJ v//vn face syntax.
     % -------------------------------------------------------------------------------------------------------------
     %% DEPENDENCIES
     % [-]
@@ -28,8 +30,10 @@ classdef CShapeModel < CBaseDatastruct
         bHasData_ = false;
         ui32triangVertexPtr = []; % Assumed as [3, N] array
         dVerticesPos = [];        % Assumed as [3, N] array
+        dShapeRadius (1,1) double {mustBeNumeric, mustBeFinite} = 0.0;
         ui32NumOfVertices = uint32(0);
         unitScaler = 1;
+        dMeshSimplifyFactor (1,1) double {mustBeFinite} = 1.0;
 
         % Optional data
         dTexCoords = [];
@@ -44,6 +48,10 @@ classdef CShapeModel < CBaseDatastruct
         dGravEdgeDyadics       = [];  % [3 x 3 x nEdges, double]
         dGravFaceDyadics       = [];  % [3 x 3 x nFaces, double]
 
+        % Spherical harmonics gravity cache (populated explicitly through setSphericalHarmonicsGravityData)
+        bHasSpherHarmonicsGravityData_ = false;
+        strSphHarmonicsGravityData_ struct = struct()
+
     end
 
     methods (Access = public)
@@ -54,17 +62,20 @@ classdef CShapeModel < CBaseDatastruct
                 charTargetUnitOutput, ...
                 bVertFacesOnly, ...
                 charModelName, ...
-                bLoadShapeModel)
+                bLoadShapeModel, ...
+                options)
             arguments
                 enumLoadingMethod       (1,:) string {mustBeA(enumLoadingMethod, ["string", "char"]), ...
                     mustBeMember(enumLoadingMethod, ["mat", "cspice", "struct", "file_obj"])} = "file_obj"
                 varInputData            (1,:) = []
-                charInputUnit           (1,:) string {mustBeA(charInputUnit       , ["string", "char"]), ...
-                    mustBeMember(charInputUnit, ["m", "km"])} = 'km'
-                charTargetUnitOutput    (1,:) string {mustBeA(charTargetUnitOutput, ["string", "char"]), mustBeMember(charTargetUnitOutput, ["m", "km"])} = 'm' % TODO add enumaration
+                charInputUnit           {mustBeA(charInputUnit, ["string", "char", "EnumLengthUnits"])} = 'km'
+                charTargetUnitOutput    {mustBeA(charTargetUnitOutput, ["string", "char", "EnumLengthUnits"])} = 'm'
                 bVertFacesOnly          (1,1) logical = true;
                 charModelName           (1,:) char = ""
                 bLoadShapeModel         (1,1) logical = true;
+            end
+            arguments
+                options.dMeshSimplifyFactor (1,1) double {mustBeFinite} = 1.0
             end
 
             % For default (placeholder) construction
@@ -72,8 +83,10 @@ classdef CShapeModel < CBaseDatastruct
                 return
             end
 
-            self.charTargetUnitOutput = charTargetUnitOutput;
+            charInputUnit = char(EnumLengthUnits.toString(charInputUnit));
+            self.charTargetUnitOutput = char(EnumLengthUnits.toString(charTargetUnitOutput));
             self.bDefaultConstructed  = false;
+            self.dMeshSimplifyFactor  = min(max(double(options.dMeshSimplifyFactor), 0.0), 1.0);
 
             % Determine scaling to match length unit
             if (strcmpi(charInputUnit, 'm') && strcmpi(self.charTargetUnitOutput, 'm')) || ...
@@ -118,7 +131,13 @@ classdef CShapeModel < CBaseDatastruct
             if self.ui32NumOfVertices > 0
                 % Update unit scaling
                 self.dVerticesPos = self.unitScaler * self.dVerticesPos;
+
+                if self.dMeshSimplifyFactor < 1.0
+                    [self, ~] = self.SimplifyMesh(100.0 * (1.0 - self.dMeshSimplifyFactor));
+                end
             end
+
+            self = self.UpdateDerivedGeometry_();
         end
 
         %% GETTERS
@@ -129,6 +148,7 @@ classdef CShapeModel < CBaseDatastruct
             if self.bHasData_ == true
                 strData.ui32triangVertexPtr = self.ui32triangVertexPtr;
                 strData.dVerticesPos = self.dVerticesPos;
+                strData.dShapeRadius = self.dShapeRadius;
             else
                 warning('No model was loaded. Returning empty struct.')
             end
@@ -179,7 +199,93 @@ classdef CShapeModel < CBaseDatastruct
 
         end
 
-        function BuildPolyhedronGravityData(self)
+        function [self, strReductionStats] = SimplifyMesh(self, dReductionPercent)
+            %% DESCRIPTION
+            % Reduces the number of faces in the current triangular mesh
+            % using MATLAB's reducepatch. The requested input is expressed
+            % as percentage of face reduction, while the achieved vertex
+            % and face reductions are returned in the output stats struct.
+            % A value of 100 clears the mesh completely.
+            %
+            % ACHTUNG: CShapeModel currently has value-class semantics
+            % through CBaseDatastruct, so the updated object must be
+            % captured by the caller.
+            % -------------------------------------------------------------------------------------------------------------
+            arguments
+                self
+                dReductionPercent (1,1) double {mustBeFinite, mustBeGreaterThanOrEqual(dReductionPercent, 0), mustBeLessThanOrEqual(dReductionPercent, 100)}
+            end
+
+            assert(self.bHasData_, 'CShapeModel:NoData', ...
+                'Shape model must be loaded before calling SimplifyMesh().');
+
+            ui32NumFacesBefore = uint32(size(self.ui32triangVertexPtr, 2));
+            ui32NumVertsBefore = uint32(size(self.dVerticesPos, 2));
+
+            % Initialize reduction stats struct with pre-reduction values and requested reduction
+            strReductionStats = struct( ...
+                'ui32NumFacesBefore', ui32NumFacesBefore, ...
+                'ui32NumFacesAfter', ui32NumFacesBefore, ...
+                'ui32NumVerticesBefore', ui32NumVertsBefore, ...
+                'ui32NumVerticesAfter', ui32NumVertsBefore, ...
+                'dRequestedReductionPercent', dReductionPercent, ...
+                'dAppliedKeepFraction', 1.0 - dReductionPercent / 100.0, ...
+                'dAchievedFaceReductionPercent', 0.0, ...
+                'dAchievedVertexReductionPercent', 0.0);
+
+            if dReductionPercent == 0 || ui32NumFacesBefore == 0
+                self = self.UpdateDerivedGeometry_();
+                return
+            end
+
+            if dReductionPercent == 100
+                self.ui32triangVertexPtr = zeros(3, 0, 'uint32');
+                self.dVerticesPos        = zeros(3, 0, 'double');
+
+            else
+                % Execute reduction and update mesh data
+                dKeepFraction = strReductionStats.dAppliedKeepFraction;
+                [dFacesReduced, dVertsReduced] = reducepatch( ...
+                    double(self.ui32triangVertexPtr'), self.dVerticesPos', dKeepFraction);
+
+                self.ui32triangVertexPtr = uint32(dFacesReduced');
+                self.dVerticesPos        = dVertsReduced';
+            end
+
+            % Fill in reduction stats with achieved reductions
+            self = self.UpdateDerivedGeometry_();
+
+            strReductionStats.ui32NumFacesAfter = uint32(size(self.ui32triangVertexPtr, 2));
+            strReductionStats.ui32NumVerticesAfter = self.ui32NumOfVertices;
+            strReductionStats.dAchievedFaceReductionPercent = 100.0 * ...
+                (1.0 - double(strReductionStats.ui32NumFacesAfter) / double(ui32NumFacesBefore));
+            strReductionStats.dAchievedVertexReductionPercent = 100.0 * ...
+                (1.0 - double(strReductionStats.ui32NumVerticesAfter) / double(ui32NumVertsBefore));
+
+            if ~isempty(self.dTexCoords) || ~isempty(self.ui32TrianglesTexIndex) || ...
+                    ~isempty(self.dNormals) || ~isempty(self.ui32TrianglesNormalsIndex)
+
+                warning('CShapeModel:SimplifyMeshDropsAuxiliaryObjData', ...
+                    ['SimplifyMesh() only updates mesh geometry. Existing texture and normal ', ...
+                     'data are being cleared because their indices are no longer valid after decimation.']);
+                
+                self.dTexCoords = [];
+                self.ui32TrianglesTexIndex = [];
+                self.dNormals = [];
+                self.ui32TrianglesNormalsIndex = [];
+            end
+
+            % Geometry-dependent caches become stale after decimation.
+            self.bHasGravityData_ = false;
+            self.ui32GravEdgeVertexIds = [];
+            self.dGravEdgeDyadics = [];
+            self.dGravFaceDyadics = [];
+
+            self.bHasSpherHarmonicsGravityData_ = false;
+            self.strSphHarmonicsGravityData_ = struct();
+        end
+
+        function self = BuildPolyhedronGravityData(self)
             %% DESCRIPTION
             % Precomputes and caches the geometric data (edge vertex IDs, edge
             % dyadic tensors, face dyadic tensors) required by EvalPolyhedronGrav.
@@ -188,6 +294,10 @@ classdef CShapeModel < CBaseDatastruct
             % getPolyhedronGravityData().
             % ACHTUNG: Vertices and faces are stored internally as [3,N]. This
             % method transposes them to [N,3] for ComputePolyhedronFaceEdgeData.
+            %
+            % ACHTUNG: CShapeModel currently has value-class semantics
+            % through CBaseDatastruct, so the updated object must be
+            % captured by the caller.
             % -------------------------------------------------------------------------------------------------------------
             %% DEPENDENCIES
             % ComputePolyhedronFaceEdgeData
@@ -229,6 +339,145 @@ classdef CShapeModel < CBaseDatastruct
             dVerticesRows     = self.dVerticesPos';
         end
 
+        function self = setSphericalHarmonicsGravityData(self, strSHgravityData)
+            %% DESCRIPTION
+            % Stores previously computed spherical harmonics gravity data in
+            % the object cache. Use the static
+            % BuildSphericalHarmonicsGravityData() method to generate the
+            % struct, then call this setter explicitly.
+            %
+            % ACHTUNG: CShapeModel currently has value-class semantics
+            % through CBaseDatastruct, so the updated object must be
+            % captured by the caller.
+            % -------------------------------------------------------------------------------------------------------------
+            arguments
+                self
+                strSHgravityData (1,1) struct
+            end
+
+            % Validate that the input struct has the required fields
+            cellRequiredFields = {'dCSlmCoeffCols', 'ui32MaxDegree', 'dGravParam', ...
+                'dBodyRadiusRef', 'dDensity', 'dGravConst', 'strFitStats'};
+
+            for idField = 1:numel(cellRequiredFields)
+                assert(isfield(strSHgravityData, cellRequiredFields{idField}), ...
+                    'CShapeModel:InvalidSHGravityData', ...
+                    'Missing required field "%s" in SH gravity data struct.', ...
+                    cellRequiredFields{idField});
+            end
+
+            % Set data and flag
+            self.strSphHarmonicsGravityData_ = strSHgravityData;
+            self.bHasSpherHarmonicsGravityData_ = true;
+        end
+
+        function strSHgravityData = getSphericalHarmonicsGravityData(self)
+            %% DESCRIPTION
+            % Returns the cached spherical harmonics gravity data previously
+            % stored through setSphericalHarmonicsGravityData().
+            % -------------------------------------------------------------------------------------------------------------
+            arguments
+                self
+            end
+
+            assert(self.bHasSpherHarmonicsGravityData_, 'CShapeModel:NoSHgravityData', ...
+                'Spherical harmonics gravity data not available. Compute and set it first.');
+
+            strSHgravityData = self.strSphHarmonicsGravityData_;
+        end
+
+        function [self, strSHgravityData] = BuildAndSetSphericalHarmonicsGravityData(self, ui32MaxDegree, options)
+            %% DESCRIPTION
+            % Builds spherical harmonics gravity data from the loaded mesh
+            % and stores it in the object cache. This is the mutating
+            % instance-level companion to the static compute-only
+            % BuildSphericalHarmonicsGravityData() method.
+            %
+            % ACHTUNG: CShapeModel currently has value-class semantics
+            % through CBaseDatastruct, so the updated object must be
+            % captured by the caller.
+            % -------------------------------------------------------------------------------------------------------------
+            arguments
+                self
+                ui32MaxDegree                  (1,1) uint32 = uint32(4)
+                options.dGravParam             (1,1) double = NaN
+                options.dDensity               (1,1) double = NaN
+                options.dGravConst             (1,1) double = NaN
+                options.dBodyRadiusRef         (1,1) double = NaN
+                options.ui32MaxFitIterations   (1,1) uint32 = uint32(5)
+                options.charMode               (1,:) string {mustBeA(options.charMode, ["string", "char"]), ...
+                    mustBeMember(options.charMode, ["auto", "registry", "compute", "none"])} = "auto"
+            end
+
+            if strcmpi(options.charMode, "none")
+                strSHgravityData = struct();
+                return
+            end
+
+            bHasExplicitPhysicalInputs = isfinite(options.dGravParam) || ...
+                isfinite(options.dDensity) || isfinite(options.dBodyRadiusRef);
+
+            if any(strcmpi(options.charMode, ["auto", "registry"])) && ...
+                    (~bHasExplicitPhysicalInputs || strcmpi(options.charMode, "registry"))
+                
+                try
+                    % Try to get registry data first
+                    [strRegistrySHgravityData, strRegistrySHmeta] = CScenarioRegistry.GetSphericalHarmonicsGravityData( ...
+                        self.charModelName, ui32MaxDegree, string(self.charTargetUnitOutput));
+                
+                catch objException
+                    
+                    if strcmp(objException.identifier, 'CScenarioRegistry:UnsupportedScenario') && strcmpi(options.charMode, "auto")
+                        
+                        strRegistrySHmeta = struct('bHasHardcodedCoefficients', false, 'ui32HardcodedMaxDegree', uint32(0));
+                        strRegistrySHgravityData = struct();
+                    else
+                        rethrow(objException)
+                    end
+                end
+
+                if strRegistrySHmeta.bHasHardcodedCoefficients && ...
+                        ui32MaxDegree <= strRegistrySHmeta.ui32HardcodedMaxDegree
+                    
+                    % Cache registry data on the object and return it
+                    self = self.setSphericalHarmonicsGravityData(strRegistrySHgravityData);
+                    strSHgravityData = self.getSphericalHarmonicsGravityData();
+                    return
+                end
+
+                if strcmpi(options.charMode, "registry")
+                    error('CShapeModel:RegistrySHUnavailable', ...
+                        ['Registry SH data for %s are unavailable at requested degree %u. ' ...
+                         'Available hardcoded max degree is %u.'], ...
+                        string(self.charModelName), ui32MaxDegree, strRegistrySHmeta.ui32HardcodedMaxDegree);
+                end
+            end
+
+            dGravParam = options.dGravParam;
+            dDensity   = options.dDensity;
+
+            % Get gravity defaults for model and target unit if not provided as input
+            if ~isfinite(dGravParam) && ~isfinite(dDensity)
+
+                strGravityDefaults = GetShapeModelScenarioGravityDefaults( ...
+                    self.charModelName, self.charTargetUnitOutput);
+            
+                dGravParam = strGravityDefaults.dGravParam;
+                dDensity   = strGravityDefaults.dDensity;
+            end
+
+            % Build SH gravity data struct and store it in the object cache
+            strSHgravityData = CShapeModel.BuildSphericalHarmonicsGravityData(self, ui32MaxDegree, ...
+                                                                            dGravParam=dGravParam, ...
+                                                                            dDensity=dDensity, ...
+                                                                            dGravConst=options.dGravConst, ...
+                                                                            dBodyRadiusRef=options.dBodyRadiusRef, ...
+                                                                            ui32MaxFitIterations=options.ui32MaxFitIterations);
+
+            self = self.setSphericalHarmonicsGravityData(strSHgravityData);
+            strSHgravityData = self.getSphericalHarmonicsGravityData();
+        end
+
     end
 
     methods (Access = protected)
@@ -241,7 +490,17 @@ classdef CShapeModel < CBaseDatastruct
             end
 
             % Check if SPICE is available
-            % TODO
+            if isempty(which('cspice_furnsh'))
+                CShapeModel.TryAddMiceFromWorkspace_();
+            end
+
+            if isempty(which('cspice_furnsh'))
+                error('CShapeModel:CSPICEUnavailable', ...
+                    ['SPICE DSK shape loading requires NAIF MICE on the MATLAB path. ' ...
+                     'Set WS_SIMGEARS or WS_NAVSYS to a workspace containing mice/, ' ...
+                     'install/add MICE before loading %s, or set bLoadShapeModel=false for metadata-only use.'], ...
+                    string(charKernelName));
+            end
 
             % Check that kernel is loaded else, try to load it
             % TODO
@@ -266,6 +525,7 @@ classdef CShapeModel < CBaseDatastruct
             % Assign data to object attributes
             self.ui32triangVertexPtr = ui32TrianglesVertices;
             self.dVerticesPos        = dModelVertices;
+            self = self.UpdateDerivedGeometry_();
 
             self.bHasData_ = true;
         end
@@ -280,6 +540,7 @@ classdef CShapeModel < CBaseDatastruct
 
             self.ui32triangVertexPtr = uint32(strShapeModel.(cellFieldnames{contains(cellFieldnames, '32')} ));
             self.dVerticesPos        = double(strShapeModel.(cellFieldnames{contains(cellFieldnames, 'dVert')} ));
+            self = self.UpdateDerivedGeometry_();
 
             self.bHasData_ = true;
         end
@@ -319,8 +580,28 @@ classdef CShapeModel < CBaseDatastruct
                 self.ui32TrianglesNormalsIndex = transpose(self.ui32TrianglesNormalsIndex);
             end
 
+            self = self.UpdateDerivedGeometry_();
             self.bHasData_ = true;
 
+        end
+
+        function [self] = UpdateDerivedGeometry_(self)
+            % Method to update geometry-dependent attributes (number of vertices, shape radius) after loading or modifying the mesh. Called internally at the end of loading and simplification methods.
+            self.ui32NumOfVertices = uint32(size(self.dVerticesPos, 2));
+
+            if isempty(self.dVerticesPos)
+                self.dShapeRadius = 0.0;
+                return
+            end
+
+            dVertexNorms = vecnorm(self.dVerticesPos, 2, 1);
+            dVertexNorms = dVertexNorms(isfinite(dVertexNorms));
+
+            if isempty(dVertexNorms)
+                self.dShapeRadius = 0.0;
+            else
+                self.dShapeRadius = mean(dVertexNorms);
+            end
         end
 
         function checkIfModelAlreadyLoaded(self)
@@ -328,19 +609,125 @@ classdef CShapeModel < CBaseDatastruct
                 warning('A shape model was already loaded before and is being overwritten.')
             end
         end
+
     end
 
     methods (Static, Access = public)
 
+        function [objShapeModel, strSHgravityData] = BuildSphericalHarmonicsGravityDataFromObj( ...
+                charObjFilePath, ui32MaxDegree, options)
+            arguments
+                charObjFilePath                 (1,:) string {mustBeA(charObjFilePath, ["string", "char"])}
+                ui32MaxDegree                   (1,1) uint32
+                options.charInputUnit          {mustBeA(options.charInputUnit, ["string", "char", "EnumLengthUnits"])} = "m"
+                options.charTargetUnitOutput   {mustBeA(options.charTargetUnitOutput, ["string", "char", "EnumLengthUnits"])} = "m"
+                options.bVertFacesOnly         (1,1) logical = true
+                options.charModelName          (1,:) string {mustBeA(options.charModelName, ["string", "char"])} = ""
+                options.dGravParam             (1,1) double = NaN
+                options.dDensity               (1,1) double = NaN
+                options.dGravConst             (1,1) double = NaN
+                options.dBodyRadiusRef         (1,1) double = NaN
+                options.ui32MaxFitIterations   (1,1) uint32 = uint32(5)
+                options.dMeshSimplifyFactor    (1,1) double {mustBeFinite} = 1.0
+                options.bCacheOnShapeModel     (1,1) logical = true
+            end
+            %% DESCRIPTION
+            % Static compute-only utility that loads a shape model from a
+            % Wavefront .obj file and builds spherical harmonics gravity
+            % data from it.
+            %
+            % The method mirrors the compute-only style of
+            % BuildSphericalHarmonicsGravityData(): it performs no
+            % diagnostics plots and no workflow-side reporting. Use the
+            % returned object directly, or cache the fitted SH data on it
+            % by leaving options.bCacheOnShapeModel = true.
+            % -------------------------------------------------------------------------------------------------------------
+
+            if ~isfile(charObjFilePath)
+                error('CShapeModel:ObjFileNotFound', ...
+                    'Cannot find .obj file: %s', char(charObjFilePath));
+            end
+
+            % Determine model name from input path if not provided explicitly
+            if options.charModelName == ""
+                [~, charModelStem, ~] = fileparts(char(charObjFilePath));
+                charModelName = string(charModelStem);
+            else
+                charModelName = options.charModelName;
+            end
+
+            % Clamp mesh simplification factor to [0,1]
+            dMeshSimplifyFactor = min(max(double(options.dMeshSimplifyFactor), 0.0), 1.0);
+
+            % Load shape model from obj file
+            objShapeModel = CShapeModel("file_obj", charObjFilePath, options.charInputUnit, options.charTargetUnitOutput, ...
+                                        options.bVertFacesOnly, char(charModelName), true, ...
+                                        dMeshSimplifyFactor=dMeshSimplifyFactor);
+
+            if options.bCacheOnShapeModel
+
+                % Build SH gravity data and store it in the object cache
+                objShapeModel = objShapeModel.BuildAndSetSphericalHarmonicsGravityData(ui32MaxDegree, ...
+                    dGravParam=options.dGravParam, ...
+                    dDensity=options.dDensity, ...
+                    dGravConst=options.dGravConst, ...
+                    dBodyRadiusRef=options.dBodyRadiusRef, ...
+                    ui32MaxFitIterations=options.ui32MaxFitIterations);
+                
+                    strSHgravityData = objShapeModel.getSphericalHarmonicsGravityData();
+            else
+                % Just build SH gravity data without caching on the object
+                strSHgravityData = CShapeModel.BuildSphericalHarmonicsGravityData(objShapeModel, ui32MaxDegree, ...
+                                                        dGravParam=options.dGravParam, ...
+                                                        dDensity=options.dDensity, ...
+                                                        dGravConst=options.dGravConst, ...
+                                                        dBodyRadiusRef=options.dBodyRadiusRef, ...
+                                                        ui32MaxFitIterations=options.ui32MaxFitIterations);
+            end
+        end
+
+        function strSHgravityData = BuildSphericalHarmonicsGravityData(objShapeModel, ui32MaxDegree, options)
+            arguments
+                objShapeModel                  (1,1) CShapeModel
+                ui32MaxDegree                  (1,1) uint32
+                options.dGravParam             (1,1) double = NaN
+                options.dDensity               (1,1) double = NaN
+                options.dGravConst             (1,1) double = NaN
+                options.dBodyRadiusRef         (1,1) double = NaN
+                options.ui32MaxFitIterations   (1,1) uint32 = uint32(5)
+            end
+            %% DESCRIPTION
+            % Static compute-only utility to build spherical harmonics
+            % gravity data from the mesh stored in a CShapeModel object.
+            % The method does not mutate the object. Store the returned
+            % struct explicitly through setSphericalHarmonicsGravityData().
+            % -------------------------------------------------------------------------------------------------------------
+
+            assert(objShapeModel.bHasData_, 'CShapeModel:NoData', ...
+                'Shape model must be loaded before building SH gravity data.');
+
+            ui32FacesRows = uint32(objShapeModel.ui32triangVertexPtr');
+            dVerticesRows = objShapeModel.dVerticesPos';
+            dGravConst = CShapeModel.ResolveGravConstForLengthUnit_( ...
+                objShapeModel.charTargetUnitOutput, options.dGravConst);
+
+            strSHgravityData = FitSpherHarmCoeffToPolyhedrGrav(ui32FacesRows, dVerticesRows, ui32MaxDegree, ...
+                                                                options.dGravParam, ...
+                                                                options.dDensity, ...
+                                                                dGravConst, ...
+                                                                options.dBodyRadiusRef, ...
+                                                                options.ui32MaxFitIterations);
+        end
+
         function [ui32TrianglesIndex, dVerticesCoords, dTexCoords, ...
-                ui32TrianglesTexIndex, dNormals, ui32TrianglesNormalsIndex] = LoadModelFromObj(charObjFilePath, bVertFacesOnly) %#codegen
+                ui32TrianglesTexIndex, dNormals, ui32TrianglesNormalsIndex] = LoadModelFromObj(charObjFilePath, bVertFacesOnly)
             arguments
                 charObjFilePath (1,1) string {mustBeA(charObjFilePath, ["string", "char"])}
                 bVertFacesOnly  (1,1) logical = true;
             end
             %% SIGNATURE
             % [ui32TrianglesIndex, dVerticesCoords, dTexCoords, ...
-            %  ui32TrianglesTexIndex, dNormals, ui32TrianglesNormalsIndex] = LoadModelFromObj(charObjFilePath, bVertFacesOnly) %#codegen
+            %  ui32TrianglesTexIndex, dNormals, ui32TrianglesNormalsIndex] = LoadModelFromObj(charObjFilePath, bVertFacesOnly)
             % -------------------------------------------------------------------------------------------------------------
             %% DESCRIPTION
             % [ui32TrianglesIndex, dVerticesCoords] = LoadModelFromObj(charObjFilePath) reads the vertices and the
@@ -413,50 +800,37 @@ classdef CShapeModel < CBaseDatastruct
             ui32TrianglesTexIndex       = zeros(0,3,'uint32');
             ui32TrianglesNormalsIndex   = zeros(0,3,'uint32');
 
-            % Determine face format by presence of vt/vn
-            bHasVT = ~isempty(dTexCoords);
-            bHasVN = ~isempty(dNormals);
+            fMatch = regexp(charFileText, '^f\s+.*$', 'match', 'lineanchors');
+            if ~isempty(fMatch)
+                charFBlock = sprintf('%s\n', fMatch{:});
+                charFirstFace = string(strtrim(fMatch{1}));
 
-            % Build regex and index maps
-            if bHasVT && bHasVN && not(bVertFacesOnly)
-                % Case to handle both texture and normals
-                fMatch = regexp(charFileText, '^f\s+\d+/\d+/\d+.*$', 'match', 'lineanchors');
-                if ~isempty(fMatch)
-                    charFBlock = sprintf('%s\n', fMatch{:});
+                if ~isempty(regexp(charFirstFace, '^f\s+\d+//\d+', 'once'))
+                    ui32AllFaceLines = sscanf(charFBlock, 'f %u//%u %u//%u %u//%u\n', [6, Inf]);
+                    ui32AllFaceLines = uint32(ui32AllFaceLines);
+                    ui32TrianglesIndex = ui32AllFaceLines(1:2:end, :);
+                    if ~bVertFacesOnly
+                        ui32TrianglesNormalsIndex = ui32AllFaceLines(2:2:end, :);
+                    end
+
+                elseif ~isempty(regexp(charFirstFace, '^f\s+\d+/\d+/\d+', 'once'))
                     ui32AllFaceLines = sscanf(charFBlock, 'f %u/%u/%u %u/%u/%u %u/%u/%u\n', [9, Inf]);
-                    ui32AllFaceLines = uint32(ui32AllFaceLines);              % 9-by-N
-                    ui32TrianglesIndex        = ui32AllFaceLines(1:3:end, :);
-                    ui32TrianglesTexIndex     = ui32AllFaceLines(2:3:end, :);
-                    ui32TrianglesNormalsIndex = ui32AllFaceLines(3:3:end, :);
-                end
+                    ui32AllFaceLines = uint32(ui32AllFaceLines);
+                    ui32TrianglesIndex = ui32AllFaceLines(1:3:end, :);
+                    if ~bVertFacesOnly
+                        ui32TrianglesTexIndex = ui32AllFaceLines(2:3:end, :);
+                        ui32TrianglesNormalsIndex = ui32AllFaceLines(3:3:end, :);
+                    end
 
-            elseif bHasVT && not(bVertFacesOnly)
-                % Case to handle only texture
-                fMatch = regexp(charFileText, '^f\s+\d+/\d+.*$', 'match', 'lineanchors');
-                if ~isempty(fMatch)
-                    charFBlock = sprintf('%s\n', fMatch{:});
+                elseif ~isempty(regexp(charFirstFace, '^f\s+\d+/\d+', 'once'))
                     ui32AllFaceLines = sscanf(charFBlock, 'f %u/%u %u/%u %u/%u\n', [6, Inf]);
                     ui32AllFaceLines = uint32(ui32AllFaceLines);
-                    ui32TrianglesIndex    = ui32AllFaceLines(1:2:end, :);
-                    ui32TrianglesTexIndex = ui32AllFaceLines(2:2:end, :);
-                end
+                    ui32TrianglesIndex = ui32AllFaceLines(1:2:end, :);
+                    if ~bVertFacesOnly
+                        ui32TrianglesTexIndex = ui32AllFaceLines(2:2:end, :);
+                    end
 
-            elseif bHasVN && not(bVertFacesOnly)
-                % Case to handle only normals
-                fMatch = regexp(charFileText, '^f\s+\d+//\d+.*$', 'match', 'lineanchors');
-                if ~isempty(fMatch)
-                    charFBlock = sprintf('%s\n', fMatch{:});
-                    ui32AllFaceLines = sscanf(charFBlock, 'f %u//%u %u//%u %u//%u', [6, Inf]);
-                    ui32AllFaceLines = uint32(ui32AllFaceLines);
-                    ui32TrianglesIndex        = ui32AllFaceLines(1:2:end, :);
-                    ui32TrianglesNormalsIndex = ui32AllFaceLines(2:2:end, :);
-                end
-
-            else
-                % No normals, no texture, indices only
-                fMatch = regexp(charFileText, '^f\s+.*$', 'match', 'lineanchors');
-                if ~isempty(fMatch)
-                    charFBlock = sprintf('%s\n', fMatch{:});
+                else
                     ui32AllFaceLines = sscanf(charFBlock, 'f %u %u %u\n', [3, Inf]);
                     ui32TrianglesIndex = uint32(ui32AllFaceLines);
                 end
@@ -468,5 +842,70 @@ classdef CShapeModel < CBaseDatastruct
 
     end
 
-end
+    methods (Static, Access = private)
 
+        function TryAddMiceFromWorkspace_()
+            cellWorkspaceEnvNames = ["WS_SIMGEARS", "WS_NAVSYS"];
+
+            for idxEnv = 1:numel(cellWorkspaceEnvNames)
+                charWorkspaceRoot = string(getenv(cellWorkspaceEnvNames(idxEnv)));
+                if strlength(strtrim(charWorkspaceRoot)) == 0
+                    continue
+                end
+
+                cellMiceRootCandidates = CShapeModel.BuildMiceRootCandidates_(charWorkspaceRoot);
+                for idxCandidate = 1:numel(cellMiceRootCandidates)
+                    charMiceRoot = cellMiceRootCandidates(idxCandidate);
+                    charMiceSrcPath = fullfile(charMiceRoot, "src", "mice");
+                    charMiceLibPath = fullfile(charMiceRoot, "lib");
+                    if ~isfile(fullfile(charMiceSrcPath, "cspice_furnsh.m"))
+                        continue
+                    end
+
+                    if isfolder(charMiceLibPath)
+                        addpath(char(charMiceLibPath));
+                    end
+                    addpath(char(charMiceSrcPath));
+
+                    if ~isempty(which('cspice_furnsh'))
+                        return
+                    end
+                end
+            end
+        end
+
+        function cellMiceRootCandidates = BuildMiceRootCandidates_(charWorkspaceRoot)
+            charWorkspaceRoot = string(charWorkspaceRoot);
+            cellMiceRootCandidates = strings(1, 0);
+
+            if strlength(strtrim(charWorkspaceRoot)) == 0
+                return
+            end
+
+            cellMiceRootCandidates(end + 1) = fullfile(charWorkspaceRoot, "mice");
+            cellMiceRootCandidates(end + 1) = charWorkspaceRoot;
+
+            charParentRoot = string(fileparts(charWorkspaceRoot));
+            if strlength(charParentRoot) > 0
+                cellMiceRootCandidates(end + 1) = fullfile(charParentRoot, "mice");
+            end
+
+            cellMiceRootCandidates = unique(cellMiceRootCandidates, "stable");
+        end
+
+        function dGravConst = ResolveGravConstForLengthUnit_(charLengthUnits, dExplicitGravConst)
+            if isfinite(dExplicitGravConst)
+                dGravConst = dExplicitGravConst;
+                return
+            end
+
+            if strcmpi(charLengthUnits, "km")
+                dGravConst = 6.67430e-20;
+            else
+                dGravConst = 6.67430e-11;
+            end
+        end
+
+    end
+
+end

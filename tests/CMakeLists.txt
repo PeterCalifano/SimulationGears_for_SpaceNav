@@ -9,6 +9,7 @@
 
 # Set additional properties for Catch2 test targets
 set(CATCH2_TEST_PROPERTIES "--output-on-failure;--reporter=compact")
+include(CTest)
 
 # Exclude EXCLUDED_LIST from the list of tests
 set(EXCLUDED_LIST "test_to_exclude")
@@ -16,15 +17,11 @@ set(TESTS_LIST "")
 
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 
-# Add subdirectories
-if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/template_test/CMakeLists.txt")
-  add_subdirectory(template_test)
-endif()
-if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/template_fixtures/CMakeLists.txt")
-  add_subdirectory(template_fixtures)
-endif()
-
 # Add tests to build
-add_tests(${project_name} EXCLUDED_LIST TESTS_LIST ${CUDA_COMPILE_TARGET} CATCH2_TEST_PROPERTIES Catch2::Catch2WithMain)
+if(Catch2_FOUND)
+  add_tests(${project_name} EXCLUDED_LIST TESTS_LIST ${CUDA_COMPILE_TARGET} CATCH2_TEST_PROPERTIES Catch2::Catch2WithMain)
+else()
+  message(STATUS "Catch2 not found. Skipping Catch2 unit tests.")
+endif()
 
 message(STATUS "List of test targets: ${TESTS_LIST}")

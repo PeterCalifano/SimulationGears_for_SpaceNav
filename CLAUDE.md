@@ -16,7 +16,7 @@ Run `SetupSimGears` from any directory (it resolves its own path):
 run('/path/to/SimulationGears_for_SpaceNav/matlab/SetupSimGears.m')
 ```
 
-This adds all source directories to the MATLAB path, excluding `.deprecated/`, `codegen/mex/`, and `experimental/`.
+This adds all source directories to the MATLAB path, excluding `.deprecated/`, generated MEX outputs, `codegen/mex/`, and `experimental/`.
 
 ## Running Tests
 
@@ -82,7 +82,7 @@ CGeneralPropagator (handle)
 
 ### MEX Code Generation
 
-Performance-critical ray-tracing functions have MEX-compiled versions under `matlab/simulation_models/sensors/cameras/codegen_scripts/codegen/mex/`. Codegen scripts in `matlab/codegen_scripts/` produce these. Pre-compiled binaries target Linux x86-64 (`.glnxa64`).
+MEX builder entrypoints live under `matlab/builders/mex/`. By default they write generated artifacts under `matlab/mex/` using the same subsystem layout as the MATLAB source tree, and `SetupSimGears` keeps that generated tree off the normal source path. Root-level `.mex*` artifacts are invalid build pollution.
 
 ### Variable Naming Conventions (Hungarian prefix)
 
