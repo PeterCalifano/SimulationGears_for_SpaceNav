@@ -1,11 +1,15 @@
 classdef CAttitudePointingGenerator < handle
     %% DESCRIPTION
-    % What the class represent
+    % Generate camera attitude sequences whose +Z boresight points toward a
+    % target while a Sun, velocity, or auxiliary-axis constraint resolves
+    % rotation about the boresight. Optional deterministic and stochastic
+    % displacements model boresight off-pointing and pose roll.
     % -------------------------------------------------------------------------------------------------------------
     %% CHANGELOG
     % 08-12-2024    Pietro Califano     Class implemented from adapted codes for pointing generation
     % 12-02-2025    Pietro Califano     Update of class to add Sun position as input and static methods
     % 22-03-2025    Pietro Califano     [MAJOR] Upgrade class usage with new general-purpose methods
+    % 22-07-2026    Pietro Califano, Codex     Correct constraint validation, vectorization, and displacement routing.
     % -------------------------------------------------------------------------------------------------------------
     %% DEPENDENCIES
     % [-]
@@ -91,6 +95,18 @@ classdef CAttitudePointingGenerator < handle
                 dOffPointingAngles        (:,1)   double {mustBeNumeric}
             end
 
+            %% DESCRIPTION
+            % Point the pose +Z axis toward each target and resolve its +Y
+            % axis using the selected Sun, velocity, or auxiliary-axis
+            % constraint. Reference-axis off-pointing can be applied either
+            % in the reference-axis/boresight plane or orthogonal to it.
+            %
+            % enumOffPointingMode selects a random displacement direction,
+            % an out-of-plane displacement, or an in-plane displacement.
+            % dOutRot3 follows enumOutRot3Param, while dDCM_FrameFromPose
+            % always contains the direction-cosine matrices.
+            % -------------------------------------------------------------------------------------------------------------
+
             % Determine number of entries
             ui32NumOfEntries = uint32(size(dCameraPosition_Frame, 2));
             
@@ -107,9 +123,6 @@ classdef CAttitudePointingGenerator < handle
                 assert( all(vecnorm(kwargs.dSunPosition_Frame, 2, 1) ~= 0 ), ...
                     "Invalid input data: Sun position cannot be zero for YorthogonalSun contraint type.");
 
-                assert(any(vecnorm(kwargs.dSunPosition_Frame) ~= 1, "all"), ['ERROR: invalid Sun positions. ' ...
-                    'Must be provided either when constructing the class or when calling this method.']);
-
             elseif options.enumConstraintType == "trackLVLH"
                 % trackLVLH constraint 
                 assert(ui32NumOfEntries == size(kwargs.dVelocity_Frame, 2) || size(kwargs.dVelocity_Frame, 2) == 1)
@@ -118,7 +131,7 @@ classdef CAttitudePointingGenerator < handle
             elseif options.enumConstraintType == "auxiliaryAxis"
                 % Normalize if not unit vectors
                 if any(abs(kwargs.dAuxiliaryAxis) > 1)
-                    kwargs.dAuxiliaryAxis = vecnorm(kwargs.dAuxiliaryAxis, 2,1);
+                    kwargs.dAuxiliaryAxis = kwargs.dAuxiliaryAxis ./ vecnorm(kwargs.dAuxiliaryAxis, 2, 1);
                 end
 
             else
@@ -484,13 +497,16 @@ classdef CAttitudePointingGenerator < handle
                 assert(size(dReferenceAxis_Frame, 2) >= 1, 'ERROR: reference axes must be provided for "refAxisOutOfPlane", "refAxisInPlane" off-pointing modes')
             end
 
+            bDisplaceOrthogonalToRefAxisPlane = strcmpi(options.enumOffPointingMode, "refAxisInPlane");
+
             % Compute displaced boresight axis
             [dCamBoresightAxis_Frame(1:3, :), dCamLookAtPoint_Frame(1:3,:)] = CAttitudePointingGenerator.ComputeDisplacedBoresight(dCamLookAtPoint_Frame, ...
                                                                                                     dReferenceAxis_Frame, ...
                                                                                                     kwargs.dDisplaceOffsetValue, ...
                                                                                                     "dDisplaceSigma", dDisplaceSigma, ...
                                                                                                     "enumDisplacementMode", options.enumDisplacementMethod, ...
-                                                                                                    "enumDisplaceDistribution", options.enumDisplaceDistribution);
+                                                                                                    "enumDisplaceDistribution", options.enumDisplaceDistribution, ...
+                                                                                                    "bDisplaceOrthogonalToRefAxisPlane", bDisplaceOrthogonalToRefAxisPlane);
 
         end
 
@@ -517,9 +533,10 @@ classdef CAttitudePointingGenerator < handle
             %                                                                                     settings)
             % -------------------------------------------------------------------------------------------------------------
             %% DESCRIPTION
-            % This function computes the displaced boresight unit vector and the new look-at point based on the provided parameters.
-            % It supports two modes of displacement: "lookAtPoint" and "rotate3d". The displacement can be defined as an angle or a distance.
-            % The function can also apply a randomization of the displacement value based on a Gaussian or uniform distribution.
+            % Compute a displaced boresight using either a translated
+            % look-at point or a direct three-dimensional rotation. The
+            % displacement may be deterministic or sampled independently or
+            % once for the complete batch.
             % -------------------------------------------------------------------------------------------------------------
             %% INPUT
             % arguments
@@ -535,12 +552,15 @@ classdef CAttitudePointingGenerator < handle
             % end
             % -------------------------------------------------------------------------------------------------------------
             %% OUTPUT
-            % dBoresightUnitVec_Frame
-            % dNewLookAtPoint_Frame
+            % dBoresightUnitVec_Frame   Unit boresight after applying the selected displacement.
+            % dNewLookAtPoint_Frame     Translated look-at point in "lookAtPoint" mode. It is
+            %                           unchanged for zero displacement and zero in "rotate3d"
+            %                           mode, where no translated point is constructed.
             % -------------------------------------------------------------------------------------------------------------
             %% CHANGELOG
             % 21-03-2025    Pietro Califano     Implement from previous function code, update for vect.
             % 22-03-2025    Pietro Califano     [MAJOR] Reworking, provide implementation for two displacement modes
+            % 22-07-2026    Pietro Califano, Codex     Preserve input geometry for zero displacement.
             % -------------------------------------------------------------------------------------------------------------
             %% DEPENDENCIES
             % [-]
@@ -581,7 +601,7 @@ classdef CAttitudePointingGenerator < handle
                         error('Not implemented yet')
                         % Run simulation of FOGM stochastic process dynamics
                         % TODO
-                    case "guassian_same_on_batch"
+                    case "gaussian_same_on_batch"
                         assert(isscalar(settings.dDisplaceSigma), 'ERROR: you must provide a scalar displace value for this options.');
                         % Sample 1 value from Gaussian distribution
                         dDisplaceValue = dDisplaceValue + settings.dDisplaceSigma .* randn(1, 1);
@@ -610,15 +630,17 @@ classdef CAttitudePointingGenerator < handle
             end
 
             % Quick return case (do nothing!)
-            if all(settings.dDisplaceSigma == 0) && all(settings.dDisplaceValue == 0)
-                warning('No displacement or displacement scattering was provided: no displacement applied, returning input values.')
+            if all(settings.dDisplaceSigma == 0) && all(dDisplaceValue == 0)
+                dBoresightUnitVec_Frame = dLookAtPoint_Frame ./ vecnorm(dLookAtPoint_Frame, 2, 1);
+                dNewLookAtPoint_Frame = dLookAtPoint_Frame;
+                warning('No displacement or displacement scattering was provided: no displacement applied, returning input geometry.')
                 return
             end
 
             % Apply displacement using selected displacement mode
             switch settings.enumDisplacementMode
                 case "lookAtPoint"
-                    [dBoresightUnitVec_Frame(1:3,:), dNewLookAtPoint_Frame(1:3,:)] = CAttitudePointingGenerator.ComputeDisplacedBoresight_LookAtPoint_(dLookAtPoint_Frame, ...
+                    [dNewLookAtPoint_Frame(1:3,:), dBoresightUnitVec_Frame(1:3,:)] = CAttitudePointingGenerator.ComputeDisplacedBoresight_LookAtPoint_(dLookAtPoint_Frame, ...
                                                                                                                                     dReferenceAxis_Frame, ...
                                                                                                                                     dDisplaceValue, ...
                                                                                                                                     "bDisplaceOrthogonalToRefAxisPlane", settings.bDisplaceOrthogonalToRefAxisPlane);
@@ -652,7 +674,8 @@ classdef CAttitudePointingGenerator < handle
                 %% Displace in-plane toward reference axis direction
 
                 % Compute component of dRotReferenceAxis orthogonal to dLookAtPointUnitVec, in plane
-                dDisplaceUnitVec(:,:) = dRotReferenceAxis - dot(dLookAtPointUnitVec, dRotReferenceAxis, 1) * dLookAtPointUnitVec; 
+                dDisplaceUnitVec(:,:) = dRotReferenceAxis - ...
+                    dot(dLookAtPointUnitVec, dRotReferenceAxis, 1) .* dLookAtPointUnitVec;
 
             else
                 %% Displace orthogonal to plane of reference axis and lookAtPoint
