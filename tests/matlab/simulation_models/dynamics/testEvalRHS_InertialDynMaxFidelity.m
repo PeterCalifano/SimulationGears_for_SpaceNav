@@ -201,6 +201,98 @@ classdef testEvalRHS_InertialDynMaxFidelity < matlab.unittest.TestCase
             testCase.verifyEqual(strInfo.dAccPolyhedronPert_IN, dAccPolyTotal - dAccCentral, ...
                 'RelTol', 1e-12, 'AbsTol', 1e-18);
         end
+
+        function testConflictingGravityModelsAreRejected(testCase)
+            [ui32Faces, dVerts] = testCase.buildCubeMesh();
+            [ui32Edges, dEe, dFf] = ComputePolyhedronFaceEdgeData(ui32Faces, dVerts);
+            [dVolume, ~] = ComputeMeshModelVolumeAndCoM(ui32Faces, dVerts);
+
+            dDensity = 2000.0;
+            dGravConst = 6.67430e-11;
+            dGravParam = dGravConst * dDensity * dVolume;
+
+            strDynParams = testCase.buildDynParams();
+            strDynParams.strMainData.dGM = dGravParam;
+            strDynParams.strMainData.strPolyhedronGravityData = struct( ...
+                'ui32FaceVertexIds', ui32Faces, ...
+                'dVerticesPos', dVerts, ...
+                'dDensity', dDensity, ...
+                'ui32EdgeVertexIds', ui32Edges, ...
+                'dEdgeDyadics', dEe, ...
+                'dFaceDyadics', dFf, ...
+                'dGravConst', dGravConst, ...
+                'dGravParam', dGravParam);
+
+            strModelConfigFlags = struct('bIncludeThirdBodies', false, ...
+                                         'bIncludeSRP', false, ...
+                                         'bIncludeSphericalHarmonics', true, ...
+                                         'bIncludePolyhedronGravity', true);
+            dxState = [4.0; 0.3; -0.2; 0.0; 0.0; 0.0];
+
+            testCase.verifyError(@() evalRHS_InertialDynMaxFidelity( ...
+                0.0, dxState, strDynParams, strModelConfigFlags), ...
+                'ResolveInertialDynMaxFidelityConfig:ConflictingGravityModels');
+        end
+
+        function testReportsExclusiveSelectedGravityModel(testCase)
+            [ui32Faces, dVerts] = testCase.buildCubeMesh();
+            [ui32Edges, dEe, dFf] = ComputePolyhedronFaceEdgeData(ui32Faces, dVerts);
+            [dVolume, ~] = ComputeMeshModelVolumeAndCoM(ui32Faces, dVerts);
+
+            dDensity = 2000.0;
+            dGravConst = 6.67430e-11;
+            dGravParam = dGravConst * dDensity * dVolume;
+
+            strDynParams = testCase.buildDynParams();
+            strDynParams.strMainData.dGM = dGravParam;
+            strDynParams.strMainData.dSHcoeff(2, 1) = -1.0e-3;
+            strDynParams.strMainData.strPolyhedronGravityData = struct( ...
+                'ui32FaceVertexIds', ui32Faces, ...
+                'dVerticesPos', dVerts, ...
+                'dDensity', dDensity, ...
+                'ui32EdgeVertexIds', ui32Edges, ...
+                'dEdgeDyadics', dEe, ...
+                'dFaceDyadics', dFf, ...
+                'dGravConst', dGravConst, ...
+                'dGravParam', dGravParam);
+
+            strFlags = struct('bIncludeMainGravity', true, ...
+                              'bIncludeThirdBodies', false, ...
+                              'bIncludeSRP', false, ...
+                              'bIncludeSphericalHarmonics', false, ...
+                              'bIncludePolyhedronGravity', false);
+            dxState = [4.0; 0.3; -0.2; 0.0; 0.0; 0.0];
+
+            [~, strInfoCentral] = evalRHS_InertialDynMaxFidelity(0.0, dxState, strDynParams, strFlags);
+
+            strFlags.bIncludeMainGravity = false;
+            [~, strInfoNone] = evalRHS_InertialDynMaxFidelity(0.0, dxState, strDynParams, strFlags);
+
+            strFlags.bIncludeMainGravity = true;
+            strFlags.bIncludeSphericalHarmonics = true;
+            [~, strInfoSH] = evalRHS_InertialDynMaxFidelity(0.0, dxState, strDynParams, strFlags);
+
+            strFlags.bIncludeSphericalHarmonics = false;
+            strFlags.bIncludePolyhedronGravity = true;
+            [~, strInfoPolyhedron] = evalRHS_InertialDynMaxFidelity(0.0, dxState, strDynParams, strFlags);
+
+            cellAccelInfo = {strInfoNone, strInfoCentral, strInfoSH, strInfoPolyhedron};
+            bHasSelectionDiagnostic = cellfun( ...
+                @(strInfo) isfield(strInfo, 'ui8SelectedGravityModel'), cellAccelInfo);
+            testCase.verifyTrue(all(bHasSelectionDiagnostic), ...
+                'Max-fidelity acceleration diagnostics must report the selected gravity model.');
+
+            if all(bHasSelectionDiagnostic)
+                testCase.verifyEqual(strInfoNone.ui8SelectedGravityModel, uint8(0));
+                testCase.verifyEqual(strInfoCentral.ui8SelectedGravityModel, uint8(1));
+                testCase.verifyEqual(strInfoSH.ui8SelectedGravityModel, uint8(2));
+                testCase.verifyEqual(strInfoPolyhedron.ui8SelectedGravityModel, uint8(3));
+                testCase.verifyEqual(strInfoSH.dAccPolyhedronPert_IN, zeros(3, 1), 'AbsTol', 0.0);
+                testCase.verifyGreaterThan(norm(strInfoSH.dAccNonSphr_IN), 0.0);
+                testCase.verifyEqual(strInfoPolyhedron.dAccNonSphr_IN, zeros(3, 1), 'AbsTol', 0.0);
+                testCase.verifyGreaterThan(norm(strInfoPolyhedron.dAccPolyhedronPert_IN), 0.0);
+            end
+        end
     end
 
     methods (Access = private)

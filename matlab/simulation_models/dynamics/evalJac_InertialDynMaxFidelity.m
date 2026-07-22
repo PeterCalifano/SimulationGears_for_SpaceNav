@@ -18,6 +18,7 @@ end
 % Point-mass, third-body, cannonball SRP, and polyhedron partials are analytical; the spherical-harmonics partial
 % is the finite-difference target-frame partial returned by EvalJac_ExtSphHarmExpInTargetFrame.
 % Panel SRP uses the analytical frozen-active-set partial returned by EvalJac_QuadsModelSRP.
+% Target-gravity partials follow the exclusive model ID resolved by ResolveInertialDynMaxFidelityConfig.
 % -------------------------------------------------------------------------------------------------------------
 %% INPUT
 % dStateTimetag:       (1,1) double   Dynamics evaluation time.
@@ -34,6 +35,7 @@ end
 % 28-05-2026    Pietro Califano, Codex 5.5      Centralize model configuration and document finite-difference SH partial.
 % 01-07-2026    Pietro Califano, Codex 5.5      Document zero state partial for time-indexed stochastic acceleration.
 % 01-07-2026    Pietro Califano, Codex 5.5      Wire analytical panel SRP acceleration Jacobian.
+% 22-07-2026    Pietro Califano, Codex 5.6      Match RHS exclusive target-gravity model selection.
 % -------------------------------------------------------------------------------------------------------------
 %% DEPENDENCIES
 % ResolveInertialDynMaxFidelityConfig()
@@ -55,6 +57,7 @@ dPosSC_IN = dxOrbitState(1:3);
 
 % Resolve static model configuration to match max-fidelity RHS configuration.
 strModelConfig = ResolveInertialDynMaxFidelityConfig(strDynParams, strModelConfigFlags);
+ui8SelectedGravityModel = strModelConfig.ui8SelectedGravityModel;
 dMainGM = 0.0;
 
 if strModelConfig.bIncludeMainGravity
@@ -62,14 +65,13 @@ if strModelConfig.bIncludeMainGravity
 end
 
 dMainCSlmCoeffCols = [];
-if strModelConfig.bHasSphericalHarmonicsData
+if ui8SelectedGravityModel == uint8(2)
     dMainCSlmCoeffCols = strDynParams.strMainData.dSHcoeff;
 end
 
 ui32MaxSHdegree = strModelConfig.ui32MaxSHdegree;
 
 % Resolve target attitude and third-body ephemerides used by position partials.
-bHasPolyhedronGravity = strModelConfig.bHasPolyhedronGravity;
 dDCMmainAtt_INfromTF = ResolveMainAttitude_(dStateTimetag, ...
                                             strDynParams, ...
                                             strModelConfig.bNeedMainAttitude);
@@ -118,7 +120,7 @@ if ~isempty(dMainCSlmCoeffCols)
 end
 
 % Add polyhedron gravity correction partial over central gravity.
-if bHasPolyhedronGravity
+if ui8SelectedGravityModel == uint8(3)
     dDynMatrix(4:6, 1:3) = dDynMatrix(4:6, 1:3) + ...
         ComputePolyhedronGravityJacobianCorrection(dPosSC_IN, ...
                                                    dDCMmainAtt_INfromTF, ...

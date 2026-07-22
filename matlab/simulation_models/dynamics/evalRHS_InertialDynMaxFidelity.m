@@ -20,7 +20,8 @@ end
 %   strSCdata         cannonball data and optional strSRPpanelData
 %
 % This entry point owns compile-time model-configuration options while preserving evalRHS_InertialDynOrbit for
-% estimator paths.
+% estimator paths. Target gravity is exclusive and reported by ui8SelectedGravityModel: 0 none, 1 central,
+% 2 spherical harmonics, and 3 polyhedron.
 % -------------------------------------------------------------------------------------------------------------
 %% INPUT
 % dStateTimetag:       (1,1) double   Dynamics evaluation time.
@@ -30,12 +31,13 @@ end
 % -------------------------------------------------------------------------------------------------------------
 %% OUTPUT
 % dDxDt:               (:,1) double   State derivative for the inertial orbit state.
-% strAccelInfo:        (1,1) struct   Diagnostic acceleration metadata used by tests and Jacobian evaluation.
+% strAccelInfo:        (1,1) struct   Acceleration diagnostics, including the selected target-gravity model ID.
 % -------------------------------------------------------------------------------------------------------------
 %% CHANGELOG
 % 13-05-2026    Pietro Califano, Codex 5.5      Add max-fidelity RHS wrapper around shared orbit dynamics.
 % 28-05-2026    Pietro Califano, Codex 5.5      Centralize model configuration and schema-driven SH activation.
 % 01-07-2026    Pietro Califano, Codex 5.5      Add optional pre-generated stochastic residual acceleration hook.
+% 22-07-2026    Pietro Califano, Codex           Evaluate exactly one selected target-gravity model.
 % -------------------------------------------------------------------------------------------------------------
 %% DEPENDENCIES
 % ResolveInertialDynMaxFidelityConfig()
@@ -56,18 +58,18 @@ dxOrbitState = dxState_IN(1:6);
 
 % Resolve static model configuration once before building force-model inputs.
 strModelConfig = ResolveInertialDynMaxFidelityConfig(strDynParams, strModelConfigFlags);
+ui8SelectedGravityModel = strModelConfig.ui8SelectedGravityModel;
 dMainGM = 0.0;
 if strModelConfig.bIncludeMainGravity
     dMainGM = strDynParams.strMainData.dGM;
 end
 dMainCSlmCoeffCols = [];
-if strModelConfig.bHasSphericalHarmonicsData
+if ui8SelectedGravityModel == uint8(2)
     dMainCSlmCoeffCols = strDynParams.strMainData.dSHcoeff;
 end
 ui32MaxSHdegree = strModelConfig.ui32MaxSHdegree;
 
 % Resolve target attitude and third-body ephemerides required by gravity, SRP, and eclipse.
-bHasPolyhedronGravity = strModelConfig.bHasPolyhedronGravity;
 dDCMmainAtt_INfromTF = ResolveMainAttitude_(dStateTimetag, ...
                                             strDynParams, ...
                                             strModelConfig.bNeedMainAttitude);
@@ -100,7 +102,7 @@ end
 
 % Compute polyhedron perturbation as correction over central gravity before shared orbit RHS call.
 dAccPolyhedronPert_IN = zeros(3, 1);
-if bHasPolyhedronGravity
+if ui8SelectedGravityModel == uint8(3)
     dAccPolyhedronPert_IN = ComputePolyhedronGravityCorrection(dxOrbitState(1:3), ...
                                                                dDCMmainAtt_INfromTF, ...
                                                                dMainGM, ...
@@ -146,6 +148,7 @@ if nargout > 1
     strAccelInfo.dAccPolyhedronPert_IN = dAccPolyhedronPert_IN;
     strAccelInfo.dAccPanelSRP_IN = dAccPanelSRP_IN;
     strAccelInfo.dAccStochastic_IN = dAccStochastic_IN;
+    strAccelInfo.ui8SelectedGravityModel = ui8SelectedGravityModel;
     strAccelInfo.dSRPtorque_SCB = dSRPtorque_SCB;
     strAccelInfo.bPanelSRPActive = bPanelSRPActive;
     strAccelInfo.bCannonballSRPSelected = strModelConfig.bIncludeSRP && ~bHasPanelSRP;

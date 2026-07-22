@@ -9,6 +9,7 @@ end
 %% DESCRIPTION
 % Resolve compile-time model-configuration flags and static force-model availability for max-fidelity inertial
 % dynamics. These flags select the generated model structure; they are not intended to vary during propagation.
+% ui8SelectedGravityModel is 0 for none, 1 for central, 2 for spherical harmonics, and 3 for polyhedron gravity.
 % -------------------------------------------------------------------------------------------------------------
 %% INPUT
 % strDynParams:          (1,1) struct   Dynamics payload with main-body, third-body, SRP, and spacecraft data.
@@ -22,6 +23,7 @@ end
 % 01-07-2026    Pietro Califano, Codex 5.5      Add optional stochastic residual acceleration availability flag.
 % 18-07-2026    Pietro Califano, Codex 5.5      Restore fixed SRP pressure as the compatibility default; make
 %                                               distance-based pressure recomputation opt-in.
+% 22-07-2026    Pietro Califano, Codex           Enforce exclusive target-gravity selection and report its model ID.
 % -------------------------------------------------------------------------------------------------------------
 %% DEPENDENCIES
 % [-]
@@ -79,6 +81,23 @@ bHasPolyhedronGravity = bIncludePolyhedronGravity && ...
     coder.const(isfield(strDynParams.strMainData, 'strPolyhedronGravityData')) && ...
     ~isempty(strDynParams.strMainData.strPolyhedronGravityData);
 
+if bHasSphericalHarmonicsData && bHasPolyhedronGravity
+    error('ResolveInertialDynMaxFidelityConfig:ConflictingGravityModels', ...
+        ['Spherical-harmonic and polyhedron gravity cannot both be selected. ', ...
+         'Keep both payloads if needed, but enable exactly one target-gravity model.']);
+end
+
+% Resolve one authoritative target-gravity model while preserving the legacy
+% behavior in which absent optional data falls back to central gravity.
+ui8SelectedGravityModel = uint8(0);
+if bHasSphericalHarmonicsData
+    ui8SelectedGravityModel = uint8(2);
+elseif bHasPolyhedronGravity
+    ui8SelectedGravityModel = uint8(3);
+elseif bIncludeMainGravity
+    ui8SelectedGravityModel = uint8(1);
+end
+
 bHasPanelSRP = bIncludeSRP && bUsePanelSRP && ...
     coder.const(isfield(strDynParams, 'strSCdata')) && ...
     coder.const(isfield(strDynParams.strSCdata, 'strSRPpanelData')) && ...
@@ -88,7 +107,8 @@ bHasStochasticAccelData = bIncludeStochasticAcceleration && ...
     coder.const(isfield(strDynParams, 'strStochasticAccelData')) && ...
     ~isempty(strDynParams.strStochasticAccelData);
 
-bNeedMainAttitude = bHasSphericalHarmonicsData || bHasPolyhedronGravity;
+bNeedMainAttitude = ui8SelectedGravityModel == uint8(2) || ...
+                    ui8SelectedGravityModel == uint8(3);
 
 % Construct typed structure
 strModelConfig = struct();
@@ -108,6 +128,7 @@ strModelConfig.bRecomputeSRPpressureFromDistance = bRecomputeSRPpressureFromDist
 strModelConfig.bHasSphericalHarmonicsData = bHasSphericalHarmonicsData;
 strModelConfig.ui32MaxSHdegree = ui32MaxSHdegree;
 strModelConfig.bHasPolyhedronGravity = bHasPolyhedronGravity;
+strModelConfig.ui8SelectedGravityModel = ui8SelectedGravityModel;
 strModelConfig.bHasPanelSRP = bHasPanelSRP;
 strModelConfig.bHasStochasticAccelData = bHasStochasticAccelData;
 strModelConfig.bNeedMainAttitude = bNeedMainAttitude;

@@ -3,7 +3,9 @@ function strMexInfo = BuildMexTargets_InertialDynMaxFidelity(charBuildDir)
 % strMexInfo = BuildMexTargets_InertialDynMaxFidelity(charBuildDir)
 % -------------------------------------------------------------------------------------------------------------
 %% DESCRIPTION
-% Builds MEX targets for the max-fidelity inertial dynamics RHS and matching Jacobian.
+% Builds spherical-harmonic and polyhedron MEX targets for the max-fidelity inertial dynamics RHS and matching
+% Jacobian. The generic target names retain spherical harmonics for backward compatibility; polyhedron targets use
+% the explicit _polyhedron_mex suffix.
 %
 % The build is intentionally fail-fast: if RHS code generation fails, the Jacobian target is not attempted; if the
 % Jacobian target fails, the first failure is reported and rethrown.
@@ -17,12 +19,14 @@ function strMexInfo = BuildMexTargets_InertialDynMaxFidelity(charBuildDir)
 %% CHANGELOG
 % 13-05-2026    Pietro Califano                 Add fail-fast MEX build utility for max-fidelity RHS and Jacobian.
 % 28-05-2026    Pietro Califano, Codex 5.5      Move to codegen builders and standardize builder name.
+% 22-07-2026    Pietro Califano, Codex           Build separate compile-time SH and polyhedron gravity variants.
 % -------------------------------------------------------------------------------------------------------------
 %% DEPENDENCIES
 % evalRHS_InertialDynMaxFidelity()
 % evalJac_InertialDynMaxFidelity()
 % ComputePolyhedronFaceEdgeData()
 % ComputeMeshModelVolumeAndCoM()
+% GenerateGaussMarkovAccelSeq()
 % -------------------------------------------------------------------------------------------------------------
 
 %% Function code
@@ -45,31 +49,56 @@ cfg.GenerateReport = true;
 
 [dStateTimetag, dxState_IN, strDynParams, strModelConfigFlags, strAccelInfo] = BuildRepresentativeInputs_();
 
-charRHSTarget = 'evalRHS_InertialDynMaxFidelity_mex';
-charJacTarget = 'evalJac_InertialDynMaxFidelity_mex';
+strSHmodelConfigFlags = strModelConfigFlags;
+strSHmodelConfigFlags.bIncludeSphericalHarmonics = true;
+strSHmodelConfigFlags.bIncludePolyhedronGravity = false;
 
-try
-    codegen('-config', cfg, '-d', charBuildDir, '-o', charRHSTarget, ...
-        'evalRHS_InertialDynMaxFidelity', ...
-        '-args', {dStateTimetag, dxState_IN, strDynParams, coder.Constant(strModelConfigFlags)});
-catch objException
-    ReportCodegenFailure_(charRHSTarget, objException);
-    rethrow(objException);
-end
+strPolyhedronModelConfigFlags = strModelConfigFlags;
+strPolyhedronModelConfigFlags.bIncludeSphericalHarmonics = false;
+strPolyhedronModelConfigFlags.bIncludePolyhedronGravity = true;
 
-try
-    codegen('-config', cfg, '-d', charBuildDir, '-o', charJacTarget, ...
-        'evalJac_InertialDynMaxFidelity', ...
-        '-args', {dStateTimetag, dxState_IN, strDynParams, coder.Constant(strModelConfigFlags), strAccelInfo});
-catch objException
-    ReportCodegenFailure_(charJacTarget, objException);
-    rethrow(objException);
+cellGravityModelNames = {'spherical_harmonics', 'polyhedron'};
+cellModelConfigFlags = {strSHmodelConfigFlags, strPolyhedronModelConfigFlags};
+cellRHSTargets = {'evalRHS_InertialDynMaxFidelity_mex', ...
+                  'evalRHS_InertialDynMaxFidelity_polyhedron_mex'};
+cellJacTargets = {'evalJac_InertialDynMaxFidelity_mex', ...
+                  'evalJac_InertialDynMaxFidelity_polyhedron_mex'};
+cellMexTargets = cell(1, 2 * numel(cellGravityModelNames));
+
+for ui32ModelIdx = uint32(1):uint32(numel(cellGravityModelNames))
+    dModelIdx = double(ui32ModelIdx);
+    strSelectedModelConfigFlags = cellModelConfigFlags{dModelIdx};
+    charRHSTarget = cellRHSTargets{dModelIdx};
+    charJacTarget = cellJacTargets{dModelIdx};
+
+    try
+        codegen('-config', cfg, '-d', charBuildDir, '-o', charRHSTarget, ...
+            'evalRHS_InertialDynMaxFidelity', ...
+            '-args', {dStateTimetag, dxState_IN, strDynParams, coder.Constant(strSelectedModelConfigFlags)});
+    catch objException
+        ReportCodegenFailure_(charRHSTarget, objException);
+        rethrow(objException);
+    end
+
+    try
+        codegen('-config', cfg, '-d', charBuildDir, '-o', charJacTarget, ...
+            'evalJac_InertialDynMaxFidelity', ...
+            '-args', {dStateTimetag, dxState_IN, strDynParams, coder.Constant(strSelectedModelConfigFlags), strAccelInfo});
+    catch objException
+        ReportCodegenFailure_(charJacTarget, objException);
+        rethrow(objException);
+    end
+
+    ui32TargetOffset = uint32(2) * (ui32ModelIdx - uint32(1));
+    cellMexTargets{double(ui32TargetOffset + 1)} = charRHSTarget;
+    cellMexTargets{double(ui32TargetOffset + 2)} = charJacTarget;
 end
 
 strMexInfo = struct();
 strMexInfo.charBuildDir = charBuildDir;
 strMexInfo.ui32StateSize = uint32(numel(dxState_IN));
-strMexInfo.cellMexTargets = {charRHSTarget, charJacTarget};
+strMexInfo.cellGravityModelNames = cellGravityModelNames;
+strMexInfo.cellMexTargets = cellMexTargets;
 
 end
 
@@ -130,17 +159,21 @@ strDynParams.strSCdata.strSRPpanelData = struct( ...
     'dQuadsNormals_SCB', [1.0; 0.0; 0.0], ...
     'dQuadsPressCentre_SCB', [0.0; 0.0; 0.0], ...
     'charLengthUnit', 'm');
+strDynParams.strStochasticAccelData = GenerateGaussMarkovAccelSeq( ...
+    [0.0, 1.0], zeros(3, 1), ones(3, 1), 1.0, uint32(1), ...
+    'bSampleInitialAccel', false);
 
 strModelConfigFlags = struct();
 strModelConfigFlags.bIncludeMainGravity = true;
-strModelConfigFlags.bIncludeSphericalHarmonics = true;
+strModelConfigFlags.bIncludeSphericalHarmonics = false;
 strModelConfigFlags.bIncludeThirdBodies = true;
 strModelConfigFlags.bIncludeSunThirdBody = true;
 strModelConfigFlags.bIncludeEarthThirdBody = true;
 strModelConfigFlags.bIncludeSRP = true;
 strModelConfigFlags.bIncludeEclipse = true;
 strModelConfigFlags.bUsePanelSRP = false;
-strModelConfigFlags.bIncludePolyhedronGravity = true;
+strModelConfigFlags.bIncludeStochasticAcceleration = false;
+strModelConfigFlags.bIncludePolyhedronGravity = false;
 strModelConfigFlags.bRecomputeSRPpressureFromDistance = true;
 
 strAccelInfo = struct();

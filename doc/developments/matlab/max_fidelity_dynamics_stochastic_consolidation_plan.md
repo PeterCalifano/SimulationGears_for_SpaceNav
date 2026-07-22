@@ -92,13 +92,16 @@
   - `uint8(2)`: panel.
 - Preserve existing flag compatibility where possible, but never evaluate cannonball and panel SRP together or spherical harmonics and polyhedron gravity together.
 
-- [ ] Add a failing test that non-empty SH data plus non-empty polyhedron data with both include flags enabled errors with `ResolveInertialDynMaxFidelityConfig:ConflictingGravityModels`.
+- [x] Add a failing test that non-empty SH data plus non-empty polyhedron data with both include flags enabled errors with `ResolveInertialDynMaxFidelityConfig:ConflictingGravityModels`.
 - [ ] Add a failing test that an explicit panel SRP request without panel data errors with `ResolveInertialDynMaxFidelityConfig:MissingPanelSRPData`.
 - [ ] Add a failing test that an explicit cannonball SRP request without cannonball scalar data errors with `ResolveInertialDynMaxFidelityConfig:MissingCannonballSRPData`.
-- [ ] Update `ResolveInertialDynMaxFidelityConfig(...)` to compute the selected model IDs once.
-- [ ] Update RHS and Jacobian to branch only on the selected model IDs.
+- [x] Update `ResolveInertialDynMaxFidelityConfig(...)` to compute `ui8SelectedGravityModel` once.
+- [ ] Update `ResolveInertialDynMaxFidelityConfig(...)` to compute `ui8SelectedSRPModel` once.
+- [x] Update RHS and Jacobian to branch only on `ui8SelectedGravityModel` for target gravity.
+- [ ] Update RHS and Jacobian to branch only on `ui8SelectedSRPModel` for SRP.
 - [ ] Keep diagnostic fields such as `bCannonballSRPSelected` and `bPanelSRPSelected`, but derive them from `ui8SelectedSRPModel`.
-- [ ] Run `testEvalRHS_InertialDynMaxFidelity` and the panel-SRP Jacobian test.
+- [x] Run `testEvalRHS_InertialDynMaxFidelity` and the panel-SRP Jacobian test.
+- [x] Build separate compile-time SH and polyhedron RHS/Jacobian MEX variants from one payload containing both datasets.
 
 ## Task 3: Extract Shared Geometry Helpers
 
