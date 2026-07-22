@@ -39,7 +39,10 @@ end
 %                                                                 bIsInEclipse) %#codegen
 % -------------------------------------------------------------------------------------------------------------
 %% DESCRIPTION
-% ACHTUNG: Sun is always assumed to be the first body in the list of d3rdBodiesGM and processed in this way.
+% Evaluate inertial position/velocity dynamics about the main body. Third-body
+% gravity is the physical differential acceleration between the spacecraft and
+% the main body. The Sun is always the first entry in d3rdBodiesGM and its
+% matching ephemeris is always the first three elements of dBodyEphemerides.
 % -------------------------------------------------------------------------------------------------------------
 %% INPUT
 % dxState_IN
@@ -65,7 +68,9 @@ end
 % 12-07-2024    Pietro Califano     Function debugging and verification completed.
 % 17-08-2024    Pietro Califano     Improved robustness, flexibility for filters, fixed design errors.
 % 20-06-2025    Pietro Califano     Major fix: incorrect 3rd bodies acceleration computation (sign)
-% 30-04-2026    Pietro Califano, Codex 5.5      Routed cannonball SRP through standalone acceleration kernel.
+% 30-04-2026    Pietro Califano, Codex 5.5    Routed cannonball SRP through standalone acceleration kernel.
+% 22-07-2026    Pietro Califano, Codex 5.6    Correct the remaining global sign error in direct and indirect
+%                                             third-body gravity.
 % -------------------------------------------------------------------------------------------------------------
 %% DEPENDENCIES
 % [-]
@@ -190,7 +195,10 @@ if ~isempty(dBodyEphemerides)
                 % Compute 3rd body acceleration
                 d3rdBodyPosFromMain_IN = d3rdBodyPos_IN - dMainBodyPos_IN;
 
-                dTotAcc3rdBody(:) = dTotAcc3rdBody(1:3) + d3rdBodyGM * ...
+                % dPos3rdBodiesToSC stores r_sc-r_body. Negating this
+                % stored-vector expression yields the physical differential
+                % acceleration mu*((r_body-r_sc)/rho^3-r_body/|r_body|^3).
+                dTotAcc3rdBody(:) = dTotAcc3rdBody(1:3) - d3rdBodyGM * ...
                                                  ( dPos3rdBodiesToSC./( norm(dPos3rdBodiesToSC) )^3 + ...
                                                  d3rdBodyPosFromMain_IN./(norm(d3rdBodyPosFromMain_IN)^3) );
             end
@@ -223,7 +231,7 @@ if ~isempty(dBodyEphemerides)
 
         % Sun 3rd Body acceleration
         if d3rdBodiesGM(1) > 0.0
-            dAcc3rdSun(1:3) = d3rdBodiesGM(1) * dAuxTerm3;
+            dAcc3rdSun(1:3) = -d3rdBodiesGM(1) * dAuxTerm3;
         end
 
     else
