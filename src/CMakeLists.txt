@@ -4,15 +4,21 @@ set(lib_name ${LIB_TARGET_NAME}) # Override lets nested consumers avoid target n
 configure_file(config.h.in config.h)
 
 # Add src files to library
-set(SRC_PATTERN "*.cpp; *.cu")
+set(SRC_PATTERN "*.cpp" "*.cu")
 file(GLOB srcLibFiles RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} ${SRC_PATTERN})
 file(GLOB srcCudaFilesToPTX "*.ptx.cu")
+list(FILTER srcLibFiles EXCLUDE REGEX "\\.ptx\\.cu$")
 
 # Get current folder name
 get_filename_component(CURRENT_FOLDER_NAME ${CMAKE_CURRENT_SOURCE_DIR} NAME)
 message(STATUS "Library src files found in ${CURRENT_FOLDER_NAME}: ${srcLibFiles}")
 
 # Add subdirectories with src files
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/utils/CMakeLists.txt")
+  message(STATUS "Adding module: utils")
+  add_subdirectory(utils)
+endif()
+
 if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/attitude/CMakeLists.txt")
   message(STATUS "Adding module: attitude")
   add_subdirectory(attitude)
@@ -59,18 +65,13 @@ else()
 endif()
 
 set_target_properties(${lib_name} PROPERTIES EXPORT_NAME ${project_name})
+target_compile_features(${lib_name} ${lib_link_scope} cxx_std_20)
 
 message(STATUS "Configured ${lib_name} as a ${lib_target_type} library target")
 set(PROJECT_LIBRARY_KIND "${lib_target_type}" PARENT_SCOPE)
 
 if(NOT TARGET ${LIB_NAMESPACE}::${project_name})
   add_library(${LIB_NAMESPACE}::${project_name} ALIAS ${lib_name})
-endif()
-
-if(SPDLOG_ENABLED)
-  target_compile_definitions(${lib_name} ${lib_link_scope} SPDLOG_UTILS_ENABLED=1)
-else()
-  target_compile_definitions(${lib_name} ${lib_link_scope} SPDLOG_UTILS_ENABLED=0)
 endif()
 
 if(NOT lib_is_header_only AND SANITIZE_BUILD AND SANITIZER_TARGET AND TARGET ${SANITIZER_TARGET})
@@ -108,11 +109,8 @@ endif()
 target_link_libraries(${lib_name} ${lib_link_scope}
                       ${project_name}_include
                       ${LIB_COMPILE_TARGET}
-                      Eigen3::Eigen)
-
-if(SPDLOG_ENABLED AND SPDLOG_LINK_TARGET)
-  target_link_libraries(${lib_name} ${lib_link_scope} ${SPDLOG_LINK_TARGET})
-endif()
+                      Eigen3::Eigen
+                      Threads::Threads)
 
 if(ENABLE_CUDA)
   target_link_libraries(${lib_name} ${lib_link_scope} ${CUDA_COMPILE_TARGET})
@@ -140,9 +138,6 @@ set(installable_targets ${installable_targets}
                         ${lib_name}
                         ${project_name}_include
                         ${LIB_COMPILE_TARGET})
-if(SPDLOG_ENABLED AND SPDLOG_LINK_TARGET AND NOT SPDLOG_EXTERNAL_PACKAGE)
-  list(APPEND installable_targets ${SPDLOG_LINK_TARGET})
-endif()
 if(TARGET ${PROFILING_COMPILE_TARGET})
   list(APPEND installable_targets ${PROFILING_COMPILE_TARGET})
 endif()
@@ -180,23 +175,23 @@ install(
 install(EXPORT ${project_name}
         FILE "${project_name}Target.cmake"
         NAMESPACE ${project_name}::
-        DESTINATION lib/cmake/${project_name})
+        DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/${project_name})
 
 write_basic_package_version_file(
-  "${CMAKE_CURRENT_BINARY_DIR}/${project_name}ConfigVersion.cmake"
+  "${PROJECT_BINARY_DIR}/${project_name}ConfigVersion.cmake"
   VERSION ${PROJECT_VERSION}
   COMPATIBILITY AnyNewerVersion)
 
 configure_package_config_file(
   "${CMAKE_CURRENT_SOURCE_DIR}/cmake/${project_name}Config.cmake.in"
-  "${CMAKE_CURRENT_BINARY_DIR}/${project_name}Config.cmake"
-  INSTALL_DESTINATION lib/cmake/${project_name})
+  "${PROJECT_BINARY_DIR}/${project_name}Config.cmake"
+  INSTALL_DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/${project_name})
 
 install(FILES
-  "${CMAKE_CURRENT_BINARY_DIR}/${project_name}Config.cmake"
-  "${CMAKE_CURRENT_BINARY_DIR}/${project_name}ConfigVersion.cmake"
-  DESTINATION lib/cmake/${project_name})
+  "${PROJECT_BINARY_DIR}/${project_name}Config.cmake"
+  "${PROJECT_BINARY_DIR}/${project_name}ConfigVersion.cmake"
+  DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/${project_name})
 
 export(EXPORT ${project_name}
-       FILE "${CMAKE_CURRENT_BINARY_DIR}/cmake/${project_name}Target.cmake"
+       FILE "${PROJECT_BINARY_DIR}/${project_name}Target.cmake"
        NAMESPACE ${project_name}::)

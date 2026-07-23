@@ -28,9 +28,10 @@ function(compose_full_version_string OUT_VAR VERSION_CORE VERSION_PRERELEASE VER
 endfunction()
 
 # Try to extract version from git tags. Sets version variables in parent scope on success.
-# Returns GIT_VERSION_FOUND = TRUE/FALSE in parent scope.
+# Returns GIT_VERSION_FOUND and GIT_VERSION_IS_EXACT_CLEAN_TAG in parent scope.
 function(get_version_from_git)
     set(GIT_VERSION_FOUND FALSE PARENT_SCOPE)
+    set(GIT_VERSION_IS_EXACT_CLEAN_TAG FALSE PARENT_SCOPE)
 
     find_package(Git QUIET)
     if(NOT Git_FOUND)
@@ -97,6 +98,7 @@ function(get_version_from_git)
         set(GIT_VERSION_FOUND TRUE PARENT_SCOPE)
 
         if("${VERSION_DISTANCE_LOCAL}" STREQUAL "0" AND "${VERSION_DIRTY_LOCAL}" STREQUAL "")
+            set(GIT_VERSION_IS_EXACT_CLEAN_TAG TRUE PARENT_SCOPE)
             message(STATUS "Version from exact git tag: ${FULL_VERSION_LOCAL}")
         else()
             message(STATUS "Version from git describe: ${FULL_VERSION_LOCAL}")
@@ -124,6 +126,7 @@ function(get_version_from_git)
 
         set(FULL_VERSION "${FULL_VERSION_LOCAL}" PARENT_SCOPE)
         set(GIT_VERSION_FOUND TRUE PARENT_SCOPE)
+        set(GIT_VERSION_IS_EXACT_CLEAN_TAG TRUE PARENT_SCOPE)
         message(STATUS "Version from git tag: ${FULL_VERSION_LOCAL}")
     else()
         message(STATUS "Git describe '${CLEAN_TAG}' does not match supported semver format (vX.Y.Z[-prerelease])")
@@ -202,6 +205,9 @@ endfunction()
 # Main version resolution function.
 # Fallback chain: git --> VERSION file --> CMake hardcoded defaults (already set by caller)
 function(resolve_project_version)
+    # Only this explicit provenance authorizes exact-release source validation.
+    set(PROJECT_VERSION_IS_EXACT_CLEAN_GIT_TAG FALSE PARENT_SCOPE)
+
     # Try git
     get_version_from_git()
     if(GIT_VERSION_FOUND)
@@ -214,6 +220,8 @@ function(resolve_project_version)
         set(PROJECT_VERSION_PRERELEASE ${PROJECT_VERSION_PRERELEASE} PARENT_SCOPE)
         set(PROJECT_VERSION_METADATA ${PROJECT_VERSION_METADATA} PARENT_SCOPE)
         set(FULL_VERSION ${FULL_VERSION} PARENT_SCOPE)
+        set(PROJECT_VERSION_IS_EXACT_CLEAN_GIT_TAG
+            ${GIT_VERSION_IS_EXACT_CLEAN_TAG} PARENT_SCOPE)
         return()
     endif()
 

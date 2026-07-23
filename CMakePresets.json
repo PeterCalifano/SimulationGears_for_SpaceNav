@@ -1,0 +1,69 @@
+{
+  "version": 3,
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 21,
+    "patch": 0
+  },
+  "configurePresets": [
+    {
+      "name": "native-cpu",
+      "displayName": "SimulationGears native CPU",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/presets/native-cpu",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "RelWithDebInfo",
+        "ENABLE_TESTS": "ON",
+        "ENABLE_PYTHON_TESTS": "ON",
+        "ENABLE_CUDA": "OFF",
+        "ENABLE_OPTIX": "OFF",
+        "ENABLE_OPENGL": "OFF",
+        "SimulationGears_for_SpaceNav_BUILD_PROGRAMS": "OFF",
+        "SimulationGears_for_SpaceNav_BUILD_EXAMPLES": "OFF"
+      }
+    },
+    {
+      "name": "docs",
+      "displayName": "SimulationGears Doxygen documentation",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/presets/docs",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "RelWithDebInfo",
+        "ENABLE_TESTS": "OFF",
+        "ENABLE_SUBMODULES": "OFF",
+        "ENABLE_CUDA": "OFF",
+        "ENABLE_OPTIX": "OFF",
+        "ENABLE_OPENGL": "OFF",
+        "BUILD_DOC_HTML": "ON",
+        "BUILD_DOC_XML": "ON",
+        "BUILD_DOC_LATEX": "OFF",
+        "DOC_WARN_AS_ERROR": "OFF",
+        "SimulationGears_for_SpaceNav_BUILD_PROGRAMS": "OFF",
+        "SimulationGears_for_SpaceNav_BUILD_EXAMPLES": "OFF"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "native-cpu",
+      "displayName": "Build SimulationGears native CPU targets",
+      "configurePreset": "native-cpu"
+    },
+    {
+      "name": "docs",
+      "displayName": "Build SimulationGears documentation",
+      "configurePreset": "docs",
+      "targets": ["doc"]
+    }
+  ],
+  "testPresets": [
+    {
+      "name": "native-cpu",
+      "displayName": "Test SimulationGears native CPU targets",
+      "configurePreset": "native-cpu",
+      "output": {
+        "outputOnFailure": true
+      }
+    }
+  ]
+}

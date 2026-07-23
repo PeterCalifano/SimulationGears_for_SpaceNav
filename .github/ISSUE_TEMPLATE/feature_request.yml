@@ -1,0 +1,50 @@
+name: Feature request
+description: Propose a scoped SimulationGears capability or contract change.
+title: "[Feature]: "
+labels: [enhancement, triage]
+body:
+  - type: dropdown
+    id: area
+    attributes:
+      label: Primary area
+      options:
+        - MATLAB library or simulation model
+        - Native C++ or CUDA library
+        - Python or MATLAB wrapper
+        - ROS 2 overlay
+        - Versioning or release behavior
+        - Documentation
+        - CI or packaging
+        - Nested or installed-package consumption
+    validations:
+      required: true
+  - type: textarea
+    id: need
+    attributes:
+      label: Problem and use case
+      description: Explain the navigation/simulation or development need, including current limitations.
+    validations:
+      required: true
+  - type: textarea
+    id: contract
+    attributes:
+      label: Proposed behavior
+      description: Describe inputs, outputs, compatibility requirements, and ownership boundaries.
+    validations:
+      required: true
+  - type: textarea
+    id: verification
+    attributes:
+      label: Acceptance evidence
+      description: Describe the tests, data, consumer, or scenario that would prove the change.
+    validations:
+      required: true
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Scope checks
+      options:
+        - label: I searched existing issues and documentation for this capability.
+          required: true
+        - label: I identified any MATLAB, wrapper, ROS 2, or nested-repository compatibility impact.
+          required: true

@@ -39,16 +39,21 @@ MATLAB assertion results separately from wrapper teardown warnings or crashes.
 
 ## Optional ROS 2 Overlay
 
-The canonical template policy is retained here even when the overlay artifacts
-have not yet been imported into this checkout. Adding `doc/ros2_overlay.md`,
-`build_ros2.sh`, `ros2/`, or related workflows is a separate template-sync task.
+The optional ROS 2 Jazzy overlay is present as four packages under `ros2/`:
+`simulation_gears`, `simulation_gears_interfaces`, `simulation_gears_ros`, and
+`simulation_gears_spinup`. See `doc/ros2_overlay.md` before changing its build,
+metadata, lifecycle, interface, or launch contracts.
 
-See `doc/ros2_overlay.md` before changing the optional ROS 2 overlay.
-`./build_lib.sh` is the C++-first library entry point and never needs ROS.
-`./build_ros2.sh` is the optional ROS 2 overlay build and test entry point.
+`./build_lib.sh` remains the C++-first entry point and never needs ROS.
+`./build_ros2.sh --clean` is the overlay build and test entry point. The sample
+node must continue to consume the exported native package and generated
+`config.h` build metadata; do not replace that seam with invented simulation
+behavior.
 
 Keep ROS-related changes confined to `ros2/` plus the documented root helpers,
-docs, tests, markers, and the single ROS overlay workflow.
+docs, project-owned tests, four discovery markers, and the single ROS overlay
+workflow. Preserve package prefix `simulation_gears`, lifecycle autostart in
+both launch paths, private service/topic names, and root/namespaced coverage.
 
 ## Canonical Language Conventions
 

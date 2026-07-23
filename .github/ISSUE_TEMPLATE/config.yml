@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Build, testing, CI, and release documentation
+    url: https://github.com/PeterCalifano/SimulationGears_for_SpaceNav/tree/develop/doc
+    about: Review the project documentation before filing setup or packaging issues.
+  - name: Security-sensitive report
+    url: https://github.com/PeterCalifano/SimulationGears_for_SpaceNav/security/advisories/new
+    about: Report vulnerabilities privately instead of opening a public issue.

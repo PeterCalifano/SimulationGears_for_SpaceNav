@@ -1,6 +1,12 @@
 /*build*/
 /*debug*/
 /*install*/
+
+# Optional ROS 2 overlay colcon outputs are nested below the anchored root rules.
+/ros2/build/
+/ros2/install/
+/ros2/log/
+
 **/codegen*/
 /matlab/mex/
 
