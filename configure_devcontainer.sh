@@ -12,9 +12,10 @@ DEVCONTAINER_JSON_WRITER="${DEVCONTAINER_DIR}/update_devcontainer_json.py"
 # Define supported options
 BASE_OPTIONS=("ubuntu-24.04" "ubuntu-22.04" "ubuntu-20.04" "ubuntu-18.04" "debian-12" "debian-11" "custom")
 ROS1_DISTROS=("noetic" "melodic")
-ROS2_DISTROS=("humble" "iron" "jazzy" "rolling")
+ROS2_DISTROS=("jazzy" "humble" "iron" "rolling")
 ROS_PROFILES=("ros-base" "desktop" "desktop-full")
 ROS2_PROFILES=("ros-base" "desktop")
+GPU_RUNTIME_OPTIONS=("auto" "docker" "podman")
 
 if [[ ! -f "$DOCKERFILE" ]]; then
   echo "Dockerfile not found at: $DOCKERFILE"
@@ -31,22 +32,27 @@ Usage: ./configure_devcontainer.sh [options]
 
 Options:
   --cuda               Enable CUDA support.
+  --cuda-version <v>   CUDA toolkit version for the nvidia-cuda feature (default: 12.9).
+  --gpu-runtime <r>    GPU runArgs mode: auto, docker, or podman (default: auto).
   --base <name>        Base image tag (ubuntu-24.04, ubuntu-22.04, ubuntu-20.04, ubuntu-18.04, debian-12, debian-11, custom).
   --base-image <img>   Full base image name (overrides --base).
   --ros <distro>       Install ROS 1 with selected distro (noetic, melodic).
-  --ros2 <distro>      Install ROS 2 with selected distro (humble, iron, jazzy, rolling).
+  --ros2 <distro>      Install ROS 2 (jazzy default; also humble, iron, rolling).
   --ros-profile <p>    ROS package profile (ros-base, desktop, desktop-full).
   --non-interactive    Fail if required options are missing instead of prompting.
   -h, --help           Show this help.
 
 Examples:
   ./configure_devcontainer.sh --cuda --base ubuntu-24.04 --ros2 jazzy
+  ./configure_devcontainer.sh --cuda --gpu-runtime podman --base ubuntu-24.04
   ./configure_devcontainer.sh --no-cuda --base debian-12
   ./configure_devcontainer.sh --base-image ubuntu:20.04 --ros noetic
 
 Note:
   CUDA is off by default (use --cuda to enable).
-  ROS 1 supports Ubuntu 18.04/20.04; ROS 2 supports Ubuntu 22.04+.
+  GPU runtime auto-detection prefers docker when both engines are installed.
+  ROS 1 pairings are melodic/18.04 and noetic/20.04.
+  ROS 2 pairings are humble|iron/22.04 and jazzy|rolling/24.04.
 EOF
 }
 
@@ -153,6 +159,52 @@ detect_ubuntu_version() {
   esac
 }
 
+resolve_gpu_runtime() {
+  local requested="$1"
+  if [[ "$requested" != "auto" ]]; then
+    echo "$requested"
+    return 0
+  fi
+  if command -v docker >/dev/null 2>&1; then
+    echo "docker"
+    return 0
+  fi
+  if command -v podman >/dev/null 2>&1; then
+    echo "podman"
+    return 0
+  fi
+  echo "Warning: neither docker nor podman found; defaulting devcontainer GPU runtime to docker." >&2
+  echo "docker"
+}
+
+validate_ros_ubuntu_pairing() {
+  local ros_mode="$1"
+  local ros_distro="$2"
+  local ubuntu_version="$3"
+  local required_version=""
+  local ros_label=""
+
+  if [[ "$ros_mode" == "ros2" ]]; then
+    ros_label="ROS 2"
+    case "$ros_distro" in
+      humble | iron) required_version="22.04" ;;
+      jazzy | rolling) required_version="24.04" ;;
+    esac
+  else
+    ros_label="ROS 1"
+    case "$ros_distro" in
+      melodic) required_version="18.04" ;;
+      noetic) required_version="20.04" ;;
+    esac
+  fi
+
+  if [[ -n "$required_version" && "$ubuntu_version" != "$required_version" ]]; then
+    echo "${ros_label} ${ros_distro} requires Ubuntu ${required_version} (detected ${ubuntu_version})."
+    return 1
+  fi
+  return 0
+}
+
 #######################################
 # Main script 
 #######################################
@@ -171,6 +223,14 @@ fi
 cuda_default="off"
 if [[ -f "$DEVCONTAINER_JSON" ]] && file_contains "nvidia-cuda" "$DEVCONTAINER_JSON"; then
   cuda_default="on"
+fi
+
+cuda_version_default="12.9"
+if [[ -f "$DEVCONTAINER_JSON" ]]; then
+  cuda_version_detected="$(sed -n 's/.*"cudaVersion"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$DEVCONTAINER_JSON" | head -n1)"
+  if [[ -n "$cuda_version_detected" ]]; then
+    cuda_version_default="$cuda_version_detected"
+  fi
 fi
 
 ros_mode_default="none"
@@ -196,6 +256,8 @@ fi
 
 # Set default values from current configuration
 CUDA="$cuda_default"
+CUDA_VERSION="$cuda_version_default"
+GPU_RUNTIME="auto"
 BASE="$current_base"
 BASE_IMAGE=""
 ROS_MODE="$ros_mode_default"
@@ -203,6 +265,7 @@ ROS_DISTRO="$ros_distro_default"
 ROS_PROFILE="$ros_profile_default"
 NON_INTERACTIVE="no"
 CUDA_SET="no"
+GPU_RUNTIME_SET="no"
 BASE_SET="no"
 BASE_IMAGE_SET="no"
 ROS_MODE_SET="no"
@@ -219,6 +282,27 @@ while [[ $# -gt 0 ]]; do
     --no-cuda)
       CUDA="off"
       CUDA_SET="yes"
+      ;;
+    --cuda-version)
+      shift
+      CUDA_VERSION="${1:-}"
+      if [[ -z "$CUDA_VERSION" ]]; then
+        echo "--cuda-version requires a value (e.g. 12.9)."
+        exit 1
+      fi
+      ;;
+    --gpu-runtime)
+      shift
+      GPU_RUNTIME="${1:-}"
+      GPU_RUNTIME_SET="yes"
+      if [[ -z "$GPU_RUNTIME" ]]; then
+        echo "--gpu-runtime requires a value: auto, docker, or podman."
+        exit 1
+      fi
+      if ! contains_value "$GPU_RUNTIME" "${GPU_RUNTIME_OPTIONS[@]}"; then
+        echo "Invalid --gpu-runtime value: $GPU_RUNTIME"
+        exit 1
+      fi
       ;;
     --base)
       shift
@@ -266,13 +350,12 @@ while [[ $# -gt 0 ]]; do
   shift
 done
 
-# Pre-fill defaults for interactive prompts
-if [[ "$NON_INTERACTIVE" != "yes" ]]; then
-  if [[ "$ROS_MODE" == "ros" && -z "$ROS_DISTRO" ]]; then
-    ROS_DISTRO="${ROS1_DISTROS[0]}"
-  elif [[ "$ROS_MODE" == "ros2" && -z "$ROS_DISTRO" ]]; then
-    ROS_DISTRO="${ROS2_DISTROS[0]}"
-  fi
+# Fill mode-specific defaults before either interactive prompting or
+# non-interactive validation. Jazzy is the approved ROS 2 default.
+if [[ "$ROS_MODE" == "ros" && -z "$ROS_DISTRO" ]]; then
+  ROS_DISTRO="${ROS1_DISTROS[0]}"
+elif [[ "$ROS_MODE" == "ros2" && -z "$ROS_DISTRO" ]]; then
+  ROS_DISTRO="${ROS2_DISTROS[0]}"
 fi
 
 # Prompt user for options
@@ -288,6 +371,10 @@ if [[ "$NON_INTERACTIVE" != "yes" ]]; then
   fi
 
   echo "Selected CUDA support: $CUDA"
+
+  if [[ "$CUDA" == "on" && "$GPU_RUNTIME_SET" != "yes" ]]; then
+    GPU_RUNTIME="$(prompt_select "Select GPU runtime for devcontainer GPU passthrough:" "$GPU_RUNTIME" "${GPU_RUNTIME_OPTIONS[@]}")"
+  fi
 
   # Base image
   if [[ -z "$BASE_IMAGE" && "$BASE_SET" != "yes" ]]; then
@@ -375,6 +462,10 @@ if [[ "$NON_INTERACTIVE" != "yes" ]]; then
 
 else
   # Validate options in non-interactive mode
+  if ! contains_value "$GPU_RUNTIME" "${GPU_RUNTIME_OPTIONS[@]}"; then
+    echo "Invalid GPU runtime: $GPU_RUNTIME"
+    exit 1
+  fi
   if [[ -z "$BASE_IMAGE" ]]; then
     if ! contains_value "$BASE" "${BASE_OPTIONS[@]}"; then
       echo "Invalid --base value: $BASE"
@@ -409,6 +500,16 @@ else
   fi
 fi
 
+RESOLVED_GPU_RUNTIME="docker"
+if [[ "$CUDA" == "on" ]]; then
+  RESOLVED_GPU_RUNTIME="$(resolve_gpu_runtime "$GPU_RUNTIME")"
+  if [[ "$GPU_RUNTIME" == "auto" ]]; then
+    echo "Selected GPU runtime: ${RESOLVED_GPU_RUNTIME} (auto)"
+  else
+    echo "Selected GPU runtime: ${RESOLVED_GPU_RUNTIME}"
+  fi
+fi
+
 effective_base="$BASE"
 if [[ -n "$BASE_IMAGE" ]]; then
   effective_base="$BASE_IMAGE"
@@ -417,24 +518,8 @@ ubuntu_version="$(detect_ubuntu_version "$effective_base")"
 
 if [[ "$ROS_MODE" != "none" ]]; then
   if [[ -n "$ubuntu_version" ]]; then
-    if [[ "$ROS_MODE" == "ros2" ]]; then
-      if [[ "$ubuntu_version" != "22.04" && "$ubuntu_version" != "24.04" ]]; then
-        echo "ROS 2 requires Ubuntu 22.04 or newer (detected ${ubuntu_version})."
-        exit 1
-      fi
-    else
-      if [[ "$ubuntu_version" != "18.04" && "$ubuntu_version" != "20.04" ]]; then
-        echo "ROS 1 requires Ubuntu 18.04 or 20.04 (detected ${ubuntu_version})."
-        exit 1
-      fi
-      if [[ "$ROS_DISTRO" == "noetic" && "$ubuntu_version" != "20.04" ]]; then
-        echo "ROS 1 noetic requires Ubuntu 20.04 (detected ${ubuntu_version})."
-        exit 1
-      fi
-      if [[ "$ROS_DISTRO" == "melodic" && "$ubuntu_version" != "18.04" ]]; then
-        echo "ROS 1 melodic requires Ubuntu 18.04 (detected ${ubuntu_version})."
-        exit 1
-      fi
+    if ! validate_ros_ubuntu_pairing "$ROS_MODE" "$ROS_DISTRO" "$ubuntu_version"; then
+      exit 1
     fi
   else
     if [[ "$effective_base" == *debian* ]]; then
@@ -445,17 +530,33 @@ if [[ "$ROS_MODE" != "none" ]]; then
   fi
 fi
 
-# Backup existing file
-timestamp="$(date +%Y%m%d%H%M%S)"
-if [[ -f "$DEVCONTAINER_JSON" ]]; then
-  cp "$DEVCONTAINER_JSON" "${DEVCONTAINER_JSON}.bak.${timestamp}"
-fi
-if [[ -f "$DOCKERFILE" ]]; then
-  cp "$DOCKERFILE" "${DOCKERFILE}.bak.${timestamp}"
-fi
+# Render both outputs before replacing either tracked configuration file.
+tmp_dockerfile="$(mktemp "${DEVCONTAINER_DIR}/.Dockerfile.tmp.XXXXXX")"
+tmp_json="$(mktemp "${DEVCONTAINER_DIR}/.devcontainer.json.tmp.XXXXXX")"
+rollback_dockerfile=""
+rollback_json=""
+replacement_started="no"
+replacement_complete="no"
+cleanup_temporary_files() {
+  local temporary_file
 
-# Write updated Dockerfile
-tmp_dockerfile="$(mktemp)"
+  if [[ "$replacement_started" == "yes" && "$replacement_complete" != "yes" ]]; then
+    if [[ -n "$rollback_dockerfile" && -f "$rollback_dockerfile" ]]; then
+      cp -p "$rollback_dockerfile" "$DOCKERFILE"
+    fi
+    if [[ -n "$rollback_json" && -f "$rollback_json" ]]; then
+      cp -p "$rollback_json" "$DEVCONTAINER_JSON"
+    fi
+  fi
+
+  for temporary_file in "$tmp_dockerfile" "$tmp_json" "$rollback_dockerfile" "$rollback_json"; do
+    if [[ -n "$temporary_file" && -e "$temporary_file" ]]; then
+      rm -f -- "$temporary_file"
+    fi
+  done
+}
+trap cleanup_temporary_files EXIT
+
 if [[ -n "$BASE_IMAGE" ]]; then
   new_from="FROM ${BASE_IMAGE}"
 else
@@ -472,15 +573,49 @@ if ! awk -v new_from="$new_from" '
   { print }
   END { if (replaced==0) exit 1 }
 ' "$DOCKERFILE" > "$tmp_dockerfile"; then
-  rm -f "$tmp_dockerfile"
   echo "Failed to update Dockerfile base image."
   exit 1
 fi
-mv "$tmp_dockerfile" "$DOCKERFILE"
+chmod --reference="$DOCKERFILE" "$tmp_dockerfile"
 
-# Write updated devcontainer.json using python script
-CUDA="$CUDA" ROS_MODE="$ROS_MODE" ROS_DISTRO="$ROS_DISTRO" ROS_PROFILE="$ROS_PROFILE" \
-  python3 "$DEVCONTAINER_JSON_WRITER" > "$DEVCONTAINER_JSON"
+# The updater reads the original JSON while the rendered Dockerfile remains
+# temporary, so any render failure leaves both tracked inputs unchanged.
+if ! CUDA="$CUDA" CUDA_VERSION="$CUDA_VERSION" \
+     DEVCONTAINER_GPU_RUNTIME="$RESOLVED_GPU_RUNTIME" \
+     ROS_MODE="$ROS_MODE" ROS_DISTRO="$ROS_DISTRO" ROS_PROFILE="$ROS_PROFILE" \
+     DEVCONTAINER_JSON_PATH="$DEVCONTAINER_JSON" \
+     python3 "$DEVCONTAINER_JSON_WRITER" > "$tmp_json"; then
+  echo "Failed to update devcontainer.json."
+  exit 1
+fi
+if ! python3 -m json.tool "$tmp_json" >/dev/null; then
+  echo "Generated devcontainer.json is not valid JSON."
+  exit 1
+fi
+chmod --reference="$DEVCONTAINER_JSON" "$tmp_json"
+
+# Preserve user-visible backups only after both candidate files are valid.
+timestamp="$(date +%Y%m%d%H%M%S)"
+cp "$DEVCONTAINER_JSON" "${DEVCONTAINER_JSON}.bak.${timestamp}"
+cp "$DOCKERFILE" "${DOCKERFILE}.bak.${timestamp}"
+
+# Keep private rollback copies for the narrow interval between the two final
+# replacements. Restore both originals if either replacement fails.
+rollback_dockerfile="$(mktemp "${DEVCONTAINER_DIR}/.Dockerfile.rollback.XXXXXX")"
+rollback_json="$(mktemp "${DEVCONTAINER_DIR}/.devcontainer.json.rollback.XXXXXX")"
+cp -p "$DOCKERFILE" "$rollback_dockerfile"
+cp -p "$DEVCONTAINER_JSON" "$rollback_json"
+
+replacement_started="yes"
+if ! mv "$tmp_dockerfile" "$DOCKERFILE"; then
+  echo "Failed to replace Dockerfile."
+  exit 1
+fi
+if ! mv "$tmp_json" "$DEVCONTAINER_JSON"; then
+  echo "Failed to replace devcontainer.json; restored both original files."
+  exit 1
+fi
+replacement_complete="yes"
 
 echo "Updated:"
 echo "  - ${DOCKERFILE}"
