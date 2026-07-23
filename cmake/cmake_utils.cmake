@@ -115,11 +115,6 @@ function(add_examples project_lib_name excluded_list target_compile_settings)
         add_executable(${exampleName} ${exampleFile})
         target_link_libraries(${exampleName} PRIVATE ${project_lib_name} ${target_compile_settings})
         target_include_directories(${exampleName} PRIVATE ${${project_lib_name}_INCLUDE_DIRS})
-        if(SPDLOG_ENABLED)
-            target_compile_definitions(${exampleName} PRIVATE SPDLOG_UTILS_ENABLED=1)
-        else()
-            target_compile_definitions(${exampleName} PRIVATE SPDLOG_UTILS_ENABLED=0)
-        endif()
     endforeach()
 
 endfunction()
@@ -203,6 +198,20 @@ function(resolve_python_test_command output_var)
     set(${output_var} "${pythonTestCommand}" PARENT_SCOPE)
 endfunction()
 
+function(resolve_catch2_test_properties out_var properties_arg)
+    set(resolved "")
+    if(NOT "${properties_arg}" STREQUAL "")
+        if("${properties_arg}" MATCHES ";")
+            set(resolved ${properties_arg})
+        elseif(DEFINED ${properties_arg})
+            set(resolved ${${properties_arg}})
+        else()
+            set(resolved ${properties_arg})
+        endif()
+    endif()
+    set(${out_var} "${resolved}" PARENT_SCOPE)
+endfunction()
+
 # Function to add test files to the build
 function(add_tests project_lib_name excluded_list tests_list_var target_compile_settings catch2_test_properties_var catch2_target)
 
@@ -227,14 +236,7 @@ function(add_tests project_lib_name excluded_list tests_list_var target_compile_
 
     # Register compiled tests for catch2
     if(Catch2_FOUND)
-        set(catch2TestProperties "")
-
-        # Check if the catch2_test_properties_var is defined and assign
-        if(DEFINED ${catch2_test_properties_var})
-            set(catch2TestProperties ${${catch2_test_properties_var}})
-        elseif(NOT "${catch2_test_properties_var}" STREQUAL "")
-            set(catch2TestProperties ${catch2_test_properties_var})
-        endif()
+        resolve_catch2_test_properties(catch2TestProperties "${catch2_test_properties_var}")
 
         # Append the CTest properties to the test discovery arguments if they are set
         set(catch2DiscoverArgs "")
@@ -255,11 +257,6 @@ function(add_tests project_lib_name excluded_list tests_list_var target_compile_
 
             target_link_libraries(${testName} PRIVATE ${project_lib_name} ${target_compile_settings} ${catch2_target})
 
-            if(SPDLOG_ENABLED)
-                target_compile_definitions(${testName} PRIVATE SPDLOG_UTILS_ENABLED=1)
-            else()
-                target_compile_definitions(${testName} PRIVATE SPDLOG_UTILS_ENABLED=0)
-            endif()
             catch_discover_tests(${testName} ${catch2DiscoverArgs})
         endforeach()
 

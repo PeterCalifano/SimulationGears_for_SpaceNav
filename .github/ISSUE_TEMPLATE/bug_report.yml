@@ -1,0 +1,56 @@
+name: Bug report
+description: Report reproducible incorrect behavior in SimulationGears.
+title: "[Bug]: "
+labels: [bug, triage]
+body:
+  - type: dropdown
+    id: area
+    attributes:
+      label: Affected area
+      options:
+        - MATLAB library or simulation model
+        - Native C++ or CUDA library
+        - Python or MATLAB wrapper
+        - ROS 2 overlay
+        - Versioning or release metadata
+        - Documentation
+        - CI or packaging
+        - Nested or installed-package consumption
+    validations:
+      required: true
+  - type: textarea
+    id: behavior
+    attributes:
+      label: Observed behavior
+      description: Include the exact error, output, or numerical discrepancy.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Minimal reproduction
+      description: Provide commands, MATLAB entry points, inputs, and the smallest reproducing case.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Include OS, compiler/CUDA or MATLAB release, Python/ROS version, commit/tag, and container use.
+    validations:
+      required: true
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Pre-submission checks
+      options:
+        - label: I searched existing issues and included reproducible evidence.
+          required: true
+        - label: I identified whether this belongs to this repository rather than a nested or sibling dependency.
+          required: true

@@ -1,61 +1,37 @@
 # SimulationGears_for_SpaceNav {#mainpage}
 
-See @ref md__r_e_a_d_m_e "README" for full usage documentation, or read on for the condensed reference.
+SimulationGears provides spacecraft navigation simulation models in MATLAB and
+reusable native C++20 utilities, with optional CUDA, wrappers, and a ROS 2 Jazzy
+overlay. The repository README is the entry point for installation and project
+layout.
 
-## Installation
-
-```bash
-git clone <repo-url> my_project && cd my_project
-./build_lib.sh -t release -i      # build + install to ./install
-```
-
-## Common Build Toggles
+## Native build and consumption
 
 ```bash
-# Enable CUDA + NVCC optimization toggles
-./build_lib.sh -D ENABLE_CUDA=ON -D CUDA_ENABLE_FMAD=ON -D CUDA_ENABLE_EXTRA_DEVICE_VECTORIZATION=ON
-
-# Enable oneTBB and explicit SIMD/FMA
-./build_lib.sh -D ENABLE_TBB=ON -D CPU_ENABLE_SIMD=ON -D CPU_SIMD_LEVEL=avx2 -D CPU_ENABLE_FMA=ON
-
-# Disable native tuning for portable binaries
-./build_lib.sh -D CPU_ENABLE_NATIVE_TUNING=OFF
+cmake --preset native-cpu
+cmake --build --preset native-cpu
+ctest --preset native-cpu --output-on-failure --no-tests=error
 ```
 
-## Wrapper Build
-
-```bash
-# Python wrapper
-./build_lib.sh -p
-
-# Python + MATLAB wrappers
-./build_lib.sh -p -m
-
-# Use a local wrap checkout instead of installed gtwrap
-./build_lib.sh -p --gtwrap-root /path/to/wrap
-```
-
-Install Python package manually from the source Python package:
-
-```bash
-cd python
-python -m pip install .
-```
-
-## Example usage (assuming installation worked)
+Installed consumers use:
 
 ```cmake
-set(SimulationGears_for_SpaceNav_DIR "/path/to/install/lib/cmake/SimulationGears_for_SpaceNav")
-find_package(SimulationGears_for_SpaceNav REQUIRED)
-target_link_libraries(my_target PRIVATE SimulationGears_for_SpaceNav::SimulationGears_for_SpaceNav)
+find_package(SimulationGears_for_SpaceNav CONFIG REQUIRED)
+target_link_libraries(my_target PRIVATE
+  SimulationGears_for_SpaceNav::SimulationGears_for_SpaceNav)
 ```
 
-See `examples/template_consumer_project/` for a complete downstream CMake project.
+Use `CPU_ENABLE_NATIVE_TUNING=OFF` for portable CPU artifacts. CUDA is enabled
+with `ENABLE_CUDA=ON`; OptiX remains an independent opt-in.
 
-## Scaffold Notes
+## Project contracts
 
-This repository is aligned with the current fresh-init template layout.
-The placeholder C++ sources live under `src/template_src/`, `src/template_src_kernels/`,
-`src/wrapped_impl/`, and `src/bin/` and can be replaced as the real implementation lands.
+- @ref md_doc_2logging documents CLogger.
+- @ref md_doc_2testing__ci documents tests, CI, containers, ROS 2, and the
+  downloadable documentation artifact.
+- @ref md_doc_2ros2__overlay documents the optional ROS 2 overlay.
+- @ref md_doc_2version__release documents version resolution and the canonical
+  source TGZ release.
 
-Full details in `README.md`.
+The `doc` preset generates HTML and XML locally. CI uploads those outputs as a
+normal documentation artifact; it does not publish a website.

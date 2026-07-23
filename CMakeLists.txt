@@ -12,6 +12,13 @@ set(MATLAB_DEFAULT_RELEASE "R2023b")
 
 # PROJECT DEFINITION
 set(project_name "SimulationGears_for_SpaceNav")
+set(project_description
+    "Spacecraft navigation simulation models and utilities")
+set(project_homepage_url
+    "https://github.com/PeterCalifano/SimulationGears_for_SpaceNav")
+set(PROJECT_MAINTAINER_NAME "Pietro Califano" CACHE STRING "Project maintainer name")
+set(PROJECT_MAINTAINER_EMAIL "petercalifano.gs@gmail.com" CACHE STRING "Project maintainer email")
+set(PROJECT_LICENSE "MIT" CACHE STRING "Project SPDX license identifier")
 
 # Set install default directory if not specified
 if(NOT DEFINED CMAKE_INSTALL_PREFIX)
@@ -19,22 +26,25 @@ if(NOT DEFINED CMAKE_INSTALL_PREFIX)
 endif()
 
 # Major options
+option(PROJECT_METADATA_ONLY "Configure only project identity and version metadata" OFF)
 option(ENABLE_OPTIX "Enable OptiX" OFF)
 option(ENABLE_CUDA "Enable CUDA" OFF)
-option(BUILD_SHARED_LIBS "Build libraries as shared" ON)
-include(cmake/HandleOpenMP.cmake)
 
-set(languages CXX)
+if(PROJECT_METADATA_ONLY)
+  set(languages NONE)
+else()
+  set(languages CXX)
 
-if (ENABLE_OPTIX)
-  set(ENABLE_CUDA ON)
-endif()
+  if(ENABLE_OPTIX)
+    set(ENABLE_CUDA ON)
+  endif()
 
-if (ENABLE_CUDA)
+  if(ENABLE_CUDA)
     list(APPEND languages CUDA)
-    if (ENABLE_OPTIX)
+    if(ENABLE_OPTIX)
       list(APPEND languages C)
     endif()
+  endif()
 endif()
 
 # Add cmake folder to path
@@ -54,9 +64,18 @@ set(PROJECT_VERSION_CORE "${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}.${PR
 # Resolve version: git --> VERSION file --> hardcoded defaults above
 resolve_project_version()
 
-project( ${project_name} 
-        LANGUAGES ${languages}
-        VERSION ${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}.${PROJECT_VERSION_PATCH})
+project(${project_name}
+        VERSION ${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}.${PROJECT_VERSION_PATCH}
+        DESCRIPTION "${project_description}"
+        HOMEPAGE_URL "${project_homepage_url}"
+        LANGUAGES ${languages})
+
+if(PROJECT_METADATA_ONLY)
+  return()
+endif()
+
+option(BUILD_SHARED_LIBS "Build libraries as shared" ON)
+include(cmake/HandleOpenMP.cmake)
 
 # Write VERSION file to the build directory by default. Writing into the source
 # tree is opt-in so CI/test harness configures do not dirty the checkout.
@@ -84,7 +103,6 @@ set(CUDA_COMPILE_TARGET "${LIB_NAMESPACE}_cuda_compile_interface")
 set(OPTIX_COMPILE_TARGET "${LIB_NAMESPACE}_optix_compile_interface")
 set(OPENGL_COMPILE_TARGET "${LIB_NAMESPACE}_opengl_compile_interface")
 set(LIB_COMPILE_TARGET "${LIB_NAMESPACE}_lib_compile_interface")
-set(SPDLOG_COMPILE_TARGET "${LIB_NAMESPACE}_spdlog_interface")
 set(SANITIZER_TARGET "${LIB_NAMESPACE}_sanitizer_target_interface")
 
 # Set library target name (without namespace)
@@ -134,8 +152,6 @@ option(ENABLE_TESTS              "Build and run tests" ON)
 option(ENABLE_PYTHON_TESTS       "Discover and register Python pytest tests through CTest" OFF)
 option(ENABLE_SUBMODULES "Automatically add CMake submodules from lib/" ON)
 option(ENABLE_FETCH_CATCH2 "Fetch Catch2 from GitHub if not found" ON)
-option(ENABLE_SPDLOG "Enable spdlog logging support" ON)
-option(ENABLE_FETCH_SPDLOG "Fetch spdlog from GitHub if not found" ON)
 
 # Catch2 tests configuration
 set(CATCH2_TEST_REPORTER "compact" CACHE STRING "Catch2 reporter used by catch_discover_tests. Set empty to use Catch2 defaults.")
@@ -253,12 +269,11 @@ message(STATUS "====================  Dependencies ===========================")
 
 # LIBRARY DEPENDENCIES DEFINITION
 find_package( Eigen3 3.4 REQUIRED )
+find_package( Threads REQUIRED )
 find_package( Doxygen QUIET)
 
 # Handle Catch2 tools
 include(cmake/HandleCatch2.cmake)
-include(cmake/HandleSpdlog.cmake)
-handle_spdlog(TARGET ${SPDLOG_COMPILE_TARGET})
 
 # Include cmake tools (depends on Catch2)
 include(cmake/cmake_utils.cmake)
@@ -309,7 +324,7 @@ if(ENABLE_SUBMODULES)
 endif()
 
 # Set the dependencies for the automated export
-set(EXPORT_TARGET_DEPS Eigen3) # TODO make automatic based on used packages
+set(EXPORT_TARGET_DEPS Eigen3 Threads) # TODO make automatic based on used packages
 
 if(ENABLE_CUDA)
   list(APPEND EXPORT_TARGET_DEPS CUDAToolkit)
@@ -319,9 +334,6 @@ if (ENABLE_OPENGL)
 endif()
 if(ENABLE_TBB)
   list(APPEND EXPORT_TARGET_DEPS TBB)
-endif()
-if(SPDLOG_ENABLED AND SPDLOG_EXTERNAL_PACKAGE)
-  list(APPEND EXPORT_TARGET_DEPS spdlog)
 endif()
 
 message(STATUS "Target dependencies: ${EXPORT_TARGET_DEPS}")
@@ -359,13 +371,14 @@ add_library(${project_name}_include INTERFACE)
 # Define include directories for install compatibility
 target_include_directories(${project_name}_include INTERFACE 
                            $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>  # Used during development
+                           $<BUILD_INTERFACE:${PROJECT_BINARY_DIR}/src>  # Generated config.h
                            #$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/lib/stb_PeterCdev>  
                            #$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/lib/rapidyaml_PeterCdev>
                            #$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/lib/gdt>
                            #$<BUILD_INTERFACE:${CUDA_INCLUDE_DIRS}> 
                            #$<BUILD_INTERFACE:${OPTIX_INCLUDE_DIR}>   
                            #$<BUILD_INTERFACE:${OpenCV_INCLUDE_DIRS}>  # Add OpenCV include directories
-                           $<INSTALL_INTERFACE:include/${project_name}>  # Used in installed projects
+                           $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/${project_name}>  # Used in installed projects
 )
 
 # Build/install tree for runtime programs: $ORIGIN/../lib
@@ -517,6 +530,10 @@ set(CTEST_NIGHTLY_START_TIME "00:00:00 CET")
 # PACKAGING CONFIGURATION 
 include(InstallRequiredSystemLibraries)
 set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE")
+set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "${PROJECT_DESCRIPTION}")
+set(CPACK_PACKAGE_HOMEPAGE_URL "${PROJECT_HOMEPAGE_URL}")
+set(CPACK_PACKAGE_VENDOR "${PROJECT_MAINTAINER_NAME}")
+set(CPACK_PACKAGE_CONTACT "${PROJECT_MAINTAINER_NAME} <${PROJECT_MAINTAINER_EMAIL}>")
 set(CPACK_PACKAGE_VERSION_MAJOR "${PROJECT_VERSION_MAJOR}")
 set(CPACK_PACKAGE_VERSION_MINOR "${PROJECT_VERSION_MINOR}")
 set(CPACK_PACKAGE_VERSION_PATCH "${PROJECT_VERSION_PATCH}")
@@ -524,6 +541,42 @@ if(DEFINED FULL_VERSION AND NOT "${FULL_VERSION}" STREQUAL "")
   set(CPACK_PACKAGE_FILE_NAME "${project_name}-${FULL_VERSION}")
   set(CPACK_SOURCE_PACKAGE_FILE_NAME "${project_name}-${FULL_VERSION}")
 endif()
+
 set(CPACK_GENERATOR "TGZ")
 set(CPACK_SOURCE_GENERATOR "TGZ")
+# Preserve regex backslashes when CPack serializes project variables into its
+# generated CMake configuration files.
+set(CPACK_VERBATIM_VARIABLES TRUE)
+
+# Defer exact-tag VERSION enforcement to source CPack so ordinary CPU, CUDA,
+# and documentation configures do not require an ignored release artifact.
+set(_source_package_validation
+    "${PROJECT_BINARY_DIR}/SimulationGearsSourcePackageValidation.cmake")
+configure_file(
+  "${CMAKE_CURRENT_SOURCE_DIR}/cmake/SourcePackageValidation.cmake.in"
+  "${_source_package_validation}"
+  @ONLY)
+set(CPACK_PROJECT_CONFIG_FILE "${_source_package_validation}")
+
+# CPack evaluates these expressions against absolute source paths. Anchor every
+# exclusion to this checkout so similarly named project sources remain eligible.
+set(_cpack_source_root_regex "${CMAKE_CURRENT_SOURCE_DIR}")
+string(
+  REGEX REPLACE "([][+.*^$()|?\\\\])" "\\\\\\1"
+  _cpack_source_root_regex "${_cpack_source_root_regex}")
+set(CPACK_SOURCE_IGNORE_FILES
+  "^${_cpack_source_root_regex}/\\.git/"
+  "^${_cpack_source_root_regex}/build[^/]*/"
+  "^${_cpack_source_root_regex}/install[^/]*/"
+  "^${_cpack_source_root_regex}/ros2/(build|install|log)/"
+  "^${_cpack_source_root_regex}/lib/MathCore_for_ComputerVision(/|$)"
+  "^${_cpack_source_root_regex}/(.*/)?\\.pytest_cache/"
+  "^${_cpack_source_root_regex}/(.*/)?__pycache__/"
+  "^${_cpack_source_root_regex}/.*\\.py[cod]$"
+  "^${_cpack_source_root_regex}/(.*/)?codegen/"
+  "^${_cpack_source_root_regex}/matlab/mex/"
+  "^${_cpack_source_root_regex}/python/(build|dist)/"
+  "^${_cpack_source_root_regex}/python/[^/]+\\.egg-info/"
+  "^${_cpack_source_root_regex}/python/[^/]+/_wrapper_build\\.py$"
+  "^${_cpack_source_root_regex}/python/.*\\.(so|pyd|dylib)$")
 include(CPack)

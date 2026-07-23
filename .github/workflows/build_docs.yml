@@ -1,0 +1,56 @@
+name: build_simgears_docs
+run-name: Build SimulationGears documentation artifact
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [master, main, develop]
+    tags: ["v*.*.*"]
+    paths:
+      - README.md
+      - src/**
+      - doc/**
+      - cmake/**
+      - CMakeLists.txt
+      - CMakePresets.json
+      - .github/workflows/build_docs.yml
+  pull_request:
+    branches: [master, main, develop, "dev*"]
+    paths:
+      - README.md
+      - src/**
+      - doc/**
+      - cmake/**
+      - CMakeLists.txt
+      - CMakePresets.json
+      - .github/workflows/build_docs.yml
+
+jobs:
+  documentation:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install documentation dependencies
+        run: |
+          sudo apt update
+          sudo apt install -y cmake ninja-build g++ libeigen3-dev doxygen graphviz
+
+      - name: Configure documentation
+        run: cmake --preset docs
+
+      - name: Build documentation
+        run: cmake --build --preset docs
+
+      - name: Upload documentation artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: simulation-gears-documentation
+          path: |
+            build/presets/docs/doc/html
+            build/presets/docs/doc/xml
+          if-no-files-found: error
+          retention-days: 14

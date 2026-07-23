@@ -24,4 +24,9 @@ else()
   message(STATUS "Catch2 not found. Skipping Catch2 unit tests.")
 endif()
 
+# Register project-owned Python tests through the shared template helper.
+if(ENABLE_PYTHON_TESTS)
+  add_subdirectory(python)
+endif()
+
 message(STATUS "List of test targets: ${TESTS_LIST}")
