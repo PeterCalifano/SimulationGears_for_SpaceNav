@@ -7,18 +7,34 @@ classdef CScenarioGenerator < CGeneralPropagator
     % strDynParams struct format (for interoperability with EstimationGears library functions).
     % Ephemerides are evaluated using Chebyshev polynomials data stored in strDynParams or using SPICE
     % kernels (TODO).
+    %
+    % Static construction utilities resolve target constants and embedded
+    % spherical-harmonics gravity through CScenarioRegistry. Explicit
+    % coefficient files remain caller-selected overrides.
     % -------------------------------------------------------------------------------------------------------------
     %% CHANGELOG
     % 12-03-2025        Pietro Califano     First experimental version (tested)
+    % 24-07-2026        Pietro Califano, Codex     Document registry-owned embedded gravity defaults.
     % -------------------------------------------------------------------------------------------------------------
     %% METHODS
-    % Method1: Description
+    % CScenarioGenerator: Construct a stateful reference-scenario generator.
+    % generateData: Propagate and package the configured reference scenario.
+    % LoadDefaultScenarioData: Resolve registry-backed target and gravity data.
+    % LoadSpherHarmCoefficients: Load explicit or registry-selected coefficients.
+    % BuildReferenceScenarioDataset: Build a complete reference dataset from supplied states.
+    % packageDataset: Package state and environment histories into the dataset object.
     % -------------------------------------------------------------------------------------------------------------
     %% PROPERTIES
-    % Property1: Description, dtype, nominal size
+    % strDynParams: Dynamics parameters used by the reference propagator.
+    % enumEphemerisMode: Selected ephemeris evaluation mode.
+    % enumGenerationMode: Selected orbit and pointing generation mode.
+    % enumWorldFrameName: World frame attached to generated data.
+    % bProvideAccelerationData: Include acceleration histories when enabled.
     % -------------------------------------------------------------------------------------------------------------
     %% DEPENDENCIES
-    % [-]
+    % CGeneralPropagator
+    % CScenarioRegistry
+    % SSphericalHarmonicsGravityData
     % -------------------------------------------------------------------------------------------------------------
 
 
@@ -326,29 +342,34 @@ classdef CScenarioGenerator < CGeneralPropagator
             % -------------------------------------------------------------------------------------------------------------
             %% DESCRIPTION
             % Resolve registry-backed default target dynamics data for a scenario and optionally attach
-            % spherical-harmonics gravity coefficients from either the scenario registry or a schema-backed file.
+            % spherical-harmonics gravity coefficients. A caller-provided
+            % schema-backed file takes precedence and is validated against the
+            % requested scenario. Otherwise CScenarioRegistry returns an exact
+            % truncation of the scenario's embedded coefficient family.
             % -------------------------------------------------------------------------------------------------------------
             %% INPUT
-            % enumScenarioName EnumScenarioName {mustBeA(enumScenarioName, ["EnumScenarioName", "string", "char"])}
-            % strDynParams (1,1) struct = struct()
-            % kwargs.charSpherHarmCoeffInputFileName (1,:) string {mustBeA(kwargs.charSpherHarmCoeffInputFileName, ["string", "char"])} = ""
-            % kwargs.bUseKilometersScale             (1,1) logical = false;
-            % kwargs.ui16MaxSHdegree                 (1,1) uint16 = uint16(4); % Set to 0 to disable SH data.
-            % settings.bAddNonSphericalGravityCoeffs (1,1) logical = false;
+            % enumScenarioName                       Registered scenario enum or name.
+            % strDynParams                           Existing dynamics payload to populate or extend.
+            % kwargs.charSpherHarmCoeffInputFileName Optional schema-backed coefficient-file override.
+            % kwargs.bUseKilometersScale             Return dimensional gravity data in km-based units.
+            % kwargs.ui16MaxSHdegree                 Requested maximum SH degree; zero disables SH loading.
+            % settings.bAddNonSphericalGravityCoeffs Attach SH coefficients when true.
             % -------------------------------------------------------------------------------------------------------------
             %% OUTPUT
-            % charTargetName
-            % charTargetFixedFrame
-            % strDynParams
+            % charTargetName                         Registry-selected SPICE target name.
+            % charTargetFixedFrame                   Registry-selected target-fixed frame.
+            % strDynParams                           Dynamics payload with target constants and optional SH data.
             % -------------------------------------------------------------------------------------------------------------
             %% CHANGELOG
             % 14-03-2025    Pietro Califano     First version implemented from legacy codes
             % 15-06-2025    Pietro Califano     Fix incorrect measurement unit for Apophis radius
             % 22-07-2025    Pietro Califano     Add new scenarios, updates to support future-nav simulations
             % 01-07-2026    Pietro Califano     Add support for user-defined Spherical Harmonics coefficients
+            % 24-07-2026    Pietro Califano, Codex     Document embedded registry coefficient selection.
             % -------------------------------------------------------------------------------------------------------------
             %% DEPENDENCIES
-            % [-]
+            % CScenarioRegistry
+            % SSphericalHarmonicsGravityData
             % -------------------------------------------------------------------------------------------------------------
 
             if kwargs.bUseKilometersScale
@@ -422,15 +443,18 @@ classdef CScenarioGenerator < CGeneralPropagator
                         [strSHgravityData, strSHmeta] = CScenarioRegistry.GetSphericalHarmonicsGravityData( ...
                             enumScenarioName, ui32RequestedDegree, charLengthUnits);
 
-                        if ~strSHmeta.bHasHardcodedCoefficients || ui32RequestedDegree > strSHmeta.ui32HardcodedMaxDegree
+                        if ~strSHmeta.bHasHardcodedCoefficients || ...
+                                ui32RequestedDegree > strSHmeta.ui32HardcodedMaxDegree
                             error('CScenarioGenerator:RegistrySHUnavailable', ...
                                 ['Registry SH data for %s are unavailable at requested degree %u. ' ...
                                  'Available hardcoded max degree is %u.'], ...
-                                string(enumScenarioName), ui32RequestedDegree, strSHmeta.ui32HardcodedMaxDegree);
+                                string(enumScenarioName), ui32RequestedDegree, ...
+                                strSHmeta.ui32HardcodedMaxDegree);
                         end
                         fprintf(['Loaded registry spherical harmonics for %s: degree %u/%u, ' ...
                             'units %s, normalization %s, source %s, %s\n'], ...
-                            char(string(enumScenarioName)), ui32RequestedDegree, strSHmeta.ui32HardcodedMaxDegree, ...
+                            char(string(enumScenarioName)), ui32RequestedDegree, ...
+                            strSHmeta.ui32HardcodedMaxDegree, ...
                             char(charLengthUnits), char(strSHmeta.charNormalization), ...
                             char(strSHmeta.charSource), char(strSHmeta.charSourceUrl));
                     end
@@ -454,7 +478,10 @@ classdef CScenarioGenerator < CGeneralPropagator
             % -------------------------------------------------------------------------------------------------------------
             %% DESCRIPTION
             % Load unnormalized [Clm, Slm] spherical-harmonics coefficient columns for a scenario from a
-            % schema-backed file when provided, otherwise from hardcoded registry metadata when available.
+            % schema-backed file when provided, otherwise from embedded
+            % registry metadata. Explicit files are validated against the
+            % requested scenario; registry lookup returns its complete
+            % hardcoded coefficient family.
             % -------------------------------------------------------------------------------------------------------------
             %% INPUT
             % enumScenarioName: Scenario enum/name used to validate registry or file-backed coefficients.
@@ -463,6 +490,9 @@ classdef CScenarioGenerator < CGeneralPropagator
             %% OUTPUT
             % dCSlmCoeffCols: Unnormalized [Clm, Slm] coefficient columns.
             % ui16MaxSHdegree: Maximum spherical-harmonics degree represented by dCSlmCoeffCols.
+            % -------------------------------------------------------------------------------------------------------------
+            %% CHANGELOG
+            % 24-07-2026  Pietro Califano, Codex     Document embedded registry default loading.
             % -------------------------------------------------------------------------------------------------------------
             %% DEPENDENCIES
             % CScenarioRegistry, SSphericalHarmonicsGravityData
@@ -484,10 +514,10 @@ classdef CScenarioGenerator < CGeneralPropagator
                 return
             end
 
-            % Else, load registry-backed spherical harmonics data
+            % Load the complete embedded family so callers can retain its
+            % declared maximum degree with the coefficient rows.
             strScenarioSpec = CScenarioRegistry.GetScenarioSpec(enumScenarioName);
             strSHmeta = strScenarioSpec.strSphericalHarmonics;
-
             if ~strSHmeta.bHasHardcodedCoefficients
                 dCSlmCoeffCols = zeros(0, 2);
                 ui16MaxSHdegree = uint16(0);
