@@ -36,6 +36,7 @@ end
 % 01-07-2026    Pietro Califano, Codex 5.5      Document zero state partial for time-indexed stochastic acceleration.
 % 01-07-2026    Pietro Califano, Codex 5.5      Wire analytical panel SRP acceleration Jacobian.
 % 22-07-2026    Pietro Califano, Codex 5.6      Match RHS exclusive target-gravity model selection.
+% 23-07-2026    Pietro Califano, Codex           Fix generated-code Sun ephemeris column orientation.
 % -------------------------------------------------------------------------------------------------------------
 %% DEPENDENCIES
 % ResolveInertialDynMaxFidelityConfig()
@@ -92,7 +93,7 @@ dDCMmainAtt_INfromTF = ResolveMainAttitude_(dStateTimetag, ...
 bIsInEclipse = false;
 if strModelConfig.bIncludeSRP && strModelConfig.bIncludeEclipse && bHasSunEphemeris
     bIsInEclipse = IsInCylindricalTargetShadow(dPosSC_IN, ...
-                                               dBodyEphemerides(1:3), ...
+                                               dBodyEphemerides(1:3, 1), ...
                                                strDynParams.strMainData.dRefRadius);
 end
 
@@ -140,7 +141,7 @@ if ~isempty(dBodyEphemerides)
         end
 
         idxBody = (3 * (idB - 1) + 1):(3 * idB);
-        dPosBodyToSC_IN = dPosSC_IN - dBodyEphemerides(idxBody);
+        dPosBodyToSC_IN = dPosSC_IN - dBodyEphemerides(idxBody, 1);
         dDynMatrix(4:6, 1:3) = dDynMatrix(4:6, 1:3) + EvalPointMassJacobian_(dPosBodyToSC_IN, dGMbody);
     end
 end
@@ -149,7 +150,7 @@ end
 if bHasPanelSRP && bHasSunEphemeris && ~bIsInEclipse
     dDynMatrix(4:6, 1:3) = dDynMatrix(4:6, 1:3) + ...
         ComputePanelSRPJacobianFromDynParams(dPosSC_IN, ...
-                                             dBodyEphemerides(1:3), ...
+                                             dBodyEphemerides(1:3, 1), ...
                                              dSolarPressure, ...
                                              strDynParams, ...
                                              strModelConfig.bRecomputeSRPpressureFromDistance);
@@ -251,7 +252,8 @@ for idB = 1:ui32NumInputBodies
 
     idx = (3 * (idB - 1) + 1):(3 * idB);
     if bIncludePosition
-        dBodyEphemerides(idx) = EvalBodyOrbitData_(dStateTimetag, strDynParams.strBody3rdData(idB).strOrbitData);
+        dBodyEphemerides(idx, 1) = EvalBodyOrbitData_( ...
+            dStateTimetag, strDynParams.strBody3rdData(idB).strOrbitData);
     end
     if bIncludeBodyGravity && coder.const(isfield(strDynParams.strBody3rdData(idB), 'dGM'))
         d3rdBodiesGM(idB) = strDynParams.strBody3rdData(idB).dGM;
@@ -289,7 +291,8 @@ function [dCoeffSRP, dSolarPressure, bHasSunEphemeris] = ResolveCannonballSRP_(d
 % Compute SRP pressure and cannonball coefficient from Sun-spacecraft range.
 dCoeffSRP = [];
 dSolarPressure = 0.0;
-bHasSunEphemeris = ~isempty(dBodyEphemerides) && norm(dBodyEphemerides(1:3)) > eps('single');
+bHasSunEphemeris = ~isempty(dBodyEphemerides) && ...
+    norm(dBodyEphemerides(1:3, 1)) > eps('single');
 
 if ~bIncludeSRP || ~bHasSunEphemeris || ~coder.const(isfield(strDynParams, 'strSRPdata')) || ...
         ~coder.const(isfield(strDynParams, 'strSCdata'))

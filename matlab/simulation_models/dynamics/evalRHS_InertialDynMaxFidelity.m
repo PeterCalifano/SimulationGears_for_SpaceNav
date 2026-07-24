@@ -38,6 +38,7 @@ end
 % 28-05-2026    Pietro Califano, Codex 5.5      Centralize model configuration and schema-driven SH activation.
 % 01-07-2026    Pietro Califano, Codex 5.5      Add optional pre-generated stochastic residual acceleration hook.
 % 22-07-2026    Pietro Califano, Codex           Evaluate exactly one selected target-gravity model.
+% 23-07-2026    Pietro Califano, Codex           Fix generated-code Sun ephemeris column orientation.
 % -------------------------------------------------------------------------------------------------------------
 %% DEPENDENCIES
 % ResolveInertialDynMaxFidelityConfig()
@@ -89,7 +90,7 @@ dDCMmainAtt_INfromTF = ResolveMainAttitude_(dStateTimetag, ...
 bIsInEclipse = false;
 if strModelConfig.bIncludeSRP && strModelConfig.bIncludeEclipse && bHasSunEphemeris
     bIsInEclipse = IsInCylindricalTargetShadow(dxOrbitState(1:3), ...
-                                               dBodyEphemerides(1:3), ...
+                                               dBodyEphemerides(1:3, 1), ...
                                                strDynParams.strMainData.dRefRadius);
 end
 
@@ -129,7 +130,7 @@ dSRPtorque_SCB = zeros(3, 1);
 bPanelSRPActive = false;
 if bHasPanelSRP && bHasSunEphemeris && ~bIsInEclipse
     [dAccPanelSRP_IN, dSRPtorque_SCB] = ComputePanelSRPFromDynParams(dxOrbitState(1:3), ...
-                                                                     dBodyEphemerides(1:3), ...
+                                                                     dBodyEphemerides(1:3, 1), ...
                                                                      dSolarPressure, ...
                                                                      strDynParams);
     dDxDt(4:6) = dDxDt(4:6) + dAccPanelSRP_IN;
@@ -230,7 +231,8 @@ for idB = 1:ui32NumInputBodies
 
     idx = (3 * (idB - 1) + 1):(3 * idB);
     if bIncludePosition
-        dBodyEphemerides(idx) = EvalBodyOrbitData_(dStateTimetag, strDynParams.strBody3rdData(idB).strOrbitData);
+        dBodyEphemerides(idx, 1) = EvalBodyOrbitData_( ...
+            dStateTimetag, strDynParams.strBody3rdData(idB).strOrbitData);
     end
     if bIncludeBodyGravity && coder.const(isfield(strDynParams.strBody3rdData(idB), 'dGM'))
         d3rdBodiesGM(idB) = strDynParams.strBody3rdData(idB).dGM;
@@ -268,7 +270,8 @@ function [dCoeffSRP, dSolarPressure, bHasSunEphemeris] = ResolveCannonballSRP_(d
 % Compute cannonball SRP coefficient and solar pressure from Sun-spacecraft range.
 dCoeffSRP = [];
 dSolarPressure = 0.0;
-bHasSunEphemeris = ~isempty(dBodyEphemerides) && norm(dBodyEphemerides(1:3)) > eps('single');
+bHasSunEphemeris = ~isempty(dBodyEphemerides) && ...
+    norm(dBodyEphemerides(1:3, 1)) > eps('single');
 if ~bIncludeSRP || ~bHasSunEphemeris || ~coder.const(isfield(strDynParams, 'strSRPdata')) || ...
         ~coder.const(isfield(strDynParams, 'strSCdata'))
     return

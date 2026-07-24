@@ -71,6 +71,7 @@ end
 % 30-04-2026    Pietro Califano, Codex 5.5    Routed cannonball SRP through standalone acceleration kernel.
 % 22-07-2026    Pietro Califano, Codex 5.6    Correct the remaining global sign error in direct and indirect
 %                                             third-body gravity.
+% 23-07-2026    Pietro Califano, Codex        Enforce generated-code ephemeris column-vector indexing.
 % -------------------------------------------------------------------------------------------------------------
 %% DEPENDENCIES
 % [-]
@@ -117,7 +118,8 @@ if ~isempty(dBodyEphemerides)
         end
 
         if ui8N3rdBodies > 0
-            d3rdBodiesPos_IN(:,:) = reshape(dBodyEphemerides(4:end), 3, ui8N3rdBodies); % TODO may require modification, if so, just add a extraction index that moved along column
+            d3rdBodiesPos_IN(:,:) = reshape( ...
+                dBodyEphemerides(4:end, 1), 3, ui8N3rdBodies);
         end
 
     end
