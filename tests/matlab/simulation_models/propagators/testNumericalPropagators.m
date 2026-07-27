@@ -1,0 +1,349 @@
+classdef testNumericalPropagators < matlab.unittest.TestCase
+    %% DESCRIPTION
+    % Behavioral tests for the shared SimulationGears numerical propagators.
+    % The suite verifies trajectory layout, integration direction, convergence,
+    % adaptive error control, public-input diagnostics, and generated-code
+    % specialization of the fixed-step scheme.
+    % -------------------------------------------------------------------------------------------------------------
+    %% CHANGELOG
+    % 27-07-2026  Pietro Califano, Codex     First behavioral regression suite.
+    % -------------------------------------------------------------------------------------------------------------
+
+    methods (Test)
+        function testRK2AndRK8StepsAdvanceState(self)
+            % Both public step variants must preserve column-state layout and
+            % return the advanced timestamp without trajectory allocation.
+            dStepSize = 0.1;
+            dExpectedHeunState = 1.0 + dStepSize + dStepSize^2 / 2.0;
+
+            [dxHeunState, dHeunTime] = PropagateRK2HeunStep( ...
+                @GrowthRhs_, 3.0, 1.0, dStepSize);
+            [dxRK8State, dRK8Time] = PropagateRK8Step( ...
+                @GrowthRhs_, 3.0, 1.0, dStepSize);
+
+            self.verifyEqual(dxHeunState, dExpectedHeunState, ...
+                'AbsTol', 10.0 * eps);
+            self.verifyEqual(dxRK8State, exp(dStepSize), 'AbsTol', 1.0e-12);
+            self.verifyEqual([dHeunTime, dRK8Time], [3.1, 3.1], ...
+                'AbsTol', 10.0 * eps);
+        end
+
+        function testRK4StepAdvancesTimeAndState(self)
+            % One public step must return only the advanced state and time.
+            dStepSize = 0.1;
+            dExpectedState = 1.0 + dStepSize + dStepSize^2 / 2.0 + ...
+                dStepSize^3 / 6.0 + dStepSize^4 / 24.0;
+
+            [dxAdvancedState, dAdvancedTime] = PropagateRK4Step( ...
+                @GrowthRhs_, 2.0, 1.0, dStepSize);
+
+            self.verifyEqual(dxAdvancedState, dExpectedState, ...
+                'AbsTol', 10.0 * eps);
+            self.verifyEqual(dAdvancedTime, 2.1, 'AbsTol', 10.0 * eps);
+        end
+
+        function testRK4ForwardGridAndDimension(self)
+            % A shortened final step must reach the exact endpoint without
+            % changing the state-history row contract.
+            dxInitialState = [1.0; 0.0];
+
+            [dxStateHistory, dTimeGrid, strStatistics] = PropagateFixedStep( ...
+                @OscillatorRhs_, [0.0, 1.0], dxInitialState, 0.3, ...
+                EnumFixedStepScheme.RK4);
+
+            self.verifyEqual(dTimeGrid, [0.0; 0.3; 0.6; 0.9; 1.0], ...
+                'AbsTol', 10.0 * eps);
+            self.verifySize(dxStateHistory, [5, 2]);
+            self.verifyEqual(dxStateHistory(1, :).', dxInitialState);
+            self.verifyEqual(strStatistics.ui32AcceptedSteps, uint32(4));
+            self.verifyEqual(strStatistics.ui32RejectedSteps, uint32(0));
+            self.verifyEqual(strStatistics.ui32FunctionEvaluations, uint32(16));
+        end
+
+        function testRK2AndRK8IntervalContracts(self)
+            % Fixed-step scheme variants must share the same endpoint,
+            % history orientation, and evaluation-count contracts.
+            dxInitialState = [1.0; 0.0];
+
+            [dxHeunHistory, dHeunGrid, strHeunStatistics] = ...
+                PropagateFixedStep(@OscillatorRhs_, [0.0, 1.0], ...
+                dxInitialState, 0.4, EnumFixedStepScheme.RK2Heun);
+            [dxRK8History, dRK8Grid, strRK8Statistics] = ...
+                PropagateFixedStep(@OscillatorRhs_, [0.0, 1.0], ...
+                dxInitialState, 0.4, EnumFixedStepScheme.RK8);
+
+            dExpectedGrid = [0.0; 0.4; 0.8; 1.0];
+            self.verifyEqual(dHeunGrid, dExpectedGrid, ...
+                'AbsTol', 10.0 * eps);
+            self.verifyEqual(dRK8Grid, dExpectedGrid, ...
+                'AbsTol', 10.0 * eps);
+            self.verifySize(dxHeunHistory, [4, 2]);
+            self.verifySize(dxRK8History, [4, 2]);
+            self.verifyEqual(strHeunStatistics.ui32FunctionEvaluations, ...
+                uint32(6));
+            self.verifyEqual(strRK8Statistics.ui32FunctionEvaluations, ...
+                uint32(39));
+        end
+
+        function testFixedPropagatorsConvergeAtExpectedOrders(self)
+            % Step halving must reduce global error consistently with each
+            % method's advertised order.
+            dExactFinalState = exp(1.0);
+
+            dxHeunCoarse = PropagateFixedStep( ...
+                @GrowthRhs_, [0.0, 1.0], 1.0, 0.25, ...
+                EnumFixedStepScheme.RK2Heun);
+            dxHeunFine = PropagateFixedStep( ...
+                @GrowthRhs_, [0.0, 1.0], 1.0, 0.125, ...
+                EnumFixedStepScheme.RK2Heun);
+            dxRK4Coarse = PropagateFixedStep( ...
+                @GrowthRhs_, [0.0, 1.0], 1.0, 0.25, ...
+                EnumFixedStepScheme.RK4);
+            dxRK4Fine = PropagateFixedStep( ...
+                @GrowthRhs_, [0.0, 1.0], 1.0, 0.125, ...
+                EnumFixedStepScheme.RK4);
+            dxRK8Coarse = PropagateFixedStep( ...
+                @GrowthRhs_, [0.0, 1.0], 1.0, 0.5, ...
+                EnumFixedStepScheme.RK8);
+            dxRK8Fine = PropagateFixedStep( ...
+                @GrowthRhs_, [0.0, 1.0], 1.0, 0.25, ...
+                EnumFixedStepScheme.RK8);
+
+            dHeunErrorRatio = abs(dxHeunCoarse(end) - dExactFinalState) / ...
+                abs(dxHeunFine(end) - dExactFinalState);
+            dRK4ErrorRatio = abs(dxRK4Coarse(end) - dExactFinalState) / ...
+                abs(dxRK4Fine(end) - dExactFinalState);
+            dRK8ErrorRatio = abs(dxRK8Coarse(end) - dExactFinalState) / ...
+                abs(dxRK8Fine(end) - dExactFinalState);
+
+            self.verifyGreaterThan(dHeunErrorRatio, 3.5);
+            self.verifyGreaterThan(dRK4ErrorRatio, 12.0);
+            self.verifyGreaterThan(dRK8ErrorRatio, 150.0);
+        end
+
+        function testRK8ConvergesForGenericFirstOrderDynamics(self)
+            % Eighth-order convergence must hold for nonlinear autonomous
+            % and explicitly time-dependent dynamics, not only linear growth.
+            dCoarseStep = 0.5;
+            dFineStep = 0.25;
+
+            dxNonlinearCoarse = PropagateFixedStep( ...
+                @QuadraticGrowthRhs_, [0.0, 1.0], 0.25, dCoarseStep, ...
+                EnumFixedStepScheme.RK8);
+            dxNonlinearFine = PropagateFixedStep( ...
+                @QuadraticGrowthRhs_, [0.0, 1.0], 0.25, dFineStep, ...
+                EnumFixedStepScheme.RK8);
+            dxTimeVaryingCoarse = PropagateFixedStep( ...
+                @TimeVaryingGrowthRhs_, [0.0, 1.0], 1.0, dCoarseStep, ...
+                EnumFixedStepScheme.RK8);
+            dxTimeVaryingFine = PropagateFixedStep( ...
+                @TimeVaryingGrowthRhs_, [0.0, 1.0], 1.0, dFineStep, ...
+                EnumFixedStepScheme.RK8);
+
+            dExactNonlinearState = 1.0 / 3.0;
+            dExactTimeVaryingState = exp(0.5);
+            dNonlinearErrorRatio = ...
+                abs(dxNonlinearCoarse(end) - dExactNonlinearState) / ...
+                abs(dxNonlinearFine(end) - dExactNonlinearState);
+            dTimeVaryingErrorRatio = ...
+                abs(dxTimeVaryingCoarse(end) - dExactTimeVaryingState) / ...
+                abs(dxTimeVaryingFine(end) - dExactTimeVaryingState);
+
+            self.verifyGreaterThan(dNonlinearErrorRatio, 180.0);
+            self.verifyGreaterThan(dTimeVaryingErrorRatio, 180.0);
+        end
+
+        function testRKF45HonorsToleranceAndCountsRejectedSteps(self)
+            % Tightening the tolerance must improve the final state while a
+            % deliberately large first step exercises rejection accounting.
+            [dxLooseHistory, dLooseGrid] = ...
+                PropagateAdaptiveStep(@GrowthRhs_, [0.0, 2.0], 1.0, 2.0, ...
+                dRelativeTolerance=1.0e-3, ...
+                dAbsoluteTolerance=1.0e-6);
+            [dxTightHistory, dTightGrid, strTightStatistics] = ...
+                PropagateAdaptiveStep(@GrowthRhs_, [0.0, 2.0], 1.0, 2.0, ...
+                dRelativeTolerance=1.0e-10, ...
+                dAbsoluteTolerance=1.0e-12);
+
+            dExactFinalState = exp(2.0);
+            dLooseError = abs(dxLooseHistory(end) - dExactFinalState);
+            dTightError = abs(dxTightHistory(end) - dExactFinalState);
+
+            self.verifyEqual(dLooseGrid(end), 2.0);
+            self.verifyEqual(dTightGrid(end), 2.0);
+            self.verifyLessThan(dTightError, dLooseError);
+            self.verifyGreaterThan(strTightStatistics.ui32RejectedSteps, ...
+                uint32(0));
+            self.verifyEqual(strTightStatistics.ui32FunctionEvaluations, ...
+                uint32(6) * (strTightStatistics.ui32AcceptedSteps + ...
+                strTightStatistics.ui32RejectedSteps));
+        end
+
+        function testGeneralPropagatorDispatchesRK4AndRK8(self)
+            % The class-level host dispatcher must expose the same state-first
+            % contract as the shared fixed-step provider.
+            dxInitialState = [1.0; 0.0];
+
+            [dxRK4History, dRK4Grid] = CGeneralPropagator.propagateState( ...
+                @OscillatorRhs_, [0.0, 1.0], dxInitialState, ...
+                dTimestep=0.3, enumOdeFunctioName="RK4");
+            [dxRK8History, dRK8Grid] = CGeneralPropagator.propagateState( ...
+                @OscillatorRhs_, [0.0, 1.0], dxInitialState, ...
+                dTimestep=0.3, enumOdeFunctioName="RK8");
+
+            [dxExpectedRK4History, dExpectedRK4Grid] = PropagateFixedStep( ...
+                @OscillatorRhs_, [0.0, 1.0], dxInitialState, 0.3, ...
+                EnumFixedStepScheme.RK4);
+            [dxExpectedRK8History, dExpectedRK8Grid] = PropagateFixedStep( ...
+                @OscillatorRhs_, [0.0, 1.0], dxInitialState, 0.3, ...
+                EnumFixedStepScheme.RK8);
+
+            self.verifyEqual(dxRK4History, dxExpectedRK4History);
+            self.verifyEqual(dRK4Grid, dExpectedRK4Grid);
+            self.verifyEqual(dxRK8History, dxExpectedRK8History);
+            self.verifyEqual(dRK8Grid, dExpectedRK8Grid);
+        end
+
+        function testPropagatorsSupportBackwardAndZeroDuration(self)
+            % Every interval provider must integrate backward and avoid all RHS
+            % evaluations when the requested interval has zero duration.
+            enumFixedSchemes = [EnumFixedStepScheme.RK2Heun, ...
+                EnumFixedStepScheme.RK4, EnumFixedStepScheme.RK8];
+            for ui32SchemeIndex = uint32(1):uint32(numel(enumFixedSchemes))
+                [dxBackwardHistory, dBackwardGrid] = PropagateFixedStep( ...
+                    @GrowthRhs_, [1.0, 0.0], exp(1.0), 0.1, ...
+                    enumFixedSchemes(double(ui32SchemeIndex)));
+
+                self.verifyTrue(all(diff(dBackwardGrid) < 0.0));
+                self.verifyEqual(dBackwardGrid([1, end]), [1.0; 0.0]);
+                self.verifyLessThan(abs(dxBackwardHistory(end) - 1.0), ...
+                    5.0e-3);
+            end
+
+            [dxAdaptiveHistory, dAdaptiveGrid] = PropagateAdaptiveStep( ...
+                @GrowthRhs_, [1.0, 0.0], exp(1.0), 0.5, ...
+                dRelativeTolerance=1.0e-10, ...
+                dAbsoluteTolerance=1.0e-12);
+            self.verifyTrue(all(diff(dAdaptiveGrid) < 0.0));
+            self.verifyEqual(dAdaptiveGrid([1, end]), [1.0; 0.0]);
+            self.verifyEqual(dxAdaptiveHistory(end), 1.0, 'AbsTol', 1.0e-9);
+
+            for ui32SchemeIndex = uint32(1):uint32(numel(enumFixedSchemes))
+                [dxZeroHistory, dZeroGrid, strZeroStatistics] = ...
+                    PropagateFixedStep(@ErrorRhs_, [5.0, 5.0], ...
+                    [1.0; 2.0], 0.2, ...
+                    enumFixedSchemes(double(ui32SchemeIndex)));
+
+                self.verifyEqual(dxZeroHistory, [1.0, 2.0]);
+                self.verifyEqual(dZeroGrid, 5.0);
+                self.verifyEqual(strZeroStatistics.ui32AcceptedSteps, ...
+                    uint32(0));
+                self.verifyEqual(strZeroStatistics.ui32FunctionEvaluations, ...
+                    uint32(0));
+            end
+
+            [dxZeroHistory, dZeroGrid, strZeroStatistics] = ...
+                PropagateAdaptiveStep(@ErrorRhs_, [5.0, 5.0], ...
+                [1.0; 2.0], 0.2);
+            self.verifyEqual(dxZeroHistory, [1.0, 2.0]);
+            self.verifyEqual(dZeroGrid, 5.0);
+            self.verifyEqual(strZeroStatistics.ui32AcceptedSteps, uint32(0));
+            self.verifyEqual(strZeroStatistics.ui32FunctionEvaluations, ...
+                uint32(0));
+        end
+
+        function testInvalidInputsAndDerivativeDimensionsFailClearly(self)
+            % Empty states, impossible adaptive bounds, and malformed RHS
+            % outputs must fail at the owning propagation boundary.
+            self.verifyError(@() PropagateFixedStep( ...
+                @GrowthRhs_, [0.0, 1.0], zeros(0, 1), 0.1, ...
+                EnumFixedStepScheme.RK4), ...
+                'PropagateFixedStep:EmptyInitialState');
+            self.verifyError(@() PropagateAdaptiveStep( ...
+                @GrowthRhs_, [0.0, 1.0], 1.0, 0.1, ...
+                dMinimumStep=0.2, dMaximumStep=0.1), ...
+                'PropagateAdaptiveStep:InvalidStepBounds');
+            self.verifyError(@() PropagateRK4Step( ...
+                @WrongDimensionRhs_, 0.0, [1.0; 2.0], 0.1), ...
+                'PropagateRK4Step:InvalidDerivative');
+            self.verifyError(@() PropagateAdaptiveStep( ...
+                @WrongDimensionRhs_, [0.0, 1.0], [1.0; 2.0], 0.1), ...
+                'PropagateAdaptiveStep:InvalidDerivative');
+        end
+
+        function testRKF45FailsWhenMinimumStepCannotMeetTolerance(self)
+            % The solver must reject an unsatisfied tolerance instead of
+            % silently accepting a step at the configured lower bound.
+            self.verifyError(@() PropagateAdaptiveStep( ...
+                @GrowthRhs_, [0.0, 2.0], 1.0, 2.0, ...
+                dRelativeTolerance=1.0e-14, ...
+                dAbsoluteTolerance=1.0e-15, ...
+                dMinimumStep=0.5), ...
+                'PropagateAdaptiveStep:MinimumStepExceeded');
+        end
+
+        function testFixedStepCodegenRequiresConstantScheme(self)
+            % A constant scheme must generate successfully, while exposing
+            % the same scheme as a runtime entry-point input must be rejected.
+            charCodegenRoot = tempname;
+            mkdir(charCodegenRoot);
+            objCodegenCleanup = onCleanup( ...
+                @() rmdir(charCodegenRoot, 's'));
+
+            objCodegenConfig = coder.config('lib');
+            charConstantBuildDir = fullfile(charCodegenRoot, 'constant');
+            codegen('-config', objCodegenConfig, ...
+                '-d', charConstantBuildDir, ...
+                'CodegenFixedStepSchemeProbe', ...
+                '-args', {coder.Constant(EnumFixedStepScheme.RK4)});
+
+            charRuntimeBuildDir = fullfile(charCodegenRoot, 'runtime');
+            bRuntimeSchemeRejected = false;
+            try
+                codegen('-config', objCodegenConfig, ...
+                    '-d', charRuntimeBuildDir, ...
+                    'CodegenFixedStepSchemeProbe', ...
+                    '-args', {EnumFixedStepScheme.RK4});
+            catch
+                bRuntimeSchemeRejected = true;
+            end
+
+            self.verifyTrue(bRuntimeSchemeRejected, ...
+                ['Code generation must reject a runtime-variable fixed-step ', ...
+                 'scheme.']);
+            clear objCodegenCleanup
+        end
+    end
+end
+
+function dxDerivative = GrowthRhs_(dTime, dxState)
+% Return exponential-growth dynamics.
+dxDerivative = dxState + 0.0 * dTime;
+end
+
+function dxDerivative = ErrorRhs_(~, dxState)
+% Fail if a zero-duration propagator evaluates its derivative.
+dxDerivative = dxState;
+error('testNumericalPropagators:UnexpectedRhsEvaluation', ...
+    'The RHS must not be evaluated for a zero-duration interval.');
+end
+
+function dxDerivative = OscillatorRhs_(dTime, dxState)
+% Return a two-state harmonic-oscillator derivative.
+dxDerivative = [dxState(2); -dxState(1)] + 0.0 * dTime;
+end
+
+function dxDerivative = QuadraticGrowthRhs_(dTime, dxState)
+% Return nonlinear autonomous dynamics with a closed-form solution.
+dxDerivative = dxState.^2 + 0.0 * dTime;
+end
+
+function dxDerivative = TimeVaryingGrowthRhs_(dTime, dxState)
+% Return explicitly time-dependent linear dynamics.
+dxDerivative = dTime * dxState;
+end
+
+function dxDerivative = WrongDimensionRhs_(dTime, dxState)
+% Return one fewer derivative element than the state contract requires.
+dxDerivative = dxState(1:end-1) + 0.0 * dTime;
+end

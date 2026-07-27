@@ -1,9 +1,12 @@
 classdef CGeneralPropagator < handle
     %% DESCRIPTION
-    % TODO
+    % Host-side propagation dispatcher for orbit and generic state dynamics.
+    % MATLAB ODE solvers and the shared SimulationGears fixed-step provider use
+    % one state-history-first output contract.
     % -------------------------------------------------------------------------------------------------------------
     %% CHANGELOG
     % 15-03-2025    Pietro Califano     Implemented moving methods from CScenarioGeneration (now a subclass)
+    % 27-07-2026    Pietro Califano, Codex     Add shared RK4/RK8 dispatch.
     % -------------------------------------------------------------------------------------------------------------
     %% METHODS
     % See public methods below or call function: methods <class_name>.
@@ -119,6 +122,34 @@ classdef CGeneralPropagator < handle
                                                                 dxState0, ...
                                                                 varargparams, ...
                                                                 settings)
+            %% SIGNATURE
+            % [dxStateTrajectory, dTimegrid] = CGeneralPropagator.propagateState( ...
+            %     objDynamicFcnHandle, dTimegrid, dxState0, varargin, Name=Value)
+            % -------------------------------------------------------------------------------------------------------------
+            %% DESCRIPTION
+            % Propagate a column state through a MATLAB ODE solver or the
+            % shared fixed-step RK4/RK8 provider. Requested grids with more
+            % than two timestamps are preserved as output-sample locations.
+            % -------------------------------------------------------------------------------------------------------------
+            %% INPUT
+            % objDynamicFcnHandle          (1,1) function_handle state derivative
+            % dTimegrid                    (1,N) double interval or requested output grid
+            % dxState0                     (Mx1) double initial state
+            % varargparams                 repeating derivative parameters
+            % settings.dTimestep           (1,1) double fixed-step maximum magnitude
+            % settings.objOdeOpts          (1,1) struct MATLAB ODE options
+            % settings.enumOdeFunctioName  (1,1) string solver identifier
+            % -------------------------------------------------------------------------------------------------------------
+            %% OUTPUT
+            % dxStateTrajectory            (NxM) double state history, one state per row
+            % dTimegrid                    (Nx1) double state timestamps
+            % -------------------------------------------------------------------------------------------------------------
+            %% CHANGELOG
+            % 27-07-2026  Pietro Califano, Codex     Implement RK4/RK8 dispatch.
+            % -------------------------------------------------------------------------------------------------------------
+            %% DEPENDENCIES
+            % EnumFixedStepScheme, PropagateFixedStep
+            % -------------------------------------------------------------------------------------------------------------
             arguments
                 objDynamicFcnHandle {mustBeA(objDynamicFcnHandle, 'function_handle')}
                 dTimegrid           (1,:) double {isvector, isnumeric}
@@ -133,45 +164,51 @@ classdef CGeneralPropagator < handle
                 settings.enumOdeFunctioName {mustBeMember(settings.enumOdeFunctioName, ["ode113", "ode45", "ode78", "RK4", "RK8"])} = "ode113"
             end
 
-            % objDynamicFcnHandle = @(dTime, dxState) objDynamicFcnHandle(dTime, dxState);
-            % cellOdeInput = {objDynamicFcnHandle, dTimegrid, dxState0, settings.objOdeOpts};
-
-            assert(length(dTimegrid) >= 2, 'ERROR: invalid timegrid. It must contain at least two time instants.')
-
-            % Determine timegrid if required
-            if length(dTimegrid) == 2 && not(settings.dTimestep == 0)
-                dTimegrid = dTimegrid(1):settings.dTimestep:dTimegrid(2);
+            assert(length(dTimegrid) >= 2, ...
+                'CGeneralPropagator:InvalidTimegrid', ...
+                'The time grid must contain at least two timestamps.');
+            if settings.dTimestep < 0.0
+                error('CGeneralPropagator:InvalidTimestep', ...
+                    'The fixed-step magnitude must be nonnegative.');
             end
+
+            % Bind any repeating dynamics parameters once at the dispatcher
+            % boundary so every backend sees the same two-input RHS contract.
+            fcnStateDerivative = @(dTime, dxState) objDynamicFcnHandle( ...
+                dTime, dxState, varargparams{:});
 
             switch settings.enumOdeFunctioName
                 case "ode113"
 
-                    [dTimegrid, dxStateTrajectory] = ode113(objDynamicFcnHandle, ...
-                        dTimegrid, ...
-                        dxState0, ...
+                    [dTimegrid, dxStateTrajectory] = ode113( ...
+                        fcnStateDerivative, dTimegrid, dxState0, ...
                         settings.objOdeOpts);
 
                 case "ode45"
 
-                    [dTimegrid, dxStateTrajectory] = ode45(objDynamicFcnHandle, ...
-                        dTimegrid, ...
-                        dxState0, ...
+                    [dTimegrid, dxStateTrajectory] = ode45( ...
+                        fcnStateDerivative, dTimegrid, dxState0, ...
                         settings.objOdeOpts);
                     
                 case "ode78"
 
-                    [dTimegrid, dxStateTrajectory] = ode78(objDynamicFcnHandle, ...
-                        dTimegrid, ...
-                        dxState0, ...
+                    [dTimegrid, dxStateTrajectory] = ode78( ...
+                        fcnStateDerivative, dTimegrid, dxState0, ...
                         settings.objOdeOpts);
 
                 case "RK4"
-                    error('Not implemented yet')
+                    [dxStateTrajectory, dTimegrid] = PropagateFixedGrid_( ...
+                        fcnStateDerivative, dTimegrid, dxState0, ...
+                        settings.dTimestep, EnumFixedStepScheme.RK4);
+
                 case "RK8"
-                    error('Not implemented yet')
+                    [dxStateTrajectory, dTimegrid] = PropagateFixedGrid_( ...
+                        fcnStateDerivative, dTimegrid, dxState0, ...
+                        settings.dTimestep, EnumFixedStepScheme.RK8);
 
                 otherwise
-                    error('Unsupported ode function')
+                    error('CGeneralPropagator:UnsupportedSolver', ...
+                        'Unsupported propagation solver.');
             end
         end
 
@@ -246,3 +283,43 @@ classdef CGeneralPropagator < handle
     % end
 end
 
+function [dxStateTrajectory, dOutputTimegrid] = PropagateFixedGrid_( ...
+    fcnStateDerivative, dRequestedTimegrid, dxState0, dMaximumStep, ...
+    enumFixedStepScheme)
+% Propagate a requested fixed-step interval or preserve an explicit sample grid.
+if numel(dRequestedTimegrid) == 2
+    dIntervalDuration = abs(dRequestedTimegrid(2) - dRequestedTimegrid(1));
+    if dMaximumStep == 0.0
+        dMaximumStep = max(dIntervalDuration, 1.0);
+    end
+
+    [dxStateTrajectory, dOutputTimegrid] = PropagateFixedStep( ...
+        fcnStateDerivative, dRequestedTimegrid, dxState0, dMaximumStep, ...
+        enumFixedStepScheme);
+    return;
+end
+
+% For an explicit output grid, integrate each adjacent interval internally
+% and retain only its endpoint so the caller's sampling contract is unchanged.
+dOutputTimegrid = dRequestedTimegrid(:);
+dxStateTrajectory = zeros(numel(dOutputTimegrid), numel(dxState0));
+dxStateTrajectory(1, :) = dxState0.';
+dxCurrentState = dxState0;
+
+for ui32IntervalIndex = uint32(1):uint32(numel(dOutputTimegrid) - 1)
+    dIntervalTimeSpan = dOutputTimegrid( ...
+        double(ui32IntervalIndex):double(ui32IntervalIndex) + 1).';
+    dIntervalDuration = abs(dIntervalTimeSpan(2) - dIntervalTimeSpan(1));
+    dIntervalMaximumStep = dMaximumStep;
+    if dIntervalMaximumStep == 0.0
+        dIntervalMaximumStep = max(dIntervalDuration, 1.0);
+    end
+
+    dxIntervalHistory = PropagateFixedStep(fcnStateDerivative, ...
+        dIntervalTimeSpan, dxCurrentState, dIntervalMaximumStep, ...
+        enumFixedStepScheme);
+    dxCurrentState = dxIntervalHistory(end, :).';
+    dxStateTrajectory(double(ui32IntervalIndex) + 1, :) = ...
+        dxCurrentState.';
+end
+end
