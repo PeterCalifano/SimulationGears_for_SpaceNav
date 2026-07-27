@@ -1,8 +1,10 @@
 function [dxAdvancedState, dAdvancedTime] = PropagateRK2HeunStep( ...
-    fcnStateDerivative, dCurrentTime, dxCurrentState, dStepSize) %#codegen
+    fcnStateDerivative, dCurrentTime, dxCurrentState, dStepSize, ...
+    strDynParams, strModelConfigFlags) %#codegen
 %% SIGNATURE
 % [dxAdvancedState, dAdvancedTime] = PropagateRK2HeunStep( ...
-%     fcnStateDerivative, dCurrentTime, dxCurrentState, dStepSize)
+%     fcnStateDerivative, dCurrentTime, dxCurrentState, dStepSize, ...
+%     strDynParams, strModelConfigFlags)
 % -------------------------------------------------------------------------------------------------------------
 %% DESCRIPTION
 % Advance one state with Heun's explicit second-order Runge-Kutta method.
@@ -14,6 +16,8 @@ function [dxAdvancedState, dAdvancedTime] = PropagateRK2HeunStep( ...
 % dCurrentTime        (1,1) double current independent-variable value
 % dxCurrentState      (Nx1) double current state
 % dStepSize           (1,1) double signed integration step
+% strDynParams        (1,1) struct runtime dynamics payload forwarded to RHS
+% strModelConfigFlags (1,1) struct compile-time model selection forwarded to RHS
 % -------------------------------------------------------------------------------------------------------------
 %% OUTPUT
 % dxAdvancedState     (Nx1) double state at the advanced timestamp
@@ -21,6 +25,7 @@ function [dxAdvancedState, dAdvancedTime] = PropagateRK2HeunStep( ...
 % -------------------------------------------------------------------------------------------------------------
 %% CHANGELOG
 % 27-07-2026  Pietro Califano, Codex     First shared SimulationGears implementation.
+% 27-07-2026  Pietro Califano, Codex     Add explicit standard RHS inputs.
 % -------------------------------------------------------------------------------------------------------------
 %% DEPENDENCIES
 % None.
@@ -31,6 +36,8 @@ arguments (Input)
     dCurrentTime (1,1) double {mustBeFinite}
     dxCurrentState (:,1) double {mustBeFinite}
     dStepSize (1,1) double {mustBeFinite}
+    strDynParams (1,1) struct
+    strModelConfigFlags (1,1) struct {coder.mustBeConst}
 end
 
 arguments (Output)
@@ -39,11 +46,13 @@ arguments (Output)
 end
 
 % Evaluate the tangent at the interval start and at the Euler predictor.
-dStage1 = fcnStateDerivative(dCurrentTime, dxCurrentState);
+dStage1 = fcnStateDerivative( ...
+    dCurrentTime, dxCurrentState, strDynParams, strModelConfigFlags);
 ValidateDerivative_(dStage1, dxCurrentState);
 
 dxPredictedState = dxCurrentState + dStepSize * dStage1;
-dStage2 = fcnStateDerivative(dCurrentTime + dStepSize, dxPredictedState);
+dStage2 = fcnStateDerivative(dCurrentTime + dStepSize, dxPredictedState, ...
+    strDynParams, strModelConfigFlags);
 ValidateDerivative_(dStage2, dxCurrentState);
 
 % Average the endpoint tangents to obtain the second-order correction.

@@ -1,10 +1,10 @@
 function [dxStateHistory, dTimeGrid, strStatistics] = PropagateFixedStep( ...
     fcnStateDerivative, dTimeSpan, dxInitialState, dMaximumStep, ...
-    enumFixedStepScheme) %#codegen
+    strDynParams, strModelConfigFlags, enumFixedStepScheme) %#codegen
 %% SIGNATURE
 % [dxStateHistory, dTimeGrid, strStatistics] = PropagateFixedStep( ...
 %     fcnStateDerivative, dTimeSpan, dxInitialState, dMaximumStep, ...
-%     enumFixedStepScheme)
+%     strDynParams, strModelConfigFlags, enumFixedStepScheme)
 % -------------------------------------------------------------------------------------------------------------
 %% DESCRIPTION
 % Propagate a state over one interval with the selected fixed-step numerical
@@ -17,6 +17,9 @@ function [dxStateHistory, dTimeGrid, strStatistics] = PropagateFixedStep( ...
 % dTimeSpan           (1,2) double start and end timestamps
 % dxInitialState      (Nx1) double initial state
 % dMaximumStep        (1,1) double positive maximum step magnitude
+% strDynParams        (1,1) struct runtime dynamics payload forwarded to RHS
+% strModelConfigFlags (1,1) struct model selection forwarded to RHS; must be
+%                     compile-time constant for generated code
 % enumFixedStepScheme (1,1) EnumFixedStepScheme integration scheme; must be
 %                     compile-time constant for generated code
 % -------------------------------------------------------------------------------------------------------------
@@ -28,6 +31,7 @@ function [dxStateHistory, dTimeGrid, strStatistics] = PropagateFixedStep( ...
 %% CHANGELOG
 % 27-07-2026  Pietro Califano, Codex     First shared fixed-step propagator.
 % 27-07-2026  Pietro Califano, Codex     Require codegen scheme specialization.
+% 27-07-2026  Pietro Califano, Codex     Add explicit standard RHS inputs.
 % -------------------------------------------------------------------------------------------------------------
 %% DEPENDENCIES
 % EnumFixedStepScheme, PropagateRK2HeunStep, PropagateRK4Step,
@@ -39,6 +43,8 @@ arguments (Input)
     dTimeSpan (1,2) double {mustBeFinite}
     dxInitialState (:,1) double {mustBeFinite}
     dMaximumStep (1,1) double {mustBeFinite, mustBePositive}
+    strDynParams (1,1) struct
+    strModelConfigFlags (1,1) struct {coder.mustBeConst}
     enumFixedStepScheme (1,1) EnumFixedStepScheme {coder.mustBeConst}
 end
 
@@ -88,13 +94,16 @@ for ui32StepIndex = uint32(1):ui32StepCount
     switch enumFixedStepScheme
         case EnumFixedStepScheme.RK2Heun
             [dxAdvancedState, dAdvancedTime] = PropagateRK2HeunStep( ...
-                fcnStateDerivative, dCurrentTime, dxCurrentState, dStepSize);
+                fcnStateDerivative, dCurrentTime, dxCurrentState, dStepSize, ...
+                strDynParams, strModelConfigFlags);
         case EnumFixedStepScheme.RK4
             [dxAdvancedState, dAdvancedTime] = PropagateRK4Step( ...
-                fcnStateDerivative, dCurrentTime, dxCurrentState, dStepSize);
+                fcnStateDerivative, dCurrentTime, dxCurrentState, dStepSize, ...
+                strDynParams, strModelConfigFlags);
         case EnumFixedStepScheme.RK8
             [dxAdvancedState, dAdvancedTime] = PropagateRK8Step( ...
-                fcnStateDerivative, dCurrentTime, dxCurrentState, dStepSize);
+                fcnStateDerivative, dCurrentTime, dxCurrentState, dStepSize, ...
+                strDynParams, strModelConfigFlags);
         otherwise
             error('PropagateFixedStep:UnsupportedScheme', ...
                 'The fixed-step integration scheme is unsupported.');

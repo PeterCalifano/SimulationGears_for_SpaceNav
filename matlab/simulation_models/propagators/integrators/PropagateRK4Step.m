@@ -1,8 +1,10 @@
 function [dxAdvancedState, dAdvancedTime] = PropagateRK4Step( ...
-    fcnStateDerivative, dCurrentTime, dxCurrentState, dStepSize) %#codegen
+    fcnStateDerivative, dCurrentTime, dxCurrentState, dStepSize, ...
+    strDynParams, strModelConfigFlags) %#codegen
 %% SIGNATURE
 % [dxAdvancedState, dAdvancedTime] = PropagateRK4Step( ...
-%     fcnStateDerivative, dCurrentTime, dxCurrentState, dStepSize)
+%     fcnStateDerivative, dCurrentTime, dxCurrentState, dStepSize, ...
+%     strDynParams, strModelConfigFlags)
 % -------------------------------------------------------------------------------------------------------------
 %% DESCRIPTION
 % Advance one state with the classical explicit fourth-order Runge-Kutta
@@ -14,6 +16,8 @@ function [dxAdvancedState, dAdvancedTime] = PropagateRK4Step( ...
 % dCurrentTime        (1,1) double current independent-variable value
 % dxCurrentState      (Nx1) double current state
 % dStepSize           (1,1) double signed integration step
+% strDynParams        (1,1) struct runtime dynamics payload forwarded to RHS
+% strModelConfigFlags (1,1) struct compile-time model selection forwarded to RHS
 % -------------------------------------------------------------------------------------------------------------
 %% OUTPUT
 % dxAdvancedState     (Nx1) double state at the advanced timestamp
@@ -21,6 +25,7 @@ function [dxAdvancedState, dAdvancedTime] = PropagateRK4Step( ...
 % -------------------------------------------------------------------------------------------------------------
 %% CHANGELOG
 % 27-07-2026  Pietro Califano, Codex     First shared SimulationGears implementation.
+% 27-07-2026  Pietro Califano, Codex     Add explicit standard RHS inputs.
 % -------------------------------------------------------------------------------------------------------------
 %% DEPENDENCIES
 % None.
@@ -31,6 +36,8 @@ arguments (Input)
     dCurrentTime (1,1) double {mustBeFinite}
     dxCurrentState (:,1) double {mustBeFinite}
     dStepSize (1,1) double {mustBeFinite}
+    strDynParams (1,1) struct
+    strModelConfigFlags (1,1) struct {coder.mustBeConst}
 end
 
 arguments (Output)
@@ -39,19 +46,23 @@ arguments (Output)
 end
 
 % Evaluate the classical four stages at their matched intermediate states.
-dStage1 = fcnStateDerivative(dCurrentTime, dxCurrentState);
+dStage1 = fcnStateDerivative( ...
+    dCurrentTime, dxCurrentState, strDynParams, strModelConfigFlags);
 ValidateDerivative_(dStage1, dxCurrentState);
 
 dStage2 = fcnStateDerivative(dCurrentTime + dStepSize / 2.0, ...
-    dxCurrentState + (dStepSize / 2.0) * dStage1);
+    dxCurrentState + (dStepSize / 2.0) * dStage1, ...
+    strDynParams, strModelConfigFlags);
 ValidateDerivative_(dStage2, dxCurrentState);
 
 dStage3 = fcnStateDerivative(dCurrentTime + dStepSize / 2.0, ...
-    dxCurrentState + (dStepSize / 2.0) * dStage2);
+    dxCurrentState + (dStepSize / 2.0) * dStage2, ...
+    strDynParams, strModelConfigFlags);
 ValidateDerivative_(dStage3, dxCurrentState);
 
 dStage4 = fcnStateDerivative(dCurrentTime + dStepSize, ...
-    dxCurrentState + dStepSize * dStage3);
+    dxCurrentState + dStepSize * dStage3, ...
+    strDynParams, strModelConfigFlags);
 ValidateDerivative_(dStage4, dxCurrentState);
 
 % Combine the stages without allocating interval-level history.

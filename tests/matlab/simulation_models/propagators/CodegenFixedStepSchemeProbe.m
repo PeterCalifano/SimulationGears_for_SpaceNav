@@ -29,11 +29,12 @@ arguments (Output)
 end
 
 dxStateHistory = PropagateFixedStep(@GrowthRhs_, ...
-    [0.0, 1.0], 1.0, 0.25, enumFixedStepScheme);
+    [0.0, 1.0], 1.0, 0.25, struct(), struct(), ...
+    enumFixedStepScheme);
 dFinalState = dxStateHistory(end);
 end
 
-function dxStateDerivative = GrowthRhs_(dTime, dxState)
+function dxStateDerivative = GrowthRhs_(dTime, dxState, ~, ~)
 % Return scalar exponential-growth dynamics for generated-code validation.
 dxStateDerivative = dxState + 0.0 * dTime;
 end
