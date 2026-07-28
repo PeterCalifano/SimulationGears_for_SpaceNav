@@ -89,3 +89,21 @@ were `1.566527463304e-11` for the double RKF45 path,
 `1.435924157356e-10` for backward MX propagation. Returned endpoints were
 exactly `2.0`, `1.3`, and `0.0`, respectively. Code Analyzer reported zero
 messages in all three implementation files and both focused test files.
+
+## Final Reconciliation
+
+- [x] Commit the restored AutoDiff providers and focused tests at `e7820d2`.
+- [x] Verify that the RK4 and RK8 SX graphs can be wrapped in
+  `casadi.Function` and emitted through `Function.generate`. Generated C
+  contained constant coefficient literals and no arithmetic division
+  instructions from the Runge-Kutta tableau.
+- [x] Keep this as code-generation compatibility rather than a new public
+  builder/API. No standalone-C claim is made for the adaptive CVODES path.
+- [x] Retire the superseded MathCore AutoDiff files, migrated numerical
+  propagators, experimental `PropagateRKF45v2`, and ten deprecated integrator
+  files at nested MathCore commit `06337d2`.
+- [x] Advance the SimulationGears MathCore gitlink to that clean revision at
+  parent commit `b01fc50`.
+
+Fresh MATLAB R2024b reconciliation on 28-07-2026 passed the 20/20 generic and
+numerical AutoDiff tests plus the explicitly loaded CasADi 3.6.7 suite at 5/5.

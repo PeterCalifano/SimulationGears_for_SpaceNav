@@ -101,16 +101,30 @@ adding a specialized interval-propagation API.
 
 ## Downstream COSMICA Gate
 
-- [ ] Compile the shared `PropagateFixedStep` implementation through the
+- [x] Compile the shared `PropagateFixedStep` implementation through the
   builder-private max-fidelity RHS-binding adapter with runtime `strDynParams`,
-  constant truth/model flags, and constant fixed-step scheme.
-- [ ] If COSMICA still requires a named MEX entry point for artifact
+  constant truth/model flags, and constant fixed-step scheme. COSMICA commit
+  `75b0ff3` owns the consumer and artifact workflow.
+- [x] If COSMICA still requires a named MEX entry point for artifact
   management, keep it builder-private and limited to binding the shared RHS
   plus adapting output orientation; it must not contain an integration
-  algorithm or remain a public COSMICA propagation API.
-- [ ] Delete `PropagateCosmicaTruthFixedStep`, `propagate_env_src`, and
+  algorithm or remain a public COSMICA propagation API. The retained
+  `CosmicaTruthMexAdapter` satisfies this seam, while generated callables use
+  readable `PropagateTruth_<scheme>_<gravtype>` names.
+- [x] Delete `PropagateCosmicaTruthFixedStep`, `propagate_env_src`, and
   `rhs_dynamics_env` after behavioral consumer parity confirms no runtime
   caller remains.
-- [ ] Re-run point-mass RK4, polyhedron RK4, and registry degree-16 RK8
+- [x] Re-run point-mass RK4, polyhedron RK4, and registry degree-16 RK8
   source/MEX parity plus the one-day timestamp, endpoint, and performance
   benchmark.
+
+Final reconciliation on 28-07-2026 passed 18/18 focused max-fidelity RHS,
+generated-code parity, and MEX-output hygiene tests. Fresh COSMICA R2024b
+verification passed the fixed-step source/MEX harness, registry-backed
+degree-16 RK8 parity, object-level MATLAB/MEX dispatch, interface/default
+contracts, and full Monte Carlo execution/preflight. The previously recorded
+manual one-day diagnostic returned exactly 86,401 timestamps and the requested
+endpoint; warmed medians were 279.141226 seconds for MATLAB and 11.575337
+seconds for MEX, with maximum full-history differences of
+`7.771561e-15 km` and `3.862470e-19 km/s`. Timing remains a manual
+optimization diagnostic rather than an automatic acceptance threshold.
