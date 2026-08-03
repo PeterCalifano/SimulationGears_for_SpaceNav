@@ -48,6 +48,50 @@ classdef testCScenarioRegistry < matlab.unittest.TestCase
                 "CScenarioRegistry:UnsupportedScenario");
         end
 
+        function testApophisOwnsDefaultSpiceMetaKernel(testCase)
+            strApophis = CScenarioRegistry.GetScenarioSpec("Apophis");
+            strItokawa = CScenarioRegistry.GetScenarioSpec("Itokawa");
+
+            testCase.verifyEqual(string(strApophis.charDefaultSpiceMetaKernelRelativePath), ...
+                fullfile("scenarios", "Apophis", "assets", "spice", "mk", "metakernel.mk"));
+            testCase.verifyEqual(string(strItokawa.charDefaultSpiceMetaKernelRelativePath), "");
+        end
+
+        function testApophisEmbeddedGravityUsesOneDegree16Family(testCase)
+            [strDegree4Km, strMeta4] = ...
+                CScenarioRegistry.GetSphericalHarmonicsGravityData( ...
+                    "Apophis", uint32(4), "km");
+            [strDegree8Km, strMeta8] = ...
+                CScenarioRegistry.GetSphericalHarmonicsGravityData( ...
+                    "Apophis", uint32(8), "km");
+            [strDegree16Km, strMeta16] = ...
+                CScenarioRegistry.GetSphericalHarmonicsGravityData( ...
+                    "Apophis", uint32(16), "km");
+            [strDegree16M, ~] = ...
+                CScenarioRegistry.GetSphericalHarmonicsGravityData( ...
+                    "Apophis", uint32(16), "m");
+
+            testCase.verifyTrue(strMeta4.bHasHardcodedCoefficients);
+            testCase.verifyTrue(strMeta8.bHasHardcodedCoefficients);
+            testCase.verifyTrue(strMeta16.bHasHardcodedCoefficients);
+            testCase.verifyEqual(strMeta16.ui32HardcodedMaxDegree, uint32(16));
+            testCase.verifySize(strDegree4Km.dCSlmCoeffCols, [13 2]);
+            testCase.verifySize(strDegree8Km.dCSlmCoeffCols, [43 2]);
+            testCase.verifySize(strDegree16Km.dCSlmCoeffCols, [151 2]);
+            testCase.verifyEqual(strDegree4Km.dCSlmCoeffCols, ...
+                strDegree16Km.dCSlmCoeffCols(1:13, :), AbsTol=0.0);
+            testCase.verifyEqual(strDegree8Km.dCSlmCoeffCols, ...
+                strDegree16Km.dCSlmCoeffCols(1:43, :), AbsTol=0.0);
+            testCase.verifyTrue(all(isfinite(strDegree16Km.dCSlmCoeffCols), 'all'));
+            testCase.verifyGreaterThan(norm(strDegree16Km.dCSlmCoeffCols), 0.0);
+            testCase.verifyEqual(strDegree16M.dCSlmCoeffCols, ...
+                strDegree16Km.dCSlmCoeffCols, AbsTol=0.0);
+            testCase.verifyEqual(strDegree16M.dGravParam, ...
+                1.0e9 * strDegree16Km.dGravParam, RelTol=1.0e-14);
+            testCase.verifyEqual(strDegree16M.dBodyRadiusRef, ...
+                1.0e3 * strDegree16Km.dBodyRadiusRef, RelTol=1.0e-14);
+        end
+
         function testNewTaggedScenarioAliasesResolve(testCase)
             [enumScenarioName, charCanonicalName] = CScenarioRegistry.ResolveScenario("67P");
             testCase.verifyEqual(enumScenarioName, EnumScenarioName.Comet67P);

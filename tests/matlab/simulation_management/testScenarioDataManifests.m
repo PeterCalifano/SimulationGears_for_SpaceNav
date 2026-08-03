@@ -103,6 +103,15 @@ classdef testScenarioDataManifests < matlab.unittest.TestCase
             testCase.verifyEqual(sort(cellManifestBacked), sort(cellExpectedManifestBacked));
         end
 
+        function testRegisteredSpiceMetaKernelIsDeclaredByManifest(testCase)
+            strSpec = CScenarioRegistry.GetScenarioSpec("Apophis");
+            strManifest = LoadScenarioDataManifest("Apophis");
+            cellAssetPaths = string({strManifest.assets.local_path});
+
+            testCase.verifyTrue(any(cellAssetPaths == ...
+                string(strSpec.charDefaultSpiceMetaKernelRelativePath)));
+        end
+
         function testManifestBackedDefaultShapePathsMatchLoaderContracts(testCase)
             for charScenarioName = CScenarioRegistry.ListSupportedScenarios()
                 strSpec = CScenarioRegistry.GetScenarioSpec(charScenarioName);

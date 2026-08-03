@@ -4,19 +4,129 @@
   "canonical_name": "Apophis",
   "aliases": ["Apophis"],
   "confidence": "high",
-  "tags": ["shape_runnable", "synthetic_texture"],
+  "tags": ["shape_runnable", "synthetic_texture", "spice_environment_runnable"],
   "default_shape_asset_id": "apophis_centered_mean_size_obj",
   "assets": [
     {
       "asset_id": "apophis_centered_mean_size_obj",
       "asset_type": "shape",
       "local_path": "scenarios/Apophis/assets/shape/Apophis_RGB_Centered_MeanSize_NoTexture.obj",
-      "source_url": "local projects-DART rcs-1 phase-C shape model",
+      "source_url": "",
       "download_url": "",
       "sha256": "",
       "size_gb": 0.01,
       "fidelity": "project_reference",
       "required_for_shape_runnable": true
+    },
+    {
+      "asset_id": "apophis_spice_metakernel",
+      "asset_type": "spice",
+      "local_path": "scenarios/Apophis/assets/spice/mk/metakernel.mk",
+      "source_url": "",
+      "download_url": "",
+      "sha256": "b6ffaacf56979ca8745d5ce4f5a1414b1805734a9fe710e1e70af11c8573dc65",
+      "size_gb": 0.000000594,
+      "fidelity": "project_reference",
+      "required_for_shape_runnable": false
+    },
+    {
+      "asset_id": "apophis_npa_nominal_pravec_ck",
+      "asset_type": "spice",
+      "local_path": "scenarios/Apophis/assets/spice/ck/apophis_npa_220101_330101_nominal_pravec_v1.bc",
+      "source_url": "",
+      "download_url": "",
+      "sha256": "3d856791782b60a63a26cf6f2eaaa0c59bd7b5c4a6fd4e71ce3d6760cea64a36",
+      "size_gb": 0.02472448,
+      "fidelity": "project_reference",
+      "required_for_shape_runnable": false
+    },
+    {
+      "asset_id": "apophis_frame_kernel",
+      "asset_type": "spice",
+      "local_path": "scenarios/Apophis/assets/spice/fk/apophis.tf",
+      "source_url": "",
+      "download_url": "",
+      "sha256": "2b9bdfd8ec483acffc1fbd80f9c245878512fdf006477910eb2a2232d91cfcfd",
+      "size_gb": 0.000000306,
+      "fidelity": "project_reference",
+      "required_for_shape_runnable": false
+    },
+    {
+      "asset_id": "apophis_all_frames_kernel",
+      "asset_type": "spice",
+      "local_path": "scenarios/Apophis/assets/spice/fk/apophis_all.fk",
+      "source_url": "",
+      "download_url": "",
+      "sha256": "2ea1c8a239f19135e4d2726629c13d93ee4edddd780b7aa98f9114bb61efc21a",
+      "size_gb": 0.000003615,
+      "fidelity": "project_reference",
+      "required_for_shape_runnable": false
+    },
+    {
+      "asset_id": "naif0012_lsk",
+      "asset_type": "spice",
+      "local_path": "scenarios/Apophis/assets/spice/lsk/naif0012.tls",
+      "source_url": "https://naif.jpl.nasa.gov/pub/naif/generic_kernels/lsk/",
+      "download_url": "",
+      "sha256": "f15293b0747e5fb01a865596281cb0534f7c77274e78184bd64260cc92be3706",
+      "size_gb": 0.000005409,
+      "fidelity": "standard",
+      "required_for_shape_runnable": false
+    },
+    {
+      "asset_id": "apophis_constants_pck",
+      "asset_type": "spice",
+      "local_path": "scenarios/Apophis/assets/spice/pck/apophis.tpc",
+      "source_url": "",
+      "download_url": "",
+      "sha256": "8054b4c89af3b661e17982075eb32b0c9ae94dfef2ed0fd85ac734878e98e7f7",
+      "size_gb": 0.000001072,
+      "fidelity": "project_reference",
+      "required_for_shape_runnable": false
+    },
+    {
+      "asset_id": "gm_de440_pck",
+      "asset_type": "spice",
+      "local_path": "scenarios/Apophis/assets/spice/pck/gm_de440.tpc",
+      "source_url": "https://naif.jpl.nasa.gov/pub/naif/generic_kernels/pck/",
+      "download_url": "",
+      "sha256": "924ddf4fb9ead9fe8a1aa55780bcabde40b09d00065d58226e24b68d8092f140",
+      "size_gb": 0.000012406,
+      "fidelity": "standard",
+      "required_for_shape_runnable": false
+    },
+    {
+      "asset_id": "pck00011_text_pck",
+      "asset_type": "spice",
+      "local_path": "scenarios/Apophis/assets/spice/pck/pck00011.tpc",
+      "source_url": "https://naif.jpl.nasa.gov/pub/naif/generic_kernels/pck/",
+      "download_url": "",
+      "sha256": "3dff7b1dbeceaa01f25467767d3fa25816051c85d162d1edf04acb310ee28bb1",
+      "size_gb": 0.000131226,
+      "fidelity": "standard",
+      "required_for_shape_runnable": false
+    },
+    {
+      "asset_id": "apophis_ephemeris_spk",
+      "asset_type": "spice",
+      "local_path": "scenarios/Apophis/assets/spice/spk/apophis.bsp",
+      "source_url": "",
+      "download_url": "",
+      "sha256": "5526b53ca5a4fff0c1bc129a35cfb3ed4bc48c48ab64c16859bf73010492b278",
+      "size_gb": 0.000169984,
+      "fidelity": "project_reference",
+      "required_for_shape_runnable": false
+    },
+    {
+      "asset_id": "de432s_planetary_ephemeris_spk",
+      "asset_type": "spice",
+      "local_path": "scenarios/Apophis/assets/spice/spk/de432s.bsp",
+      "source_url": "https://naif.jpl.nasa.gov/pub/naif/generic_kernels/spk/planets/",
+      "download_url": "",
+      "sha256": "363f32e14f5255359ac32c4d38080cf28ab55564a5e16696a75f63394b666e9b",
+      "size_gb": 0.01089536,
+      "fidelity": "standard",
+      "required_for_shape_runnable": false
     }
   ]
 }
