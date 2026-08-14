@@ -1,11 +1,9 @@
 classdef SReferenceMissionDesign < CBaseDatastructWithTimes
     %% DESCRIPTION
-    % Datastruct containing essential information for spacecraft orbit and attitude as sequence of discrete
-    % states on a discrete timegrid. The following data are included:
-    % REQUIRED
-    % TODO
-    % OPTIONAL
-    % TODO
+    % Mission-design reference data sampled on one discrete timegrid. The carrier includes spacecraft state and
+    % attitude, target attitude and position, environmental directions, manoeuvre data, and optional source-provided
+    % target angular velocity. Angular velocity is carried as external model data and is never inferred from sampled
+    % attitudes by this class.
     % -------------------------------------------------------------------------------------------------------------
     %% CHANGELOG
     % 01-02-2025    Pietro Califano     First prototype implementation
@@ -15,12 +13,14 @@ classdef SReferenceMissionDesign < CBaseDatastructWithTimes
     %                                   attitude data directly from dataset
     % 14-12-2025    Pietro Califano     Implement conversion methods to/from simulation states arrays
     % 22-12-2025    Pietro Califano     Extend conversion pipeline with intermediate representation class
+    % 13-08-2026    Pietro Califano, Codex gpt-5.6     Carry source-provided target angular velocity.
     % -------------------------------------------------------------------------------------------------------------
     %% METHODS
     % [-]
     % -------------------------------------------------------------------------------------------------------------
     %% PROPERTIES
-    % TODO
+    % dTargetAngVel_IN: Optional source-provided target attitude-model rate satisfying
+    %                   R_INfromTB(t) = Exp(-omega_IN*t) R_INfromTB(0), expressed in inertial coordinates [rad/s].
     % -------------------------------------------------------------------------------------------------------------
     %% DEPENDENCIES
     % [-]
@@ -40,6 +40,7 @@ classdef SReferenceMissionDesign < CBaseDatastructWithTimes
         % Target body data 
         dDCM_TBfromW                    (3, 3, :) double {mustBeNumeric} = []
         dTargetPosition_W               (3, :) double {mustBeNumeric} = []
+        dTargetAngVel_IN                (3, :) double {mustBeNumeric} = [] % Target attitude-model rate in inertial coordinates [rad/s]
 
         % Manoeuvres plan data
         dPrimaryPointingWhileMan_W      (3, :, :) double {mustBeNumeric} = [] % TBC, primary pointing axis during manoeuvres
@@ -93,6 +94,7 @@ classdef SReferenceMissionDesign < CBaseDatastructWithTimes
                 optional.dManoeuvresDeltaV_SC         (3, :)     double {mustBeNumeric} = [];
                 optional.dRelativeTimestamps          (1, :)     double {mustBeNumeric} = [];   
                 optional.dDCM_SCfromW                 (3, 3, :)  double {mustBeNumeric} = [];
+                optional.dTargetAngVel_IN             (3, :)     double {mustBeNumeric} = [];
             end
             
             % TODO (PC)
@@ -109,6 +111,7 @@ classdef SReferenceMissionDesign < CBaseDatastructWithTimes
 
             self.dDCM_TBfromW               = dDCM_TBfromW                 ;
             self.dTargetPosition_W          = dTargetPosition_W            ;
+            self.dTargetAngVel_IN           = optional.dTargetAngVel_IN     ;
             
             self.dSunPosition_W             = dSunPosition_W               ;
             self.dEarthPosition_W           = dEarthPosition_W             ;

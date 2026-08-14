@@ -1,5 +1,23 @@
 classdef testDefineEnvironmentProperties < matlab.unittest.TestCase
     methods (Test)
+        function testCarriesDatasetTargetAngularVelocity(testCase)
+            dTimestamps = [0.0, 15.0, 40.0];
+            dStateSC_IN = zeros(6, numel(dTimestamps));
+            dDCM_TBfromIN = repmat(eye(3), 1, 1, numel(dTimestamps));
+            dTargetPosition_IN = zeros(3, numel(dTimestamps));
+            dSunPosition_IN = repmat([1.495978707e11; 0.0; 0.0], 1, numel(dTimestamps));
+            dEarthPosition_IN = zeros(3, numel(dTimestamps));
+            dTargetAngVel_IN = repmat([0.8e-4; -0.4e-4; 1.7e-4], 1, numel(dTimestamps));
+            objDataset = SReferenceMissionDesign(EnumFrameName.IN, dTimestamps, dStateSC_IN, ...
+                dDCM_TBfromIN, dTargetPosition_IN, dSunPosition_IN, dEarthPosition_IN, ...
+                'dTargetAngVel_IN', dTargetAngVel_IN);
+
+            [~, strMainBodyRefData] = DefineEnvironmentProperties(dTimestamps, ...
+                "Itokawa", "J2000", objDataset=objDataset);
+
+            testCase.verifyEqual(strMainBodyRefData.dAngVel_IN, dTargetAngVel_IN, 'AbsTol', 0.0);
+        end
+
         function testBuildsSpacecraftPanelsAndPolyhedronGravityDataFromObj(testCase)
             fixture = testCase.applyFixture(matlab.unittest.fixtures.TemporaryFolderFixture);
             charObjPath = fullfile(string(fixture.Folder), "cube_model.obj");

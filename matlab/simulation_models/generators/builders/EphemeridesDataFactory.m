@@ -23,43 +23,36 @@ arguments
     kwargs.bUseAbsoluteTimegrid     (1,1) logical = false;
 end
 %% SIGNATURE
-% [strDynParams, strMainBodyRefData] = EphemeridesDataFactory(dEphemTimegrid, ...
-%                                                             ui32EphemerisPolyDeg,...
-%                                                             ui32AttitudePolyDeg, ...
-%                                                             strDynParams, ...
-%                                                             strMainBodyRefData, ...
-%                                                             str3rdBodyRefData, ...
-%                                                             kwargs)
+% strDynParams = EphemeridesDataFactory(dEphemTimegrid, ui32EphemerisPolyDeg, ui32AttitudePolyDeg, ...
+%     strDynParams, strMainBodyRefData, str3rdBodyRefData, kwargs)
 % -------------------------------------------------------------------------------------------------------------
 %% DESCRIPTION
-% What the function does
-% ACHTUNG: this function assumes that the input structs have the correct fields in place. Not intended for
-% standalone usage. DefineEnvironmentProperties() should be called first.
+% Fit target and third-body ephemeris products into the runtime dynamics structure. When the source provides target
+% attitude-model rate, preserve it as source data aligned with the attitude ephemeris; never recover it by differencing
+% sampled attitudes. The model rate satisfies R_INfromTB(t) = Exp(-omega_IN*t) R_INfromTB(0). This builder expects the
+% field contract produced by DefineEnvironmentProperties and is not a standalone source loader.
 % -------------------------------------------------------------------------------------------------------------
 %% INPUT
-% dEphemTimegrid
-% ui32EphemerisPolyDeg
-% ui32AttitudePolyDeg
-% strDynParams
-% strMainBodyRefData
-% str3rdBodyRefData = []
-% kwargs.bGroundTruthEphemerides  (1,1) logical = true
-% kwargs.bEnableInterpValidation  (1,1) logical = true
-% kwargs.bAdd3rdBodiesPosition    (1,1) logical = true
-% kwargs.bAdd3rdBodiesAttitude    (1,1) logical = false
-% kwargs.bUseInterpFcnFromRCS1    (1,1) logical = false 
+% dEphemTimegrid               Ephemeris sample epochs [s].
+% ui32EphemerisPolyDeg         Position interpolation polynomial degree.
+% ui32AttitudePolyDeg          Attitude interpolation polynomial degree.
+% strDynParams                 Dynamics structure to populate.
+% strMainBodyRefData           Target attitude, attitude-model rate, and Sun-position source data.
+% str3rdBodyRefData            Optional third-body source data.
+% kwargs                       Interpolation, validation, time-domain, and third-body options.
 % -------------------------------------------------------------------------------------------------------------
 %% OUTPUT
-% strDynParams
+% strDynParams                 Dynamics structure containing fitted ephemeris products.
 % -------------------------------------------------------------------------------------------------------------
 %% CHANGELOG
 % 19-02-2025    Pietro Califano     First version copy-pasting previous implementation
 % 22-07-2025    Pietro Califano     Extend to support definition of 3rd body attitude and position
 %                                   ephemerides from input reference data; minor updates
 % 18-08-2025    Pietro Califano     Update implementation to generalize RCS1 alternative code branch
+% 13-08-2026    Pietro Califano, Codex gpt-5.6     Preserve source-provided target angular velocity.
 % -------------------------------------------------------------------------------------------------------------
 %% DEPENDENCIES
-% [-]
+% DCM2quatSeq, fitAttQuatChbvPolynmials, fitChbvPolynomials.
 % -------------------------------------------------------------------------------------------------------------
 
 %% Common data
@@ -88,6 +81,18 @@ end
 % Convert attitude DCMs to quaternion
 dQuat_WfromTB = DCM2quatSeq(strMainBodyRefData.dDCM_INfromTB, false);
 
+% Preserve the angular velocity delivered by the ephemeris source. This is
+% source data, not a numerical derivative of the sampled attitude sequence.
+if isfield(strMainBodyRefData, 'dAngVel_IN')
+    dTargetAngVel_IN = strMainBodyRefData.dAngVel_IN;
+    if not(isequal(size(dTargetAngVel_IN), [3, numel(dEphemTimegrid)])) || ...
+            any(not(isfinite(dTargetAngVel_IN)), 'all')
+        error('EphemeridesDataFactory:InvalidTargetAngularVelocity', ...
+            ['Source-provided target angular velocity must be a finite 3-by-N sequence aligned with the ' ...
+             'ephemeris timegrid.']);
+    end
+end
+
 if not(kwargs.bUseInterpFcnFromRCS1)
 
     % Use nav-system implementation
@@ -104,6 +109,11 @@ if not(kwargs.bUseInterpFcnFromRCS1)
     strDynParams.strMainData.strAttData.dsignSwitchIntervals = dTmpSwitchIntervals;
     strDynParams.strMainData.strAttData.dTimeLowBound        = dDomainLB;
     strDynParams.strMainData.strAttData.dTimeUpBound         = dDomainUB;
+    if isfield(strMainBodyRefData, 'dAngVel_IN')
+        strDynParams.strMainData.strAttData.dNominalAngVel_IN = dTargetAngVel_IN(:,1);
+        strDynParams.strMainData.strAttData.dAngVel_IN = dTargetAngVel_IN;
+        strDynParams.strMainData.strAttData.dAngVelTimegrid = dInterpDomain;
+    end
 
 else
     % Use implementation for RCS-1
