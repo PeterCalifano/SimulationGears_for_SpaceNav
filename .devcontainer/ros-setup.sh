@@ -30,6 +30,7 @@ if [[ ! -r /etc/os-release ]]; then
 fi
 
 # Source OS info
+# shellcheck disable=SC1091
 source /etc/os-release
 if [[ "${ID:-}" != "ubuntu" ]]; then
   echo "ros-setup.sh: ROS automated installation requires Ubuntu. Cannot proceed."
@@ -75,21 +76,22 @@ echo "deb [arch=${arch} signed-by=${keyring}] ${repo_url} ${UBUNTU_CODENAME} mai
 # Install ROS dev tools
 apt-get update
 apt-get install -y "$ros_package" python3-rosdep
-apt-get install ros-dev-tools -y
 
-# Install additional packages for ROS 2
+# Install additional packages for ROS 2 (ros-dev-tools only exists in the ROS 2 repos)
 if [[ "$ros_mode" == "ros2" ]]; then
-  apt-get install -y python3-colcon-common-extensions
+  apt-get install -y ros-dev-tools python3-colcon-common-extensions
 fi
 
 # Clean up
 apt-get clean
 rm -rf /var/lib/apt/lists/*
 
-# Source the ROS setup file
-echo "source /opt/ros/${ros_distro}/setup.bash" >> ~/.bashrc
-source /opt/ros/${ros_distro}/setup.bash
-rosdep init
+# Source the ROS setup file system-wide (image is built as root; ~/.bashrc
+# would only affect root, not the devcontainer user)
+echo "source /opt/ros/${ros_distro}/setup.bash" >> /etc/bash.bashrc
+# shellcheck disable=SC1090
+source "/opt/ros/${ros_distro}/setup.bash"
+rosdep init || true
 rosdep update
 
 set -eu

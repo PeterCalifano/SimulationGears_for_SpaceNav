@@ -20,24 +20,74 @@ set(PROJECT_MAINTAINER_NAME "Pietro Califano" CACHE STRING "Project maintainer n
 set(PROJECT_MAINTAINER_EMAIL "petercalifano.gs@gmail.com" CACHE STRING "Project maintainer email")
 set(PROJECT_LICENSE "MIT" CACHE STRING "Project SPDX license identifier")
 
+# Determine ownership before project() so pre-language feature selection cannot
+# consume unrelated generic cache options from an add_subdirectory() parent.
+set(BUILD_AS_MAIN_PROJECT OFF)
+if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
+  set(BUILD_AS_MAIN_PROJECT ON)
+endif()
+
 # Set install default directory if not specified
 if(NOT DEFINED CMAKE_INSTALL_PREFIX)
   set(CMAKE_INSTALL_PREFIX ${CMAKE_SOURCE_DIR}/install CACHE PATH "Install path" FORCE)
 endif()
 
-# Major options
-option(PROJECT_METADATA_ONLY "Configure only project identity and version metadata" OFF)
-option(ENABLE_OPTIX "Enable OptiX" OFF)
-option(ENABLE_CUDA "Enable CUDA" OFF)
+# Project-qualified options are canonical in nested builds. Preserve the
+# historical generic spellings only as one-config top-level input aliases.
+set(METADATA_ONLY_OPTION_NAME "${project_name}_METADATA_ONLY")
+set(ENABLE_OPTIX_OPTION_NAME "${project_name}_ENABLE_OPTIX")
+set(ENABLE_CUDA_OPTION_NAME "${project_name}_ENABLE_CUDA")
+
+function(_simulation_gears_migrate_top_level_bool_option_alias legacy_option
+         canonical_option option_help)
+  if(NOT BUILD_AS_MAIN_PROJECT)
+    return()
+  endif()
+
+  get_property(_legacy_alias_is_cached
+      CACHE "${legacy_option}" PROPERTY TYPE SET)
+  if(NOT _legacy_alias_is_cached)
+    return()
+  endif()
+
+  # Consume legacy command-line/cache input on every configure so an ON-to-OFF
+  # transition updates the canonical value instead of remaining stuck.
+  set(_legacy_alias_value "${${legacy_option}}")
+  set("${canonical_option}" "${_legacy_alias_value}"
+      CACHE BOOL "${option_help}" FORCE)
+  unset("${legacy_option}" CACHE)
+endfunction()
+
+_simulation_gears_migrate_top_level_bool_option_alias(
+    PROJECT_METADATA_ONLY "${METADATA_ONLY_OPTION_NAME}"
+    "Configure only project identity and version metadata")
+_simulation_gears_migrate_top_level_bool_option_alias(
+    ENABLE_OPTIX "${ENABLE_OPTIX_OPTION_NAME}" "Enable OptiX")
+_simulation_gears_migrate_top_level_bool_option_alias(
+    ENABLE_CUDA "${ENABLE_CUDA_OPTION_NAME}" "Enable CUDA")
+
+option(${METADATA_ONLY_OPTION_NAME}
+       "Configure only project identity and version metadata"
+       OFF)
+option(${ENABLE_OPTIX_OPTION_NAME} "Enable OptiX" OFF)
+option(${ENABLE_CUDA_OPTION_NAME} "Enable CUDA" OFF)
+
+# Retained modules consume the historical local variable names. Normal
+# directory-scope assignments isolate them from a parent's cache entries.
+set(PROJECT_METADATA_ONLY "${${METADATA_ONLY_OPTION_NAME}}")
+set(ENABLE_OPTIX "${${ENABLE_OPTIX_OPTION_NAME}}")
+set(ENABLE_CUDA "${${ENABLE_CUDA_OPTION_NAME}}")
+
+# OptiX requires the project CUDA feature when languages and dependency targets
+# are configured.
+if(ENABLE_OPTIX)
+  set(ENABLE_CUDA ON)
+endif()
 
 if(PROJECT_METADATA_ONLY)
   set(languages NONE)
 else()
-  set(languages CXX)
-
-  if(ENABLE_OPTIX)
-    set(ENABLE_CUDA ON)
-  endif()
+  set(languages CXX) # ACHTUNG: PTX code requires C language!
 
   if(ENABLE_CUDA)
     list(APPEND languages CUDA)
@@ -46,9 +96,6 @@ else()
     endif()
   endif()
 endif()
-
-# Add cmake folder to path
-list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake")
 
 # Add git version handling
 include(cmake/HandleGitVersion.cmake)
@@ -77,6 +124,9 @@ endif()
 option(BUILD_SHARED_LIBS "Build libraries as shared" ON)
 include(cmake/HandleOpenMP.cmake)
 
+# Add cmake folder to path
+list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake")
+
 # Write VERSION file to the build directory by default. Writing into the source
 # tree is opt-in so CI/test harness configures do not dirty the checkout.
 option(WRITE_SOURCE_VERSION_FILE "Write VERSION into the source tree during CMake configure" OFF)
@@ -87,12 +137,6 @@ endif()
 
 write_build_VERSION_file()
 install(FILES "${PROJECT_BINARY_DIR}/VERSION" DESTINATION ".")
-
-# Define variable for build as subproject (compare source dir)
-set(BUILD_AS_MAIN_PROJECT ON)
-if(NOT CMAKE_SOURCE_DIR STREQUAL PROJECT_SOURCE_DIR)
-  set(BUILD_AS_MAIN_PROJECT OFF)
-endif()
 
 # Define variable for namespacing (required to prevent global target clashes!)
 set(LIB_NAMESPACE "${PROJECT_NAME}")
@@ -185,6 +229,8 @@ set(GTWRAP_MATLAB_OPTION_NAME "${LIB_NAMESPACE}_BUILD_MATLAB_WRAPPER")
 set(GTWRAP_INTERFACE_OPTION_NAME "${LIB_NAMESPACE}_WRAPPER_INTERFACE_FILES")
 set(GTWRAP_TOP_NAMESPACE_OPTION_NAME "${LIB_NAMESPACE}_GTWRAP_TOP_NAMESPACE")
 set(GTWRAP_DEPENDENCIES_OPTION_NAME "${LIB_NAMESPACE}_GTWRAP_DEPENDENCY_TARGETS")
+set(GTWRAP_RUNTIME_DEPENDENCIES_OPTION_NAME
+    "${LIB_NAMESPACE}_GTWRAP_RUNTIME_DEPENDENCY_TARGETS")
 set(GTWRAP_ROOT_OPTION_NAME "${LIB_NAMESPACE}_GTWRAP_ROOT_DIR")
 
 option(${GTWRAP_PYTHON_OPTION_NAME} "Build Python wrapper" ${GTWRAP_BUILD_PYTHON_DEFAULT})
@@ -211,6 +257,14 @@ if (NOT DEFINED ${GTWRAP_DEPENDENCIES_OPTION_NAME})
       ""
       CACHE STRING
       "Additional dependency targets required before wrapping."
+      FORCE)
+endif()
+
+if (NOT DEFINED ${GTWRAP_RUNTIME_DEPENDENCIES_OPTION_NAME})
+  set(${GTWRAP_RUNTIME_DEPENDENCIES_OPTION_NAME}
+      ""
+      CACHE STRING
+      "Direct project-owned shared runtime build targets packaged beside the Python wrapper."
       FORCE)
 endif()
 
@@ -423,10 +477,9 @@ set(ANY_WRAPPER_ENABLED OFF)
 if(BUILD_AS_MAIN_PROJECT)
   set(LIBNAME_WRAP_TARGET ${project_name})
   handle_gtwrappers() # You may also pass WRAP_INTERFACE_FILES variable to specify interface files, else autofetching is used
-  handle_pybind11_wrapper()
 
   # Determine if any wrapper is enabled
-  if (${GTWRAP_PYTHON_OPTION_NAME} OR PYBIND11_WRAPPER_ENABLED OR ${GTWRAP_MATLAB_OPTION_NAME})
+  if (${GTWRAP_PYTHON_OPTION_NAME} OR ${GTWRAP_MATLAB_OPTION_NAME})
     set(ANY_WRAPPER_ENABLED ON)
   endif()
 endif()
@@ -503,7 +556,6 @@ print_compiler_flags_summary()
 # Print info about wrappers if any
 if (ANY_WRAPPER_ENABLED)
   message(STATUS "================  Wrappers Configuration  ======================")
-  message(STATUS "Python pybind11 direct wrapper              : ${PYBIND11_WRAPPER_ENABLED}")
   message(STATUS "Python gtwrapper                            : ${${GTWRAP_PYTHON_OPTION_NAME}}")
   message(STATUS "MATLAB gtwrapper                            : ${${GTWRAP_MATLAB_OPTION_NAME}}")
   message(STATUS "MATLAB default release                      : ${MATLAB_DEFAULT_RELEASE}")
@@ -512,6 +564,7 @@ if (ANY_WRAPPER_ENABLED)
   message(STATUS "gtwrap interface option name                : ${GTWRAP_INTERFACE_OPTION_NAME}")
   message(STATUS "gtwrap interface files                      : ${${GTWRAP_INTERFACE_OPTION_NAME}}")
   message(STATUS "gtwrap top namespace                        : ${${GTWRAP_TOP_NAMESPACE_OPTION_NAME}}")
+  message(STATUS "gtwrap runtime dependency targets          : ${${GTWRAP_RUNTIME_DEPENDENCIES_OPTION_NAME}}")
   message(STATUS "gtwrap root override                        : ${${GTWRAP_ROOT_OPTION_NAME}}")
 endif()
 message(STATUS "===============================================================")
@@ -539,44 +592,46 @@ set(CPACK_PACKAGE_VERSION_MINOR "${PROJECT_VERSION_MINOR}")
 set(CPACK_PACKAGE_VERSION_PATCH "${PROJECT_VERSION_PATCH}")
 if(DEFINED FULL_VERSION AND NOT "${FULL_VERSION}" STREQUAL "")
   set(CPACK_PACKAGE_FILE_NAME "${project_name}-${FULL_VERSION}")
-  set(CPACK_SOURCE_PACKAGE_FILE_NAME "${project_name}-${FULL_VERSION}")
+  set(CPACK_SOURCE_PACKAGE_FILE_NAME "${project_name}-${FULL_VERSION}-source")
 endif()
 
 set(CPACK_GENERATOR "TGZ")
 set(CPACK_SOURCE_GENERATOR "TGZ")
-# Preserve regex backslashes when CPack serializes project variables into its
-# generated CMake configuration files.
-set(CPACK_VERBATIM_VARIABLES TRUE)
 
-# Defer exact-tag VERSION enforcement to source CPack so ordinary CPU, CUDA,
-# and documentation configures do not require an ignored release artifact.
-set(_source_package_validation
-    "${PROJECT_BINARY_DIR}/SimulationGearsSourcePackageValidation.cmake")
-configure_file(
-  "${CMAKE_CURRENT_SOURCE_DIR}/cmake/SourcePackageValidation.cmake.in"
-  "${_source_package_validation}"
-  @ONLY)
-set(CPACK_PROJECT_CONFIG_FILE "${_source_package_validation}")
-
-# CPack evaluates these expressions against absolute source paths. Anchor every
-# exclusion to this checkout so similarly named project sources remain eligible.
+# Package the prepared source tree without claiming caller-owned CPack hooks.
+# Anchor deterministic generated outputs and the exact active build below their
+# physical paths so similarly named source directories remain package input.
+set(CPACK_VERBATIM_VARIABLES YES)
 set(_cpack_source_root_regex "${CMAKE_CURRENT_SOURCE_DIR}")
 string(
   REGEX REPLACE "([][+.*^$()|?\\\\])" "\\\\\\1"
   _cpack_source_root_regex "${_cpack_source_root_regex}")
-set(CPACK_SOURCE_IGNORE_FILES
-  "^${_cpack_source_root_regex}/\\.git/"
-  "^${_cpack_source_root_regex}/build[^/]*/"
-  "^${_cpack_source_root_regex}/install[^/]*/"
-  "^${_cpack_source_root_regex}/ros2/(build|install|log)/"
-  "^${_cpack_source_root_regex}/lib/MathCore_for_ComputerVision(/|$)"
+set(_cpack_binary_root_regex "${CMAKE_BINARY_DIR}")
+string(
+  REGEX REPLACE "([][+.*^$()|?\\\\])" "\\\\\\1"
+  _cpack_binary_root_regex "${_cpack_binary_root_regex}")
+list(APPEND CPACK_SOURCE_IGNORE_FILES
+  "^${_cpack_source_root_regex}/(.*/)?\\.git(/|$)"
+  "^${_cpack_source_root_regex}/(.*/)?\\.codex(/|$)"
+  "^${_cpack_source_root_regex}/CONTEXT\\.md$"
+  "^${_cpack_source_root_regex}/(.*/)?\\.mypy_cache/"
   "^${_cpack_source_root_regex}/(.*/)?\\.pytest_cache/"
   "^${_cpack_source_root_regex}/(.*/)?__pycache__/"
-  "^${_cpack_source_root_regex}/.*\\.py[cod]$"
+  "^${_cpack_source_root_regex}/build[^/]*/"
+  "^${_cpack_source_root_regex}/(.*/)?build(/|$)"
+  "^${_cpack_source_root_regex}/(.*/)?install[^/]*/"
+  "^${_cpack_source_root_regex}/ros2/(build|install|log)/"
+  "^${_cpack_source_root_regex}/lib/MathCore_for_ComputerVision(/|$)"
   "^${_cpack_source_root_regex}/(.*/)?codegen/"
+  "^${_cpack_source_root_regex}/(.*/)?slprj/"
+  "^${_cpack_source_root_regex}/(.*/)?[^/]+_ert_rtw(/|$)"
   "^${_cpack_source_root_regex}/matlab/mex/"
+  "^${_cpack_source_root_regex}/.*\\.(mexa64|mexw64|mexmaci64)$"
+  "^${_cpack_source_root_regex}/.*\\.py[cod]$"
   "^${_cpack_source_root_regex}/python/(build|dist)/"
   "^${_cpack_source_root_regex}/python/[^/]+\\.egg-info/"
+  "^${_cpack_source_root_regex}/python/(setup\\.py|pyproject\\.toml)$"
   "^${_cpack_source_root_regex}/python/[^/]+/_wrapper_build\\.py$"
-  "^${_cpack_source_root_regex}/python/.*\\.(so|pyd|dylib)$")
+  "^${_cpack_source_root_regex}/python/.*\\.(so(\\..*)?|pyd|dylib|dll)$"
+  "^${_cpack_binary_root_regex}(/|$)")
 include(CPack)

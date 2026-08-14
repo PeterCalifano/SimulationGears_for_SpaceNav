@@ -5,7 +5,20 @@
 Version resolution follows Git tags, then a source `VERSION` file, then the
 hardcoded CMake fallback. ROS 2 manifests always receive the strict core
 `X.Y.Z`; prerelease and build metadata are retained only in the full version.
-CPack binary and source package filenames use that full version.
+CPack binary and source package filenames use that full version. The source
+archive appends `-source`, so generating both package kinds cannot overwrite
+one artifact with the other.
+
+Every generated `VERSION` file contains exactly these five fields and one
+terminating newline, with no blank sixth line:
+
+```text
+Project version: X.Y.Z
+Project version core: X.Y.Z
+Project version prerelease: <none>
+Project version metadata: <none>
+Full version: X.Y.Z
+```
 
 The canonical source distribution is CPack's generated source TGZ. GitHub's
 automatic tag archives are non-canonical because they do not contain the
@@ -37,7 +50,9 @@ test "$(git describe --tags --exact-match)" = "vX.Y.Z"
 ./generate_version.sh --sync-ros2
 git diff --exit-code -- ros2/*/package.xml
 cmake -S . -B build_release -G Ninja \
-  -DCMAKE_BUILD_TYPE=Release -DENABLE_TESTS=OFF -DENABLE_SUBMODULES=OFF
+  -DCMAKE_BUILD_TYPE=Release -DENABLE_TESTS=OFF -DENABLE_SUBMODULES=OFF \
+  -DSimulationGears_for_SpaceNav_ENABLE_CUDA=OFF \
+  -DSimulationGears_for_SpaceNav_ENABLE_OPTIX=OFF
 cmake --build build_release --target package_source
 ```
 
@@ -54,3 +69,12 @@ trees, ROS generated trees, Python caches, generated wrapper/codegen products,
 and the complete `lib/MathCore_for_ComputerVision` submodule source. Consumers
 obtain nested dependencies independently; the archive must configure outside a
 Git worktree with `ENABLE_SUBMODULES=OFF`.
+
+## Python wrapper version boundary
+
+The semantic CMake and release version remains the five-field SemVer contract
+above. When the optional Python wrapper is configured, the shared donor wrapper
+infrastructure projects those structured fields into a PEP 440-compatible
+package version without renaming the existing distribution, import package, or
+extension module. This repository adds no independent PEP-version policy or
+PEP-specific regression suite.
