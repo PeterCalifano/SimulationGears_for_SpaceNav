@@ -2,8 +2,8 @@ classdef SReferenceMissionDesign < CBaseDatastructWithTimes
     %% DESCRIPTION
     % Mission-design reference data sampled on one discrete timegrid. The carrier includes spacecraft state and
     % attitude, target attitude and position, environmental directions, manoeuvre data, and optional source-provided
-    % target angular velocity. Angular velocity is carried as external model data and is never inferred from sampled
-    % attitudes by this class.
+    % target angular velocity and the resolved target body-fixed spin axis. Angular velocity is carried as external
+    % model data and is never inferred from sampled attitudes by this class.
     % -------------------------------------------------------------------------------------------------------------
     %% CHANGELOG
     % 01-02-2025    Pietro Califano     First prototype implementation
@@ -14,6 +14,7 @@ classdef SReferenceMissionDesign < CBaseDatastructWithTimes
     % 14-12-2025    Pietro Califano     Implement conversion methods to/from simulation states arrays
     % 22-12-2025    Pietro Califano     Extend conversion pipeline with intermediate representation class
     % 13-08-2026    Pietro Califano, Codex gpt-5.6     Carry source-provided target angular velocity.
+    % 13-08-2026    Pietro Califano, Codex gpt-5.6     Resolve target spin-axis provenance with a +Z default.
     % -------------------------------------------------------------------------------------------------------------
     %% METHODS
     % [-]
@@ -21,6 +22,8 @@ classdef SReferenceMissionDesign < CBaseDatastructWithTimes
     %% PROPERTIES
     % dTargetAngVel_IN: Optional source-provided target attitude-model rate satisfying
     %                   R_INfromTB(t) = Exp(-omega_IN*t) R_INfromTB(0), expressed in inertial coordinates [rad/s].
+    % dTargetSpinAxis_TB: Resolved unit spin axis expressed in the target body-fixed frame.
+    % charTargetSpinAxisSource: DEFAULT_PLUS_Z or SCENARIO_DECLARED provenance token.
     % -------------------------------------------------------------------------------------------------------------
     %% DEPENDENCIES
     % [-]
@@ -41,6 +44,8 @@ classdef SReferenceMissionDesign < CBaseDatastructWithTimes
         dDCM_TBfromW                    (3, 3, :) double {mustBeNumeric} = []
         dTargetPosition_W               (3, :) double {mustBeNumeric} = []
         dTargetAngVel_IN                (3, :) double {mustBeNumeric} = [] % Target attitude-model rate in inertial coordinates [rad/s]
+        dTargetSpinAxis_TB              (3, 1) double {mustBeNumeric} = [0.0; 0.0; 1.0]
+        charTargetSpinAxisSource        (1, 1) string = "DEFAULT_PLUS_Z"
 
         % Manoeuvres plan data
         dPrimaryPointingWhileMan_W      (3, :, :) double {mustBeNumeric} = [] % TBC, primary pointing axis during manoeuvres
@@ -95,6 +100,9 @@ classdef SReferenceMissionDesign < CBaseDatastructWithTimes
                 optional.dRelativeTimestamps          (1, :)     double {mustBeNumeric} = [];   
                 optional.dDCM_SCfromW                 (3, 3, :)  double {mustBeNumeric} = [];
                 optional.dTargetAngVel_IN             (3, :)     double {mustBeNumeric} = [];
+                optional.dTargetSpinAxis_TB           (3, :)     double {mustBeNumeric} = [];
+                optional.charTargetSpinAxisSource     (1,1) string {mustBeMember(optional.charTargetSpinAxisSource, ...
+                    ["", "DEFAULT_PLUS_Z", "SCENARIO_DECLARED"])} = "";
             end
             
             % TODO (PC)
@@ -112,6 +120,30 @@ classdef SReferenceMissionDesign < CBaseDatastructWithTimes
             self.dDCM_TBfromW               = dDCM_TBfromW                 ;
             self.dTargetPosition_W          = dTargetPosition_W            ;
             self.dTargetAngVel_IN           = optional.dTargetAngVel_IN     ;
+
+            % Resolve the physical spin-axis definition once at source materialization. A caller-provided axis is
+            % normalized; omitting it selects the approved target-body +Z default.
+            if isempty(optional.dTargetSpinAxis_TB)
+                self.dTargetSpinAxis_TB = [0.0; 0.0; 1.0];
+                self.charTargetSpinAxisSource = "DEFAULT_PLUS_Z";
+            else
+                if not(isequal(size(optional.dTargetSpinAxis_TB), [3,1]))
+                    error('SReferenceMissionDesign:InvalidTargetSpinAxis', ...
+                        'The declared target spin axis must be one finite nonzero 3-vector.');
+                end
+                dTargetSpinAxisNorm = norm(optional.dTargetSpinAxis_TB);
+                if any(not(isfinite(optional.dTargetSpinAxis_TB)), 'all') || ...
+                        dTargetSpinAxisNorm <= 1.0e-12
+                    error('SReferenceMissionDesign:InvalidTargetSpinAxis', ...
+                        'The declared target spin axis must be one finite nonzero 3-vector.');
+                end
+                self.dTargetSpinAxis_TB = optional.dTargetSpinAxis_TB ./ dTargetSpinAxisNorm;
+                if optional.charTargetSpinAxisSource == ""
+                    self.charTargetSpinAxisSource = "SCENARIO_DECLARED";
+                else
+                    self.charTargetSpinAxisSource = optional.charTargetSpinAxisSource;
+                end
+            end
             
             self.dSunPosition_W             = dSunPosition_W               ;
             self.dEarthPosition_W           = dEarthPosition_W             ;

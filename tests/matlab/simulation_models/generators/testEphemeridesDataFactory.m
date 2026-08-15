@@ -36,6 +36,8 @@ end
 strMainBodyRefData = struct();
 strMainBodyRefData.dDCM_INfromTB = dDCM_INfromTB;
 strMainBodyRefData.dAngVel_IN = repmat(dNominalAngVel_IN, 1, numel(dEphemerisTimegrid));
+strMainBodyRefData.dSpinAxis_TB = [0.0; 1.0; 0.0];
+strMainBodyRefData.charSpinAxisSource = "SCENARIO_DECLARED";
 strMainBodyRefData.dSunPosition_IN = repmat([1.4e8; 2.0e7; -0.6e7], ...
     1, numel(dEphemerisTimegrid));
 strDynParams = struct('strMainData', struct(), 'strBody3rdData', struct());
@@ -49,6 +51,8 @@ strAttitudeData = strDynParams.strMainData.strAttData;
 verifyEqual(testCase, strAttitudeData.dNominalAngVel_IN, dNominalAngVel_IN, 'AbsTol', 0.0);
 verifyEqual(testCase, strAttitudeData.dAngVel_IN, strMainBodyRefData.dAngVel_IN, 'AbsTol', 0.0);
 verifyEqual(testCase, strAttitudeData.dAngVelTimegrid, dEphemerisTimegrid, 'AbsTol', 0.0);
+verifyEqual(testCase, strAttitudeData.dTargetSpinAxis_TB, [0.0; 1.0; 0.0], 'AbsTol', 0.0);
+verifyEqual(testCase, strAttitudeData.charTargetSpinAxisSource, "SCENARIO_DECLARED");
 end
 
 function testRejectsMalformedAngularVelocity(testCase)

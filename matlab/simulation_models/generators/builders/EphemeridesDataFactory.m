@@ -81,6 +81,21 @@ end
 % Convert attitude DCMs to quaternion
 dQuat_WfromTB = DCM2quatSeq(strMainBodyRefData.dDCM_INfromTB, false);
 
+% Persist the already resolved body-fixed spin axis and its source beside the attitude model. Direct callers that
+% predate this contract receive the approved +Z default with explicit default provenance.
+if isfield(strMainBodyRefData, 'dSpinAxis_TB')
+    dTargetSpinAxis_TB = strMainBodyRefData.dSpinAxis_TB;
+    charTargetSpinAxisSource = string(strMainBodyRefData.charSpinAxisSource);
+else
+    dTargetSpinAxis_TB = [0.0; 0.0; 1.0];
+    charTargetSpinAxisSource = "DEFAULT_PLUS_Z";
+end
+if not(isequal(size(dTargetSpinAxis_TB), [3,1])) || any(not(isfinite(dTargetSpinAxis_TB))) || ...
+        abs(norm(dTargetSpinAxis_TB) - 1.0) > 1.0e-12
+    error('EphemeridesDataFactory:InvalidTargetSpinAxis', ...
+        'The resolved target spin axis must be one finite unit 3-vector.');
+end
+
 % Preserve the angular velocity delivered by the ephemeris source. This is
 % source data, not a numerical derivative of the sampled attitude sequence.
 if isfield(strMainBodyRefData, 'dAngVel_IN')
@@ -132,6 +147,11 @@ else
     strDynParams.strMainData.ui32CoeffsSizePtr = size(strDynParams.strMainData.d_gnc_eph_target_att_coeffs, 2);
 
 end
+
+% Keep spin-axis analysis provenance available in both interpolation layouts and in serialized COSMICA dynamics
+% context. This metadata is not consumed by the propagation kernel.
+strDynParams.strMainData.strAttData.dTargetSpinAxis_TB = dTargetSpinAxis_TB;
+strDynParams.strMainData.strAttData.charTargetSpinAxisSource = charTargetSpinAxisSource;
 
 %% Sun position
 if not(kwargs.bUseInterpFcnFromRCS1)

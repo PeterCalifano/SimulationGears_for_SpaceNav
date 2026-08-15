@@ -66,6 +66,7 @@ end
 % 14-03-2025    Pietro Califano     Move code to CScenarioGenerator static method for standardization
 % 21-07-2025    Pietro Califano     Add support for 3rd body reference data and generalize implementation
 % 13-08-2026    Pietro Califano, Codex gpt-5.6     Preserve source-owned target angular velocity.
+% 13-08-2026    Pietro Califano, Codex gpt-5.6     Resolve and transport target spin-axis provenance.
 % -------------------------------------------------------------------------------------------------------------
 %% DEPENDENCIES
 % [-]
@@ -125,6 +126,8 @@ if kwargs.objDataset.bDefaultConstructed % Try to use SPICE kernels
     % SPICE returns target-frame angular velocity relative to inertial. The
     % onboard model uses R_INfromTB(t) = Exp(-omega_IN*t) R_INfromTB(0).
     strMainBodyRefData.dAngVel_IN = -dTargetFrameAngVel_IN;
+    strMainBodyRefData.dSpinAxis_TB = [0.0; 0.0; 1.0];
+    strMainBodyRefData.charSpinAxisSource = "DEFAULT_PLUS_Z";
 
     % Get Sun position in Inertial frame
     strMainBodyRefData.dSunPosition_IN = dUnitsScaling * cspice_spkpos('SUN', dEphemeridesTimegrid, ...
@@ -196,6 +199,8 @@ else
 
     strMainBodyRefData.dDCM_INfromTB    = pagetranspose(kwargs.objDataset.dDCM_TBfromW(:,:,ui32EphemeridesExtractIdx));
     strMainBodyRefData.dSunPosition_IN  = kwargs.objDataset.dSunPosition_W(:,ui32EphemeridesExtractIdx);
+    strMainBodyRefData.dSpinAxis_TB = kwargs.objDataset.dTargetSpinAxis_TB;
+    strMainBodyRefData.charSpinAxisSource = kwargs.objDataset.charTargetSpinAxisSource;
     if not(isempty(kwargs.objDataset.dTargetAngVel_IN))
         if size(kwargs.objDataset.dTargetAngVel_IN, 2) ~= ui32NumEntriesInDataset || ...
                 any(not(isfinite(kwargs.objDataset.dTargetAngVel_IN)), 'all')
