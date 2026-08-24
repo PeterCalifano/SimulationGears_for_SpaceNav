@@ -1,94 +1,84 @@
-function [uncJ, unc_axis] = PerturbInertia(Jnom, Nsamples, Sigma)
-% PROTOTYPE
-% [uncJ, unc_axis] = PerturbInertia(Jnom, Nsamples, Sigma)
-% -------------------------------------------------------------------------
-% DESCRIPTION
-% What the function does.
-% -------------------------------------------------------------------------
-% INPUT
-%    in1    [dim]    input 1 description 
-%    in2    [dim]    input 2 description
-% -------------------------------------------------------------------------
-% OUTPUT
-%    out1    [dim]    output 1 description 
-%    out2    [dim]    output 2 description
-% -------------------------------------------------------------------------
-% CONTRIBUTORS
-%    DD-MM-AAAA    Name Surname    First Version
-%    DD-MM-AAAA    Name Surname    Last Version (optional changelog)
-% -------------------------------------------------------------------------
-% DEPENDENCIES
-%    nameOfTheFunction1InsideTheFunction.m
-%    nameOfTheFunction2InsideTheFunction.m
+function dPerturbedInertia_TB = PerturbInertiaTensor(dNominalInertia_TB, ...
+                                                     dInertiaChartError) %#codegen
+%% SIGNATURE
+% dPerturbedInertia_TB = PerturbInertiaTensor(dNominalInertia_TB, dInertiaChartError)
+% -------------------------------------------------------------------------------------------------------------
+%% DESCRIPTION
+% Apply one deterministic six-coordinate relative log-Cholesky perturbation to a physically consistent rigid-body
+% inertia tensor. The map factors the pseudo-inertia covariance
 %
-% -------------------------------------------------------------------------
-% Future upgrades
-% Things TODO
-% -------------------------------------------------------------------------
-% Function beautiful wonderful colorful code here
+%   Sigma = 0.5 * trace(J) * I - J
+%
+% and composes its nominal lower Cholesky factor with a dimensionless lower-triangular relative factor. Coordinates
+% [1, 3, 6] are logarithmic diagonal errors and [2, 4, 5] are the lower off-diagonal errors in row order. Every
+% numerically representable input maps directly to a symmetric positive-definite inertia satisfying all strict triangle
+% inequalities; this routine performs no random sampling, eigenspace selection, rejection, or retry.
+% -------------------------------------------------------------------------------------------------------------
+%% INPUT
+% dNominalInertia_TB    (3,3) double nominal physical target-frame inertia tensor [kg m^2]
+% dInertiaChartError    (6,1) double dimensionless relative log-Cholesky chart error
+% -------------------------------------------------------------------------------------------------------------
+%% OUTPUT
+% dPerturbedInertia_TB  (3,3) double perturbed physical target-frame inertia tensor [kg m^2]
+% -------------------------------------------------------------------------------------------------------------
+%% CHANGELOG
+% 23-08-2026  Pietro Califano, Codex     Replace nondeterministic rejection-sampling prototype.
+% -------------------------------------------------------------------------------------------------------------
+%% DEPENDENCIES
+% None.
+% -------------------------------------------------------------------------------------------------------------
 
-% Get Eigenvalues and Eigenvector
-% (Principal Moments of Inertia and Principal Axis)
-[princ_axis, J_princ] = eig(Jnom);
-
-% Default 3.5-Sigma value: 10% of Jnom (Gaussian distribution assumption)
-if nargin < 3
-    Sigma = 0.1/3.5 * J_princ * diag(randn(3, 1));
-else
-    if isvector(Sigma)
-        Sigma = diag(Sigma);
-    end
-    if sum(Sigma/3 - J_princ, 'all') > 0
-        error('PerturbInertia fcn exception: Sigma value too high with respect to nominal J')
-    end
+arguments (Input)
+    dNominalInertia_TB (3,3) double {mustBeReal, mustBeFinite}
+    dInertiaChartError (6,1) double {mustBeReal, mustBeFinite}
+end
+arguments (Output)
+    dPerturbedInertia_TB (3,3) double
 end
 
-% Static allocation
-% Jp_pool = zeros(3, 3, N);
-uncJ = zeros(3, 3, Nsamples);
-if nargout > 1
-    unc_axis = zeros(3, 3, Nsamples);
+% Require the nominal input itself to represent one physical inertia. The
+% pseudo-inertia covariance is positive definite exactly when the inertia is
+% positive definite and satisfies all strict triangle inequalities.
+dSymmetryTolerance = 1.0e-12 * norm(dNominalInertia_TB, 'fro');
+if norm(dNominalInertia_TB - transpose(dNominalInertia_TB), 'fro') > dSymmetryTolerance
+    error('PerturbInertiaTensor:InvalidNominalInertia', ...
+        'Nominal inertia must be finite, symmetric, and strictly physical.');
+end
+dNominalInertia_TB = 0.5 * (dNominalInertia_TB + transpose(dNominalInertia_TB));
+dNominalPseudoInertia = 0.5 * trace(dNominalInertia_TB) * eye(3) - dNominalInertia_TB;
+[dNominalCholFactor, dNominalCholFailure] = chol(dNominalPseudoInertia, 'lower');
+if dNominalCholFailure ~= 0.0
+    error('PerturbInertiaTensor:InvalidNominalInertia', ...
+        'Nominal inertia must be finite, symmetric, and strictly physical.');
 end
 
-% Initialize counter
-property_check_counter = 0;
-safe_var = 0;
-safe_thr = 1e7;
+% Map the unconstrained six-vector to a dimensionless lower-triangular
+% factor with positive diagonal, then compose it with the nominal factor.
+dRelativeCholFactor = zeros(3);
+dRelativeCholFactor(1, 1) = exp(dInertiaChartError(1));
+dRelativeCholFactor(2, 1) = dInertiaChartError(2);
+dRelativeCholFactor(2, 2) = exp(dInertiaChartError(3));
+dRelativeCholFactor(3, 1) = dInertiaChartError(4);
+dRelativeCholFactor(3, 2) = dInertiaChartError(5);
+dRelativeCholFactor(3, 3) = exp(dInertiaChartError(6));
+if any(~isfinite(dRelativeCholFactor), 'all') || any(diag(dRelativeCholFactor) <= 0.0)
+    error('PerturbInertiaTensor:ChartOutOfRange', ...
+        'Inertia chart error exceeds the numerically representable physical domain.');
+end
 
-while property_check_counter < Nsamples
+% Reconstruct through the inverse pseudo-inertia map. Symmetrization removes
+% roundoff asymmetry without altering the physical construction.
+dPerturbedCholFactor = dNominalCholFactor * dRelativeCholFactor;
+dPerturbedPseudoInertia = dPerturbedCholFactor * transpose(dPerturbedCholFactor);
+dPerturbedInertia_TB = trace(dPerturbedPseudoInertia) * eye(3) - dPerturbedPseudoInertia;
+dPerturbedInertia_TB = 0.5 * (dPerturbedInertia_TB + transpose(dPerturbedInertia_TB));
 
-    
-    % Add random perturbation to eigenvalues
-    Jp_perturbed = J_princ + Sigma .* diag(randn(3, 1));
-    J_body_temp = princ_axis * Jp_perturbed * princ_axis';
-
-    % Enforce symmetry of the matrix
-    J_body_temp = (J_body_temp + J_body_temp')/2;
-
-    % Get eigenpair of generated sample
-    [axis_new, J_princ_new] = eig(J_body_temp);
-
-    % Check conditions: Ixx < Iyy + Izz; Iyy < Ixx + Izz; Izz < Ixx + Iyy and
-    % Positive Definite;
-    if sum((diag(J_princ_new) > 0), 'all') == 3 && J_princ_new(1, 1) - J_princ_new(2, 2) - J_princ_new(3, 3) < 0 && ...
-            J_princ_new(2, 2) - J_princ_new(1, 1) - J_princ_new(3, 3) < 0 && ...
-            J_princ_new(3, 3) - J_princ_new(1, 1) - J_princ_new(2, 2) < 0
-
-        % Update counter
-        property_check_counter = property_check_counter + 1;
-        % Assign sample to 3D array
-        uncJ(:, :, property_check_counter) = J_body_temp;
-
-        if nargout > 1
-            unc_axis(:, :, property_check_counter) = axis_new;
-        end
-    end
-
-    safe_var = safe_var + 1;
-    if safe_var == safe_thr
-        error('PerturbInertia fcn exception: while safe exit triggered')
-    end
-
+% Detect only floating-point range loss. This is not a stochastic
+% admissibility gate: representable chart points are physical by construction.
+[~, dPerturbedCholFailure] = chol(dPerturbedInertia_TB, 'lower');
+if any(~isfinite(dPerturbedInertia_TB), 'all') || dPerturbedCholFailure ~= 0.0
+    error('PerturbInertiaTensor:ChartOutOfRange', ...
+        'Inertia chart error exceeds the numerically representable physical domain.');
 end
 
 end
