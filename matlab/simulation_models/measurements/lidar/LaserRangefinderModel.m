@@ -66,6 +66,7 @@ end
 %% CHANGELOG
 % 16-01-2025    Pietro Califano     First implementation for RCS-1 simulator
 % 21-01-2026    Pietro Califano     Review and optimization for codegen
+% 24-08-2026    Pietro Califano, Codex gpt-5.6     Reject ranges outside either validity bound.
 % -------------------------------------------------------------------------------------------------------------
 %% DEPENDENCIES
 % [-]
@@ -123,7 +124,7 @@ dMeasDistance(:) = dMeasDistance(:) + dMeasErr;
 
 % Validity checks
 if bEnableValidityChecks == true
-    if (dMeasDistance < dMeasValidInterval(1) && dMeasDistance > dMeasValidInterval(2)) || dMeasDistance < 0
+    if dMeasDistance < dMeasValidInterval(1) || dMeasDistance > dMeasValidInterval(2) || dMeasDistance < 0
         bValidityFlag = false;
     end
 end
