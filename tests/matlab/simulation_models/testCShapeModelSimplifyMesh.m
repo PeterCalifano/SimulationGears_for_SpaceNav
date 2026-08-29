@@ -1,5 +1,96 @@
 classdef testCShapeModelSimplifyMesh < matlab.unittest.TestCase
     methods (Test)
+        function TestFileMeshLoadsAndRepairsAsciiStl(self)
+            objFixture = self.applyFixture(matlab.unittest.fixtures.TemporaryFolderFixture);
+            charStlPath = fullfile(string(objFixture.Folder), "two_facets.stl");
+            i32FileId = fopen(charStlPath, "w");
+            objFileCleanup = onCleanup(@() fclose(i32FileId));
+            fprintf(i32FileId, "solid two_facets\n");
+            fprintf(i32FileId, "facet normal 0 0 1\nouter loop\n");
+            fprintf(i32FileId, "vertex 0 0 0\nvertex 1 0 0\nvertex 1 1 0\n");
+            fprintf(i32FileId, "endloop\nendfacet\n");
+            fprintf(i32FileId, "facet normal 0 0 1\nouter loop\n");
+            fprintf(i32FileId, "vertex 0 0 0\nvertex 1 1 0\nvertex 0 1 0\n");
+            fprintf(i32FileId, "endloop\nendfacet\nendsolid two_facets\n");
+            clear objFileCleanup
+
+            objShapeModel = CShapeModel("file_mesh", charStlPath, "m", "m", ...
+                true, "two_facets", true);
+
+            self.verifyEqual(objShapeModel.ui32NumOfVertices, uint32(4));
+            self.verifyEqual(size(objShapeModel.ui32triangVertexPtr, 2), 2);
+            self.verifyEqual(size(objShapeModel.dVerticesPos), [3, 4]);
+            self.verifyError(@() CShapeModel("file_mesh", charStlPath, "m", "m", ...
+                false, "two_facets", true), "CShapeModel:MeshAuxiliaryDataUnsupported");
+        end
+
+        function TestFileMeshLoadsObjPolygon(self)
+            objFixture = self.applyFixture(matlab.unittest.fixtures.TemporaryFolderFixture);
+            charObjPath = fullfile(string(objFixture.Folder), "polygon.obj");
+            i32FileId = fopen(charObjPath, "w");
+            objFileCleanup = onCleanup(@() fclose(i32FileId));
+            fprintf(i32FileId, "v 0 0 0\nv 1 0 0\nv 1 1 0\nv 0 1 0\n");
+            fprintf(i32FileId, "f 1 2 3 4\n");
+            clear objFileCleanup
+
+            objShapeModel = CShapeModel("file_mesh", charObjPath, "m", "m", ...
+                true, "polygon", true);
+
+            self.verifyEqual(objShapeModel.ui32NumOfVertices, uint32(4));
+            self.verifyEqual(size(objShapeModel.ui32triangVertexPtr, 2), 2);
+        end
+
+        function TestGeometryOnlyObjRepairIsExplicit(self)
+            objFixture = self.applyFixture(matlab.unittest.fixtures.TemporaryFolderFixture);
+            charObjPath = fullfile(string(objFixture.Folder), "repair.obj");
+            i32FileId = fopen(charObjPath, "w");
+            objFileCleanup = onCleanup(@() fclose(i32FileId));
+            fprintf(i32FileId, "v 0 0 0\nv 1 0 0\nv 0 1 0\nv 0 0 0\nv 2 0 0\n");
+            fprintf(i32FileId, "f 1 2 3\nf 4 2 5\n");
+            clear objFileCleanup
+
+            [ui32RawFaces, dRawVertices] = CShapeModel.LoadModelFromObj( ...
+                charObjPath, true, bRepairMesh=false);
+            [ui32RepairedFaces, dRepairedVertices] = CShapeModel.LoadModelFromObj( ...
+                charObjPath, true, bRepairMesh=true);
+
+            self.verifyEqual(size(ui32RawFaces, 2), 2);
+            self.verifyEqual(size(dRawVertices, 2), 5);
+            self.verifyEqual(size(ui32RepairedFaces, 2), 1);
+            self.verifyEqual(size(dRepairedVertices, 2), 3);
+        end
+
+        function TestObjRepairRejectsAuxiliaryIndexLoading(self)
+            objFixture = self.applyFixture(matlab.unittest.fixtures.TemporaryFolderFixture);
+            charObjPath = fullfile(string(objFixture.Folder), "auxiliary.obj");
+            i32FileId = fopen(charObjPath, "w");
+            objFileCleanup = onCleanup(@() fclose(i32FileId));
+            fprintf(i32FileId, "v 0 0 0\nv 1 0 0\nv 0 1 0\n");
+            fprintf(i32FileId, "vt 0 0\nvt 1 0\nvt 0 1\nvn 0 0 1\n");
+            fprintf(i32FileId, "f 1/1/1 2/2/1 3/3/1\n");
+            clear objFileCleanup
+
+            self.verifyError(@() CShapeModel.LoadModelFromObj( ...
+                charObjPath, false, bRepairMesh=true), ...
+                "CShapeModel:RepairWithAuxiliaryDataUnsupported");
+        end
+
+        function TestDeprecatedObjEntryPointForwardsGeometry(self)
+            objFixture = self.applyFixture(matlab.unittest.fixtures.TemporaryFolderFixture);
+            charObjPath = fullfile(string(objFixture.Folder), "forwarder.obj");
+            i32FileId = fopen(charObjPath, "w");
+            objFileCleanup = onCleanup(@() fclose(i32FileId));
+            fprintf(i32FileId, "v 0 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 3\n");
+            clear objFileCleanup
+
+            [ui32ExpectedFaces, dExpectedVertices] = CShapeModel.LoadModelFromObj( ...
+                charObjPath, true, bRepairMesh=false);
+            [ui32ActualFaces, dActualVertices] = LoadModelFromObj(charObjPath, true);
+
+            self.verifyEqual(ui32ActualFaces, ui32ExpectedFaces);
+            self.verifyEqual(dActualVertices, dExpectedVertices);
+        end
+
         function testConstructorAppliesLoadTimeKeepFraction(testCase)
             fixture = testCase.applyFixture(matlab.unittest.fixtures.TemporaryFolderFixture);
             charObjPath = fullfile(string(fixture.Folder), "icosphere_mesh.obj");
