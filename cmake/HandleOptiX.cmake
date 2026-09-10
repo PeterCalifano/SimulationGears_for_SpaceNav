@@ -151,27 +151,15 @@ function(handle_optix)
     #target_include_directories(${HOPT_TARGET} INTERFACE ${_optix_includes})
     target_compile_definitions(${HOPT_TARGET} INTERFACE __OPTIX_ENABLED__=1)
 
-    # Define include directories for install compatibility
-    #target_include_directories(${HOPT_TARGET} INTERFACE
-    #                        $<BUILD_INTERFACE:"single_entry">  # Used during development
-    #                        #$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/lib/stb_PeterCdev>
-    #                        #$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/lib/rapidyaml_PeterCdev>
-    #                        #$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/lib/gdt>
-    #                        #$<BUILD_INTERFACE:${CUDA_INCLUDE_DIRS}>
-    #                        #$<BUILD_INTERFACE:${OPTIX_INCLUDE_DIR}>
-    #                        #$<BUILD_INTERFACE:${OpenCV_INCLUDE_DIRS}>  # Add OpenCV include directories
-    #                        $<INSTALL_INTERFACE:include/optix>  # Used in installed projects
-    #)
-
     foreach(_inc ${_optix_includes})
         target_include_directories(${HOPT_TARGET} INTERFACE
             $<BUILD_INTERFACE:${_inc}>
         )
     endforeach()
 
-    target_include_directories(${HOPT_TARGET} INTERFACE
-        $<INSTALL_INTERFACE:include/optix>
-    )
+    # The installed package resolves an external SDK through its generated
+    # package config. Do not export this build's SDK path or claim that the
+    # project installs a private copy of the OptiX headers.
 
     if(HOPT_CUDA_TARGET)
         #target_include_directories(${HOPT_CUDA_TARGET} INTERFACE ${_optix_includes})

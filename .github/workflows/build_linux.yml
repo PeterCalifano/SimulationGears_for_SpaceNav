@@ -23,6 +23,7 @@ on:
       - src/**
       - examples/**
       - tests/**
+      - lib/**
       - cmake/**
       - doc/**
       - CMakeLists.txt
@@ -40,6 +41,7 @@ on:
       - src/**
       - examples/**
       - tests/**
+      - lib/**
       - cmake/**
       - doc/**
       - CMakeLists.txt
@@ -55,6 +57,7 @@ jobs:
       BUILD_DIR: build_ci
       BUILD_TYPE: RelWithDebInfo
       ENABLE_TBB: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.runner == 'self-hosted' && 'OFF' || 'ON' }}
+      CTEST_OUTPUT_ON_FAILURE: 1
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -74,6 +77,7 @@ jobs:
           command -v ninja
           command -v g++
           command -v ccache
+          command -v python3
           python3 -m pytest --version
           python3 -c 'import yaml'
 
@@ -88,7 +92,6 @@ jobs:
 
       - name: Configure
         run: |
-          # The downloaded build tree may run on another host, so keep CPU flags portable.
           cmake -S . -B "${BUILD_DIR}" -GNinja \
             -DCMAKE_BUILD_TYPE="${BUILD_TYPE}" \
             -DENABLE_TESTS=ON \
@@ -111,7 +114,7 @@ jobs:
       - name: Show ccache stats
         run: ccache --show-stats || true
 
-      - name: Upload build artifact
+      - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
           name: simulation-gears-native-build
@@ -140,11 +143,13 @@ jobs:
       - name: Validate self-hosted prerequisites
         if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.runner == 'self-hosted' }}
         run: |
+          command -v cmake
           command -v ctest
+          command -v python3
           python3 -m pytest --version
           python3 -c 'import yaml'
 
-      - name: Download build artifact
+      - name: Download build artifacts
         uses: actions/download-artifact@v4
         with:
           name: simulation-gears-native-build
@@ -157,12 +162,14 @@ jobs:
           elif [ -d "${BUILD_DIR}/${BUILD_DIR}/CMakeFiles" ]; then
             echo "CTEST_DIR=${BUILD_DIR}/${BUILD_DIR}" >> "$GITHUB_ENV"
           else
+            echo "Could not find CMakeFiles under '${BUILD_DIR}' after artifact download."
             find "${BUILD_DIR}" -maxdepth 3 -type d | sort || true
             exit 1
           fi
 
       - name: Restore test executable permissions
-        run: find "${CTEST_DIR}" -type f -path "*/tests/*" -exec chmod +x {} + || true
+        run: |
+          find "${CTEST_DIR}" -type f -path "*/tests/*" -exec chmod +x {} + || true
 
       - name: Test
         run: ctest --test-dir "${CTEST_DIR}" --output-on-failure --parallel 2 --no-tests=error

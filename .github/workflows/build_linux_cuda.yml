@@ -9,13 +9,17 @@ on:
         required: true
         default: "false"
         type: choice
-        options: ["false", "true"]
+        options:
+          - "false"
+          - "true"
       enable_tbb:
         description: "Enable oneTBB (requires TBB on runner)"
         required: true
         default: "false"
         type: choice
-        options: ["false", "true"]
+        options:
+          - "false"
+          - "true"
   push:
     tags:
       - "v*.*.*"
@@ -27,11 +31,17 @@ concurrency:
 jobs:
   build:
     if: ${{ vars.CI_USE_SELF_HOSTED == 'true' }}
-    runs-on: [self-hosted, Linux, X64, gpu, cuda]
+    runs-on:
+      - self-hosted
+      - Linux
+      - X64
+      - gpu
+      - cuda
     timeout-minutes: 90
     env:
       BUILD_DIR: build_cuda_ci
       BUILD_TYPE: RelWithDebInfo
+      CTEST_OUTPUT_ON_FAILURE: 1
       ENABLE_OPTIX: ${{ github.event.inputs.enable_optix == 'true' && 'ON' || 'OFF' }}
       ENABLE_TBB: ${{ github.event.inputs.enable_tbb == 'true' && 'ON' || 'OFF' }}
     steps:
@@ -48,6 +58,7 @@ jobs:
           command -v ccache
           command -v nvcc
           command -v nvidia-smi
+          command -v python3
           python3 -m pytest --version
           python3 -c 'import yaml'
           nvidia-smi
@@ -57,7 +68,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.ccache
-          key: ccache-simgears-cuda-${{ runner.os }}-${{ github.ref_name }}-${{ hashFiles('CMakeLists.txt', 'cmake/**', 'src/**', 'tests/**') }}
+          key: ccache-simgears-cuda-${{ runner.os }}-${{ github.ref_name }}-${{ hashFiles('CMakeLists.txt', 'cmake/**', 'src/**', 'tests/**', '.github/workflows/build_linux_cuda.yml') }}
           restore-keys: |
             ccache-simgears-cuda-${{ runner.os }}-${{ github.ref_name }}-
             ccache-simgears-cuda-${{ runner.os }}-
@@ -85,7 +96,10 @@ jobs:
       - name: Build
         run: cmake --build "${BUILD_DIR}" --parallel 4
 
-      - name: Upload build artifact
+      - name: Show ccache stats
+        run: ccache --show-stats || true
+
+      - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
           name: simulation-gears-cuda-build
@@ -96,7 +110,12 @@ jobs:
   test:
     needs: build
     if: ${{ vars.CI_USE_SELF_HOSTED == 'true' }}
-    runs-on: [self-hosted, Linux, X64, gpu, cuda]
+    runs-on:
+      - self-hosted
+      - Linux
+      - X64
+      - gpu
+      - cuda
     timeout-minutes: 45
     env:
       BUILD_DIR: build_cuda_ci
@@ -107,15 +126,14 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Validate CUDA test prerequisites
+      - name: Validate test prerequisites
         run: |
           command -v ctest
-          command -v nvidia-smi
+          command -v python3
           python3 -m pytest --version
           python3 -c 'import yaml'
-          nvidia-smi
 
-      - name: Download build artifact
+      - name: Download build artifacts
         uses: actions/download-artifact@v4
         with:
           name: simulation-gears-cuda-build
@@ -128,12 +146,14 @@ jobs:
           elif [ -d "${BUILD_DIR}/${BUILD_DIR}/CMakeFiles" ]; then
             echo "CTEST_DIR=${BUILD_DIR}/${BUILD_DIR}" >> "$GITHUB_ENV"
           else
+            echo "Could not find CMakeFiles under '${BUILD_DIR}' after artifact download."
             find "${BUILD_DIR}" -maxdepth 3 -type d | sort || true
             exit 1
           fi
 
       - name: Restore test executable permissions
-        run: find "${CTEST_DIR}" -type f -path "*/tests/*" -exec chmod +x {} + || true
+        run: |
+          find "${CTEST_DIR}" -type f -path "*/tests/*" -exec chmod +x {} + || true
 
       - name: Test
         run: ctest --test-dir "${CTEST_DIR}" --output-on-failure --parallel 2 --no-tests=error

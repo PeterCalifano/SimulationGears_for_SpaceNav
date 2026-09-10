@@ -91,12 +91,13 @@ CUDA and OptiX remain optional through the overlay facade:
 
 | User flag | Colcon CMake argument | Core option |
 |---|---|---|
-| `--cuda` | `-DSIMULATION_GEARS_ENABLE_CUDA=ON` | `ENABLE_CUDA=ON` |
-| `--optix` | CUDA plus `-DSIMULATION_GEARS_ENABLE_OPTIX=ON` | `ENABLE_OPTIX=ON` |
+| `--cuda` | `-DSIMULATION_GEARS_ENABLE_CUDA=ON` | `SimulationGears_for_SpaceNav_ENABLE_CUDA=ON` |
+| `--optix` | CUDA plus `-DSIMULATION_GEARS_ENABLE_OPTIX=ON` | `SimulationGears_for_SpaceNav_ENABLE_OPTIX=ON` |
 
-Use the helper flags rather than passing `ENABLE_CUDA` or `ENABLE_OPTIX`
-directly; the shim owns the mapping. OptiX still requires an SDK root through
-the native project's documented CMake/environment inputs.
+Use the helper flags rather than passing generic `ENABLE_CUDA` or
+`ENABLE_OPTIX` values directly; the shim maps its stable facade to this
+project's qualified core options. OptiX still requires an SDK root through the
+native project's documented CMake/environment inputs.
 
 ## Project metadata synchronization
 

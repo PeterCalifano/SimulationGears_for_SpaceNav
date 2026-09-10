@@ -34,10 +34,10 @@ if (ENABLE_TESTS)
     find_package(Git QUIET)
 
     if(NOT Git_FOUND)
-      message(WARNING "Git not found; cannot fetch Catch2. Catch2 unit tests will be disabled.")
+      message(WARNING "Git not found; cannot fetch Catch2. Catch2 tests will be disabled.")
     elseif(EXISTS "${_catch2_local_dir}")
       # Local Catch2 directory exists but is not usable
-      message(WARNING "Local Catch2 directory exists but is not usable: ${_catch2_local_dir}. Catch2 unit tests will be disabled.")
+      message(WARNING "Local Catch2 directory exists but is not usable: ${_catch2_local_dir}. Catch2 tests will be disabled.")
     else()
       # Try fetching it by cloning into lib/
 
@@ -50,7 +50,7 @@ if (ENABLE_TESTS)
         TIMEOUT 10)
 
       if(_git_result EQUAL 0)
-        # If network access is OK, clone it   
+        # If network access is OK, clone it
         execute_process(
           COMMAND "${GIT_EXECUTABLE}" clone --depth 1 --branch v3.8.1 https://github.com/catchorg/Catch2.git "${_catch2_local_dir}"
           RESULT_VARIABLE _git_clone_result
@@ -65,16 +65,16 @@ if (ENABLE_TESTS)
             set(Catch2_FOUND TRUE)
           endif() # All went OK
         else()
-          message(WARNING "Failed to clone Catch2 into lib/. Catch2 unit tests will be disabled.")
+          message(WARNING "Failed to clone Catch2 into lib/. Catch2 tests will be disabled.")
         endif()
 
       else()
         # Network access fails
-        message(WARNING "Cannot reach GitHub (no network or blocked). Catch2 unit tests will be disabled.")
+        message(WARNING "Cannot reach GitHub (no network or blocked). Catch2 tests will be disabled.")
       endif()
     endif()
   elseif(NOT Catch2_FOUND AND NOT ENABLE_FETCH_CATCH2)
-    message(STATUS "Catch2 not found and ENABLE_FETCH_CATCH2=OFF. Catch2 unit tests will be disabled.")
+    message(STATUS "Catch2 not found and ENABLE_FETCH_CATCH2=OFF. Catch2 tests will be disabled.")
   endif()
 
   # Only add tests if we really have Catch2 (either found or fetched)

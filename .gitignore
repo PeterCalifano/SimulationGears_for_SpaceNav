@@ -2,14 +2,14 @@
 /*debug*/
 /*install*/
 
-# Optional ROS 2 overlay colcon outputs are nested below the anchored root rules.
+# ROS 2 overlay colcon outputs (root patterns above are anchored and do not cover subdirs)
 /ros2/build/
 /ros2/install/
 /ros2/log/
 
+# SimulationGears generated MATLAB/codegen artifacts.
 **/codegen*/
 /matlab/mex/
-
 *.mexa64
 
 VERSION
@@ -31,6 +31,7 @@ CMakeUserPresets.json
 *.asv
 *.png
 .idea
+/*.code-workspace
 *.pyc
 __pycache__/
 .pytest_cache/
@@ -52,9 +53,11 @@ CMakeLists.txt.user*
 xcode/
 /Dockerfile
 /python/gtsam/notebooks/.ipynb_checkpoints/ellipses-checkpoint.ipynb
+lib/wrap
 .codex
 
-# SimulationGears scenario data: keep manifests tracked, ignore fetched assets and derived data.
+# Keep scenario manifests tracked while excluding fetched and derived assets.
 /data/scenarios/*/assets/**
 /data/scenarios/*/derived/**
 /data/common/spice/assets/**
+CONTEXT.md

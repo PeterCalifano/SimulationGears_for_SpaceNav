@@ -145,7 +145,7 @@ touch_root_colcon_ignore_markers() {
   local path_
 
   shopt -s nullglob
-  for path_ in "${ROOT_DIR}"/build* "${ROOT_DIR}/install" "${ROOT_DIR}/template_subbuild"; do
+  for path_ in "${ROOT_DIR}"/build* "${ROOT_DIR}"/install "${ROOT_DIR}"/template_subbuild; do
     [[ -d "${path_}" ]] || continue
     if touch "${path_}/COLCON_IGNORE" 2>/dev/null; then
       info "ensured COLCON_IGNORE in ${path_#"${ROOT_DIR}"/}"
@@ -179,16 +179,21 @@ sync_ros2_package_metadata() {
 }
 
 run_colcon_build() {
-  local cuda_flag_="OFF"
-  local optix_flag_="OFF"
+  local cuda_flag_
+  local optix_flag_
   local build_cmd_
   local package_
   local test_cmd_
 
+  cuda_flag_="OFF"
+  optix_flag_="OFF"
   [[ "${enable_cuda}" == true ]] && cuda_flag_="ON"
   [[ "${enable_optix}" == true ]] && optix_flag_="ON"
 
-  build_cmd_=(colcon build --symlink-install)
+  build_cmd_=(
+    colcon build
+    --symlink-install
+  )
   if ((${#packages_select[@]} > 0)); then
     build_cmd_+=(--packages-select "${packages_select[@]}")
   fi

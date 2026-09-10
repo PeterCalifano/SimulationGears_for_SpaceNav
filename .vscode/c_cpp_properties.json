@@ -5,7 +5,10 @@
       "includePath": [
         "${workspaceFolder}/src",
         "${workspaceFolder}/lib",
-        "${workspaceFolder}/tests"
+        "${workspaceFolder}/examples",
+        "${workspaceFolder}/tests",
+        "${workspaceFolder}/build/src",
+        "${workspaceFolder}/build/no_optimization/src"
       ],
       "defines": [],
       "compilerPath": "/usr/bin/gcc",
@@ -14,7 +17,10 @@
         "path": [
           "${workspaceFolder}/src",
           "${workspaceFolder}/lib",
-          "${workspaceFolder}/tests"
+          "${workspaceFolder}/examples",
+          "${workspaceFolder}/tests",
+          "${workspaceFolder}/build/src",
+          "${workspaceFolder}/build/no_optimization/src"
         ],
         "limitSymbolsToIncludedHeaders": true
       }
@@ -24,7 +30,10 @@
       "includePath": [
         "${workspaceFolder}/src",
         "${workspaceFolder}/lib",
-        "${workspaceFolder}/tests"
+        "${workspaceFolder}/examples",
+        "${workspaceFolder}/tests",
+        "${workspaceFolder}/build/src",
+        "${workspaceFolder}/build/no_optimization/src"
       ],
       "defines": [],
       "compilerPath": "/usr/bin/gcc",
@@ -33,7 +42,10 @@
         "path": [
           "${workspaceFolder}/src",
           "${workspaceFolder}/lib",
-          "${workspaceFolder}/tests"
+          "${workspaceFolder}/examples",
+          "${workspaceFolder}/tests",
+          "${workspaceFolder}/build/src",
+          "${workspaceFolder}/build/no_optimization/src"
         ],
         "limitSymbolsToIncludedHeaders": true
       }
