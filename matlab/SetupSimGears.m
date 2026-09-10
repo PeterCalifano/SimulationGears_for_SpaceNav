@@ -6,6 +6,7 @@ function SetupSimGears()
 % -------------------------------------------------------------------------------------------------------------
 %% CHANGELOG
 % 28-03-2026    Pietro Califano     Initial version
+% 27-07-2026    Pietro Califano, Codex     Prioritize shared SimulationGears propagators.
 % -------------------------------------------------------------------------------------------------------------
 %% DEPENDENCIES
 % [-]
@@ -90,5 +91,17 @@ if strlength(charMathCoreRoot) > 0
 else
     warning('SetupSimGears:MathCoreNotFound', ...
         'MathCore MATLAB sources not found under expected lib/MathCore submodules.');
+end
+
+% Keep both levels of the SimulationGears provider authoritative while the
+% migrated legacy MathCore implementations await their removal batch.
+charPropagatorRoot = fullfile(charMatlabRoot, ...
+    'simulation_models', 'propagators');
+charIntegratorRoot = fullfile(charPropagatorRoot, 'integrators');
+if isfolder(charPropagatorRoot)
+    addpath(charPropagatorRoot, '-begin');
+end
+if isfolder(charIntegratorRoot)
+    addpath(charIntegratorRoot, '-begin');
 end
 end

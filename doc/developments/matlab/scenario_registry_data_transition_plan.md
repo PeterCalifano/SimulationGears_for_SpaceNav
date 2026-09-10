@@ -194,3 +194,86 @@
   - SimGears data layout/manifests/fetch validation.
   - New tagged scenarios and Eros/Apophis harmonization.
   - Existing unrelated dynamics/noise/photometry/tooling groups.
+
+## Task 9: Registry-Owned Scenario SPICE Environments
+
+**Files:**
+- Modify: `matlab/simulation_management/CScenarioRegistry.m`
+- Modify: `matlab/simulation_management/CSPICEkerLoader.m`
+- Modify: `data/scenarios/Apophis/manifest.json`
+- Create: ignored environment assets under `data/scenarios/Apophis/assets/spice/`
+- Create/modify: focused simulation-management tests
+
+**Interfaces:**
+- A scenario may declare `charDefaultSpiceMetaKernelRelativePath` in its registry spec.
+- `CSPICEkerLoader` prefers that SimulationGears-owned metakernel and does not require a legacy kernel root for the scenario.
+- Scenarios without a registered metakernel retain the existing explicit legacy-root behavior.
+- Scenario environment packs contain target and generic-body kernels only; spacecraft trajectory kernels remain outside the scenario database.
+
+- [x] Add failing tests for registry metadata, manifest alignment, and data-root precedence.
+- [x] Add the registry metakernel field and SimulationGears-first loader path.
+- [x] Copy the generic Apophis environment pack into the ignored scenario asset tree and record its hashes in the manifest.
+- [x] Verify the copied hashes and load the real environment with MICE.
+- [x] Verify target-fixed attitude and target/Sun ephemerides at the pilot epoch.
+- [x] Run the COSMICA Apophis truth-setup boundary without an external Apophis initializer or trajectory kernel.
+
+## Task 10: Complete Legacy SPICE Data Ownership Migration
+
+**Files:**
+- Modify: scenario and common-data manifests under `data/`
+- Create: ignored scenario, common, and mission SPICE asset packs under `data/`
+- Modify: registry and loader contracts where additional pack types require explicit ownership
+- Modify: consumers in their owning repositories through separately reviewed batches
+
+**Interfaces:**
+- Generic NAIF kernels are owned by the SimulationGears common-data collection.
+- Target environment kernels are owned by registered scenario packs.
+- Spacecraft trajectories, spacecraft attitude, and mission frames are owned by explicit mission packs rather than target scenarios.
+- The legacy nav-backend kernel root remains available until all consumers have migrated and passed runtime validation.
+
+- [ ] Inventory every legacy kernel asset and classify it as common, scenario, or mission data.
+- [ ] Define manifest-backed common and mission-pack contracts without weakening scenario ownership.
+- [ ] Copy classified assets into ignored SimulationGears data folders and record hashes and provenance.
+- [ ] Migrate each scenario and mission consumer in its owning repository through a separate review batch.
+- [ ] Verify representative frame, attitude, and ephemeris queries for every migrated pack.
+- [ ] Confirm no runtime consumer resolves the legacy nav-backend kernel root.
+- [ ] Create and verify a recoverable archive of the legacy kernel directory.
+- [ ] Remove the legacy directory only after explicit user approval.
+
+## Task 11: Embedded Apophis Degree-16 Gravity Family
+
+**Files:**
+- Create: `examples/matlab/shape_models/GenerateScenarioSHGravityCoefficients.m`
+- Create: `matlab/simulation_models/accelerations/RescaleSphericalHarmonicsReferenceRadius.m`
+- Modify: `examples/matlab/shape_models/DemoItokawaDegree16GravityComparison.m`
+- Modify: `matlab/simulation_management/CScenarioRegistry.m`
+- Modify: `tests/matlab/simulation_management/testCScenarioRegistry.m`
+- Modify: `tests/matlab/simulation_models/accelerations/testSSphericalHarmonicsGravityData.m`
+
+**Interfaces:**
+- `GenerateScenarioSHGravityCoefficients(...)` is manually runnable for any registry-backed target
+  with an installed shape and finite gravity metadata. It reuses `DefineShapeModel`, centers the uniform-density
+  volume centroid, fits outside the enclosing sphere, and rescales the generated rows to the target's registered
+  mean/reference normalization radius.
+- The generator returns and optionally prints the MATLAB-ready unnormalized coefficient rows used for registry
+  embedding. The mesh enclosing radius remains generation evidence rather than replacing the physical mean radius.
+- `CScenarioRegistry.GetSphericalHarmonicsGravityData("Apophis", degree, "km")` returns exact prefixes of the
+  accepted embedded degree-16 family.
+- Normal runtime setup consumes only the registry and never performs an online fit.
+- Apophis and Itokawa generation reuse one shared reference-radius transformation.
+
+- [x] Add a failing structural test for unavailable Apophis registry coefficients.
+- [x] Implement the generic registry-target coefficient generator and reuse the promoted Itokawa radius transform.
+- [x] Generate the degree-16 family from the registered full mesh and review the fit evidence. The complete
+  3,996-face/2,000-vertex mesh was translated from a 3.511e-7 km volume-COM offset to a 5.544e-18 km residual;
+  one full-resolution fit iteration produced 151 finite rows with perturbative validation RMS errors of 2.876e-2
+  for acceleration and 9.050e-3 for potential.
+- [x] Embed the accepted coefficient rows and physical metadata in `CScenarioRegistry`. The coefficient family is
+  normalized at the registered 0.175930344 km mean radius; the 0.248137567 km enclosing mesh radius remains fit
+  evidence and is not substituted for the physical reference radius.
+- [x] Verify exact degree-prefix behavior and dimensional scaling. Registry and shared reference-radius tests pass,
+  and numerical evaluation before/after radius rescaling agrees to 3.46e-16 relative acceleration and 9.28e-17
+  relative potential.
+- [x] Re-run the COSMICA Apophis truth-setup boundary with registry-backed spherical harmonics. The real typed
+  one-day condition loads the generic Apophis SPICE pack and degree-16 family, producing 151 SH rows with
+  `dRefRadius = 0.175930344 km` and spherical-harmonics truth enabled.

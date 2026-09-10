@@ -167,6 +167,93 @@ classdef testInertialDynMaxFidelityMexParity < matlab.unittest.TestCase
             end
         end
 
+        function testFixedStepProviderKeepsDynamicsPayloadRuntime(self)
+            %% SIGNATURE
+            % testFixedStepProviderKeepsDynamicsPayloadRuntime(self)
+            % -----------------------------------------------------------------------------------------------------
+            %% DESCRIPTION
+            % Generate a thin max-fidelity entry point that delegates its
+            % complete integration algorithm to the shared fixed-step provider.
+            % Verify the generated target still accepts runtime dynamics
+            % coefficients by changing the target GM after compilation.
+            % -----------------------------------------------------------------------------------------------------
+            %% INPUT
+            % self                  Active MATLAB unit-test instance.
+            % -----------------------------------------------------------------------------------------------------
+            %% OUTPUT
+            % [-]
+            % -----------------------------------------------------------------------------------------------------
+            %% CHANGELOG
+            % 27-07-2026  Pietro Califano, Codex    Add shared-provider codegen regression.
+            % -----------------------------------------------------------------------------------------------------
+            %% DEPENDENCIES
+            % CodegenInertialFixedStepProbe()
+            % PropagateFixedStep()
+            % evalRHS_InertialDynMaxFidelity()
+            % -----------------------------------------------------------------------------------------------------
+
+            [~, dxInitialState, strDynParams, ...
+                strModelConfigFlags] = self.buildRepresentativeInputs_();
+            strModelConfigFlags.bIncludeSphericalHarmonics = false;
+            strModelConfigFlags.bIncludePolyhedronGravity = false;
+            dTimeSpan = [0.0, 0.2];
+            dMaximumStep = 0.1;
+
+            charProviderBuildDir = fullfile( ...
+                self.charMexBuildDir, 'fixed_step_provider');
+            mkdir(charProviderBuildDir);
+            objCodegenConfig = coder.config('mex');
+            objCodegenConfig.GenerateReport = true;
+            charMexTarget = 'PropagateInertialFixedStep_mex';
+
+            % MATLAB Coder emits the final named MEX into the current working
+            % directory, so enter the class-scoped temporary build directory
+            % before compiling and restore the caller directory afterward.
+            charCallerDirectory = pwd;
+            objDirectoryCleanup = onCleanup( ...
+                @() cd(charCallerDirectory));
+            cd(charProviderBuildDir);
+            codegen('-config', objCodegenConfig, ...
+                '-d', charProviderBuildDir, '-o', charMexTarget, ...
+                'CodegenInertialFixedStepProbe', '-args', { ...
+                dTimeSpan, dxInitialState, dMaximumStep, strDynParams, ...
+                coder.Constant(strModelConfigFlags), ...
+                coder.Constant(EnumFixedStepScheme.RK4)});
+            clear objDirectoryCleanup
+            self.applyFixture(matlab.unittest.fixtures.PathFixture( ...
+                charProviderBuildDir));
+
+            [dxSourceHistory, dSourceGrid] = ...
+                CodegenInertialFixedStepProbe(dTimeSpan, ...
+                dxInitialState, dMaximumStep, strDynParams, ...
+                strModelConfigFlags, EnumFixedStepScheme.RK4);
+            [dxMexHistory, dMexGrid] = ...
+                PropagateInertialFixedStep_mex( ...
+                dTimeSpan, dxInitialState, dMaximumStep, strDynParams, ...
+                strModelConfigFlags, EnumFixedStepScheme.RK4);
+
+            self.verifyEqual(dMexGrid, dSourceGrid, 'AbsTol', 0.0);
+            self.verifyEqual(dxMexHistory, dxSourceHistory, ...
+                'AbsTol', 1.0e-13);
+
+            strPerturbedDynParams = strDynParams;
+            strPerturbedDynParams.strMainData.dGM = ...
+                1.05 * strDynParams.strMainData.dGM;
+            dxPerturbedSource = CodegenInertialFixedStepProbe( ...
+                dTimeSpan, ...
+                dxInitialState, dMaximumStep, strPerturbedDynParams, ...
+                strModelConfigFlags, EnumFixedStepScheme.RK4);
+            dxPerturbedMex = PropagateInertialFixedStep_mex( ...
+                dTimeSpan, ...
+                dxInitialState, dMaximumStep, strPerturbedDynParams, ...
+                strModelConfigFlags, EnumFixedStepScheme.RK4);
+
+            self.verifyEqual(dxPerturbedMex, dxPerturbedSource, ...
+                'AbsTol', 1.0e-13);
+            self.verifyGreaterThan( ...
+                max(abs(dxPerturbedMex - dxMexHistory), [], 'all'), 0.0);
+        end
+
     end
 
     methods (Static, Access = private)

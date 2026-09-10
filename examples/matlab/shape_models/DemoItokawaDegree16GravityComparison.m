@@ -61,6 +61,7 @@ function strComparison = DemoItokawaDegree16GravityComparison( ...
 % EvalPolyhedronGravPerturbationSamples
 % GenerateShellPointSet
 % GetSphHarmNormalizationFactors
+% RescaleSphericalHarmonicsReferenceRadius
 % -------------------------------------------------------------------------------------------------------------
 
 arguments (Input)
@@ -162,7 +163,7 @@ dFitElapsedSec = toc(ui64FitTimer);
 % Put the generated and legacy candidates on the same unnormalized
 % coefficient convention, radius, GM, and row ordering as the registered
 % fitted family.
-strGeneratedModel = RescaleSHModel_( ...
+strGeneratedModel = RescaleSphericalHarmonicsReferenceRadius( ...
     strGeneratedAtFitRadius, strRegisteredModel.dBodyRadiusRef);
 strAlbanModel = LoadAlbanModel_(charAlbanCoeffFilePath, ui32MaxDegree);
 AssertMatchedScalar_(strAlbanModel.dGravParam, ...
@@ -272,23 +273,6 @@ if ~isempty(options.charOutputMatFilePath)
     save(options.charOutputMatFilePath, 'strComparison', '-v7.3');
 end
 
-end
-
-function strRescaledModel = RescaleSHModel_(strInputModel, dTargetRadius)
-% Rescale each coefficient so C_lm*R^l and S_lm*R^l remain invariant.
-strRescaledModel = strInputModel;
-[ui32DegreeIds, ~] = BuildCoeffIds_(strInputModel.ui32MaxDegree);
-dRadiusRatio = strInputModel.dBodyRadiusRef / dTargetRadius;
-for ui32Row = uint32(1):uint32(size(strInputModel.dCSlmCoeffCols, 1))
-    dDegreeScale = dRadiusRatio ^ double(ui32DegreeIds(ui32Row));
-    strRescaledModel.dCSlmCoeffCols(ui32Row, :) = ...
-        strInputModel.dCSlmCoeffCols(ui32Row, :) .* dDegreeScale;
-end
-strRescaledModel.dBodyRadiusRef = dTargetRadius;
-strRescaledModel.strFitStats.dOriginalFitRadius = ...
-    strInputModel.dBodyRadiusRef;
-strRescaledModel.strFitStats.charRadiusTransform = ...
-    'C_lm(new)=C_lm(fit)*(R_fit/R_new)^l';
 end
 
 function strScheeresModel = BuildScheeresReference_( ...
