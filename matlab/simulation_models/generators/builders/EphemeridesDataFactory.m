@@ -50,6 +50,7 @@ end
 %                                   ephemerides from input reference data; minor updates
 % 18-08-2025    Pietro Califano     Update implementation to generalize RCS1 alternative code branch
 % 13-08-2026    Pietro Califano, Codex gpt-5.6     Preserve source-provided target angular velocity.
+% 11-09-2026  Pietro Califano, Codex gpt-6    Remove unused runtime sign-switch metadata.
 % -------------------------------------------------------------------------------------------------------------
 %% DEPENDENCIES
 % DCM2quatSeq, fitAttQuatChbvPolynmials, fitChbvPolynomials.
@@ -111,7 +112,7 @@ end
 if not(kwargs.bUseInterpFcnFromRCS1)
 
     % Use nav-system implementation
-    [dTmpChbvCoeffs, ~, dTmpSwitchIntervals, ...
+    [dTmpChbvCoeffs, ~, ~, ...
             strTmpFitStats] = fitAttQuatChbvPolynmials(ui32AttitudePolyDeg, ...
                                                         dInterpDomain, ...
                                                         dQuat_WfromTB, ...
@@ -121,7 +122,6 @@ if not(kwargs.bUseInterpFcnFromRCS1)
 
     strDynParams.strMainData.strAttData.ui32PolyDeg          = ui32AttitudePolyDeg;
     strDynParams.strMainData.strAttData.dChbvPolycoeffs      = dTmpChbvCoeffs;
-    strDynParams.strMainData.strAttData.dsignSwitchIntervals = dTmpSwitchIntervals;
     strDynParams.strMainData.strAttData.dTimeLowBound        = dDomainLB;
     strDynParams.strMainData.strAttData.dTimeUpBound         = dDomainUB;
     if isfield(strMainBodyRefData, 'dAngVel_IN')
@@ -244,7 +244,7 @@ if not(isempty(str3rdBodyRefData)) && length(strDynParams.strBody3rdData) > 1 &&
 
                 if not(kwargs.bUseInterpFcnFromRCS1)
                     % Use nav-system implementation
-                    [dTmpChbvCoeffs, ~, dTmpSwitchIntervals, ...
+                    [dTmpChbvCoeffs, ~, ~, ...
                         strTmpFitStats] = fitAttQuatChbvPolynmials(ui32AttitudePolyDeg, ...
                                                                     dInterpDomain, ...
                                                                     dQuat_WfromTB, ...
@@ -254,7 +254,6 @@ if not(isempty(str3rdBodyRefData)) && length(strDynParams.strBody3rdData) > 1 &&
 
                     strDynParams.strBody3rdData(idB+1).strAttData.ui32PolyDeg          = ui32AttitudePolyDeg;
                     strDynParams.strBody3rdData(idB+1).strAttData.dChbvPolycoeffs      = dTmpChbvCoeffs;
-                    strDynParams.strBody3rdData(idB+1).strAttData.dsignSwitchIntervals = dTmpSwitchIntervals;
                     strDynParams.strBody3rdData(idB+1).strAttData.dTimeLowBound        = dDomainLB;
                     strDynParams.strBody3rdData(idB+1).strAttData.dTimeUpBound         = dDomainUB;
 
@@ -279,7 +278,6 @@ if not(isempty(str3rdBodyRefData)) && length(strDynParams.strBody3rdData) > 1 &&
                 warning("EphemeridesDataFactory: Failed to fit attitude data for 3rd body %d due to error: %s. \nSkipping attitude fitting.", idB, string(ME.message));
                 strDynParams.strBody3rdData(idB+1).strAttData.ui32PolyDeg          = 0;
                 strDynParams.strBody3rdData(idB+1).strAttData.dChbvPolycoeffs      = [];
-                strDynParams.strBody3rdData(idB+1).strAttData.dsignSwitchIntervals = [];
                 strDynParams.strBody3rdData(idB+1).strAttData.dTimeLowBound        = [];
                 strDynParams.strBody3rdData(idB+1).strAttData.dTimeUpBound         = [];
             end

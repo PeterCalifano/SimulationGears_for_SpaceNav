@@ -15,6 +15,8 @@ classdef CScenarioGenerator < CGeneralPropagator
     %% CHANGELOG
     % 12-03-2025        Pietro Califano     First experimental version (tested)
     % 24-07-2026        Pietro Califano, Codex     Document registry-owned embedded gravity defaults.
+    % 10-09-2026  Pietro Califano, Codex gpt-6    Separate runtime attitude degree from fixed capacity.
+    % 11-09-2026  Pietro Califano, Codex gpt-6    Remove unused runtime sign-switch metadata.
     % -------------------------------------------------------------------------------------------------------------
     %% METHODS
     % CScenarioGenerator: Construct a stateful reference-scenario generator.
@@ -221,11 +223,13 @@ classdef CScenarioGenerator < CGeneralPropagator
                     end
 
                     % Evaluate target ephemerides
+                    % Keep the workspace bound fixed while the active degree remains runtime data.
+                    ui32AttMaxDegree = coder.const(uint32(floor( ...
+                        numel(self.strDynParams.strMainData.strAttData.dChbvPolycoeffs) / 4)) - 1);
                     dTmpQuat = evalAttQuatChbvPolyWithCoeffs(self.strDynParams.strMainData.strAttData.ui32PolyDeg, 4, dEvalPoint,...
                                                             self.strDynParams.strMainData.strAttData.dChbvPolycoeffs, ...
-                                                            self.strDynParams.strMainData.strAttData.dsignSwitchIntervals, ...
                                                             self.strDynParams.strMainData.strAttData.dTimeLowBound, ...
-                                                            self.strDynParams.strMainData.strAttData.dTimeUpBound);
+                                                            self.strDynParams.strMainData.strAttData.dTimeUpBound, ui32AttMaxDegree);
 
                     dDCM_TBfromW(1:3, 1:3, idT) = Quat2DCM(dTmpQuat, true);
 
