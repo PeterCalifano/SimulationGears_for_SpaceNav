@@ -62,6 +62,7 @@ end
 % strAdditionalData
 % -------------------------------------------------------------------------------------------------------------
 %% CHANGELOG
+% 18-09-2026    Pietro Califano, Codex gpt-5.6     Label default SRP area in the selected dynamics units.
 % 19-02-2025    Pietro Califano     First version copy-pasting previous implementation
 % 14-03-2025    Pietro Califano     Move code to CScenarioGenerator static method for standardization
 % 21-07-2025    Pietro Califano     Add support for 3rd body reference data and generalize implementation
@@ -275,7 +276,7 @@ end
 %% Spacecraft data
 dDefaultReflCoeff = 1.29;  % Global CR
 dDefaultSCmass    = 12.5; %14.8; % 12; % [kg]
-dDefaultA_SRP     = 0.5329E-6 * (dUnitsScaling^2); % [m^2]
+dDefaultA_SRP     = 0.5329E-6 * (dUnitsScaling^2); % [dynamics length units^2]
 
 if isempty(strDynParams.strSCdata)
     warning('No spacecraft data provided in strDynParams.strSCdata. Default hardcoded values (RCS-1) will be used.')    
@@ -294,7 +295,8 @@ else
         strDynParams.strSCdata.dSCmass = dDefaultSCmass;
     end
     if not(isfield(strDynParams.strSCdata, "dA_SRP"))
-        warning('No spacecraft area provided in strDynParams.strSCdata.dA_SRP. Default value of %4.4g m^2 will be used.', dDefaultA_SRP)
+        warning('No spacecraft area provided in strDynParams.strSCdata.dA_SRP. Default value of %4.4g %s^2 will be used.', ...
+                dDefaultA_SRP, char(charDynamicsLengthUnit))
         strDynParams.strSCdata.dA_SRP = dDefaultA_SRP;
     end
 end
