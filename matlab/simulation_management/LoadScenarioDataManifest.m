@@ -13,10 +13,12 @@ function strManifest = LoadScenarioDataManifest(enumOrName, options)
 % strManifest                (1,1) struct decoded from the scenario manifest JSON and validated.
 % -------------------------------------------------------------------------------------------------------------
 %% CHANGELOG
-% 01-07-2026    Pietro Califano     Add SimulationGears scenario manifest loader.
+% 21-09-2026  Pietro Califano, Codex gpt-5.6  Keep manifest and payload root resolution separate.
+% 01-07-2026  Pietro Califano     Add SimulationGears scenario manifest loader.
 % -------------------------------------------------------------------------------------------------------------
 %% DEPENDENCIES
-% CScenarioRegistry, ResolveSimGearsDataRoot, ValidateScenarioDataManifest, jsondecode.
+% CScenarioRegistry, ResolveSimGearsDataRoot, NormalizeManifestStructArray,
+% ValidateScenarioDataManifest, jsondecode.
 % -------------------------------------------------------------------------------------------------------------
 
 arguments
@@ -40,5 +42,9 @@ if ~isfile(charManifestPath)
 end
 
 strManifest = jsondecode(fileread(char(charManifestPath)));
+strManifest.assets = NormalizeManifestStructArray(strManifest.assets);
+if isfield(strManifest, "appearance_profiles")
+    strManifest.appearance_profiles = NormalizeManifestStructArray(strManifest.appearance_profiles);
+end
 ValidateScenarioDataManifest(strManifest, charCanonicalName, charDataRootPath=charDataRootPath);
 end

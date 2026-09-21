@@ -1,22 +1,96 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "scenario_name": "Bennu",
   "canonical_name": "Bennu",
-  "aliases": ["Bennu", "Bennu_OREx", "BennuOREx"],
+  "aliases": [
+    "Bennu",
+    "Bennu_OREx",
+    "BennuOREx"
+  ],
   "confidence": "high",
-  "tags": ["shape_runnable", "spice_dsk"],
-  "default_shape_asset_id": "orex_bennu_spc_03170mm_dsk",
+  "tags": [
+    "shape_runnable",
+    "spice_dsk"
+  ],
+  "default_shape_asset_id": "orex_bennu_17m_uv_obj",
   "assets": [
     {
       "asset_id": "orex_bennu_spc_03170mm_dsk",
       "asset_type": "shape",
-      "local_path": "scenarios/Bennu/assets/shape/bennu_g_03170mm_spc_obj_0000n00000_v020.bds",
+      "local_path": "assets/bodies/bennu/shape/bennu_g_03170mm_spc_obj_0000n00000_v020.bds",
       "source_url": "OSIRIS-REx Bennu SPC DSK",
       "download_url": "",
       "sha256": "",
       "size_gb": 0.01,
       "fidelity": "public_dsk",
+      "required_for_shape_runnable": false,
+      "content_format": "dsk",
+      "input_units": "km",
+      "body_fixed_frame": "IAU_BENNU",
+      "load_materials": false
+    },
+    {
+      "asset_id": "orex_bennu_17m_uv_obj",
+      "asset_type": "shape",
+      "local_path": "assets/bodies/bennu/shape/Bennu_17M_withMtl.obj",
+      "source_url": "OSIRIS-REx OLA v21 PTM Blender export",
+      "download_url": "",
+      "sha256": "dd29f9b8ce9709d026a95d67ad68f76a87b77d7502426ca8c7665ba4462489a5",
+      "size_gb": 1.989148129,
+      "fidelity": "project_high_detail_uv_mesh",
+      "required_for_shape_runnable": true,
+      "content_format": "obj",
+      "input_units": "km",
+      "body_fixed_frame": "IAU_BENNU",
+      "load_materials": true,
+      "material_path": "assets/bodies/bennu/shape/Bennu_17M_withMtl.mtl"
+    },
+    {
+      "asset_id": "orex_bennu_5cm_albedo_jpeg",
+      "asset_type": "albedo",
+      "local_path": "assets/bodies/bennu/appearance/albedo/Bennu_OSIRIS-REx_5cm_v1.jpg",
+      "source_url": "OSIRIS-REx global albedo texture",
+      "download_url": "",
+      "sha256": "65011c994b5db391df7f8be501ed768f20d789f4905a00b622e30e1a39992be9",
+      "size_gb": 0.061656124,
+      "fidelity": "global_albedo_texture",
       "required_for_shape_runnable": true
+    },
+    {
+      "asset_id": "orex_bennu_minnaert_pan_tif",
+      "asset_type": "albedo",
+      "local_path": "assets/bodies/bennu/appearance/albedo/Bennu_global_FB34_FB56_ShapeV28_GndControl_MinnaertPhase30_PAN_8bit.tif",
+      "source_url": "OSIRIS-REx ShapeV28 global Minnaert mosaic",
+      "download_url": "",
+      "sha256": "c237f77a36fb91437d390a23edd6759e770e54c2f1b0a09a6e35e484bb3247b6",
+      "size_gb": 0.493624548,
+      "fidelity": "global_science_mosaic",
+      "required_for_shape_runnable": false
+    }
+  ],
+  "default_appearance_profile_id": "global_albedo",
+  "appearance_profiles": [
+    {
+      "profile_id": "global_albedo",
+      "albedo_asset_ids": [
+        "orex_bennu_5cm_albedo_jpeg"
+      ],
+      "normal_asset_ids": [],
+      "albedo_mapping": "MESH_UV",
+      "normal_mapping": "NONE",
+      "albedo_color_space": "sRGB",
+      "normal_map_encoding": ""
+    },
+    {
+      "profile_id": "global_mosaic_equirectangular",
+      "albedo_asset_ids": [
+        "orex_bennu_minnaert_pan_tif"
+      ],
+      "normal_asset_ids": [],
+      "albedo_mapping": "BODY_FIXED_EQUIRECTANGULAR",
+      "normal_mapping": "NONE",
+      "albedo_color_space": "grayscale_reflectance",
+      "normal_map_encoding": ""
     }
   ]
 }

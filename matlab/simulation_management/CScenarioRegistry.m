@@ -9,6 +9,7 @@ classdef CScenarioRegistry
 % unnormalized [Clm, Slm] column pairs.
 % -------------------------------------------------------------------------------------------------------------
 %% CHANGELOG
+% 21-09-2026  Pietro Califano, Codex gpt-5.6  Route canonical target shapes through shared external assets.
 % 18-09-2026  Pietro Califano, Codex gpt-5.6  Register published Bennu degree-16 gravity with provenance.
 % 01-07-2026    Pietro Califano     Add first-class scenario manifests, tagged small-body scenarios, shape
 %                                   metadata, and registry-backed gravity defaults.
@@ -60,10 +61,11 @@ methods (Static, Access = public)
                 strSpec.dShapeReferenceSize_m = 1.601100000000000e+02;
                 strSpec.dEllipsoidAxes_m = [1.988439105395617e+02, 1.592144221662182e+02, 1.482274527278826e+02];
                 strSpec.charShapeSourceType = "obj";
-                strSpec.charDefaultShapeAssetId = "apophis_centered_mean_size_obj";
-                strSpec.charDefaultShapeRelativePath = fullfile("scenarios", "Apophis", "assets", "shape", "Apophis_RGB_Centered_MeanSize_NoTexture.obj");
-                strSpec.charDefaultSpiceMetaKernelRelativePath = fullfile("scenarios", "Apophis", ...
-                    "assets", "spice", "mk", "metakernel.mk");
+                strSpec.charDefaultShapeAssetId = "apophis_smoothed_centered_mean_size_obj";
+                strSpec.charDefaultShapeRelativePath = fullfile("assets", "bodies", "apophis", "shape", ...
+                    "Apophis_RGB_smoothed_centered_mean_size_km.obj");
+                strSpec.charDefaultSpiceMetaKernelRelativePath = fullfile("assets", "bodies", "apophis", ...
+                    "spice", "mk", "metakernel.mk");
                 strSpec.bHasGravityDefaults = true;
             case "ApophisElongated"
                 strSpec.cellAliases = {"ApophisElongated", "ApophisModified"};
@@ -77,7 +79,8 @@ methods (Static, Access = public)
                 strSpec.dEllipsoidAxes_m = [2.414219664400000e+02, 1.522873312000000e+02, 1.474234799100000e+02];
                 strSpec.charShapeSourceType = "obj";
                 strSpec.charDefaultShapeAssetId = "apophis_elongated_550m_obj";
-                strSpec.charDefaultShapeRelativePath = fullfile("scenarios", "ApophisElongated", "assets", "shape", "Apophis_RGB_Centered_Elongated_550m.obj");
+                strSpec.charDefaultShapeRelativePath = fullfile("assets", "bodies", "apophis_elongated", "shape", ...
+                    "Apophis_RGB_Centered_Elongated_550m.obj");
                 strSpec.bHasGravityDefaults = true;
             case "Itokawa"
                 strSpec.cellAliases = {"Itokawa"};
@@ -89,9 +92,10 @@ methods (Static, Access = public)
                 strSpec.dReferenceRadius_m = 1.619150000000000e+02;
                 strSpec.dShapeReferenceSize_m = 1.619150000000000e+02;
                 strSpec.dEllipsoidAxes_m = 0.5 * [5.350000000000000e+02, 2.940000000000000e+02, 2.090000000000000e+02];
-                strSpec.charShapeSourceType = "dsk";
-                strSpec.charDefaultShapeAssetId = "hayabusa_itokawa_64q_dsk";
-                strSpec.charDefaultShapeRelativePath = fullfile("scenarios", "Itokawa", "assets", "shape", "hay_a_amica_5_itokawashape_v1_0_64q.bds");
+                strSpec.charShapeSourceType = "obj";
+                strSpec.charDefaultShapeAssetId = "itokawa_512icq_uv_obj";
+                strSpec.charDefaultShapeRelativePath = fullfile("assets", "bodies", "itokawa", "shape", ...
+                    "25143_Itokawa_512ICQ_WithNormalsUV_WithMtl.obj");
                 strSpec.charDefaultBlenderRelativePath = "data/scenarios/S2_Itokawa/S2_Itokawa.blend";
                 strSpec.bHasGravityDefaults = true;
             case "Bennu"
@@ -104,9 +108,10 @@ methods (Static, Access = public)
                 strSpec.dReferenceRadius_m = 2.450000000000000e+02;
                 strSpec.dShapeReferenceSize_m = 2.450300000000000e+02;
                 strSpec.dEllipsoidAxes_m = [2.527800000000000e+02, 2.462000000000000e+02, 2.286900000000000e+02];
-                strSpec.charShapeSourceType = "dsk";
-                strSpec.charDefaultShapeAssetId = "orex_bennu_spc_03170mm_dsk";
-                strSpec.charDefaultShapeRelativePath = fullfile("scenarios", "Bennu", "assets", "shape", "bennu_g_03170mm_spc_obj_0000n00000_v020.bds");
+                strSpec.charShapeSourceType = "obj";
+                strSpec.charDefaultShapeAssetId = "orex_bennu_17m_uv_obj";
+                strSpec.charDefaultShapeRelativePath = fullfile("assets", "bodies", "bennu", "shape", ...
+                    "Bennu_17M_withMtl.obj");
                 strSpec.charDefaultBlenderRelativePath = "data/scenarios/S4_Bennu/S4_Bennu.blend";
                 strSpec.bHasGravityDefaults = true;
             case "Didymos"
@@ -119,9 +124,10 @@ methods (Static, Access = public)
                 strSpec.dReferenceRadius_m = 3.551500000000000e+02;
                 strSpec.dShapeReferenceSize_m = 3.551500000000000e+02;
                 strSpec.dEllipsoidAxes_m = [3.951000000000000e+02, 3.951000000000000e+02, 3.551500000000000e+02];
-                strSpec.charShapeSourceType = "dsk";
-                strSpec.charDefaultShapeAssetId = "hera_didymain_06650mm_dsk";
-                strSpec.charDefaultShapeRelativePath = fullfile("scenarios", "Didymos", "assets", "shape", "g_06650mm_rad_obj_didb_0000n00000_v001.bds");
+                strSpec.charShapeSourceType = "obj";
+                strSpec.charDefaultShapeAssetId = "didymos_detailed_boulders_obj";
+                strSpec.charDefaultShapeRelativePath = fullfile("assets", "bodies", "didymos", "shape", ...
+                    "didymos_generated_v1_km.obj");
                 strSpec.bHasGravityDefaults = true;
             case "Eros"
                 strSpec.cellAliases = {"Eros", "433 Eros", "(433) Eros"};
@@ -135,7 +141,8 @@ methods (Static, Access = public)
                 strSpec.dEllipsoidAxes_m = [1.700000000000000e+04, 5.500000000000000e+03, 5.500000000000000e+03];
                 strSpec.charShapeSourceType = "dsk";
                 strSpec.charDefaultShapeAssetId = "naif_eros_dsk_q64";
-                strSpec.charDefaultShapeRelativePath = fullfile("scenarios", "Eros", "assets", "shape", "near-a-msi-5-erosshape-v1_0_64q.bds");
+                strSpec.charDefaultShapeRelativePath = fullfile("assets", "bodies", "eros", "shape", ...
+                    "near-a-msi-5-erosshape-v1_0_64q.bds");
                 strSpec.bHasGravityDefaults = true;
             case "Arrokoth"
                 strSpec.cellAliases = {"Arrokoth", "486958 Arrokoth", "2014 MU69", "Ultima Thule"};
@@ -147,7 +154,8 @@ methods (Static, Access = public)
                 strSpec.dEllipsoidAxes_m = [1.800000000000000e+04, 1.000000000000000e+04, 8.000000000000000e+03];
                 strSpec.charShapeSourceType = "obj";
                 strSpec.charDefaultShapeAssetId = "pds_new_horizons_arrokoth_obj";
-                strSpec.charDefaultShapeRelativePath = fullfile("scenarios", "Arrokoth", "assets", "shape", "mu69_fr2kf_hipoly.obj");
+                strSpec.charDefaultShapeRelativePath = fullfile("assets", "bodies", "arrokoth", "shape", ...
+                    "mu69_fr2kf_hipoly.obj");
             case "Comet67P"
                 strSpec.cellAliases = {"67P", "67P/Churyumov-Gerasimenko", "Churyumov-Gerasimenko", "Comet67P"};
                 strSpec.cellTags = {"shape_runnable", "pds_rosetta"};
@@ -158,7 +166,8 @@ methods (Static, Access = public)
                 strSpec.dEllipsoidAxes_m = [2.400000000000000e+03, 1.800000000000000e+03, 1.600000000000000e+03];
                 strSpec.charShapeSourceType = "dsk";
                 strSpec.charDefaultShapeAssetId = "rosetta_67p_shape_high_fidelity";
-                strSpec.charDefaultShapeRelativePath = fullfile("scenarios", "Comet67P", "assets", "shape", "cg_spc_shap5_788k_cart.bds");
+                strSpec.charDefaultShapeRelativePath = fullfile("assets", "bodies", "comet_67p", "shape", ...
+                    "cg_spc_shap5_788k_cart.bds");
             case "Toutatis"
                 strSpec.cellAliases = {"Toutatis", "4179 Toutatis"};
                 strSpec.cellTags = {"shape_runnable", "radar_shape", "procedural_texture"};
@@ -169,7 +178,8 @@ methods (Static, Access = public)
                 strSpec.dEllipsoidAxes_m = [2.300000000000000e+03, 1.200000000000000e+03, 9.000000000000000e+02];
                 strSpec.charShapeSourceType = "obj";
                 strSpec.charDefaultShapeAssetId = "jpl_pds_toutatis_radar_shape";
-                strSpec.charDefaultShapeRelativePath = fullfile("scenarios", "Toutatis", "assets", "shape", "4179toutatis2.obj");
+                strSpec.charDefaultShapeRelativePath = fullfile("assets", "bodies", "toutatis", "shape", ...
+                    "4179toutatis2.obj");
             case "Moon"
                 strSpec.cellAliases = {"Moon"};
                 strSpec.charSPICETargetName = "MOON";

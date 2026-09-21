@@ -59,5 +59,6 @@ lib/wrap
 # Keep scenario manifests tracked while excluding fetched and derived assets.
 /data/scenarios/*/assets/**
 /data/scenarios/*/derived/**
+/data/scenarios/*/trajectories/**
 /data/common/spice/assets/**
 CONTEXT.md

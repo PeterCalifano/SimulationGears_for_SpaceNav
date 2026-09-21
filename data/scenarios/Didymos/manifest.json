@@ -1,22 +1,124 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "scenario_name": "Didymos",
   "canonical_name": "Didymos",
-  "aliases": ["Didymos", "Dydimos", "Didymos_Hera", "DidymosHera"],
+  "aliases": [
+    "Didymos",
+    "Dydimos",
+    "Didymos_Hera",
+    "DidymosHera"
+  ],
   "confidence": "medium",
-  "tags": ["shape_runnable", "spice_dsk"],
-  "default_shape_asset_id": "hera_didymain_06650mm_dsk",
+  "tags": [
+    "shape_runnable",
+    "spice_dsk"
+  ],
+  "default_shape_asset_id": "didymos_detailed_boulders_obj",
   "assets": [
     {
       "asset_id": "hera_didymain_06650mm_dsk",
       "asset_type": "shape",
-      "local_path": "scenarios/Didymos/assets/shape/g_06650mm_rad_obj_didb_0000n00000_v001.bds",
+      "local_path": "assets/bodies/didymos/shape/g_06650mm_rad_obj_didb_0000n00000_v001.bds",
       "source_url": "ESA Hera Didymos DSK bundle",
       "download_url": "",
       "sha256": "",
       "size_gb": 0.001,
       "fidelity": "public_dsk",
+      "required_for_shape_runnable": false,
+      "content_format": "dsk",
+      "input_units": "km",
+      "body_fixed_frame": "IAU_DIDYMOS",
+      "load_materials": false
+    },
+    {
+      "asset_id": "didymos_detailed_boulders_obj",
+      "asset_type": "shape",
+      "local_path": "assets/bodies/didymos/shape/didymos_generated_v1_km.obj",
+      "source_url": "SimulationGears binary-system delivery v1",
+      "download_url": "",
+      "sha256": "4e3e6152ac0c2e6c53a2f0609148e9d59fcb21d0920f339f81e631f2bf3cde42",
+      "size_gb": 1.958432379,
+      "fidelity": "procedural_detailed_surface_and_boulders",
+      "required_for_shape_runnable": true,
+      "content_format": "obj",
+      "input_units": "km",
+      "body_fixed_frame": "IAU_DIDYMOS",
+      "load_materials": false
+    },
+    {
+      "asset_id": "dimorphos_detailed_boulders_obj",
+      "asset_type": "shape",
+      "local_path": "assets/bodies/dimorphos/shape/dimorphos_maps_km.obj",
+      "source_url": "SimulationGears binary-system delivery v1",
+      "download_url": "",
+      "sha256": "3f66b953164e1d43b4fbcc5eb224cf50b4f5a186ad71aaf461fabf5a7c7b5c7e",
+      "size_gb": 0.208932015,
+      "fidelity": "procedural_detailed_surface_and_boulders",
+      "required_for_shape_runnable": false,
+      "content_format": "obj",
+      "input_units": "km",
+      "body_fixed_frame": "IAU_DIMORPHOS",
+      "load_materials": false,
+      "asset_role": "companion_shape"
+    },
+    {
+      "asset_id": "didymos_surface_normal",
+      "asset_type": "normal",
+      "local_path": "assets/bodies/didymos/appearance/normal/surface_normal.png",
+      "source_url": "",
+      "download_url": "",
+      "sha256": "9575b0e4546e0e7cdf97e019fe454b780a775a94edbeedb4921869c31ff7e62a",
+      "size_gb": 0.19118249,
+      "fidelity": "procedural_surface_normal",
       "required_for_shape_runnable": true
+    },
+    {
+      "asset_id": "didymos_boulder_normal",
+      "asset_type": "normal",
+      "local_path": "assets/bodies/didymos/appearance/normal/boulder_normal.png",
+      "source_url": "",
+      "download_url": "",
+      "sha256": "f18e6e55702d100dd5d85d534dda02ba860cf4bb44a6fe63ab4b70dd1fdc363d",
+      "size_gb": 0.005117158,
+      "fidelity": "procedural_boulder_normal",
+      "required_for_shape_runnable": true
+    },
+    {
+      "asset_id": "dimorphos_surface_normal",
+      "asset_type": "normal",
+      "local_path": "assets/bodies/dimorphos/appearance/normal/surface_normal.png",
+      "source_url": "",
+      "download_url": "",
+      "sha256": "1d733e4f9b32d128d29ee6806773daf7944fe3af2cd7f05be99c5462c54d01f3",
+      "size_gb": 0.048838384,
+      "fidelity": "procedural_surface_normal",
+      "required_for_shape_runnable": false
+    },
+    {
+      "asset_id": "dimorphos_boulder_normal",
+      "asset_type": "normal",
+      "local_path": "assets/bodies/dimorphos/appearance/normal/boulder_normal.png",
+      "source_url": "",
+      "download_url": "",
+      "sha256": "246fbeb875c99b43d4fa01a2409463c8a4e017ce14948b2614dc5647645188be",
+      "size_gb": 0.000338009,
+      "fidelity": "procedural_boulder_normal",
+      "required_for_shape_runnable": false
+    }
+  ],
+  "default_appearance_profile_id": "surface_and_boulders",
+  "appearance_profiles": [
+    {
+      "profile_id": "surface_and_boulders",
+      "albedo_asset_ids": [],
+      "normal_asset_ids": [
+        "didymos_surface_normal",
+        "didymos_boulder_normal"
+      ],
+      "albedo_mapping": "NONE",
+      "normal_mapping": "MESH_UV",
+      "albedo_color_space": "linear",
+      "normal_map_encoding": "MikkTSpace OpenGL +Y"
     }
   ]
 }
