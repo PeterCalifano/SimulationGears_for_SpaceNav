@@ -109,9 +109,9 @@ methods (Static, Access = public)
                 strSpec.dShapeReferenceSize_m = 2.450300000000000e+02;
                 strSpec.dEllipsoidAxes_m = [2.527800000000000e+02, 2.462000000000000e+02, 2.286900000000000e+02];
                 strSpec.charShapeSourceType = "obj";
-                strSpec.charDefaultShapeAssetId = "orex_bennu_17m_uv_obj";
+                strSpec.charDefaultShapeAssetId = "orex_bennu_17m_uv_obj_split2";
                 strSpec.charDefaultShapeRelativePath = fullfile("assets", "bodies", "bennu", "shape", ...
-                    "Bennu_17M_withMtl.obj");
+                    "Bennu_17M_withMtl_split2.obj");
                 strSpec.charDefaultBlenderRelativePath = "data/scenarios/S4_Bennu/S4_Bennu.blend";
                 strSpec.bHasGravityDefaults = true;
             case "Didymos"

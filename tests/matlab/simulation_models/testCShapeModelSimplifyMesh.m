@@ -170,6 +170,74 @@ classdef testCShapeModelSimplifyMesh < matlab.unittest.TestCase
             testCase.verifyEqual(objShapeModel.ui32NumOfVertices, uint32(3));
         end
 
+        function TestObjLoaderPreservesSupportedTriangularFaceSyntaxes(self)
+            objFixture = self.applyFixture(matlab.unittest.fixtures.TemporaryFolderFixture);
+            charObjHeader = sprintf([ ...
+                'v 0 0 0\nv 1 0 0\nv 0 1 0\n', ...
+                'vt 0 0\nvt 1 0\nvt 0 1\n', ...
+                'vn 0 0 1\n']);
+            cellFaceRecords = { ...
+                sprintf('f 1 2 3\no second_object\nf 1 3 2\n'), ...
+                sprintf('f 1/1 2/2 3/3\no second_object\nf 1/1 3/3 2/2\n'), ...
+                sprintf('f 1//1 2//1 3//1\no second_object\nf 1//1 3//1 2//1\n'), ...
+                sprintf('f 1/1/1 2/2/1 3/3/1\no second_object\nf 1/1/1 3/3/1 2/2/1\n')};
+
+            % Exercise every triangular face representation accepted by the
+            % legacy loader, including separate OBJ object sections.
+            for ui32SyntaxIdx = uint32(1):uint32(numel(cellFaceRecords))
+                charObjPath = fullfile(string(objFixture.Folder), ...
+                    sprintf("face_syntax_%u.obj", ui32SyntaxIdx));
+                i32FileId = fopen(charObjPath, "w");
+                objFileCleanup = onCleanup(@() fclose(i32FileId));
+                fwrite(i32FileId, [charObjHeader, cellFaceRecords{double(ui32SyntaxIdx)}], 'char');
+                clear objFileCleanup
+
+                [ui32Faces, ~, ~, ui32TextureIndices, ~, ui32NormalIndices] = ...
+                    CShapeModel.LoadModelFromObj(charObjPath, false);
+
+                self.verifyEqual(ui32Faces, uint32([1, 1; 2, 3; 3, 2]));
+                if any(ui32SyntaxIdx == uint32([2, 4]))
+                    self.verifyEqual(ui32TextureIndices, uint32([1, 1; 2, 3; 3, 2]));
+                else
+                    self.verifyEmpty(ui32TextureIndices);
+                end
+                if any(ui32SyntaxIdx == uint32([3, 4]))
+                    self.verifyEqual(ui32NormalIndices, ones(3, 2, 'uint32'));
+                else
+                    self.verifyEmpty(ui32NormalIndices);
+                end
+            end
+        end
+
+        function TestObjLoaderRetainsFacesAcrossBoundedBlocks(self)
+            objFixture = self.applyFixture(matlab.unittest.fixtures.TemporaryFolderFixture);
+            charObjPath = fullfile(string(objFixture.Folder), "large_face_payload.obj");
+            i32FileId = fopen(charObjPath, "w");
+            objFileCleanup = onCleanup(@() fclose(i32FileId));
+            fprintf(i32FileId, "v 0 0 0\nv 1 0 0\nv 0 1 0\n");
+            fprintf(i32FileId, "vt 0 0\nvt 1 0\nvt 0 1\nvn 0 0 1\n");
+
+            % Cross the production parser's bounded-block boundary without
+            % constructing a large temporary character array in the test.
+            ui32NumFaces = uint32(250001);
+            ui32WriteBlockSize = uint32(10000);
+            charFaceRecord = sprintf('f 1/1/1 2/2/1 3/3/1\n');
+            for ui32BlockStart = uint32(1):ui32WriteBlockSize:ui32NumFaces
+                ui32BlockEnd = min(ui32BlockStart + ui32WriteBlockSize - uint32(1), ui32NumFaces);
+                ui32BlockCount = ui32BlockEnd - ui32BlockStart + uint32(1);
+                fwrite(i32FileId, repmat(charFaceRecord, 1, double(ui32BlockCount)), 'char');
+            end
+            clear objFileCleanup
+
+            [ui32Faces, ~, ~, ui32TextureIndices, ~, ui32NormalIndices] = ...
+                CShapeModel.LoadModelFromObj(charObjPath, false);
+
+            self.verifyEqual(size(ui32Faces, 2), double(ui32NumFaces));
+            self.verifyEqual(ui32Faces(:, [1, end]), uint32([1, 1; 2, 2; 3, 3]));
+            self.verifyEqual(ui32TextureIndices(:, [1, end]), uint32([1, 1; 2, 2; 3, 3]));
+            self.verifyEqual(ui32NormalIndices(:, [1, end]), ones(3, 2, 'uint32'));
+        end
+
         function testSimplifyMeshInvalidatesPolyhedronGravityCache(testCase)
             fixture = testCase.applyFixture(matlab.unittest.fixtures.TemporaryFolderFixture);
             charObjPath = fullfile(string(fixture.Folder), "icosphere_mesh.obj");

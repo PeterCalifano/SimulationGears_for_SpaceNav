@@ -12,7 +12,7 @@
     "shape_runnable",
     "spice_dsk"
   ],
-  "default_shape_asset_id": "orex_bennu_17m_uv_obj",
+  "default_shape_asset_id": "orex_bennu_17m_uv_obj_split2",
   "assets": [
     {
       "asset_id": "orex_bennu_spc_03170mm_dsk",
@@ -38,6 +38,22 @@
       "sha256": "dd29f9b8ce9709d026a95d67ad68f76a87b77d7502426ca8c7665ba4462489a5",
       "size_gb": 1.989148129,
       "fidelity": "project_high_detail_uv_mesh",
+      "required_for_shape_runnable": false,
+      "content_format": "obj",
+      "input_units": "km",
+      "body_fixed_frame": "IAU_BENNU",
+      "load_materials": true,
+      "material_path": "assets/bodies/bennu/shape/Bennu_17M_withMtl.mtl"
+    },
+    {
+      "asset_id": "orex_bennu_17m_uv_obj_split2",
+      "asset_type": "shape",
+      "local_path": "assets/bodies/bennu/shape/Bennu_17M_withMtl_split2.obj",
+      "source_url": "Derived from OSIRIS-REx OLA v21 PTM Blender export by partitioning unchanged faces into two OBJ shapes",
+      "download_url": "",
+      "sha256": "0a0f2b0536612a4afce59f4b8e4de7a7ff1229dcfa15847fc7775396e021d1f8",
+      "size_gb": 1.989148196,
+      "fidelity": "project_high_detail_uv_mesh_partitioned",
       "required_for_shape_runnable": true,
       "content_format": "obj",
       "input_units": "km",

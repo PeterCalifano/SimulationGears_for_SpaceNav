@@ -9,7 +9,7 @@ function [dSRPaccel_IN, dSRPtorque_SCB, dQuadsCosSunPhaseAngle] = ComputeQuadsMo
                                                                                         dQuadsPressCentre_SCB) %#codegen
 arguments (Input)
     dDirSCtoSun_SCB        (3,1) double {mustBeFinite}
-    dQuat_INfromSCB             (4,1) double {mustBeFinite}
+    dQuat_INfromSCB        (4,1) double {mustBeFinite}
     dMassSC                (1,1) double {mustBeFinite, mustBePositive}
     dCoMpos_SCB            (3,1) double {mustBeFinite}
     dSolarPressure         (1,1) double {mustBeFinite, mustBeNonnegative}

@@ -15,6 +15,7 @@ classdef CShapeModel < CBaseDatastruct
     % 24-04-2026    Pietro Califano     Add mesh simplification utility and load-time keep-fraction option
     % 01-07-2026    Pietro Califano     Add workspace MICE resolution and support OBJ v//vn face syntax.
     % 28-08-2026    Pietro Califano     Add validated general OBJ/STL geometry loading.
+    % 21-09-2026    Pietro Califano, Codex gpt-5.6  Parse large OBJ face payloads in bounded blocks.
     % -------------------------------------------------------------------------------------------------------------
     %% DEPENDENCIES
     % LoadShapeMesh for `file_mesh` and explicit OBJ repair.
@@ -889,46 +890,13 @@ classdef CShapeModel < CBaseDatastruct
                 dNormals = zeros(0,3);
             end
 
-            % Defaults
-            ui32TrianglesIndex          = zeros(0,3,'uint32');
-            ui32TrianglesTexIndex       = zeros(0,3,'uint32');
-            ui32TrianglesNormalsIndex   = zeros(0,3,'uint32');
-
-            fMatch = regexp(charFileText, '^f\s+.*$', 'match', 'lineanchors');
-            if ~isempty(fMatch)
-                charFBlock = sprintf('%s\n', fMatch{:});
-                charFirstFace = string(strtrim(fMatch{1}));
-
-                if ~isempty(regexp(charFirstFace, '^f\s+\d+//\d+', 'once'))
-                    ui32AllFaceLines = sscanf(charFBlock, 'f %u//%u %u//%u %u//%u\n', [6, Inf]);
-                    ui32AllFaceLines = uint32(ui32AllFaceLines);
-                    ui32TrianglesIndex = ui32AllFaceLines(1:2:end, :);
-                    if ~bVertFacesOnly
-                        ui32TrianglesNormalsIndex = ui32AllFaceLines(2:2:end, :);
-                    end
-
-                elseif ~isempty(regexp(charFirstFace, '^f\s+\d+/\d+/\d+', 'once'))
-                    ui32AllFaceLines = sscanf(charFBlock, 'f %u/%u/%u %u/%u/%u %u/%u/%u\n', [9, Inf]);
-                    ui32AllFaceLines = uint32(ui32AllFaceLines);
-                    ui32TrianglesIndex = ui32AllFaceLines(1:3:end, :);
-                    if ~bVertFacesOnly
-                        ui32TrianglesTexIndex = ui32AllFaceLines(2:3:end, :);
-                        ui32TrianglesNormalsIndex = ui32AllFaceLines(3:3:end, :);
-                    end
-
-                elseif ~isempty(regexp(charFirstFace, '^f\s+\d+/\d+', 'once'))
-                    ui32AllFaceLines = sscanf(charFBlock, 'f %u/%u %u/%u %u/%u\n', [6, Inf]);
-                    ui32AllFaceLines = uint32(ui32AllFaceLines);
-                    ui32TrianglesIndex = ui32AllFaceLines(1:2:end, :);
-                    if ~bVertFacesOnly
-                        ui32TrianglesTexIndex = ui32AllFaceLines(2:2:end, :);
-                    end
-
-                else
-                    ui32AllFaceLines = sscanf(charFBlock, 'f %u %u %u\n', [3, Inf]);
-                    ui32TrianglesIndex = uint32(ui32AllFaceLines);
-                end
-            end
+            % Parse bounded face blocks so large OBJ files do not exceed MATLAB's
+            % contiguous character or sscanf payload limits.
+            [dFaceLineStartIdx, dFaceLineEndIdx] = regexp(charFileText, ...
+                '^f[ \t]+[^\r\n]*$', 'start', 'end', 'lineanchors');
+            [ui32TrianglesIndex, ui32TrianglesTexIndex, ui32TrianglesNormalsIndex] = ...
+                CShapeModel.ParseObjFaceLines_(charFileText, dFaceLineStartIdx, ...
+                dFaceLineEndIdx, bVertFacesOnly);
 
             dElapsedTime = toc;
             fprintf("\nFile obj loaded in %.5g seconds\n", dElapsedTime);
@@ -937,6 +905,148 @@ classdef CShapeModel < CBaseDatastruct
     end
 
     methods (Static, Access = private)
+
+        function [ui32TrianglesIndex, ui32TrianglesTexIndex, ui32TrianglesNormalsIndex] = ...
+                ParseObjFaceLines_(charFileText, dFaceLineStartIdx, dFaceLineEndIdx, bVertFacesOnly)
+            %% SIGNATURE
+            % [ui32TrianglesIndex, ui32TrianglesTexIndex, ui32TrianglesNormalsIndex] = ...
+            %     CShapeModel.ParseObjFaceLines_(charFileText, dFaceLineStartIdx, ...
+            %     dFaceLineEndIdx, bVertFacesOnly)
+            % -------------------------------------------------------------------------------------------------
+            %% DESCRIPTION
+            % Parse triangular OBJ face records in bounded blocks while preserving source order and optional
+            % texture and normal indices.
+            % -------------------------------------------------------------------------------------------------
+            %% INPUT
+            % charFileText         Complete OBJ text payload.
+            % dFaceLineStartIdx    Start index of each face record in charFileText.
+            % dFaceLineEndIdx      End index of each face record in charFileText.
+            % bVertFacesOnly       True when auxiliary texture and normal indices are not required.
+            % -------------------------------------------------------------------------------------------------
+            %% OUTPUT
+            % ui32TrianglesIndex           Vertex indices as a 3-by-F array.
+            % ui32TrianglesTexIndex        Texture-coordinate indices as a 3-by-F array when requested.
+            % ui32TrianglesNormalsIndex    Normal indices as a 3-by-F array when requested.
+            % -------------------------------------------------------------------------------------------------
+            %% CHANGELOG
+            % 21-09-2026  Pietro Califano, Codex gpt-5.6  First implementation.
+            % -------------------------------------------------------------------------------------------------
+            %% DEPENDENCIES
+            % None.
+            % -------------------------------------------------------------------------------------------------
+            arguments (Input)
+                charFileText (1,:) char
+                dFaceLineStartIdx (1,:) double
+                dFaceLineEndIdx (1,:) double
+                bVertFacesOnly (1,1) logical
+            end
+            arguments (Output)
+                ui32TrianglesIndex uint32
+                ui32TrianglesTexIndex uint32
+                ui32TrianglesNormalsIndex uint32
+            end
+
+            ui32NumFaces = uint32(numel(dFaceLineStartIdx));
+            assert(numel(dFaceLineEndIdx) == double(ui32NumFaces), ...
+                'CShapeModel:InvalidObjFaceLineBounds', ...
+                'OBJ face line start and end index arrays must have equal lengths.');
+            ui32TrianglesIndex = zeros(0, 3, 'uint32');
+            ui32TrianglesTexIndex = zeros(0, 3, 'uint32');
+            ui32TrianglesNormalsIndex = zeros(0, 3, 'uint32');
+            if ui32NumFaces == uint32(0)
+                return
+            end
+            ui32TrianglesIndex = zeros(3, double(ui32NumFaces), 'uint32');
+
+            % Resolve the uniform face syntax once. Mixed face syntaxes remain
+            % outside the legacy vectorized loader contract.
+            charFirstFace = string(strtrim(charFileText( ...
+                dFaceLineStartIdx(1):dFaceLineEndIdx(1))));
+            bHasTextureIndices = false;
+            bHasNormalIndices = false;
+            if ~isempty(regexp(charFirstFace, '^f\s+\d+//\d+', 'once'))
+                charFaceFormat = 'f %u//%u %u//%u %u//%u\n';
+                ui32ValuesPerFace = uint32(6);
+                ui32VertexValueRows = uint32([1, 3, 5]);
+                ui32NormalValueRows = uint32([2, 4, 6]);
+                ui32TextureValueRows = zeros(1, 0, 'uint32');
+                bHasNormalIndices = true;
+            elseif ~isempty(regexp(charFirstFace, '^f\s+\d+/\d+/\d+', 'once'))
+                charFaceFormat = 'f %u/%u/%u %u/%u/%u %u/%u/%u\n';
+                ui32ValuesPerFace = uint32(9);
+                ui32VertexValueRows = uint32([1, 4, 7]);
+                ui32TextureValueRows = uint32([2, 5, 8]);
+                ui32NormalValueRows = uint32([3, 6, 9]);
+                bHasTextureIndices = true;
+                bHasNormalIndices = true;
+            elseif ~isempty(regexp(charFirstFace, '^f\s+\d+/\d+', 'once'))
+                charFaceFormat = 'f %u/%u %u/%u %u/%u\n';
+                ui32ValuesPerFace = uint32(6);
+                ui32VertexValueRows = uint32([1, 3, 5]);
+                ui32TextureValueRows = uint32([2, 4, 6]);
+                ui32NormalValueRows = zeros(1, 0, 'uint32');
+                bHasTextureIndices = true;
+            else
+                charFaceFormat = 'f %u %u %u\n';
+                ui32ValuesPerFace = uint32(3);
+                ui32VertexValueRows = uint32([1, 2, 3]);
+                ui32TextureValueRows = zeros(1, 0, 'uint32');
+                ui32NormalValueRows = zeros(1, 0, 'uint32');
+            end
+
+            if ~bVertFacesOnly && bHasTextureIndices
+                ui32TrianglesTexIndex = zeros(3, double(ui32NumFaces), 'uint32');
+            end
+            if ~bVertFacesOnly && bHasNormalIndices
+                ui32TrianglesNormalsIndex = zeros(3, double(ui32NumFaces), 'uint32');
+            end
+
+            % Keep each temporary text and numeric payload comfortably below
+            % MATLAB's contiguous-array limits.
+            ui32FaceParseChunkSize = uint32(250000);
+            ui32BlockStart = uint32(1);
+            while ui32BlockStart <= ui32NumFaces
+                ui32BlockEnd = min(ui32BlockStart + ui32FaceParseChunkSize - uint32(1), ui32NumFaces);
+
+                % Do not include object, group, or material records that separate
+                % otherwise contiguous face runs in a parsed text block.
+                if ui32BlockEnd > ui32BlockStart
+                    dFaceLineGaps = dFaceLineStartIdx(double(ui32BlockStart + uint32(1)):double(ui32BlockEnd)) - ...
+                        dFaceLineEndIdx(double(ui32BlockStart):double(ui32BlockEnd - uint32(1)));
+                    dFirstRunBreak = find(dFaceLineGaps > 3.0, 1, 'first');
+                    if ~isempty(dFirstRunBreak)
+                        ui32BlockEnd = ui32BlockStart + uint32(dFirstRunBreak) - uint32(1);
+                    end
+                end
+
+                ui32DestinationColumns = ui32BlockStart:ui32BlockEnd;
+                charFaceBlock = charFileText( ...
+                    dFaceLineStartIdx(double(ui32BlockStart)):dFaceLineEndIdx(double(ui32BlockEnd)));
+                dParsedFaceValues = sscanf(charFaceBlock, charFaceFormat, ...
+                    [double(ui32ValuesPerFace), Inf]);
+
+                ui32ExpectedBlockFaces = ui32BlockEnd - ui32BlockStart + uint32(1);
+                if size(dParsedFaceValues, 2) ~= double(ui32ExpectedBlockFaces)
+                    error('CShapeModel:MalformedObjFaceBlock', ...
+                        ['OBJ face block near face %u contains %u records but ', ...
+                         'the selected syntax parsed %u.'], ...
+                        ui32BlockStart, ui32ExpectedBlockFaces, uint32(size(dParsedFaceValues, 2)));
+                end
+
+                ui32ParsedFaceValues = uint32(dParsedFaceValues);
+                ui32TrianglesIndex(:, double(ui32DestinationColumns)) = ...
+                    ui32ParsedFaceValues(double(ui32VertexValueRows), :);
+                if ~bVertFacesOnly && bHasTextureIndices
+                    ui32TrianglesTexIndex(:, double(ui32DestinationColumns)) = ...
+                        ui32ParsedFaceValues(double(ui32TextureValueRows), :);
+                end
+                if ~bVertFacesOnly && bHasNormalIndices
+                    ui32TrianglesNormalsIndex(:, double(ui32DestinationColumns)) = ...
+                        ui32ParsedFaceValues(double(ui32NormalValueRows), :);
+                end
+                ui32BlockStart = ui32BlockEnd + uint32(1);
+            end
+        end
 
         function TryAddMiceFromWorkspace_()
             cellWorkspaceEnvNames = ["WS_SIMGEARS", "WS_NAVSYS"];
