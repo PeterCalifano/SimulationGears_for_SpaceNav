@@ -1,6 +1,7 @@
 /*build*/
 /*debug*/
 /*install*/
+data/
 
 # ROS 2 overlay colcon outputs (root patterns above are anchored and do not cover subdirs)
 /ros2/build/
