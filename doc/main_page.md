@@ -24,6 +24,27 @@ target_link_libraries(my_target PRIVATE
 Use `CPU_ENABLE_NATIVE_TUNING=OFF` for portable CPU artifacts. CUDA is enabled
 with `ENABLE_CUDA=ON`; OptiX remains an independent opt-in.
 
+### Package metadata and container arguments
+
+Python package metadata uses `PYTHON_PACKAGE_VERSION` from the existing CMake
+version composer. Preserve prerelease qualifiers and build metadata in the
+Python version instead of substituting only the numeric `PROJECT_VERSION`.
+
+Container regeneration retains custom Docker `build.args` and unrelated build
+fields. Update only `ROS_MODE`, `ROS_DISTRO` and `ROS_PROFILE` in the argument
+mapping; remove those keys when ROS is disabled. Remove an empty argument mapping
+without discarding any custom keys. Load JSON and JSONC through the shared helper
+imported from `cpp_cuda_template_project`.
+
+Run the focused checks against temporary inputs:
+
+```bash
+python3 -m pytest -q tests/python/test_devcontainer_build_args.py tests/python/test_python_package_version.py
+```
+
+Expected: eleven checks pass. These checks regenerate JSON and materialize
+metadata with CMake; they do not build a container image or Python extension.
+
 ## Project contracts
 
 - @ref md_doc_2logging documents CLogger.

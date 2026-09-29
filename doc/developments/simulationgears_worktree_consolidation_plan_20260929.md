@@ -373,7 +373,7 @@ first; keep the OBJ and packaging/container batches for subsequent user commits.
 
 | Reference | Current observation | Treatment |
 | --- | --- | --- |
-| Active consolidation worktree | `feature/consolidate-simulation-models`; now `f82b9dd` after user commits `e3e1e0d` (SPK), `7e18771` (rates) and `f82b9dd` (config guidelines) | Stage the reviewed OBJ batch; preserve pending SRP and packaging work |
+| Active consolidation worktree | `feature/consolidate-simulation-models`; now `88fcf6a` after the user's OBJ commit, following `e3e1e0d` (SPK), `7e18771` (rates) and `f82b9dd` (config guidelines) | Review the packaging/container batch; preserve pending SRP and asset-root work |
 | Original PR source | `feature/extend-support-for-space-nav-backend` at `801b0b7` | Already an ancestor of the current branch; replay no original commits |
 | Audit destination | Landing worktree at `e86d14d` | Keep as a separate integration option; retire `c9a99db` as an execution baseline |
 | SimulationGears MathCore reference | `lib/MathCore_for_ComputerVision` at `e3a39c68` | Preserve it; do not restore `83d9d7b` |
@@ -455,8 +455,8 @@ under `/tmp/simgears-pr11-followup-plan-20260929-ijor5e4b`.
 - [x] Check generated metadata for release, prerelease and build-metadata inputs
   using disposable CMake/Python consumers. Verify valid Python version syntax and
   agreement with the existing composer; avoid a full wrapper build for this fix.
-- [x] Restore the existing `b15b760` argument-preservation logic in the template
-  donor's `.devcontainer/update_devcontainer_json.py` first.
+- [x] Restore argument preservation in the template donor's
+  `.devcontainer/update_devcontainer_json.py` first.
   Preserve custom `build.args`; update only `ROS_MODE`, `ROS_DISTRO` and
   `ROS_PROFILE` when ROS is enabled and remove only those keys when disabled.
 - [x] Import the reviewed shared change into SimulationGears without dropping
@@ -467,22 +467,25 @@ under `/tmp/simgears-pr11-followup-plan-20260929-ijor5e4b`.
   empty arguments and preservation of unrelated build/container fields.
 - [x] Run Python syntax checks and the relevant existing helper checks. Add no
   tests tied to tunable simulation profile values and require no Docker image build.
+- [x] Place the SimulationGears checks in the existing `tests/python` directory
+  with descriptive snake-case filenames. Review Google-style help, fixture
+  ownership, typed signatures, imperative comments and shared-source parity.
 
 ### Fix stage 5: Review, stage and verify integration
 
-- [ ] Prepare three related review batches: angular-velocity transport, combined
+- [x] Prepare three related review batches: angular-velocity transport, combined
   OBJ selection/parser work, and packaging/container preservation. Keep unrelated
   SRP, landing, target-rotation and configuration changes outside those indexes.
-- [ ] Apply the staged-code quality gate: review public documentation, imperative
+- [x] Apply the staged-code quality gate: review public documentation, imperative
   comments, logical blocks, naming, readability and unnecessary complexity.
   Run focused tests, Code Analyzer where applicable and cached whitespace checks.
-- [ ] Stage each SimulationGears batch through an explicit path/hunk list, review
+- [x] Stage each SimulationGears batch through an explicit path/hunk list, review
   its complete index and suggest a repository-style subject ending in `(Codex)`
   plus imperative body bullets. Stop for the user's review and commit between batches.
   - [x] Review and stage angular-velocity transport, dataset unit-label preservation,
     the SPICE comment, focused tests and the matching main-page section.
   - [x] Review and stage combined OBJ selection/parser work.
-  - [ ] Review and stage packaging/container preservation; retain donor edits unstaged.
+  - [x] Review and stage packaging/container preservation; retain donor edits unstaged.
 - [ ] If the original source branch is chosen, integrate only the new user-created
   fix commits after separate authorization. Prefer compatible destination changes
   and reconcile its newer ephemeris and OBJ-selection implementation explicitly.
@@ -496,6 +499,25 @@ under `/tmp/simgears-pr11-followup-plan-20260929-ijor5e4b`.
 
 ## Progress and discrepancies
 
+- 29 September, packaging/container staged review (`Codex gpt-6`): Verify the
+  user's OBJ commit at `88fcf6a` and an empty index. Review the two pending
+  build-support fixes together with their two focused suites. Add Google-style
+  public/fixture documentation and retain imperative comments; follow PEP 8
+  naming and use the existing `tests/python` directory. Simplify the version
+  check to compare the composed string once and parse it once for validity.
+  Review the shared helper in the donor first, then import it byte for byte;
+  preserve the donor's unstaged, uncommitted helper and focused suite. Pass eleven
+  SimulationGears and seven donor checks plus Python 3.12 syntax checks. Qualify
+  metadata through the real CMake composer and template without building a
+  Docker image or Python extension. Stage six provider paths: helper, template,
+  two suites, this plan and only the matching main-page update. Preserve SRP,
+  asset-root edits, all other worktrees and dependency pointers. Leave COSMICA's
+  master-plan update unstaged. Save patches, hashes and logs under
+  `/tmp/simgears-packaging-consolidation-review-20260929-h8208gu9`.
+- 29 September, donor-reference discrepancy: The historical `b15b760` reference
+  in the earlier plan is unavailable in the current donor object database.
+  Remove that execution dependency from the checklist. Verify current source
+  parity and the documented behavior through focused tests; change no history.
 - 29 September, approved wrapper removal (`Codex gpt-6`): Remove
   `FitSpherHarmonicsToPolyhedronGravityFromObj`, which only forwarded arguments
   to `CShapeModel.BuildSphericalHarmonicsGravityDataFromObj`. Update all three
