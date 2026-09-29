@@ -1,149 +1,436 @@
 classdef testApplyImpulsiveDeltaVError < matlab.unittest.TestCase
     %% DESCRIPTION
-    % Unit tests for ApplyImpulsiveDeltaVError (stochastic magnitude and direction DeltaV error model).
-    % Tests deterministic edge cases, output shape, statistical unbiasedness, magnitude/direction
-    % error scaling, and robustness to near-zero inputs.
+    % Validate the stochastic impulse-error model independently of scenarios.
+    % Check edge cases, output shape, unbiasedness and the fractional magnitude
+    % and angular dispersion contracts. Restore the caller's RNG after every test.
     % -------------------------------------------------------------------------------------------------------------
+
+    %% CHANGELOG
+    % 29-09-2026  Pietro Califano, Codex gpt-6  Generalize impulse scaling regressions.
+    % -------------------------------------------------------------------------------------------------------------
+    %% DEPENDENCIES
+    % ApplyImpulsiveDeltaVError, MATLAB unit-test framework.
+    % -------------------------------------------------------------------------------------------------------------
+
+    methods (TestMethodSetup)
+        function preserveCallerRng(self)
+            %% SIGNATURE
+            % preserveCallerRng(self)
+            % ---------------------------------------------------------------------------------------------------------
+            %% DESCRIPTION
+            % Restore the caller's RNG state after each stochastic test.
+            % ---------------------------------------------------------------------------------------------------------
+            %% INPUT
+            % self    MATLAB unit-test instance.
+            % ---------------------------------------------------------------------------------------------------------
+            %% OUTPUT
+            % None; register a test teardown callback.
+            % ---------------------------------------------------------------------------------------------------------
+            %% CHANGELOG
+            % 29-09-2026  Pietro Califano, Codex gpt-6  Isolate test randomness.
+            % ---------------------------------------------------------------------------------------------------------
+            %% DEPENDENCIES
+            % rng, matlab.unittest.TestCase.addTeardown.
+            % ---------------------------------------------------------------------------------------------------------
+
+            strCallerRngState = rng;
+            self.addTeardown(@() rng(strCallerRngState));
+        end
+    end
 
     methods (Test)
 
-        function testOutputDimension(testCase)
-            % Output must always be [3x1]
-            dDV = [0.1; -0.05; 0.2];
-            dResult = ApplyImpulsiveDeltaVError(dDV, 0.01, deg2rad(0.5));
-            testCase.verifySize(dResult, [3, 1]);
+        function testOutputDimension(self)
+            %% SIGNATURE
+            % testOutputDimension(self)
+            % ---------------------------------------------------------------------------------------------------------
+            %% DESCRIPTION
+            % Verify the three-component output contract.
+            % ---------------------------------------------------------------------------------------------------------
+            %% INPUT
+            % self    MATLAB unit-test instance.
+            % ---------------------------------------------------------------------------------------------------------
+            %% OUTPUT
+            % None; assert the documented impulse-error behavior.
+            % ---------------------------------------------------------------------------------------------------------
+            %% CHANGELOG
+            % 29-09-2026  Pietro Califano, Codex gpt-6  Document the behavioral contract.
+            % ---------------------------------------------------------------------------------------------------------
+            %% DEPENDENCIES
+            % ApplyImpulsiveDeltaVError, MATLAB unit-test framework.
+            % ---------------------------------------------------------------------------------------------------------
+
+            % Check the fixed output shape for a non-axis-aligned impulse.
+            dNominalDeltaV = [0.1; -0.05; 0.2];
+            dRealizedDeltaV = ApplyImpulsiveDeltaVError(dNominalDeltaV, 0.01, deg2rad(0.5));
+            self.verifySize(dRealizedDeltaV, [3, 1]);
         end
 
-        function testZeroSigmaReturnsNominal(testCase)
-            % With both sigmas = 0, the output must equal the nominal DV exactly
+        function testZeroSigmaReturnsNominal(self)
+            %% SIGNATURE
+            % testZeroSigmaReturnsNominal(self)
+            % ---------------------------------------------------------------------------------------------------------
+            %% DESCRIPTION
+            % Preserve arbitrary nominal impulses when both dispersions are zero.
+            % ---------------------------------------------------------------------------------------------------------
+            %% INPUT
+            % self    MATLAB unit-test instance.
+            % ---------------------------------------------------------------------------------------------------------
+            %% OUTPUT
+            % None; assert the documented impulse-error behavior.
+            % ---------------------------------------------------------------------------------------------------------
+            %% CHANGELOG
+            % 29-09-2026  Pietro Califano, Codex gpt-6  Document the behavioral contract.
+            % ---------------------------------------------------------------------------------------------------------
+            %% DEPENDENCIES
+            % ApplyImpulsiveDeltaVError, MATLAB unit-test framework.
+            % ---------------------------------------------------------------------------------------------------------
+
+            % Preserve the input with both error components disabled.
             rng('default');
-            for idTrial = 1:10
-                dDV = randn(3, 1);
-                dResult = ApplyImpulsiveDeltaVError(dDV, 0.0, 0.0);
-                testCase.verifyEqual(dResult, dDV, 'AbsTol', 1e-15, ...
-                    sprintf('Zero sigma must return nominal DV (trial %d)', idTrial));
+            for dTrialIdx = 1:10
+                dNominalDeltaV = randn(3, 1);
+                dRealizedDeltaV = ApplyImpulsiveDeltaVError(dNominalDeltaV, 0.0, 0.0);
+                self.verifyEqual(dRealizedDeltaV, dNominalDeltaV, 'AbsTol', 1e-15, ...
+                    sprintf('Zero sigma must return nominal DV (trial %d)', dTrialIdx));
             end
         end
 
-        function testNearZeroDVReturnsUnchanged(testCase)
-            % DV below machine epsilon must be returned unchanged (early-return guard)
-            dDV_zero = zeros(3, 1);
-            dResult  = ApplyImpulsiveDeltaVError(dDV_zero, 0.1, deg2rad(1));
-            testCase.verifyEqual(dResult, dDV_zero, 'AbsTol', 1e-15, ...
+        function testNearZeroDVReturnsUnchanged(self)
+            %% SIGNATURE
+            % testNearZeroDVReturnsUnchanged(self)
+            % ---------------------------------------------------------------------------------------------------------
+            %% DESCRIPTION
+            % Preserve the zero-impulse guard before direction normalization.
+            % ---------------------------------------------------------------------------------------------------------
+            %% INPUT
+            % self    MATLAB unit-test instance.
+            % ---------------------------------------------------------------------------------------------------------
+            %% OUTPUT
+            % None; assert the documented impulse-error behavior.
+            % ---------------------------------------------------------------------------------------------------------
+            %% CHANGELOG
+            % 29-09-2026  Pietro Califano, Codex gpt-6  Document the behavioral contract.
+            % ---------------------------------------------------------------------------------------------------------
+            %% DEPENDENCIES
+            % ApplyImpulsiveDeltaVError, MATLAB unit-test framework.
+            % ---------------------------------------------------------------------------------------------------------
+
+            % Return a zero impulse unchanged before normalization.
+            dZeroDeltaV = zeros(3, 1);
+            dRealizedDeltaV = ApplyImpulsiveDeltaVError(dZeroDeltaV, 0.1, deg2rad(1));
+            self.verifyEqual(dRealizedDeltaV, dZeroDeltaV, 'AbsTol', 1e-15, ...
                 'Near-zero DV must be returned unchanged');
         end
 
-        function testStatisticalUnbiasedness(testCase)
-            % Over a large ensemble, the mean of the perturbed DV must equal the nominal
-            % (error model is zero-mean Gaussian)
-            rng('default');
-            dNsamples = 10000;
-            dDV_nominal = [1.0; 0.0; 0.0];   % 1 km/s along x
-            dSigmaMag   = 0.05;               % 5% magnitude error
-            dSigmaDir   = deg2rad(1.0);       % 1 deg direction error
+        function testStatisticalUnbiasedness(self)
+            %% SIGNATURE
+            % testStatisticalUnbiasedness(self)
+            % ---------------------------------------------------------------------------------------------------------
+            %% DESCRIPTION
+            % Check the ensemble mean against the nominal impulse.
+            % ---------------------------------------------------------------------------------------------------------
+            %% INPUT
+            % self    MATLAB unit-test instance.
+            % ---------------------------------------------------------------------------------------------------------
+            %% OUTPUT
+            % None; assert the documented impulse-error behavior.
+            % ---------------------------------------------------------------------------------------------------------
+            %% CHANGELOG
+            % 29-09-2026  Pietro Califano, Codex gpt-6  Document the behavioral contract.
+            % ---------------------------------------------------------------------------------------------------------
+            %% DEPENDENCIES
+            % ApplyImpulsiveDeltaVError, MATLAB unit-test framework.
+            % ---------------------------------------------------------------------------------------------------------
 
-            dDV_samples = zeros(3, dNsamples);
-            for idS = 1:dNsamples
-                dDV_samples(:, idS) = ApplyImpulsiveDeltaVError(dDV_nominal, dSigmaMag, dSigmaDir);
+            % Compare the ensemble mean with the zero-mean error contract.
+            rng('default');
+            dNumDraws = 10000;
+            dNominalDeltaV = [1.0; 0.0; 0.0]; % Unit impulse along x.
+            dSigmaMagnitude = 0.05; % Fractional magnitude sigma.
+            dSigmaDirection = deg2rad(1.0); % Angular sigma in radians.
+
+            dImpulseSamples = zeros(3, dNumDraws);
+            for dDrawIdx = 1:dNumDraws
+                dImpulseSamples(:, dDrawIdx) = ApplyImpulsiveDeltaVError( ...
+                    dNominalDeltaV, dSigmaMagnitude, dSigmaDirection);
             end
 
-            dMeanDV = mean(dDV_samples, 2);
-            dRelBias = norm(dMeanDV - dDV_nominal) / norm(dDV_nominal);
+            dMeanDeltaV = mean(dImpulseSamples, 2);
+            dRelativeBias = norm(dMeanDeltaV - dNominalDeltaV) / norm(dNominalDeltaV);
 
-            testCase.verifyLessThan(dRelBias, 0.01, ...
-                sprintf('Mean DV bias too large (relBias=%.4f)', dRelBias));
+            self.verifyLessThan(dRelativeBias, 0.01, ...
+                sprintf('Mean DV bias too large (relBias=%.4f)', dRelativeBias));
         end
 
-        function testMagnitudeErrorScalesWithSigma(testCase)
-            % std(|DV_out|) / |DV_nominal| should approximate sigma_mag
+        function testMagnitudeErrorScalesWithSigma(self)
+            %% SIGNATURE
+            % testMagnitudeErrorScalesWithSigma(self)
+            % ---------------------------------------------------------------------------------------------------------
+            %% DESCRIPTION
+            % Check fractional magnitude dispersion with angular error disabled.
+            % ---------------------------------------------------------------------------------------------------------
+            %% INPUT
+            % self    MATLAB unit-test instance.
+            % ---------------------------------------------------------------------------------------------------------
+            %% OUTPUT
+            % None; assert the documented impulse-error behavior.
+            % ---------------------------------------------------------------------------------------------------------
+            %% CHANGELOG
+            % 29-09-2026  Pietro Califano, Codex gpt-6  Document the behavioral contract.
+            % ---------------------------------------------------------------------------------------------------------
+            %% DEPENDENCIES
+            % ApplyImpulsiveDeltaVError, MATLAB unit-test framework.
+            % ---------------------------------------------------------------------------------------------------------
+
+            % Isolate the fractional parallel error from angular effects.
             rng(42);
-            dNsamples    = 8000;
-            dDV_nominal  = [2.0; 1.0; -0.5];
-            dNomMag      = norm(dDV_nominal);
-            dSigmaMag    = 0.1;   % 10%
+            dNumDraws = 8000;
+            dNominalDeltaV = [2.0; 1.0; -0.5];
+            dNominalMagnitude = norm(dNominalDeltaV);
+            dSigmaMagnitude = 0.1;   % 10%
 
-            dMagnitudes = zeros(1, dNsamples);
-            for idS = 1:dNsamples
-                dOut = ApplyImpulsiveDeltaVError(dDV_nominal, dSigmaMag, 0.0);
-                dMagnitudes(idS) = norm(dOut);
+            dMagnitudes = zeros(1, dNumDraws);
+            for dDrawIdx = 1:dNumDraws
+                dRealizedDeltaV = ApplyImpulsiveDeltaVError(dNominalDeltaV, dSigmaMagnitude, 0.0);
+                dMagnitudes(dDrawIdx) = norm(dRealizedDeltaV);
             end
 
-            dEstimatedSigmaFrac = std(dMagnitudes) / dNomMag;
-            testCase.verifyEqual(dEstimatedSigmaFrac, dSigmaMag, 'RelTol', 0.1, ...
-                sprintf('Magnitude error std should be ~sigma_mag (got %.4f, expected %.4f)', ...
-                        dEstimatedSigmaFrac, dSigmaMag));
+            dEstimatedSigmaFrac = std(dMagnitudes) / dNominalMagnitude;
+            self.verifyEqual(dEstimatedSigmaFrac, dSigmaMagnitude, 'RelTol', 0.1, ...
+                sprintf('Magnitude error std differs from sigma (got %.4f, expected %.4f)', ...
+                    dEstimatedSigmaFrac, dSigmaMagnitude));
         end
 
-        function testDirectionErrorOrthogonalInMean(testCase)
-            % Direction error adds a tangential perturbation orthogonal to the nominal DV.
-            % The component of the error along the nominal direction should be zero-mean.
+        function testDirectionErrorOrthogonalInMean(self)
+            %% SIGNATURE
+            % testDirectionErrorOrthogonalInMean(self)
+            % ---------------------------------------------------------------------------------------------------------
+            %% DESCRIPTION
+            % Keep angular perturbations perpendicular to the nominal impulse.
+            % ---------------------------------------------------------------------------------------------------------
+            %% INPUT
+            % self    MATLAB unit-test instance.
+            % ---------------------------------------------------------------------------------------------------------
+            %% OUTPUT
+            % None; assert the documented impulse-error behavior.
+            % ---------------------------------------------------------------------------------------------------------
+            %% CHANGELOG
+            % 29-09-2026  Pietro Califano, Codex gpt-6  Document the behavioral contract.
+            % ---------------------------------------------------------------------------------------------------------
+            %% DEPENDENCIES
+            % ApplyImpulsiveDeltaVError, MATLAB unit-test framework.
+            % ---------------------------------------------------------------------------------------------------------
+
+            % Isolate angular error and measure its parallel component.
             rng(7);
-            dNsamples   = 8000;
-            dDV_nominal = [0; 0; 1.5];   % Along z
-            dUnitDV     = dDV_nominal / norm(dDV_nominal);
-            dSigmaDir   = deg2rad(2.0);
+            dNumDraws = 8000;
+            dNominalDeltaV = [0; 0; 1.5];   % Along z
+            dUnitImpulse = dNominalDeltaV / norm(dNominalDeltaV);
+            dSigmaDirection = deg2rad(2.0);
 
-            dParallelErrors = zeros(1, dNsamples);
-            for idS = 1:dNsamples
-                dOut = ApplyImpulsiveDeltaVError(dDV_nominal, 0.0, dSigmaDir);
-                dErr = dOut - dDV_nominal;
-                dParallelErrors(idS) = dot(dErr, dUnitDV);
+            dParallelErrors = zeros(1, dNumDraws);
+            for dDrawIdx = 1:dNumDraws
+                dRealizedDeltaV = ApplyImpulsiveDeltaVError(dNominalDeltaV, 0.0, dSigmaDirection);
+                dImpulseError = dRealizedDeltaV - dNominalDeltaV;
+                dParallelErrors(dDrawIdx) = dot(dImpulseError, dUnitImpulse);
             end
 
-            % The direction error term is purely tangential, so its projection on the
-            % nominal direction should have zero mean (it only has a magnitude component with sigma=0)
-            dMeanParallel = mean(dParallelErrors);
-            testCase.verifyEqual(dMeanParallel, 0.0, 'AbsTol', 0.02, ...
-                sprintf('Direction error must be zero-mean along nominal direction (got %.4f)', dMeanParallel));
+            % Verify the tangent perturbation has no parallel component.
+            dMeanParallelError = mean(dParallelErrors);
+            self.verifyEqual(dMeanParallelError, 0.0, 'AbsTol', 0.02, ...
+                sprintf('Direction error must be zero-mean along nominal direction (got %.4f)', ...
+                    dMeanParallelError));
         end
 
-        function testOutputMagnitudeWithOnlyMagnitudeError(testCase)
-            % With direction sigma = 0, the DV direction must be preserved exactly
+        function testImpulseErrorIsScaleInvariant(self)
+            %% SIGNATURE
+            % testImpulseErrorIsScaleInvariant(self)
+            % ---------------------------------------------------------------------------------------------------------
+            %% DESCRIPTION
+            % Preserve fractional and angular errors when rescaling velocity
+            % units. Replay the same draws across several impulse magnitudes.
+            % ---------------------------------------------------------------------------------------------------------
+            %% INPUT
+            % self    MATLAB unit-test instance.
+            % ---------------------------------------------------------------------------------------------------------
+            %% OUTPUT
+            % None; assert identical normalized realizations.
+            % ---------------------------------------------------------------------------------------------------------
+            %% CHANGELOG
+            % 29-09-2026  Pietro Califano, Codex gpt-6  Check velocity-unit invariance.
+            % ---------------------------------------------------------------------------------------------------------
+            %% DEPENDENCIES
+            % ApplyImpulsiveDeltaVError, rng.
+            % ---------------------------------------------------------------------------------------------------------
+
+            % Replay common draws so the comparison isolates unit rescaling.
+            dNominalDeltaV = [0.3; -0.5; 0.8];
+            dImpulseScales = [1e-7, 1e-3, 1.0, 10.0];
+            rng(43);
+            dReferenceDeltaV = ApplyImpulsiveDeltaVError(dNominalDeltaV, 0.05, 0.01);
+            for dImpulseScale = dImpulseScales
+                rng(43);
+                dRealizedDeltaV = ApplyImpulsiveDeltaVError( ...
+                    dImpulseScale * dNominalDeltaV, 0.05, 0.01);
+                self.verifyEqual(dRealizedDeltaV / dImpulseScale, ...
+                    dReferenceDeltaV, 'AbsTol', 5e-15);
+            end
+        end
+
+        function testDirectionSigmaAcrossMagnitudes(self)
+            %% SIGNATURE
+            % testDirectionSigmaAcrossMagnitudes(self)
+            % ---------------------------------------------------------------------------------------------------------
+            %% DESCRIPTION
+            % Check angular RMS across eight decades of nominal impulse
+            % magnitude with fractional magnitude error disabled. Use generic
+            % numeric inputs, independent of mission profiles and units.
+            % ---------------------------------------------------------------------------------------------------------
+            %% INPUT
+            % self  MATLAB unit-test instance.
+            % ---------------------------------------------------------------------------------------------------------
+            %% OUTPUT
+            % None; check angular RMS against the small-angle input sigma.
+            % ---------------------------------------------------------------------------------------------------------
+            %% CHANGELOG
+            % 27-09-2026  Pietro Califano, Codex gpt-6  Cover small-burn direction scale.
+            % 29-09-2026  Pietro Califano, Codex gpt-6  Generalize impulse magnitudes.
+            % ---------------------------------------------------------------------------------------------------------
+            %% DEPENDENCIES
+            % ApplyImpulsiveDeltaVError.
+            % ---------------------------------------------------------------------------------------------------------
+
+            % Span small and large impulses without depending on campaign data.
+            rng(20260927);
+            dBurnMagnitudes = logspace(-7, 1, 5);
+            dSigmaDirection = 0.01; % rad
+            ui32NumDraws = uint32(1200);
+
+            for ui32BurnIdx = uint32(1):uint32(numel(dBurnMagnitudes))
+                dNominalDeltaV = [dBurnMagnitudes(ui32BurnIdx); 0.0; 0.0];
+                dAngularErrors = zeros(1, double(ui32NumDraws));
+                for ui32DrawIdx = uint32(1):ui32NumDraws
+                    dRealizedDeltaV = ApplyImpulsiveDeltaVError( ...
+                        dNominalDeltaV, 0.0, dSigmaDirection);
+                    dAngularErrors(ui32DrawIdx) = atan2( ...
+                        norm(cross(dNominalDeltaV, dRealizedDeltaV)), ...
+                        dot(dNominalDeltaV, dRealizedDeltaV));
+                end
+
+                dAngularRms = sqrt(mean(dAngularErrors.^2));
+                self.verifyEqual(dAngularRms, dSigmaDirection, 'RelTol', 0.15, ...
+                    sprintf('Direction sigma is wrong for impulse magnitude %.3g.', ...
+                        dBurnMagnitudes(ui32BurnIdx)));
+            end
+        end
+
+        function testOutputMagnitudeWithOnlyMagnitudeError(self)
+            %% SIGNATURE
+            % testOutputMagnitudeWithOnlyMagnitudeError(self)
+            % ---------------------------------------------------------------------------------------------------------
+            %% DESCRIPTION
+            % Preserve impulse direction when angular dispersion is zero.
+            % ---------------------------------------------------------------------------------------------------------
+            %% INPUT
+            % self    MATLAB unit-test instance.
+            % ---------------------------------------------------------------------------------------------------------
+            %% OUTPUT
+            % None; assert the documented impulse-error behavior.
+            % ---------------------------------------------------------------------------------------------------------
+            %% CHANGELOG
+            % 29-09-2026  Pietro Califano, Codex gpt-6  Document the behavioral contract.
+            % ---------------------------------------------------------------------------------------------------------
+            %% DEPENDENCIES
+            % ApplyImpulsiveDeltaVError, MATLAB unit-test framework.
+            % ---------------------------------------------------------------------------------------------------------
+
+            % Check direction preservation with only fractional magnitude error.
             rng(13);
-            dDV_nominal = [0.3; -0.5; 0.8];
-            dUnitNominal = dDV_nominal / norm(dDV_nominal);
+            dNominalDeltaV = [0.3; -0.5; 0.8];
+            dUnitNominalImpulse = dNominalDeltaV / norm(dNominalDeltaV);
 
-            for idTrial = 1:20
-                dOut = ApplyImpulsiveDeltaVError(dDV_nominal, 0.05, 0.0);
-                dUnitOut = dOut / norm(dOut);
+            for dTrialIdx = 1:20
+                dRealizedDeltaV = ApplyImpulsiveDeltaVError(dNominalDeltaV, 0.05, 0.0);
+                dUnitRealizedImpulse = dRealizedDeltaV / norm(dRealizedDeltaV);
 
-                dAngleError = acos(min(1, abs(dot(dUnitOut, dUnitNominal))));
-                % Tolerance is sqrt(eps) ~ 1.5e-8: acos near 1 has limited precision
-                testCase.verifyLessThan(dAngleError, 1e-7, ...
-                    sprintf('Direction must be unchanged when sigma_dir=0 (trial %d)', idTrial));
+                dAngleError = acos(min(1, abs(dot(dUnitRealizedImpulse, dUnitNominalImpulse))));
+                % Allow acos precision loss close to unit alignment.
+                self.verifyLessThan(dAngleError, 1e-7, ...
+                    sprintf('Direction must be unchanged when sigma_dir=0 (trial %d)', dTrialIdx));
             end
         end
 
-        function testRandomDVsProduceFiniteOutputs(testCase)
-            % For a range of random DV magnitudes and sigma values, outputs must be finite
+        function testRandomDVsProduceFiniteOutputs(self)
+            %% SIGNATURE
+            % testRandomDVsProduceFiniteOutputs(self)
+            % ---------------------------------------------------------------------------------------------------------
+            %% DESCRIPTION
+            % Check finite three-component outputs across randomized valid inputs.
+            % ---------------------------------------------------------------------------------------------------------
+            %% INPUT
+            % self    MATLAB unit-test instance.
+            % ---------------------------------------------------------------------------------------------------------
+            %% OUTPUT
+            % None; assert the documented impulse-error behavior.
+            % ---------------------------------------------------------------------------------------------------------
+            %% CHANGELOG
+            % 29-09-2026  Pietro Califano, Codex gpt-6  Document the behavioral contract.
+            % ---------------------------------------------------------------------------------------------------------
+            %% DEPENDENCIES
+            % ApplyImpulsiveDeltaVError, MATLAB unit-test framework.
+            % ---------------------------------------------------------------------------------------------------------
+
+            % Sweep valid random impulses and dispersions for finite output.
             rng('default');
-            for idTrial = 1:50
-                dDV        = randn(3, 1) * (0.001 + 5 * rand());
-                dSigmaMag  = 0.2 * rand();
-                dSigmaDir  = deg2rad(5 * rand());
+            for dTrialIdx = 1:50
+                dNominalDeltaV = randn(3, 1) * (0.001 + 5 * rand());
+                dSigmaMagnitude = 0.2 * rand();
+                dSigmaDirection = deg2rad(5 * rand());
 
-                dOut = ApplyImpulsiveDeltaVError(dDV, dSigmaMag, dSigmaDir);
+                dRealizedDeltaV = ApplyImpulsiveDeltaVError( ...
+                    dNominalDeltaV, dSigmaMagnitude, dSigmaDirection);
 
-                testCase.verifySize(dOut, [3, 1]);
-                testCase.verifyTrue(all(isfinite(dOut)), ...
-                    sprintf('Output must be finite at trial %d', idTrial));
+                self.verifySize(dRealizedDeltaV, [3, 1]);
+                self.verifyTrue(all(isfinite(dRealizedDeltaV)), ...
+                    sprintf('Output must be finite at trial %d', dTrialIdx));
             end
         end
 
-        function testSmallSigmaPreservesNominalApproximately(testCase)
-            % With very small sigma values, the perturbed DV must stay close to nominal
-            rng(21);
-            dDV_nominal = [1.0; -0.3; 0.7];
-            dNomMag     = norm(dDV_nominal);
-            dSigmaMag   = 1e-4;
-            dSigmaDir   = deg2rad(0.01);
+        function testSmallSigmaPreservesNominalApproximately(self)
+            %% SIGNATURE
+            % testSmallSigmaPreservesNominalApproximately(self)
+            % ---------------------------------------------------------------------------------------------------------
+            %% DESCRIPTION
+            % Bound relative changes for small magnitude and angular dispersions.
+            % ---------------------------------------------------------------------------------------------------------
+            %% INPUT
+            % self    MATLAB unit-test instance.
+            % ---------------------------------------------------------------------------------------------------------
+            %% OUTPUT
+            % None; assert the documented impulse-error behavior.
+            % ---------------------------------------------------------------------------------------------------------
+            %% CHANGELOG
+            % 29-09-2026  Pietro Califano, Codex gpt-6  Document the behavioral contract.
+            % ---------------------------------------------------------------------------------------------------------
+            %% DEPENDENCIES
+            % ApplyImpulsiveDeltaVError, MATLAB unit-test framework.
+            % ---------------------------------------------------------------------------------------------------------
 
-            for idTrial = 1:20
-                dOut     = ApplyImpulsiveDeltaVError(dDV_nominal, dSigmaMag, dSigmaDir);
-                dRelDiff = norm(dOut - dDV_nominal) / dNomMag;
-                testCase.verifyLessThan(dRelDiff, 0.01, ...
+            % Compare small-dispersion realizations with the nominal impulse.
+            rng(21);
+            dNominalDeltaV = [1.0; -0.3; 0.7];
+            dNominalMagnitude = norm(dNominalDeltaV);
+            dSigmaMagnitude = 1e-4;
+            dSigmaDirection = deg2rad(0.01);
+
+            for dTrialIdx = 1:20
+                dRealizedDeltaV = ApplyImpulsiveDeltaVError( ...
+                    dNominalDeltaV, dSigmaMagnitude, dSigmaDirection);
+                dRelativeChange = norm(dRealizedDeltaV - dNominalDeltaV) / dNominalMagnitude;
+                self.verifyLessThan(dRelativeChange, 0.01, ...
                     sprintf('Tiny sigma must keep output near nominal (trial %d, relDiff=%.4e)', ...
-                            idTrial, dRelDiff));
+                        dTrialIdx, dRelativeChange));
             end
         end
 
