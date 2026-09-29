@@ -156,3 +156,36 @@ identity despite matching counts, relative roots/folder restoration, exact
 four-arc/three-impulse shapes, gap/continuity/metadata/source failures, and
 pre/post reference evaluation. These checks prepare trajectory inputs; they do
 not run propagation, navigation or a physical-model qualification.
+
+### Dataset and ephemeris rate transport
+
+`SReferenceImagesDataset` accepts `dTargetAngVel_IN` and forwards it to the
+mission-design base class. `FromSReferenceMissionDesign` retains those samples,
+their timestamps and the source length-unit label; it does not rescale states
+or infer rates from attitudes. Conversions from simulation-state data use this
+same adapter and leave rates absent when their source supplies none.
+
+`EphemeridesDataFactory` stores the following fields under
+`strMainData.strAttData` for both the standard and RCS interpolation layouts:
+
+| Field | Contract |
+| --- | --- |
+| `dAngVel_IN` | Finite 3-by-N source attitude-model rates in inertial coordinates, in rad/s |
+| `dNominalAngVel_IN` | First source sample, retained for existing consumers |
+| `dAngVelTimegrid` | N matching epochs in the actual interpolation domain: relative seconds, absolute seconds or absolute days |
+
+Timegrid scaling does not rescale the rates. A source without rate data clears
+these three fields from a reused dynamics structure, while retaining unrelated
+attitude metadata. Keep the current model convention
+`R_INfromTB(t) = Exp(-omega_IN*t) R_INfromTB(0)`; this transport fix does not
+adopt the separate target-rotation extension.
+
+For SPICE inputs, `DefineEnvironmentProperties` queries the inertial-to-target
+state transform. `cspice_xf2rav` returns its rate in the input frame, already
+inertial here, so apply only the existing model sign. See the
+[NAIF frame contract](https://naif.jpl.nasa.gov/pub/naif/toolkit_docs/MATLAB/mice/cspice_xf2rav.html).
+
+Run `testReferenceImagesDatasetRates` and `testEphemeridesDataFactory` after
+`SetupSimGears`. Exercise the RCS branch with the real external
+`EphCoeffsGeneration` and its `chebCoeffsGeneration` implementation. Use double polynomial
+degrees until their separately recorded integer-type incompatibility is fixed.

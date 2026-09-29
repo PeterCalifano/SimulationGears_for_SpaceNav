@@ -356,8 +356,194 @@ by a 180 s process deadline and completed successfully.
   consumers and the existing Nav-Backend pressure batch. Report exact removals,
   retained work and validation limits.
 
+## PR #11 technical-debt follow-up
+
+29 September 2026. Address five defects: dataset rate loss, missing RCS rate
+metadata, OBJ record truncation, incomplete Python package versions and discarded
+Docker build arguments. Append the execution sequence here; use the main page
+for maintained interface documentation. The user approved this worktree and
+requested checking existing implementations before editing. The five fixes are
+implemented and pass focused tests. Review and stage the angular-velocity batch
+first; keep the OBJ and packaging/container batches for subsequent user commits.
+
+### Fix stage 1: Confirm ownership and preserve the baseline
+
+| Reference | Current observation | Treatment |
+| --- | --- | --- |
+| Active consolidation worktree | `feature/consolidate-simulation-models`; initial `c6a030c`, now `e3e1e0d` after the external SPK commit | Review the rate-transport batch first; preserve pending OBJ/SRP source |
+| Original PR source | `feature/extend-support-for-space-nav-backend` at `801b0b7` | Already an ancestor of the current branch; replay no original commits |
+| Audit destination | Landing worktree at `e86d14d` | Keep as a separate integration option; retire `c9a99db` as an execution baseline |
+| SimulationGears MathCore reference | `lib/MathCore_for_ComputerVision` at `e3a39c68` | Preserve it; do not restore `83d9d7b` |
+| Canonical MathCore | Clean `develop` at `5bc1ccf`; shared hashing committed | Keep its separate dependency-update gate in Stage 2A |
+| Template donor | `main` at `b7dc26c`; helper and focused test now modified | Leave both edits unstaged and uncommitted |
+| [PR #11](https://github.com/PeterCalifano/SimulationGears_for_SpaceNav/pull/11) | Closed; head still `801b0b7`; no attached checks | Treat review threads as history, not evidence of completed fixes |
+
+These observations replace the quoted audit's empty-index and open-PR
+assumptions. Refresh them before implementation; a saved SHA is not permission
+to overwrite newer work. Preserve the current source, document and index snapshots
+under `/tmp/simgears-pr11-followup-plan-20260929-ijor5e4b`.
+
+- [x] Inspect branch ancestry, dependency references, donor state and the five
+  affected source paths. Confirm the original PR is already in the current branch.
+- [x] Archive current source/document hashes and staged/working patches outside Git.
+- [x] Use the existing consolidation branch, as approved. Replay no original
+  PR commits and create no additional worktree.
+- [x] Preserve the nine-file SPK index until its external commit at `e3e1e0d`.
+  Confirm its content before preparing the next reviewed batch.
+- [x] Refresh active-process dependencies and overlapping edits before changing
+  source; keep protected campaign providers and other worktree indexes untouched.
+
+### Fix stage 2: Preserve angular velocity through dataset and ephemeris adapters
+
+- [x] Forward `dTargetAngVel_IN` in
+  `SReferenceImagesDataset.FromSReferenceMissionDesign`. Trace the other existing
+  dataset conversions and preserve a supplied finite 3-by-N sequence, including
+  zero values and time-varying rates, without deriving it from sampled attitudes.
+- [x] Extend `EphemeridesDataFactory` so both interpolation layouts retain the
+  existing `strMainData.strAttData` rate metadata: `dAngVel_IN`,
+  `dNominalAngVel_IN` and `dAngVelTimegrid`. Share the metadata assignment outside
+  the layout branch; keep the RCS coefficient fields and existing validation.
+- [x] Align each rate sample with the selected interpolation time domain.
+  Document rates in radians per second and timegrid scaling explicitly; preserve
+  the existing absolute/relative and seconds/days choices.
+- [x] Clarify the SPICE comment in `DefineEnvironmentProperties` from the
+  [NAIF contract](https://naif.jpl.nasa.gov/pub/naif/toolkit_docs/MATLAB/mice/cspice_xf2rav.html).
+  `cspice_xf2rav` expresses its vector in the transform's input frame, already
+  inertial for the current call. Preserve the transform direction and the
+  onboard-model sign; add no second frame rotation.
+- [x] Extend the dataset conversion and ephemeris-factory suites. Cover supplied,
+  absent, zero, time-varying and invalid rate sequences, timestamp alignment,
+  unchanged non-rate fields, both interpolation layouts and the frame/sign contract.
+- [x] Exercise the real external RCS helpers with double polynomial degrees;
+  assert their resolved paths and report missing dependencies as incomplete
+  validation. Do not use a fit stub as evidence of RCS integration.
+- [x] Record the separately reported `uint32` helper incompatibility with its
+  owning function and focused reproduction. Keep it outside the rate-preservation
+  fix unless a demonstrated prerequisite requires a separate approved correction.
+
+### Fix stage 3: Reconcile OBJ whitespace handling with object selection
+
+- [x] Modify the pending `LoadShapeMesh` implementation in place. Recognize
+  leading spaces and tabs consistently for vertex and face records in the fast
+  reader, selection scan and fallback eligibility checks.
+- [x] Prevent a successful fast-path result from silently omitting valid records.
+  Preserve source face order, index meaning, selected-object identity and the
+  existing fallback for slash indices, relative indices and polygons.
+- [x] Extend the existing OBJ tests with a closed four-face fixture containing
+  mixed indentation. Verify complete geometry for default loading and explicit
+  selection, including indented vertices, object declarations and fallback faces.
+- [x] Check repair on/off, winding, bounds and volume with synthetic geometry.
+  Run the existing object-selection and shape suites; preserve their documented
+  public entry-point contracts and record baseline failures separately.
+- [ ] Review the combined selection and truncation fix as the geometry batch
+  under Stage 3. Update its main-page contract and stage the source/tests together;
+  do not split overlapping parser hunks into incompatible commits.
+
+### Fix stage 4: Preserve package versions and custom Docker arguments
+
+- [x] Replace `@PROJECT_VERSION@` in SimulationGears' `python/pyproject.toml.in`
+  with `@PYTHON_PACKAGE_VERSION@`. Reuse the existing CMake version composer;
+  add no second conversion implementation.
+- [x] Check generated metadata for release, prerelease and build-metadata inputs
+  using disposable CMake/Python consumers. Verify valid Python version syntax and
+  agreement with the existing composer; avoid a full wrapper build for this fix.
+- [x] Restore the existing `b15b760` argument-preservation logic in the template
+  donor's `.devcontainer/update_devcontainer_json.py` first.
+  Preserve custom `build.args`; update only `ROS_MODE`, `ROS_DISTRO` and
+  `ROS_PROFILE` when ROS is enabled and remove only those keys when disabled.
+- [x] Import the reviewed shared change into SimulationGears without dropping
+  repository-specific behavior. Keep the donor patch and its focused tests
+  unstaged, uncommitted and unpushed.
+- [x] Test both helpers against temporary JSON/JSONC fixtures with custom build
+  arguments. Cover ROS disabled, enabled, on/off transitions, repeated runs,
+  empty arguments and preservation of unrelated build/container fields.
+- [x] Run Python syntax checks and the relevant existing helper checks. Add no
+  tests tied to tunable simulation profile values and require no Docker image build.
+
+### Fix stage 5: Review, stage and verify integration
+
+- [ ] Prepare three related review batches: angular-velocity transport, combined
+  OBJ selection/parser work, and packaging/container preservation. Keep unrelated
+  SRP, landing, target-rotation and configuration changes outside those indexes.
+- [ ] Apply the staged-code quality gate: review public documentation, imperative
+  comments, logical blocks, naming, readability and unnecessary complexity.
+  Run focused tests, Code Analyzer where applicable and cached whitespace checks.
+- [ ] Stage each SimulationGears batch through an explicit path/hunk list, review
+  its complete index and suggest a repository-style subject ending in `(Codex)`
+  plus imperative body bullets. Stop for the user's review and commit between batches.
+  - [x] Review and stage angular-velocity transport, dataset unit-label preservation,
+    the SPICE comment, focused tests and the matching main-page section.
+  - [ ] Review and stage combined OBJ selection/parser work.
+  - [ ] Review and stage packaging/container preservation; retain donor edits unstaged.
+- [ ] If the original source branch is chosen, integrate only the new user-created
+  fix commits after separate authorization. Prefer compatible destination changes
+  and reconcile its newer ephemeris and OBJ-selection implementation explicitly.
+- [ ] Refresh the integration target and rerun the focused contracts against the
+  final combined source. Keep `e3a39c68` unless the separate MathCore dependency
+  update is approved; qualify that update independently rather than restoring an
+  obsolete reference during a merge.
+- [ ] Record final hashes, outcomes, remaining limitations and donor dirty/index
+  state in this plan. Require no full simulation for these fixes; leave merge,
+  push and PR operations to separately authorized steps.
+
 ## Progress and discrepancies
 
+- 29 September, rate-transport staged review (`Codex gpt-6`): Recheck the empty
+  index and stage five MATLAB source/test files, the dataset-rate main-page
+  section and this follow-up plan. Replace class-header placeholders with the
+  actual data contract and use imperative comments for state, camera and unit
+  handling. Review complete staged files and verify the source matches the
+  reviewed working copy. Pass seven fresh focused contracts with real RCS helpers;
+  retain only the documented baseline analyzer finding. Keep OBJ/SRP, packaging, asset-root setup, guidelines,
+  donor changes and dependency references outside this batch.
+- 29 September, existing-fix audit and implementation (`Codex gpt-6`): Inspect
+  registered worktrees, local/cached branch versions and the template donor
+  before editing. Find Docker argument preservation in SimulationGears
+  `b15b760`, subsequently regressed by template import `ee6d0c4`. Restore only
+  that reviewed block in the donor, then copy its helper and focused test here
+  unchanged. Reuse the rotation worktree's common rate-transport placement and
+  stale-field cleanup; retain this branch's three-field/first-sample contract
+  and model sign. Its later positive-spin convention, removed nominal field
+  and typed rate regimes remain separate target-rotation work.
+- 29 September, validation: Pass 28/28 MATLAB contracts: two image-dataset,
+  five ephemeris-factory, twelve object-selection and nine mesh-reader tests.
+  Resolve the real RCS helpers explicitly and use double polynomial degrees.
+  Pass eleven Python checks here and seven in the donor, covering package
+  versions and argument preservation. Introduce no simulation-config value
+  tests. Six changed MATLAB files have no analyzer findings; the existing
+  unused third-body frame output in `DefineEnvironmentProperties` remains
+  outside this fix; compare its analyzer message with the committed baseline.
+  Pass a real-MICE `rav2xf`/`xf2rav` round-trip using a nonidentity rotation to
+  verify the documented frame relationship. Run no full simulation, wrapper
+  build or Docker image build.
+- 29 September, external helper discrepancy: Calling `EphCoeffsGeneration`
+  with `uint32(3)` reaches `chebCoeffsGeneration.m:14` and fails at `cos` because
+  its angle expression retains the integer type. The identical input with
+  degree `3.0` succeeds. Preserve the external implementation and record the
+  reproduction in `supporting-contracts.log`; treat a helper correction as
+  separate work, not part of rate transport.
+- 29 September, small discrepancies: MATLAB's `functiontests` entry does not
+  permit an Output validation block; keep typed blocks on ordinary helpers.
+  Correct fixture use of the mission constructor and allow repair to renumber
+  vertices when comparing ordered triangle coordinates. The rerun exposes
+  a pre-existing length-unit-label loss in the same dataset converter; preserve
+  that label with the supplied rates without changing numerical state units.
+  Retain the original failed logs beside successful evidence under
+  `/tmp/simgears-pr11-existing-fixes-audit-20260929-q1szek4h`.
+- 29 September, concurrent consolidation before follow-up staging: The existing SPK index is committed
+  externally as `e3e1e0d` during validation. Preserve that commit and the separate
+  edits to `ResolveSimulationRenderingAssetsRoot` and `DefineShapeModel` which
+  appear meanwhile in this worktree and the main provider. Verify the SPK commit
+  exactly matches the protected nine-file index. Keep the rotation worktree,
+  MathCore, all remaining HEADs and other indexes unchanged. Leave all follow-up
+  fixes and donor changes unstaged; make no agent commit, merge or dependency update.
+- 29 September, initial source review before staging: Review complete changed methods and reader/helper
+  contracts. Add public API documentation, separate logical blocks and purpose
+  comments; remove the implementation-history comment from the rate assignment.
+  Add `Codex gpt-6` to new changelog entries without rewriting earlier credit.
+  Verify helper/test byte equality across provider and donor, Python syntax,
+  working/cached whitespace and the source-path allowlist. Stage no new batch;
+  the full index review remains part of the user's next consolidation step.
 - 29 September, documentation harmonization: Remove three standalone
   SimulationGears notes and the MathCore package README after preserving them
   in the documentation-harmonization archive. Use the existing main pages for

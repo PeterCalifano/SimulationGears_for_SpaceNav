@@ -39,9 +39,8 @@ end
 %                                                                 kwargs)
 % -------------------------------------------------------------------------------------------------------------
 %% DESCRIPTION
-% Function defining the dynamical properties for the specified scenario. Timegrid and inertial frame are
-% specified to query specify or the input dataset object to define Sun and attitude ephemerides as position
-% and rotation matrices.
+% Define scenario dynamics and use SPICE or a supplied dataset for Sun and target-attitude ephemerides.
+% Preserve source-owned target rates in the attitude-model convention used by the onboard propagator.
 % -------------------------------------------------------------------------------------------------------------
 %% INPUT
 % dEphemeridesTimegrid  (1,:) double
@@ -68,6 +67,7 @@ end
 % 21-07-2025    Pietro Califano     Add support for 3rd body reference data and generalize implementation
 % 13-08-2026    Pietro Califano, Codex gpt-5.6     Preserve source-owned target angular velocity.
 % 13-08-2026    Pietro Califano, Codex gpt-5.6     Resolve and transport target spin-axis provenance.
+% 29-09-2026    Pietro Califano, Codex gpt-6      Clarify the SPICE rate frame and model sign.
 % -------------------------------------------------------------------------------------------------------------
 %% DEPENDENCIES
 % [-]
@@ -124,8 +124,8 @@ if kwargs.objDataset.bDefaultConstructed % Try to use SPICE kernels
         char(charTargetFixedFrame), dEphemeridesTimegrid);
     [~, dTargetFrameAngVel_IN] = cspice_xf2rav(dTargetStateTransforms);
 
-    % SPICE returns target-frame angular velocity relative to inertial. The
-    % onboard model uses R_INfromTB(t) = Exp(-omega_IN*t) R_INfromTB(0).
+    % Use the returned rate in the transform's input frame (IN); no additional frame rotation is needed.
+    % Apply the sign required by the current model: R_INfromTB(t) = Exp(-omega_IN*t) R_INfromTB(0).
     strMainBodyRefData.dAngVel_IN = -dTargetFrameAngVel_IN;
     strMainBodyRefData.dSpinAxis_TB = [0.0; 0.0; 1.0];
     strMainBodyRefData.charSpinAxisSource = "DEFAULT_PLUS_Z";

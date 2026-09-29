@@ -14,6 +14,7 @@ function tests = testEphemeridesDataFactory
 % -------------------------------------------------------------------------------------------------------------
 %% CHANGELOG
 % 13-08-2026  Pietro Califano, Codex gpt-5.6     First implementation.
+% 29-09-2026  Pietro Califano, Codex gpt-6      Cover both layouts, time domains and absent-rate reuse.
 % -------------------------------------------------------------------------------------------------------------
 %% DEPENDENCIES
 % EphemeridesDataFactory, RotationVectorToDCM.
@@ -68,4 +69,92 @@ verifyError(testCase, @() EphemeridesDataFactory(dEphemerisTimegrid, uint32(3), 
     strDynParams, strMainBodyRefData, [], 'bEnableInterpValidation', false, ...
     'bAdd3rdBodiesPosition', false, 'bAdd3rdBodiesAttitude', false), ...
     'EphemeridesDataFactory:InvalidTargetAngularVelocity');
+end
+
+function testRateMetadataAcrossLayoutsAndTimeDomains(objTestCase)
+assumeTrue(objTestCase, exist('EphCoeffsGeneration', 'file') == 2, ...
+    'Load the real external RCS ephemeris helpers before running this integration check.');
+dTimegrid = linspace(100.0, 800.0, 16);
+cellRateSequences = {zeros(3,16), ...
+    [linspace(0.01,0.02,16); linspace(-0.03,0.01,16); linspace(0.02,0.04,16)]};
+
+% Verify rate transport independently of coefficient layout and time-domain selection.
+for bUseRcs = [false, true]
+    for bAbsoluteTime = [false, true]
+        for bScaleToDays = [false, true]
+            for ui32Sequence = uint32(1):uint32(numel(cellRateSequences))
+                strSource = BuildSource_(dTimegrid);
+                strSource.dAngVel_IN = cellRateSequences{ui32Sequence};
+                strOutput = EphemeridesDataFactory(dTimegrid, 3.0, 3.0, ...
+                    struct('strMainData', struct(), 'strBody3rdData', struct()), strSource, [], ...
+                    bUseInterpFcnFromRCS1=bUseRcs, bUseAbsoluteTimegrid=bAbsoluteTime, ...
+                    bScaleTimeToDays=bScaleToDays, bEnableInterpValidation=false, ...
+                    bAdd3rdBodiesPosition=false, bAdd3rdBodiesAttitude=false);
+                strAttitude = strOutput.strMainData.strAttData;
+                dExpectedGrid = dTimegrid;
+                if bUseRcs || bAbsoluteTime
+                    if bScaleToDays
+                        dExpectedGrid = dTimegrid / 86400.0;
+                    end
+                else
+                    dExpectedGrid = dTimegrid - dTimegrid(1);
+                end
+                objTestCase.verifyEqual(strAttitude.dAngVel_IN, strSource.dAngVel_IN);
+                objTestCase.verifyEqual(strAttitude.dNominalAngVel_IN, strSource.dAngVel_IN(:,1));
+                objTestCase.verifyEqual(strAttitude.dAngVelTimegrid, dExpectedGrid);
+            end
+        end
+    end
+end
+end
+
+function testAbsentRatesClearOnlyOwnedContext(objTestCase)
+assumeTrue(objTestCase, exist('EphCoeffsGeneration', 'file') == 2, ...
+    'Load the real external RCS ephemeris helpers before running this integration check.');
+dTimegrid = linspace(100.0,800.0,16);
+strSource = BuildSource_(dTimegrid);
+strPreviousContext = struct('dAngVel_IN', ones(3,16), ...
+    'dAngVelTimegrid', dTimegrid, 'dNominalAngVel_IN', ones(3,1), 'charConsumerTag', "retained");
+
+% Reuse a dynamics payload without letting its previous source invent missing rate data.
+for bUseRcs = [false, true]
+    strOutput = EphemeridesDataFactory(dTimegrid, 3.0, 3.0, ...
+        struct('strMainData', struct('strAttData', strPreviousContext), 'strBody3rdData', struct()), ...
+        strSource, [], bUseInterpFcnFromRCS1=bUseRcs, bEnableInterpValidation=false, ...
+        bAdd3rdBodiesPosition=false, bAdd3rdBodiesAttitude=false);
+    strAttitude = strOutput.strMainData.strAttData;
+    objTestCase.verifyFalse(isfield(strAttitude, 'dAngVel_IN'));
+    objTestCase.verifyFalse(isfield(strAttitude, 'dNominalAngVel_IN'));
+    objTestCase.verifyFalse(isfield(strAttitude, 'dAngVelTimegrid'));
+    objTestCase.verifyEqual(strAttitude.charConsumerTag, strPreviousContext.charConsumerTag);
+end
+end
+
+function testRejectsNonfiniteRatesInBothLayouts(objTestCase)
+dTimegrid = linspace(100.0,800.0,16);
+for bUseRcs = [false, true]
+    for dInvalidRate = [NaN, Inf]
+        strSource = BuildSource_(dTimegrid);
+        strSource.dAngVel_IN = zeros(3,16);
+        strSource.dAngVel_IN(2,7) = dInvalidRate;
+        objTestCase.verifyError(@() EphemeridesDataFactory(dTimegrid, 3.0, 3.0, ...
+            struct('strMainData', struct(), 'strBody3rdData', struct()), strSource, [], ...
+            bUseInterpFcnFromRCS1=bUseRcs, bEnableInterpValidation=false, ...
+            bAdd3rdBodiesPosition=false, bAdd3rdBodiesAttitude=false), ...
+            'EphemeridesDataFactory:InvalidTargetAngularVelocity');
+    end
+end
+end
+
+function strSource = BuildSource_(dTimegrid)
+%% DESCRIPTION
+% Keep sampled attitude fixed so the rate tests require source transport, not numerical differencing.
+arguments (Input)
+    dTimegrid (1,:) double
+end
+arguments (Output)
+    strSource (1,1) struct
+end
+strSource = struct('dDCM_INfromTB', repmat(eye(3),1,1,numel(dTimegrid)), ...
+    'dSunPosition_IN', repmat([1.4e8;0.0;0.0],1,numel(dTimegrid)));
 end

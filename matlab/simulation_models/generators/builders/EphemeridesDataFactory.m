@@ -5,7 +5,7 @@ function strDynParams = EphemeridesDataFactory(dEphemTimegrid, ...
                                                 strMainBodyRefData, ...
                                                 str3rdBodyRefData, ...
                                                 kwargs)
-arguments
+arguments (Input)
     dEphemTimegrid
     ui32EphemerisPolyDeg
     ui32AttitudePolyDeg
@@ -13,7 +13,7 @@ arguments
     strMainBodyRefData
     str3rdBodyRefData = []
 end
-arguments
+arguments (Input)
     kwargs.bGroundTruthEphemerides  (1,1) logical = true
     kwargs.bEnableInterpValidation  (1,1) logical = true
     kwargs.bAdd3rdBodiesPosition    (1,1) logical = true
@@ -21,6 +21,9 @@ arguments
     kwargs.bUseInterpFcnFromRCS1    (1,1) logical = false
     kwargs.bScaleTimeToDays         (1,1) logical = false
     kwargs.bUseAbsoluteTimegrid     (1,1) logical = false;
+end
+arguments (Output)
+    strDynParams (1,1) struct
 end
 %% SIGNATURE
 % strDynParams = EphemeridesDataFactory(dEphemTimegrid, ui32EphemerisPolyDeg, ui32AttitudePolyDeg, ...
@@ -31,6 +34,8 @@ end
 % attitude-model rate, preserve it as source data aligned with the attitude ephemeris; never recover it by differencing
 % sampled attitudes. The model rate satisfies R_INfromTB(t) = Exp(-omega_IN*t) R_INfromTB(0). This builder expects the
 % field contract produced by DefineEnvironmentProperties and is not a standalone source loader.
+% Keep rate metadata independent of the coefficient layout. Express rates in rad/s and their timegrid in
+% the selected interpolation domain (relative/absolute seconds or absolute days).
 % -------------------------------------------------------------------------------------------------------------
 %% INPUT
 % dEphemTimegrid               Ephemeris sample epochs [s].
@@ -51,6 +56,7 @@ end
 % 18-08-2025    Pietro Califano     Update implementation to generalize RCS1 alternative code branch
 % 13-08-2026    Pietro Califano, Codex gpt-5.6     Preserve source-provided target angular velocity.
 % 11-09-2026  Pietro Califano, Codex gpt-6    Remove unused runtime sign-switch metadata.
+% 29-09-2026  Pietro Califano, Codex gpt-6    Preserve target rates in both interpolation layouts.
 % -------------------------------------------------------------------------------------------------------------
 %% DEPENDENCIES
 % DCM2quatSeq, fitAttQuatChbvPolynmials, fitChbvPolynomials.
@@ -124,11 +130,6 @@ if not(kwargs.bUseInterpFcnFromRCS1)
     strDynParams.strMainData.strAttData.dChbvPolycoeffs      = dTmpChbvCoeffs;
     strDynParams.strMainData.strAttData.dTimeLowBound        = dDomainLB;
     strDynParams.strMainData.strAttData.dTimeUpBound         = dDomainUB;
-    if isfield(strMainBodyRefData, 'dAngVel_IN')
-        strDynParams.strMainData.strAttData.dNominalAngVel_IN = dTargetAngVel_IN(:,1);
-        strDynParams.strMainData.strAttData.dAngVel_IN = dTargetAngVel_IN;
-        strDynParams.strMainData.strAttData.dAngVelTimegrid = dInterpDomain;
-    end
 
 else
     % Use implementation for RCS-1
@@ -146,6 +147,22 @@ else
     strDynParams.strMainData.d_gnc_eph_target_att_tbounds = [dInterpDomain(1), dInterpDomain(end)];
     strDynParams.strMainData.ui32CoeffsSizePtr = size(strDynParams.strMainData.d_gnc_eph_target_att_coeffs, 2);
 
+end
+
+% Share source rates across coefficient layouts and retain the first-sample nominal value.
+if isfield(strMainBodyRefData, 'dAngVel_IN')
+    strDynParams.strMainData.strAttData.dNominalAngVel_IN = dTargetAngVel_IN(:,1);
+    strDynParams.strMainData.strAttData.dAngVel_IN = dTargetAngVel_IN;
+    strDynParams.strMainData.strAttData.dAngVelTimegrid = dInterpDomain;
+elseif isfield(strDynParams.strMainData, 'strAttData')
+    % Clear context owned by the previous rate source when reusing a dynamics payload.
+    cellRateFields = {'dNominalAngVel_IN', 'dAngVel_IN', 'dAngVelTimegrid'};
+    cellPresentRateFields = intersect(cellRateFields, ...
+        fieldnames(strDynParams.strMainData.strAttData), 'stable');
+    if ~isempty(cellPresentRateFields)
+        strDynParams.strMainData.strAttData = rmfield( ...
+            strDynParams.strMainData.strAttData, cellPresentRateFields);
+    end
 end
 
 % Keep spin-axis analysis provenance available in both interpolation layouts and in serialized COSMICA dynamics
