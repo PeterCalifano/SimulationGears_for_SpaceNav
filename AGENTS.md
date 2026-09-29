@@ -92,6 +92,11 @@ service/topic names, root and namespaced coverage, and the exact packages
   piece of state. Avoid hidden coupling and duplicated decision logic.
 - Validate external inputs at system boundaries and report actionable failures.
   Do not silently fall back to behavior that changes the advertised contract.
+- Require runtime simulation profiles consumed by COSMICA to list every field
+  in their owning configuration schema, including values equal to defaults.
+  Reject missing fields during loading rather than silently inheriting
+  constructor values. Update the template, maintained profiles, and tests when
+  the schema changes.
 - Test observable behavior, invariants, and failure modes rather than internal
   implementation details or tunable defaults.
 - During review and optimization, actively seek behavior-preserving ways to
