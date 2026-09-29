@@ -105,8 +105,8 @@ jobs:
             -DENABLE_OPENGL=OFF \
             -DENABLE_FETCH_CATCH2=ON \
             -DCPU_ENABLE_NATIVE_TUNING=OFF \
-            -DSimulationGears_for_SpaceNav_BUILD_PROGRAMS=OFF \
-            -DSimulationGears_for_SpaceNav_BUILD_EXAMPLES=OFF \
+            -Dsim_gears_for_space_nav_BUILD_PROGRAMS=OFF \
+            -Dsim_gears_for_space_nav_BUILD_EXAMPLES=OFF \
             -DCMAKE_C_COMPILER_LAUNCHER=ccache \
             -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
 

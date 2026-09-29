@@ -23,9 +23,9 @@ sample does not consume, only inside the overlay build. It does not change their
 standalone defaults. The bridge consumes the real exported target:
 
 ```cmake
-find_package(SimulationGears_for_SpaceNav REQUIRED)
+find_package(sim-gears-for-space-nav REQUIRED)
 target_link_libraries(target PRIVATE
-  SimulationGears_for_SpaceNav::SimulationGears_for_SpaceNav)
+  sim-gears-for-space-nav::sim-gears-for-space-nav)
 ```
 
 ## Public sample contract
@@ -91,8 +91,8 @@ CUDA and OptiX remain optional through the overlay facade:
 
 | User flag | Colcon CMake argument | Core option |
 |---|---|---|
-| `--cuda` | `-DSIMULATION_GEARS_ENABLE_CUDA=ON` | `SimulationGears_for_SpaceNav_ENABLE_CUDA=ON` |
-| `--optix` | CUDA plus `-DSIMULATION_GEARS_ENABLE_OPTIX=ON` | `SimulationGears_for_SpaceNav_ENABLE_OPTIX=ON` |
+| `--cuda` | `-DSIMULATION_GEARS_ENABLE_CUDA=ON` | `sim_gears_for_space_nav_ENABLE_CUDA=ON` |
+| `--optix` | CUDA plus `-DSIMULATION_GEARS_ENABLE_OPTIX=ON` | `sim_gears_for_space_nav_ENABLE_OPTIX=ON` |
 
 Use the helper flags rather than passing generic `ENABLE_CUDA` or
 `ENABLE_OPTIX` values directly; the shim maps its stable facade to this

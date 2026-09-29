@@ -3,13 +3,13 @@ requires = ["setuptools>=61", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "@PROJECT_NAME@"
-version = "@PROJECT_VERSION@"
-description = "Python bindings for @PROJECT_NAME@."
+name = "@NATIVE_LIBRARY_NAME@"
+version = "@PYTHON_PACKAGE_VERSION@"
+description = "Python bindings for @NATIVE_LIBRARY_NAME@."
 requires-python = ">=3.12"
 license = {text = "MIT"}
 authors = [
-  {name = "@PROJECT_NAME@ contributors"}
+  {name = "@NATIVE_LIBRARY_NAME@ contributors"}
 ]
 
 [tool.setuptools]

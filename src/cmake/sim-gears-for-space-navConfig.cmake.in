@@ -8,4 +8,4 @@ foreach(dep ${_DEPENDENCIES})
   find_dependency(${dep})
 endforeach()
 
-include("${CMAKE_CURRENT_LIST_DIR}/@PROJECT_NAME@Target.cmake")
+include("${CMAKE_CURRENT_LIST_DIR}/@NATIVE_LIBRARY_NAME@Target.cmake")

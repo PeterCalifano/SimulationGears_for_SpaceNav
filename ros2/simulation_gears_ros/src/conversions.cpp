@@ -3,7 +3,7 @@
 
 #include "simulation_gears_ros/conversions.h"
 
-#include <config.h>
+#include <sim-gears-for-space-nav/config.h>
 
 #include <utility>
 

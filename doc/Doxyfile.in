@@ -41,7 +41,7 @@ DOXYFILE_ENCODING      = UTF-8
 # title of most generated pages and in a few other places.
 # The default value is: My Project.
 
-PROJECT_NAME           = @PROJECT_NAME@
+PROJECT_NAME           = @NATIVE_LIBRARY_NAME@
 
 # The PROJECT_NUMBER tag can be used to enter a project or revision number. This
 # could be handy for archiving the generated documentation or if some version
@@ -991,7 +991,9 @@ EXCLUDE                = @DOXYGEN_EXCLUDE_PATHS@
 # from the input.
 # The default value is: NO.
 
-EXCLUDE_SYMLINKS       = NO
+# Do not follow the public-header symlink while collecting build-tree exclusions;
+# its target is the source tree that the native API documentation must include.
+EXCLUDE_SYMLINKS       = YES
 
 # If the value of the INPUT tag contains directories, you can use the
 # EXCLUDE_PATTERNS tag to specify one or more wildcard patterns to exclude

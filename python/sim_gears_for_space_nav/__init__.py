@@ -1,4 +1,4 @@
-"""Public Python package entrypoint for SimulationGears_for_SpaceNav."""
+"""Public Python package entrypoint for sim-gears-for-space-nav."""
 
 from __future__ import annotations
 

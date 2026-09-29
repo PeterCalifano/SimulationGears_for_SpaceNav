@@ -11,7 +11,10 @@ set(MATLAB_DEFAULT_RELEASE "R2023b")
 #set(CMAKE_CUDA_COMPILER nvcc)
 
 # PROJECT DEFINITION
-set(project_name "SimulationGears_for_SpaceNav")
+# Keep build and wrapper identifiers valid for Python and MATLAB. Use the native
+# package name for public headers, exported targets and distribution artifacts.
+set(project_name "sim_gears_for_space_nav")
+set(NATIVE_LIBRARY_NAME "sim-gears-for-space-nav")
 set(project_description
     "Spacecraft navigation simulation models and utilities")
 set(project_homepage_url
@@ -422,17 +425,30 @@ set(installable_targets)
 # Define include target interface
 add_library(${project_name}_include INTERFACE)
 
-# Define include directories for install compatibility
-target_include_directories(${project_name}_include INTERFACE 
-                           $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>  # Used during development
-                           $<BUILD_INTERFACE:${PROJECT_BINARY_DIR}/src>  # Generated config.h
-                           #$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/lib/stb_PeterCdev>  
-                           #$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/lib/rapidyaml_PeterCdev>
-                           #$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/lib/gdt>
-                           #$<BUILD_INTERFACE:${CUDA_INCLUDE_DIRS}> 
-                           #$<BUILD_INTERFACE:${OPTIX_INCLUDE_DIR}>   
-                           #$<BUILD_INTERFACE:${OpenCV_INCLUDE_DIRS}>  # Add OpenCV include directories
-                           $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/${project_name}>  # Used in installed projects
+# Expose the source header tree under the package prefix in build-tree packages.
+# One directory link follows header additions and removals without generated wrappers.
+set(_project_build_include_root "${PROJECT_BINARY_DIR}/public_src_include")
+set(_project_generated_include_root "${PROJECT_BINARY_DIR}/generated_include")
+set(_project_build_header_link "${_project_build_include_root}/${NATIVE_LIBRARY_NAME}")
+file(MAKE_DIRECTORY "${_project_build_include_root}"
+     "${_project_generated_include_root}/${NATIVE_LIBRARY_NAME}")
+if(EXISTS "${_project_build_header_link}" AND NOT IS_SYMLINK "${_project_build_header_link}")
+  message(FATAL_ERROR "Build-tree include path is occupied: ${_project_build_header_link}")
+endif()
+if(IS_SYMLINK "${_project_build_header_link}")
+  file(REMOVE "${_project_build_header_link}")
+endif()
+file(CREATE_LINK "${PROJECT_SOURCE_DIR}/src" "${_project_build_header_link}"
+     SYMBOLIC RESULT _project_header_link_result)
+if(NOT _project_header_link_result STREQUAL "0")
+  message(FATAL_ERROR "Cannot link build-tree headers: ${_project_header_link_result}")
+endif()
+
+# Consumers see only the namespace parent; source-only includes stay private.
+target_include_directories(${project_name}_include INTERFACE
+                           $<BUILD_INTERFACE:${_project_generated_include_root}>
+                           $<BUILD_INTERFACE:${_project_build_include_root}>
+                           $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
 )
 
 # Build/install tree for runtime programs: $ORIGIN/../lib
@@ -491,7 +507,7 @@ message(STATUS "==============================================================="
 message(STATUS "================  Configuration Options  ======================")
 # Project info
 message(STATUS "CMAKE_VERSION                             : ${CMAKE_VERSION}")
-message(STATUS "LIBRARY NAME                              : ${project_name}")
+message(STATUS "LIBRARY NAME                              : ${NATIVE_LIBRARY_NAME}")
 message(STATUS "LIBRARY TARGET TYPE                       : ${PROJECT_LIBRARY_KIND}")
 message(STATUS "CROSS COMPILING                           : ${CMAKE_CROSSCOMPILING}")
 message(STATUS "HOST SYSTEM                               : ${CMAKE_HOST_SYSTEM}")
@@ -582,6 +598,7 @@ set(CTEST_NIGHTLY_START_TIME "00:00:00 CET")
 
 # PACKAGING CONFIGURATION 
 include(InstallRequiredSystemLibraries)
+set(CPACK_PACKAGE_NAME "${NATIVE_LIBRARY_NAME}")
 set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE")
 set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "${PROJECT_DESCRIPTION}")
 set(CPACK_PACKAGE_HOMEPAGE_URL "${PROJECT_HOMEPAGE_URL}")
@@ -591,8 +608,8 @@ set(CPACK_PACKAGE_VERSION_MAJOR "${PROJECT_VERSION_MAJOR}")
 set(CPACK_PACKAGE_VERSION_MINOR "${PROJECT_VERSION_MINOR}")
 set(CPACK_PACKAGE_VERSION_PATCH "${PROJECT_VERSION_PATCH}")
 if(DEFINED FULL_VERSION AND NOT "${FULL_VERSION}" STREQUAL "")
-  set(CPACK_PACKAGE_FILE_NAME "${project_name}-${FULL_VERSION}")
-  set(CPACK_SOURCE_PACKAGE_FILE_NAME "${project_name}-${FULL_VERSION}-source")
+  set(CPACK_PACKAGE_FILE_NAME "${NATIVE_LIBRARY_NAME}-${FULL_VERSION}")
+  set(CPACK_SOURCE_PACKAGE_FILE_NAME "${NATIVE_LIBRARY_NAME}-${FULL_VERSION}-source")
 endif()
 
 set(CPACK_GENERATOR "TGZ")

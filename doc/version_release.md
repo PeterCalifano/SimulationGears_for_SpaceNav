@@ -51,8 +51,8 @@ test "$(git describe --tags --exact-match)" = "vX.Y.Z"
 git diff --exit-code -- ros2/*/package.xml
 cmake -S . -B build_release -G Ninja \
   -DCMAKE_BUILD_TYPE=Release -DENABLE_TESTS=OFF -DENABLE_SUBMODULES=OFF \
-  -DSimulationGears_for_SpaceNav_ENABLE_CUDA=OFF \
-  -DSimulationGears_for_SpaceNav_ENABLE_OPTIX=OFF
+  -Dsim_gears_for_space_nav_ENABLE_CUDA=OFF \
+  -Dsim_gears_for_space_nav_ENABLE_OPTIX=OFF
 cmake --build build_release --target package_source
 ```
 

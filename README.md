@@ -1,4 +1,4 @@
-# SimulationGears for SpaceNav
+# sim-gears-for-space-nav
 
 SimulationGears is a MATLAB-first spacecraft navigation simulation library with
 a growing native C++20 surface, optional CUDA support, wrappers, and an optional
@@ -27,9 +27,25 @@ cmake --build --preset native-cpu
 ctest --preset native-cpu --output-on-failure --no-tests=error
 ```
 
-The native library exports
-`SimulationGears_for_SpaceNav::SimulationGears_for_SpaceNav` for downstream
-CMake consumers.
+Consume the native package with:
+
+```cmake
+find_package(sim-gears-for-space-nav CONFIG REQUIRED)
+target_link_libraries(my_target PRIVATE
+  sim-gears-for-space-nav::sim-gears-for-space-nav)
+```
+
+Include native headers as `<sim-gears-for-space-nav/...>`. The shared library is named
+`libsim-gears-for-space-nav` on Linux. Build targets, qualified CMake options and
+Python/MATLAB wrapper modules use `sim_gears_for_space_nav`, since wrapper
+identifiers cannot contain hyphens. Python distribution metadata uses
+`sim-gears-for-space-nav`; import it with `import sim_gears_for_space_nav`.
+The C++ and generated MATLAB class namespace remains `simulation_gears`.
+
+Configure a fresh build directory when migrating from the former
+`SimulationGears_for_SpaceNav` package. Update consumer package/target names,
+qualified includes, Python imports and project-qualified CMake options. Existing
+checkout paths and the four ROS package names retain their established spellings.
 
 ## Development surfaces
 
@@ -49,7 +65,7 @@ explicit interface when needed, for example:
 
 ```bash
 ./build_lib.sh -p \
-  -D SimulationGears_for_SpaceNav_WRAPPER_INTERFACE_FILES=/path/to/interface.i
+  -D sim_gears_for_space_nav_WRAPPER_INTERFACE_FILES=/path/to/interface.i
 ```
 
 Generated wrapper products are build artifacts and are not part of the
