@@ -33,6 +33,8 @@ CMake consumers.
 
 ## Development surfaces
 
+- [MATLAB models and inputs](doc/main_page.md#matlab-models-and-inputs) covers
+  MATLAB interfaces and host-side input preparation.
 - [Native logging](doc/logging.md) describes `CLogger`, its level contract,
   streams, colors, and environment override.
 - [Testing and CI](doc/testing_ci.md) covers native and Python CTest, CUDA runner

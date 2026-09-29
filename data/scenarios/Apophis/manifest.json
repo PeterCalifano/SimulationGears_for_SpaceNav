@@ -37,6 +37,45 @@
         "km/s"
       ],
       "licensing_notes": "Internal project reference data; confirm redistribution rights with the RCS-1 data owner."
+    },
+    {
+      "asset_id": "apophis_phase_d_rcs1_trajectory_spk",
+      "local_path": "assets/bodies/apophis/phase_d/trajectories/RCS1_dep2PrEPSSTO_v7.bsp",
+      "source_repository_path": "projects-DART/data/rcs-1/phase-D/kernels/trajectories/RCS1_dep2PrEPSSTO_v7.bsp",
+      "acquisition": "Copy from the authorized RCS-1 phase-D data checkout; the binary is intentionally not versioned here.",
+      "sha256": "00dd911ececfa0c1d212a58d9855e3e60b47f5cb3cc0f455700550cd5fd60b80",
+      "size_bytes": 1065984,
+      "spk_segment_type": 9,
+      "spk_object_id": -19920605,
+      "spk_center_id": 20099942,
+      "spk_frame": "J2000",
+      "coverage_et_seconds": [920815267.93079424, 923529517.93079424],
+      "coverage_arc_count": 4,
+      "state_units": ["km", "km/s"],
+      "licensing_notes": "Internal project reference data; confirm redistribution rights with the RCS-1 data owner."
+    }
+  ],
+  "kernel_bundles": [
+    {
+      "bundle_id": "apophis_phase_d_rcs1",
+      "trajectory_asset_id": "apophis_phase_d_rcs1_trajectory_spk",
+      "source_repository_path": "projects-DART/data/rcs-1/phase-D/kernels",
+      "meta_kernel": {
+        "local_path": "assets/bodies/apophis/phase_d/mk/kernels.mk",
+        "sha256": "d821db195a243d68ead2010a021a61bf31ce095b73635909d3bbcf5f34ef7a34"
+      },
+      "loaded_kernels": [
+        {"local_path": "assets/bodies/apophis/phase_d/lsk/naif0012.tls", "sha256": "f15293b0747e5fb01a865596281cb0534f7c77274e78184bd64260cc92be3706"},
+        {"local_path": "assets/bodies/apophis/phase_d/pck/pck00011.tpc", "sha256": "9c198f32cbca8050b0a962afade17850fd9cdd13d0835152f41646bd60d8be4e"},
+        {"local_path": "assets/bodies/apophis/phase_d/pck/gm_de440.tpc", "sha256": "0281f85eaa198e31bb6a63fc8a765c3d227ae7f74077ed9bd687bc7adf61cb7a"},
+        {"local_path": "assets/bodies/apophis/phase_d/pck/apophis.tpc", "sha256": "0d78e0e0a5122d42fb721d7d64f314cd54554828efa3bb7c9d6eb6c755a4aa81"},
+        {"local_path": "assets/bodies/apophis/phase_d/spk/de432s.bsp", "sha256": "363f32e14f5255359ac32c4d38080cf28ab55564a5e16696a75f63394b666e9b"},
+        {"local_path": "assets/bodies/apophis/phase_d/spk/apophis_hor_000101_500101_v01.bsp", "sha256": "2bdc66c7eeb63705cc22bc789146c80aa9d76ecd5a66eb7e3f49bf741755abc4"},
+        {"local_path": "assets/bodies/apophis/phase_d/fk/apophis.tf", "sha256": "2b9bdfd8ec483acffc1fbd80f9c245878512fdf006477910eb2a2232d91cfcfd"},
+        {"local_path": "assets/bodies/apophis/phase_d/fk/apophis_all.fk", "sha256": "e7966e1a149f3ad2941a7539c91802205cd27f6febed0f0a3374498a086731f0"},
+        {"local_path": "assets/bodies/apophis/phase_d/fk/apophis_fixed_hf_alias.tf", "sha256": "e3ad7cf9813c56a3c4ff0960c139ce0fc6a0bba1fd0ed30df14d43c4bc9c01a9"},
+        {"local_path": "assets/bodies/apophis/phase_d/ck/apophis_npa_220101_330101_nominal_pravec_v1.bc", "sha256": "3d856791782b60a63a26cf6f2eaaa0c59bd7b5c4a6fd4e71ce3d6760cea64a36"}
+      ]
     }
   ],
   "assets": [
