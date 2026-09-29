@@ -150,7 +150,7 @@ noise-model decision.
   review; all ten checks pass without incomplete tests or Code Analyzer findings.
 - [x] Stage the reviewed SPK implementation, tests, manifest and documentation;
   inspect the complete index and leave geometry/SRP source outside this batch.
-- [ ] Wait for the user's commit and verify the reviewed implementations survive
+- [x] Wait for the user's commit and verify the reviewed implementations survive
   in the destination. Apply the explicit Stage 0A preservation exception when
   removing the stale kernel checkout before that commit.
 
@@ -201,7 +201,7 @@ Use MathCore's existing main page for the shared hash package documentation.
 
 - [ ] Preserve the main-checkout panel-visibility implementation; reconcile the
   older review copy, bring over its missing generic test, and validate geometry.
-- [ ] Review OBJ object selection and gravity-fitting changes with their owning
+- [x] Review OBJ object selection and gravity-fitting changes with their owning
   renderer/asset plan. Preserve source units, selected-object identity and parser
   behavior. Keep full gravity fitting and asset delivery under that plan's gates.
 - [ ] Review the SRP LUT generator, kernels, analytical derivatives, codegen and
@@ -209,6 +209,9 @@ Use MathCore's existing main page for the shared hash package documentation.
   split: SimulationGears force mathematics, EstimationGears filter adapters.
 - [ ] Stage each completed functional batch with its tests/documentation;
   preserve any work still active in another thread.
+  - [x] Review, validate and stage OBJ selection, shared compaction, indentation
+    handling, shape/gravity forwarding, focused tests and the matching guide section.
+  - [ ] Consolidate panel visibility and SRP tables in their own reviewed batches.
 
 ### OBJ qualification record (24 September 2026)
 
@@ -370,7 +373,7 @@ first; keep the OBJ and packaging/container batches for subsequent user commits.
 
 | Reference | Current observation | Treatment |
 | --- | --- | --- |
-| Active consolidation worktree | `feature/consolidate-simulation-models`; initial `c6a030c`, now `e3e1e0d` after the external SPK commit | Review the rate-transport batch first; preserve pending OBJ/SRP source |
+| Active consolidation worktree | `feature/consolidate-simulation-models`; now `f82b9dd` after user commits `e3e1e0d` (SPK), `7e18771` (rates) and `f82b9dd` (config guidelines) | Stage the reviewed OBJ batch; preserve pending SRP and packaging work |
 | Original PR source | `feature/extend-support-for-space-nav-backend` at `801b0b7` | Already an ancestor of the current branch; replay no original commits |
 | Audit destination | Landing worktree at `e86d14d` | Keep as a separate integration option; retire `c9a99db` as an execution baseline |
 | SimulationGears MathCore reference | `lib/MathCore_for_ComputerVision` at `e3a39c68` | Preserve it; do not restore `83d9d7b` |
@@ -435,9 +438,14 @@ under `/tmp/simgears-pr11-followup-plan-20260929-ijor5e4b`.
 - [x] Check repair on/off, winding, bounds and volume with synthetic geometry.
   Run the existing object-selection and shape suites; preserve their documented
   public entry-point contracts and record baseline failures separately.
-- [ ] Review the combined selection and truncation fix as the geometry batch
+- [x] Review the combined selection and truncation fix as the geometry batch
   under Stage 3. Update its main-page contract and stage the source/tests together;
   do not split overlapping parser hunks into incompatible commits.
+- [x] Remove the forwarding `FitSpherHarmonicsToPolyhedronGravityFromObj` function
+  after user approval. Call the class builder directly from the diagnostic entry
+  point and tests; document the replacement without introducing another wrapper.
+- [x] Validate selected-object diagnostics and cached fits after removing the
+  wrapper. Review and restage the revised geometry batch; leave the commit to the user.
 
 ### Fix stage 4: Preserve package versions and custom Docker arguments
 
@@ -473,7 +481,7 @@ under `/tmp/simgears-pr11-followup-plan-20260929-ijor5e4b`.
   plus imperative body bullets. Stop for the user's review and commit between batches.
   - [x] Review and stage angular-velocity transport, dataset unit-label preservation,
     the SPICE comment, focused tests and the matching main-page section.
-  - [ ] Review and stage combined OBJ selection/parser work.
+  - [x] Review and stage combined OBJ selection/parser work.
   - [ ] Review and stage packaging/container preservation; retain donor edits unstaged.
 - [ ] If the original source branch is chosen, integrate only the new user-created
   fix commits after separate authorization. Prefer compatible destination changes
@@ -488,6 +496,47 @@ under `/tmp/simgears-pr11-followup-plan-20260929-ijor5e4b`.
 
 ## Progress and discrepancies
 
+- 29 September, approved wrapper removal (`Codex gpt-6`): Remove
+  `FitSpherHarmonicsToPolyhedronGravityFromObj`, which only forwarded arguments
+  to `CShapeModel.BuildSphericalHarmonicsGravityDataFromObj`. Update all three
+  callers in this worktree and retain the diagnostic `Run` entry point. Document
+  the replacement in the main page; refresh class/test help and imperative
+  comments. Pass 21 OBJ/mesh-reader and twelve gravity contracts with the wrapper
+  absent, including selected-object holdout diagnostics and cache preservation.
+  All nine surviving staged MATLAB files are analyzer-clean. Reproduce the
+  committed-HEAD regression outcomes: 35 passes, six existing fixture failures
+  and five incomplete flags; account for the renamed builder smoke test when
+  comparing outcomes. Restage the same functional batch in twelve paths, including
+  the wrapper deletion and updated existing gravity suite. Preserve the separate
+  renderer-root edit, SRP and packaging work. Save revised validation and review
+  evidence under the previous evidence directory's `wrapper-removal/` subdirectory.
+- 29 September, OBJ staged review (`Codex gpt-6`): Verify user commits `7e18771`
+  and `f82b9dd` and an empty index. Review and stage nine MATLAB source/test
+  files, the OBJ main-page section and this plan. Complete constructor/builder
+  help, public test documentation, explicit output contracts and imperative
+  comments. Remove duplicate keep-fraction clamping in the static OBJ builder;
+  retain the constructor's existing policy and the shared decoder/fitter.
+  Pass 21/21 OBJ/mesh-reader contracts and zero analyzer findings in all nine
+  files. Compare exact-candidate and committed-HEAD source exports: both pass
+  35 broader contracts and reproduce the same six historical asset-fixture
+  failures listed above; five failures also carry the framework's incomplete
+  flag. Introduce no new regression in those suites.
+- 29 September, independent asset-root discrepancy: The working-tree resolver
+  already uses `SPECTRA_RT_RENDERING_DATA`, absent from this validation process;
+  the committed resolver uses the available `RENDERING_DATA`. Its unstaged
+  change adds one asset-routing failure to the mixed working-tree run. Exclude
+  that resolver and its corresponding `DefineShapeModel` diagnostic hint from
+  this batch; preserve both working edits. Validate disposable exact-candidate
+  source with the committed resolver and prove the staged MATLAB blobs match
+  it. Keep the SRP guide section, packaging, donor edits and all gitlinks outside
+  the index. Record evidence in
+  `/tmp/simgears-obj-consolidation-review-20260929-ylbd30jc`.
+- 29 September, concurrent-work preservation: The landing worktree's existing
+  index changed externally during the final preservation check; its HEAD and
+  staged path list stayed the same. Record before/after index digests in the
+  evidence directory and leave that checkout untouched. The other five captured
+  repository HEADs/indexes remain unchanged. Keep this batch in the designated
+  consolidation worktree.
 - 29 September, rate-transport staged review (`Codex gpt-6`): Recheck the empty
   index and stage five MATLAB source/test files, the dataset-rate main-page
   section and this follow-up plan. Replace class-header placeholders with the

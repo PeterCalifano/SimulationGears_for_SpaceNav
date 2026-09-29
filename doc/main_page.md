@@ -189,3 +189,82 @@ Run `testReferenceImagesDatasetRates` and `testEphemeridesDataFactory` after
 `SetupSimGears`. Exercise the RCS branch with the real external
 `EphCoeffsGeneration` and its `chebCoeffsGeneration` implementation. Use double polynomial
 degrees until their separately recorded integer-type incompatibility is fixed.
+
+### OBJ object selection
+
+`charObjObjectNames` selects exact, case-sensitive OBJ `o` names. It is available through
+`CShapeModel` (`file_obj` and OBJ `file_mesh`), `CShapeModel.LoadModelFromObj`, `LoadShapeMesh`,
+`DefineShapeModel`, `CShapeModel.BuildSphericalHarmonicsGravityDataFromObj`,
+`RunFitSpherHarmonicsToPolyhedronGravityFromObj` and `GenerateScenarioSHGravityCoefficients`.
+
+Use `CShapeModel.BuildSphericalHarmonicsGravityDataFromObj` to load geometry and fit coefficients.
+Use `RunFitSpherHarmonicsToPolyhedronGravityFromObj` to add holdout diagnostics, optional figures
+and a printed summary. The standalone forwarding function
+`FitSpherHarmonicsToPolyhedronGravityFromObj` has been removed; call the class builder directly
+with the same arguments and selection options.
+
+- Omit the option, or use `strings(1, 0)`, to retain existing full-mesh loading.
+- `"surface"` selects only that object. An array selects the union in source face order, not
+  caller-specified name order. Repeated declarations of the same name are combined.
+- The scalar `""` selects unnamed faces, including faces preceding the first object record.
+- Groups and material changes do not change object identity. Names with no face records,
+  including partially missing requested unions, throw `SelectObjFaceRecords:MissingObjects`.
+- Non-OBJ selection is rejected. No implicit fallback to the complete mesh occurs.
+
+Selection precedes selected-face decoding, optional repair, simplification, bounds, volume
+centering and gravity fitting. Referenced vertices are compacted in original vertex order;
+face order, coordinates and winding are unchanged. Independent OBJ `vt`/`vn` arrays and selected
+corner indices are retained by the auxiliary-aware reader. Selection does not generate normals,
+sample maps, weld vertices, change units or recenter geometry.
+
+`LoadShapeMesh` is geometry-only and repairs by default; request `bRepairMesh=false` for selection
+without repair. The legacy `file_obj` path does not repair by default. Its existing supported
+syntax remains positive-index triangles with consistent face-token layout and unindented records;
+the general geometry reader supports relative indices and polygon triangulation. Selection does
+not silently migrate callers between these contracts.
+
+`LoadShapeMesh` accepts leading spaces and tabs for vertex and face records in
+both full-mesh and selected-object loading. Check all face records before
+accepting a fast result; route slash indices, relative indices and polygons
+through the existing general reader. Repair may renumber vertices while
+preserving ordered triangle coordinates and winding.
+
+The shared selector scans object declarations and uses binary searches over sorted face offsets.
+Scratch storage is one logical value per face plus object descriptors. Both readers reuse the
+selector and vertex compactor; the legacy reader retains its bounded face decoder. The general
+reader may use record-wise parsing when excluded faces contain polygons or slash indices.
+
+#### Usage and units
+
+Given a source OBJ whose coordinates are metres:
+
+```matlab
+run('matlab/SetupSimGears.m');
+objSurface = CShapeModel("file_obj", "body.obj", "m", "km", true, ...
+    "macro surface", true, charObjObjectNames="surface");
+ui32Faces = objSurface.ui32triangVertexPtr.';
+% Read kilometre coordinates; return volume in km3 and centroid in km.
+dVertices = objSurface.dVerticesPos.';
+[dVolume, dCentroid] = ComputeMeshModelVolumeAndCoM(ui32Faces, dVertices);
+```
+
+Expected: only referenced selected vertices/faces, in kilometre coordinates, with the source origin
+preserved. With a geometry-only generic reader, use
+`LoadShapeMesh('body.obj', bRepairMesh=false, charObjObjectNames="surface")`; its positions retain
+the source units.
+
+The scenario generator also forwards `charShapeAssetId`, `charAppearanceProfileId` and
+`charAssetRootPath` to the registered asset resolver. Use actual object names from the chosen
+OBJ; `uniform` selects appearance suitable for geometry-only preparation. Keep external payloads
+outside the repository.
+
+The scenario generator retains its existing volume-centering behavior and registered GM and
+reference-radius normalization. Returned `strGeneration.strMesh` now records `charObjObjectNames`
+and `charLengthUnits="km"` alongside the existing source metadata, original/centered volume
+centroids, counts and radii. Legacy serialized field names are unchanged: the centroid/radius
+fields use km, and the volume fields use km3. `DefineShapeModel` also records the requested names
+in its metadata. Retain asset identity and transform provenance alongside this selection metadata.
+
+When centering a rendering asset, apply the selected solid's centroid translation rigidly to
+every object. When rendering at the source origin, retain the gravity-origin offset and apply it
+when evaluating centroid-centered coefficients. Declare the target frame independently of OBJ.

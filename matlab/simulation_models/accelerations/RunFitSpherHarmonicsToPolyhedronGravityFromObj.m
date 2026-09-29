@@ -1,45 +1,11 @@
 function strRunOutputs = RunFitSpherHarmonicsToPolyhedronGravityFromObj(charObjFilePath, ui32MaxDegree, options)
-arguments
-    charObjFilePath                 (1,:) string {mustBeA(charObjFilePath, ["string", "char"])}
-    ui32MaxDegree                   (1,1) uint32
-    options.charInputUnit           {mustBeA(options.charInputUnit, ["string", "char", "EnumLengthUnits"])} = "m"
-    options.charTargetUnitOutput    {mustBeA(options.charTargetUnitOutput, ["string", "char", "EnumLengthUnits"])} = "m"
-    options.bVertFacesOnly          (1,1) logical = true
-    options.charModelName           (1,:) string {mustBeA(options.charModelName, ["string", "char"])} = ""
-    options.dGravParam              (1,1) double = NaN
-    options.dDensity                (1,1) double = NaN
-    options.dGravConst              (1,1) double = NaN
-    options.dBodyRadiusRef          (1,1) double = NaN
-    options.ui32MaxFitIterations    (1,1) uint32 = uint32(5)
-    options.bCacheOnShapeModel      (1,1) logical = true
-    options.dHoldoutShellRadii      (1,:) double {mustBeFinite, mustBeReal, mustBePositive} = []
-    options.ui32HoldoutPtsPerShell  (:,:) uint32 = uint32([])
-    options.ui32NumHoldoutShells    (1,1) uint32 = uint32(4)
-    options.dHoldoutMinRadiusScale  (1,1) double {mustBeFinite, mustBeReal, mustBePositive} = 1.15
-    options.dHoldoutMaxRadiusScale  (1,1) double {mustBeFinite, mustBeReal, mustBePositive} = 3.0
-    options.dHoldoutPhaseBase       (1,1) double {mustBeFinite, mustBeReal} = 17.0
-    options.bShowMeshFigure         (1,1) logical = true
-    options.bShowConvergenceFigure  (1,1) logical = true
-    options.bShowHoldoutFigure      (1,1) logical = true
-    options.charFigureRenderer      (1,:) string {mustBeA(options.charFigureRenderer, ["string", "char"])} = "opengl"
-    options.bUseBlackBackground     (1,1) logical = false
-    options.bVerbose                (1,1) logical = true
-end
-%% PROTOTYPE
+%% SIGNATURE
 % strRunOutputs = RunFitSpherHarmonicsToPolyhedronGravityFromObj(charObjFilePath, ui32MaxDegree, options)
 % -------------------------------------------------------------------------------------------------------------
 %% DESCRIPTION
-% User-facing entry point to:
-% 1) load a triangulated mesh from a Wavefront .obj file,
-% 2) fit exterior spherical harmonics coefficients from the exact
-%    polyhedron gravity field,
-% 3) optionally cache the fitted SH data on the CShapeModel object,
-% 4) compute holdout diagnostics against the exact polyhedron model,
-% 5) generate visualization figures for the mesh, fit convergence, and
-%    holdout errors.
-%
-% All inputs are explicit so the user can specify them manually at the
-% call site without editing internal code.
+% Load selected OBJ geometry, fit exterior spherical harmonics and evaluate holdout
+% diagnostics against its polyhedron field. Optionally cache the fit, display mesh/error
+% figures and print the summary. Preserve the caller-selected units throughout the workflow.
 %
 % Example:
 % strRunOutputs = RunFitSpherHarmonicsToPolyhedronGravityFromObj( ...
@@ -56,6 +22,7 @@ end
 % options.charInputUnit:          [1]         Input mesh unit ('m' or 'km').
 % options.charTargetUnitOutput:   [1]         Internal/output mesh unit ('m' or 'km').
 % options.bVertFacesOnly:         [1]         Load only vertices and faces from the .obj file.
+% options.charObjObjectNames:     [1 x N]     Exact OBJ names selected before fitting; empty keeps all.
 % options.charModelName:          [1]         Optional model name.
 % options.dGravParam:             [1]         Optional gravitational parameter.
 % options.dDensity:               [1]         Optional density.
@@ -87,27 +54,57 @@ end
 % 24-04-2026    Pietro Califano     Add user-facing run entry point for OBJ-to-SH workflow.
 % 01-07-2026    Pietro Califano     Accept EnumLengthUnits and require explicit gravity inputs unless
 %                                   provided by caller or registry-backed builder paths.
+% 29-09-2026    Pietro Califano, Codex gpt-6    Fit selected OBJ geometry through the class builder.
 % -------------------------------------------------------------------------------------------------------------
 %% DEPENDENCIES
-% FitSpherHarmonicsToPolyhedronGravityFromObj()
+% CShapeModel.BuildSphericalHarmonicsGravityDataFromObj()
 % ComputePolyhedronGravitySHfitDiagnostics()
 % PlotPolyhedronSHfitDiagnostics()
 % -------------------------------------------------------------------------------------------------------------
 
+arguments (Input)
+    charObjFilePath                 (1,:) string {mustBeA(charObjFilePath, ["string", "char"])}
+    ui32MaxDegree                   (1,1) uint32
+    options.charInputUnit           {mustBeA(options.charInputUnit, ["string", "char", "EnumLengthUnits"])} = "m"
+    options.charTargetUnitOutput    {mustBeA(options.charTargetUnitOutput, ["string", "char", "EnumLengthUnits"])} = "m"
+    options.bVertFacesOnly          (1,1) logical = true
+    options.charObjObjectNames      (1,:) string {mustBeNonmissing} = strings(1, 0)
+    options.charModelName           (1,:) string {mustBeA(options.charModelName, ["string", "char"])} = ""
+    options.dGravParam              (1,1) double = NaN
+    options.dDensity                (1,1) double = NaN
+    options.dGravConst              (1,1) double = NaN
+    options.dBodyRadiusRef          (1,1) double = NaN
+    options.ui32MaxFitIterations    (1,1) uint32 = uint32(5)
+    options.bCacheOnShapeModel      (1,1) logical = true
+    options.dHoldoutShellRadii      (1,:) double {mustBeFinite, mustBeReal, mustBePositive} = []
+    options.ui32HoldoutPtsPerShell  (:,:) uint32 = uint32([])
+    options.ui32NumHoldoutShells    (1,1) uint32 = uint32(4)
+    options.dHoldoutMinRadiusScale  (1,1) double {mustBeFinite, mustBeReal, mustBePositive} = 1.15
+    options.dHoldoutMaxRadiusScale  (1,1) double {mustBeFinite, mustBeReal, mustBePositive} = 3.0
+    options.dHoldoutPhaseBase       (1,1) double {mustBeFinite, mustBeReal} = 17.0
+    options.bShowMeshFigure         (1,1) logical = true
+    options.bShowConvergenceFigure  (1,1) logical = true
+    options.bShowHoldoutFigure      (1,1) logical = true
+    options.charFigureRenderer      (1,:) string {mustBeA(options.charFigureRenderer, ["string", "char"])} = "opengl"
+    options.bUseBlackBackground     (1,1) logical = false
+    options.bVerbose                (1,1) logical = true
+end
+arguments (Output)
+    strRunOutputs (1,1) struct
+end
+
 %% Function code
 
-% Call the compute-only builder function to get the shape model and SH fit data
-[objShapeModel, strSHgravityData] = FitSpherHarmonicsToPolyhedronGravityFromObj(charObjFilePath, ui32MaxDegree, ...
-                                                                    charInputUnit=options.charInputUnit, ...
-                                                                    charTargetUnitOutput=options.charTargetUnitOutput, ...
-                                                                    bVertFacesOnly=options.bVertFacesOnly, ...
-                                                                    charModelName=options.charModelName, ...
-                                                                    dGravParam=options.dGravParam, ...
-                                                                    dDensity=options.dDensity, ...
-                                                                    dGravConst=options.dGravConst, ...
-                                                                    dBodyRadiusRef=options.dBodyRadiusRef, ...
-                                                                    ui32MaxFitIterations=options.ui32MaxFitIterations, ...
-                                                                    bCacheOnShapeModel=options.bCacheOnShapeModel);
+% Load the selected solid and fit its gravity field through the shared class builder.
+[objShapeModel, strSHgravityData] = ...
+    CShapeModel.BuildSphericalHarmonicsGravityDataFromObj(charObjFilePath, ui32MaxDegree, ...
+        charInputUnit=options.charInputUnit, charTargetUnitOutput=options.charTargetUnitOutput, ...
+        bVertFacesOnly=options.bVertFacesOnly, charObjObjectNames=options.charObjObjectNames, ...
+        charModelName=options.charModelName, dGravParam=options.dGravParam, ...
+        dDensity=options.dDensity, dGravConst=options.dGravConst, ...
+        dBodyRadiusRef=options.dBodyRadiusRef, ...
+        ui32MaxFitIterations=options.ui32MaxFitIterations, ...
+        bCacheOnShapeModel=options.bCacheOnShapeModel);
 
 % Build polyhedron gravity data on the shape model if not already present (required for diagnostics)
 objShapeModel = objShapeModel.BuildPolyhedronGravityData();

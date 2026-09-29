@@ -6,25 +6,30 @@ function strShapeMesh = LoadShapeMesh(charMeshPath, options)
 % Load validated geometry from an OBJ, ASCII STL, or binary STL file without
 % changing its frame or length unit. Optional repair welds exactly duplicated
 % vertices, removes degenerate triangles, and compacts unused vertices.
+% Exact OBJ object selection precedes repair and removes unreferenced vertices without welding.
 % -------------------------------------------------------------------------------------------------------------
 %% INPUT
 % charMeshPath:          Path to the source mesh file.
 % options.bRepairMesh:   Apply deterministic geometry repair when true.
+% options.charObjObjectNames: Exact case-sensitive OBJ names; empty array keeps all objects.
+%                        "" selects unnamed faces; missing/empty requested objects are errors.
 % -------------------------------------------------------------------------------------------------------------
 %% OUTPUT
 % strShapeMesh:          Struct with row-major dVerticesPos, row-major
 %                        ui32FaceVertexIds, source path, and geometry counts.
 % -------------------------------------------------------------------------------------------------------------
 %% CHANGELOG
+% 29-09-2026  Pietro Califano, Codex gpt-6    Retain indented OBJ geometry in the fast reader.
 % 28-08-2026  Pietro Califano     Promote validated shared OBJ/STL mesh loading.
 % -------------------------------------------------------------------------------------------------------------
 %% DEPENDENCIES
-% Base MATLAB file I/O and geometry functions.
+% SelectObjFaceRecords, CompactShapeMeshVertices, base MATLAB file I/O and geometry functions.
 % -------------------------------------------------------------------------------------------------------------
 
 arguments(Input)
     charMeshPath (1, :) char
     options.bRepairMesh (1, 1) logical = true
+    options.charObjObjectNames (1,:) string {mustBeNonmissing} = strings(1, 0)
 end
 
 arguments(Output)
@@ -38,9 +43,12 @@ end
 
 % Dispatch by the declared format; STL encoding is resolved from the file content.
 [~, ~, charExtension] = fileparts(charMeshPath);
+if ~isempty(options.charObjObjectNames) && ~strcmpi(charExtension, '.obj')
+    error('LoadShapeMesh:ObjectSelectionRequiresObj', 'Object selection requires an OBJ source.');
+end
 switch lower(charExtension)
     case '.obj'
-        [dVerticesPos, ui32FaceVertexIds] = ReadObj_(charMeshPath);
+        [dVerticesPos, ui32FaceVertexIds] = ReadObj_(charMeshPath, options.charObjObjectNames);
     case '.stl'
         [dVerticesPos, ui32FaceVertexIds] = ReadStl_(charMeshPath);
     otherwise
@@ -51,6 +59,10 @@ end
 % Validate raw parser output before the optional index-changing repair step.
 ValidateMesh_(dVerticesPos, ui32FaceVertexIds, charMeshPath);
 
+% Compact before repair: excluded vertices must not change its mesh-scaled area tolerance.
+if ~isempty(options.charObjObjectNames)
+    [dVerticesPos, ui32FaceVertexIds] = CompactShapeMeshVertices(dVerticesPos, ui32FaceVertexIds);
+end
 if options.bRepairMesh
     [dVerticesPos, ui32FaceVertexIds] = RepairMesh_( ...
         dVerticesPos, ui32FaceVertexIds, charMeshPath);
@@ -61,17 +73,19 @@ strShapeMesh = struct();
 strShapeMesh.ui32FaceVertexIds = ui32FaceVertexIds;
 strShapeMesh.dVerticesPos = dVerticesPos;
 strShapeMesh.charSourcePath = charMeshPath;
+strShapeMesh.charObjObjectNames = options.charObjObjectNames;
 strShapeMesh.ui32NumVertices = uint32(size(dVerticesPos, 1));
 strShapeMesh.ui32NumFaces = uint32(size(ui32FaceVertexIds, 1));
 end
 
-function [dVerticesPos, ui32FaceVertexIds] = ReadObj_(charMeshPath)
+function [dVerticesPos, ui32FaceVertexIds] = ReadObj_(charMeshPath, charObjObjectNames)
 %% DESCRIPTION
 % Parse OBJ geometry records and triangulate simple planar polygon faces.
 % -------------------------------------------------------------------------------------------------------------
 
 % Preserve the vectorized path for the common positive-index triangular format.
-[bUsedFastPath, dVerticesPos, ui32FaceVertexIds] = TryReadTriangularObjFast_(charMeshPath);
+[bUsedFastPath, dVerticesPos, ui32FaceVertexIds] = ...
+    TryReadTriangularObjFast_(charMeshPath, charObjObjectNames);
 if bUsedFastPath
     return
 end
@@ -88,6 +102,7 @@ dVerticesTmp = zeros(1000, 3);
 ui32FacesTmp = zeros(1000, 3, 'uint32');
 ui32NumVertices = uint32(0);
 ui32NumFaces = uint32(0);
+bSelectedObject = isempty(charObjObjectNames) || any(charObjObjectNames == "");
 
 while true
     charLine = fgetl(i32FileId);
@@ -97,6 +112,12 @@ while true
 
     charLine = strtrim(charLine);
     if isempty(charLine) || startsWith(charLine, '#')
+        continue
+    end
+
+    if ~isempty(charObjObjectNames) && (strcmp(charLine, 'o') || IsObjRecord_(charLine, 'o'))
+        charObjectName = string(strtrim(regexprep(charLine(2:end), '#.*$', '')));
+        bSelectedObject = any(charObjObjectNames == charObjectName);
         continue
     end
 
@@ -116,6 +137,9 @@ while true
 
     % Keep triangles unchanged and ear-clip only faces that contain more than three vertices.
     if IsObjRecord_(charLine, 'f')
+        if ~bSelectedObject
+            continue
+        end
         ui32PolygonVertexIds = ParseObjFace_(charLine(2:end), ui32NumVertices);
         if numel(ui32PolygonVertexIds) < 3
             error('LoadShapeMesh:BadObjFace', ...
@@ -154,7 +178,7 @@ ui32FaceVertexIds = ui32FacesTmp(1:double(ui32NumFaces), :);
 end
 
 function [bUsedFastPath, dVerticesPos, ui32FaceVertexIds] = ...
-        TryReadTriangularObjFast_(charMeshPath)
+        TryReadTriangularObjFast_(charMeshPath, charObjObjectNames)
 %% DESCRIPTION
 % Parse ordinary positive-index triangular OBJ geometry using vectorized
 % whole-file operations. Return false for inputs requiring the general path.
@@ -168,30 +192,40 @@ ui32FaceVertexIds = zeros(0, 3, 'uint32');
 charFileText = fileread(charMeshPath);
 
 % Extract only the geometry records needed by the shared reader.
-cellVertexLines = regexp(charFileText, '^v[ \t]+[^\r\n]*$', 'match', 'lineanchors');
-cellFaceLines = regexp(charFileText, '^f[ \t]+[^\r\n]*$', 'match', 'lineanchors');
+cellVertexLines = regexp(charFileText, '^[ \t]*v[ \t]+[^\r\n]*$', 'match', 'lineanchors');
+charFacePattern = '^[ \t]*f[ \t]+[^\r\n]*$';
+if isempty(charObjObjectNames)
+    cellFaceLines = regexp(charFileText, charFacePattern, 'match', 'lineanchors');
+else
+    [dFaceStarts, dFaceEnds, cellFaceLines] = regexp(charFileText, ...
+        charFacePattern, 'start', 'end', 'match', 'lineanchors');
+    [~, ~, bKeepFaces] = SelectObjFaceRecords( ...
+        charFileText, dFaceStarts, dFaceEnds, charObjObjectNames);
+    cellFaceLines = cellFaceLines(bKeepFaces);
+end
 if isempty(cellVertexLines) || isempty(cellFaceLines)
     return
 end
 
 % Defer slash indices, relative indices, and polygons to the general parser.
 charNonTriangularFace = regexp(charFileText, ...
-    '^f[ \t]+(?!\d+[ \t]+\d+[ \t]+\d+[ \t]*$)[^\r\n]*$', ...
+    '^[ \t]*f[ \t]+(?!\d+[ \t]+\d+[ \t]+\d+[ \t]*$)[^\r\n]*$', ...
     'match', 'once', 'lineanchors');
 if ~isempty(charNonTriangularFace)
     return
 end
 
-% Parse each record family in one bulk operation and reject partial conversions.
+% Accept indentation in the scan format without copying the full text to strip whitespace.
+% Reject partial conversions so unsupported records still reach the general parser.
 charVertexBlock = sprintf('%s\n', cellVertexLines{:});
-dVerticesColumns = sscanf(charVertexBlock, 'v %f %f %f\n', [3, Inf]);
+dVerticesColumns = sscanf(charVertexBlock, ' v %f %f %f\n', [3, Inf]);
 if size(dVerticesColumns, 2) ~= numel(cellVertexLines) || ...
         any(~isfinite(dVerticesColumns), 'all')
     return
 end
 
 charFaceBlock = sprintf('%s\n', cellFaceLines{:});
-dFaceColumns = sscanf(charFaceBlock, 'f %u %u %u\n', [3, Inf]);
+dFaceColumns = sscanf(charFaceBlock, ' f %u %u %u\n', [3, Inf]);
 if size(dFaceColumns, 2) ~= numel(cellFaceLines)
     return
 end
@@ -591,12 +625,7 @@ if isempty(ui32FaceVertexIds)
 end
 
 % Compact the surviving vertex set and rewrite faces to contiguous one-based indices.
-ui32UsedVertices = unique(ui32FaceVertexIds(:));
-ui32VertexMap = zeros(size(dVerticesPos, 1), 1, 'uint32');
-ui32VertexMap(double(ui32UsedVertices)) = uint32(1):uint32(numel(ui32UsedVertices));
-ui32FaceVertexIds = reshape(ui32VertexMap(double(ui32FaceVertexIds)), ...
-    size(ui32FaceVertexIds));
-dVerticesPos = dVerticesPos(double(ui32UsedVertices), :);
+[dVerticesPos, ui32FaceVertexIds] = CompactShapeMeshVertices(dVerticesPos, ui32FaceVertexIds);
 end
 
 function ValidateMesh_(dVerticesPos, ui32FaceVertexIds, charMeshPath)
