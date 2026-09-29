@@ -7,9 +7,10 @@ active work, dependency pointers and external assets. Create no additional workt
 
 ## Verified inventory
 
-Use `/home/peterc/devDir/SimulationGears_for_SpaceNav` as the destination. Its
-current HEAD is `6c9db696`; its index was empty at inspection. Relative commit
-counts below compare each worktree with that HEAD.
+Use `/home/peterc/devDir/SimulationGears_for_SpaceNav` as the destination. The
+initial inventory was captured at `6c9db696` with an empty main index. Relative
+commit counts and pending work below describe that snapshot. The user has since
+committed Stage 1 at `1f10617`; track subsequent changes in the progress entries.
 
 | Worktree | Branch or checkout | Commit difference | Pending work |
 | --- | --- | --- | --- |
@@ -58,8 +59,48 @@ remote-tracking refs.
   formatting. Run the focused suite, Code Analyzer and whitespace checks.
 - [x] Stage only the reviewed implementation, tests and this plan in main.
   Inspect the complete index and suggest an imperative commit message.
-- [ ] Wait for the user's commit; verify the committed source preserves the
+- [x] Wait for the user's commit; verify the committed source preserves the
   isolated correction before considering worktree removal.
+
+### Stage 1A: Extend impulse errors to finite angles (implemented)
+
+The user approved implementation and staging on 29 September. Keep the extension
+separate from the committed first-order correction; leave the commit to the user.
+
+Retain the existing independent draws: fractional magnitude error
+`epsilon_m = sigma_m * randn` and signed rotation angle `theta = sigma_theta * randn`.
+Retain the perpendicular random-axis selection and draw order. Apply
+`realized_delta_v = (1 + epsilon_m) * R(theta * axis) * nominal_delta_v`, using
+MathCore's existing active `RotationVectorToDCM`. Reuse that implementation;
+introduce no additional rotation helper, model enum or small/large-angle switch.
+
+For direction-only errors, rotation preserves impulse magnitude. The previous
+tangent approximation instead produces magnitude ratio `sqrt(1 + theta^2)` and
+angle `atan(abs(theta))`. At a 30-degree draw, those are approximately 1.129 and
+27.64 degrees. The exact model produces unit magnitude ratio and 30 degrees.
+
+Keep `sigma_theta` as the standard deviation of the unwrapped signed draw.
+The principal pointing error lies in `[0, pi]` and wraps large draws; its RMS is
+not generally `sigma_theta`. Preserve the current Gaussian signed magnitude
+factor, including its existing negative-factor behavior. A positive-only
+magnitude distribution or another directional distribution requires a separate
+noise-model decision.
+
+- [x] Agree on the finite-angle contract before implementation.
+- [x] Replace the tangent addition with the existing exact active rotation and
+  magnitude factor. Preserve public arguments, RNG draws and the zero-impulse guard.
+- [x] Test direction-only norm preservation, zero dispersions, velocity-unit
+  invariance and deterministic finite-angle oracles through the actual function.
+- [x] Check non-axis-aligned impulses and small-angle convergence. Use independent
+  sine/cosine oracles at finite angles rather than validating MathCore against itself.
+- [x] Update ensemble expectations: for zero magnitude dispersion, the Gaussian
+  rotation model has mean vector `exp(-sigma_theta^2 / 2) * nominal_delta_v`.
+  Test wrapped principal angles without claiming their RMS equals the draw sigma.
+- [x] Run focused source and fresh fixed-size MEX checks; review full source/API
+  documentation, formatting, comments and unnecessary complexity.
+- [x] Stage only the approved implementation, tests and this plan; review the
+  complete index and preserve all other worktree sources and indexes.
+- [ ] Obtain the user's extension commit before the next consolidation batch.
 
 ## Stage 2: Consolidate selected kernel bundles and segmented states
 
@@ -173,3 +214,41 @@ remote-tracking refs.
 - 29 September: Verify Nav-Backend's pressure batch is now committed at
   `e6510d315`; its index is empty and the committed patch exactly matches the
   previous reviewed index. No Nav-Backend files or index were modified here.
+- 29 September: Verify the first impulse batch is committed at `1f10617`; its
+  three-file patch exactly matches the previously reviewed index. Record Stage
+  1A as a finite-angle proposal following the user's question. MathCore already
+  supplies the active exact rotation with a stable small-angle series and
+  codegen support. Leave implementation and the now-empty Git index unchanged.
+- 29 September: Implement approved Stage 1A in main. Reuse MathCore's exact
+  active rotation and apply the existing signed Gaussian magnitude factor to
+  the rotated impulse. Preserve the public arguments, negligible-impulse guard,
+  axis projection/fallback and random draw sequence. Change no configuration,
+  dependency implementation or pointer.
+- 29 September: Prove three finite-angle regressions fail against the committed
+  tangent source, then pass all 17 source tests with no incomplete tests. Build
+  fresh fixed-size C++ MEX entries for the public function and a temporary
+  draw-only probe; pass 30 physical, edge and RNG checks, including the exact
+  Gaussian ensemble mean. Keep independent trigonometric expectations in tests;
+  introduce no production rotation helper. Code Analyzer reports zero findings.
+  MATLAB exits zero. No full simulation was run.
+- 29 September: Keep evidence under
+  `/tmp/simgears-finite-angle-20260929-u76_nc0j`, including the baseline hashes,
+  expected failures and `final_validation.log`. The first verification attempt
+  stopped at its source-path assertion because the temporary helper directory
+  also contained the archived tangent source. Separate the probe directory from
+  the archive; both successful builds resolve the actual reviewed source and
+  bundled MathCore. No production correction was needed for that harness issue.
+- 29 September: Complete the documentation/readability pass with imperative
+  comments, explicit signed-scale/angle semantics and separate sampling/projection
+  blocks in the test oracle. Recheck all 17 source tests and Code Analyzer after
+  cleanup; MATLAB exits zero. Review and stage exactly the function, test class
+  and this plan. Verify staged/worktree byte identity, the exact three-path
+  allowlist and cached whitespace. Leave the COSMICA status update unstaged and
+  wait for the user's commit.
+- 29 September: The final cross-worktree check detects concurrent staging in
+  `landing-building-blocks` after the earlier check passed. Leave that index
+  untouched; its HEAD is unchanged. The other four worktree indexes, including
+  both detached review batches, still match the saved inventory. A later scan
+  also detects an independent update to the unstaged kernel-bundle test in main.
+  Preserve that file and record unrelated baseline deltas in `final_review.json`;
+  keep this extension confined to the three main-checkout paths.

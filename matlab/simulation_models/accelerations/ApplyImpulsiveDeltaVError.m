@@ -5,16 +5,19 @@ function dDV_WithError = ApplyImpulsiveDeltaVError(dNominalDV, ...
 %     dSigmaMagnitudeFrac, dSigmaDirectionInRad)
 % -------------------------------------------------------------------------------------------------------------
 %% DESCRIPTION
-% Apply independent Gaussian magnitude and small-angle direction errors to a
-% nominal impulse. Draw a fractional parallel error and an angular error about
-% a uniformly distributed perpendicular axis. Retain the existing first-order
-% model; the angular sigma must not depend on the impulse magnitude or units.
+% Apply independent Gaussian magnitude and direction errors to a nominal impulse.
+% Rotate exactly about a uniformly distributed perpendicular axis, then apply
+% the signed factor (1 + magnitude error). Preserve negative factors without
+% clipping. Direction-only errors preserve impulse magnitude and velocity units.
+% Interpret angular sigma as the standard deviation of the unwrapped signed
+% Gaussian rotation angle. For direction-only errors, the principal pointing
+% error wraps to [0, pi] for large draws.
 % Return impulses below machine epsilon unchanged. Draw from the current RNG state.
 % -------------------------------------------------------------------------------------------------------------
 %% INPUT
 % dNominalDV              (3, 1) Nominal impulse in the caller's velocity units.
-% dSigmaMagnitudeFrac     (1, 1) Fractional magnitude standard deviation [-].
-% dSigmaDirectionInRad    (1, 1) Angular standard deviation [rad].
+% dSigmaMagnitudeFrac     (1, 1) Fractional signed-scale error standard deviation [-].
+% dSigmaDirectionInRad    (1, 1) Unwrapped signed-angle standard deviation [rad].
 % -------------------------------------------------------------------------------------------------------------
 %% OUTPUT
 % dDV_WithError           (3, 1) Realized impulse in the input velocity units.
@@ -23,9 +26,10 @@ function dDV_WithError = ApplyImpulsiveDeltaVError(dNominalDV, ...
 % 05-12-2025    Pietro Califano     Implement first version.
 % 27-09-2026    Pietro Califano, Codex gpt-6  Correct angular dispersion scaling.
 % 29-09-2026    Pietro Califano, Codex gpt-6  Consolidate the generic impulse contract.
+% 29-09-2026    Pietro Califano, Codex gpt-6  Extend direction errors to exact rotations.
 % -------------------------------------------------------------------------------------------------------------
 %% DEPENDENCIES
-% MATLAB RNG, cross.
+% RotationVectorToDCM, MATLAB RNG.
 % -------------------------------------------------------------------------------------------------------------
 
 arguments (Input)
@@ -48,8 +52,7 @@ end
 dUnitImpulse = dNominalDV / dNominalMagnitude;
 
 % Draw the fractional magnitude error along the nominal direction.
-dMagnitudeError = dSigmaMagnitudeFrac * dNominalMagnitude * randn(1, 1);
-dParallelError = dMagnitudeError * dUnitImpulse;
+dMagnitudeScale = 1.0 + dSigmaMagnitudeFrac * randn(1, 1);
 
 % Select a random perpendicular axis, with a deterministic degenerate fallback.
 if dSigmaDirectionInRad > 0
@@ -68,14 +71,15 @@ if dSigmaDirectionInRad > 0
         dAxisTmp = dAxisTmp / dAxisNorm;
     end
 
-    % Apply the first-order angular error once; cross already scales the impulse.
+    % Apply the sampled angle as an active rotation, preserving impulse magnitude.
     dAngularError = dSigmaDirectionInRad * randn(1, 1);
-    dTangentialError = dAngularError * cross(dAxisTmp, dNominalDV);
+    dErrorRotation = RotationVectorToDCM(dAngularError * dAxisTmp);
+    dRotatedImpulse = dErrorRotation * dNominalDV;
 else
-    dTangentialError = zeros(3, 1);
+    dRotatedImpulse = dNominalDV;
 end
 
-% Combine independent parallel and tangential errors in the input velocity units.
-dDV_WithError = dNominalDV + dParallelError + dTangentialError;
+% Scale the complete rotated impulse in the caller's velocity units.
+dDV_WithError = dMagnitudeScale * dRotatedImpulse;
 
 end
