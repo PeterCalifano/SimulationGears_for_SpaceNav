@@ -199,7 +199,7 @@ Use MathCore's existing main page for the shared hash package documentation.
 
 ## Stage 3: Consolidate geometry and SRP work in separate related batches
 
-- [ ] Preserve the main-checkout panel-visibility implementation; reconcile the
+- [x] Preserve the main-checkout panel-visibility implementation; reconcile the
   older review copy, bring over its missing generic test, and validate geometry.
 - [x] Review OBJ object selection and gravity-fitting changes with their owning
   renderer/asset plan. Preserve source units, selected-object identity and parser
@@ -211,7 +211,10 @@ Use MathCore's existing main page for the shared hash package documentation.
   preserve any work still active in another thread.
   - [x] Review, validate and stage OBJ selection, shared compaction, indentation
     handling, shape/gravity forwarding, focused tests and the matching guide section.
-  - [ ] Consolidate panel visibility and SRP tables in their own reviewed batches.
+  - [x] Review, validate and stage panel visibility, its geometry harness and
+    the matching main-page contract.
+  - [x] Consolidate SRP tables and shared orbital composition with the related
+    panel-visibility and dynamics-naming work; leave asset-root edits separate.
 
 ### OBJ qualification record (24 September 2026)
 
@@ -302,6 +305,33 @@ reduction, mesh decimation, solver change or alternative dependency is authorize
 Evidence: renderer `build/apophis_sh_cost_probe.log`; the entire disposable probe was bounded
 by a 180 s process deadline and completed successfully.
 
+### SRP orbital-RHS ownership correction - 30 September 2026
+
+Reviewer: Codex gpt-6. The user requested moving LUT/bias force composition
+from the filter orbit wrapper into `EvalRHS_InertialDynOrbit`.
+
+- [x] Verify the shared orbital RHS belongs to SimulationGears and preserve
+  its existing panel-visibility index, callers and dependency revisions
+- [x] Own generic LUT/bias force and partials in SimulationGears using
+  resolved numerical spacecraft inputs, with no filter-library dependency
+- [x] Select SRP inside the shared orbital RHS; keep residual acceleration
+  independent and report the LUT component separately from cannonball SRP
+- [x] Validate unchanged positional callers, bias/units/eclipses, acceleration
+  reporting, source/MEX parity and the EstimationGears consumer
+- [x] Review the correction and retain it unstaged for the later SRP batch;
+  preserve the currently staged four-file panel-visibility batch unchanged
+
+Pass 30 offline composition/reporting cases, sixteen neighboring orbital/gravity
+tests and the EstimationGears consumer's source and generated checks. Build
+two fresh standalone provider MEX interfaces without EstimationGears on the
+path; pass eight LUT queries and retain the legacy output schema. Code Analyzer
+reports zero findings in three provider files. Correct the pressure helper's
+constant-unit calling requirement using literal selectors in the runtime unit
+branches; keep both units and the original physical formula. The caller's
+struct-schema correction remains in EstimationGears. Preserve both failed
+and passing evidence under:
+`/tmp/srp-orbital-rhs-ownership-20260930-x2x77wan`.
+
 ## Stage 4: Reconcile target rotational-state models
 
 - [ ] Compare the unique `44f0d19` covariance/inertia commit with main and reuse
@@ -366,14 +396,15 @@ metadata, OBJ record truncation, incomplete Python package versions and discarde
 Docker build arguments. Append the execution sequence here; use the main page
 for maintained interface documentation. The user approved this worktree and
 requested checking existing implementations before editing. The five fixes are
-implemented and pass focused tests. Review and stage the angular-velocity batch
-first; keep the OBJ and packaging/container batches for subsequent user commits.
+implemented, reviewed and committed by the user in the angular-velocity, OBJ
+and packaging/container batches. Keep subsequent geometry and SRP batches
+separate; preserve the remaining provider-integration gates.
 
 ### Fix stage 1: Confirm ownership and preserve the baseline
 
 | Reference | Current observation | Treatment |
 | --- | --- | --- |
-| Active consolidation worktree | `feature/consolidate-simulation-models`; now `88fcf6a` after the user's OBJ commit, following `e3e1e0d` (SPK), `7e18771` (rates) and `f82b9dd` (config guidelines) | Review the packaging/container batch; preserve pending SRP and asset-root work |
+| Active consolidation worktree | `feature/consolidate-simulation-models`; now `71c6639` after the user's packaging commit, following `88fcf6a` (OBJ), `e3e1e0d` (SPK), `7e18771` (rates) and `f82b9dd` (config guidelines) | Panel visibility reviewed and staged; preserve pending SRP and asset-root work |
 | Original PR source | `feature/extend-support-for-space-nav-backend` at `801b0b7` | Already an ancestor of the current branch; replay no original commits |
 | Audit destination | Landing worktree at `e86d14d` | Keep as a separate integration option; retire `c9a99db` as an execution baseline |
 | SimulationGears MathCore reference | `lib/MathCore_for_ComputerVision` at `e3a39c68` | Preserve it; do not restore `83d9d7b` |
@@ -499,6 +530,32 @@ under `/tmp/simgears-pr11-followup-plan-20260929-ijor5e4b`.
 
 ## Progress and discrepancies
 
+- 30 September, panel-visibility consolidation (`Codex gpt-6`): Verify the
+  user's packaging commit at `71c6639` and an empty index. Confirm the geometry
+  source matches the main provider before review. Preserve the ray/triangle
+  algorithm, face ordering and two-sided blocking; calculate the Sun-vector
+  norm once. Clarify the existing two-part tolerance: shift the origin by
+  `dRayOffset`, then require a hit distance greater than `dRayOffset`. Extend
+  the generic harness with single-face, grazing, disjoint, coincident and nearby
+  geometry, rigid-transform/unit conversion, face-order and invalid-input checks.
+  Pass the same harness against the archived source, eleven neighboring
+  panel-force tests and 50 fresh fixed-size C++ MEX/source comparisons. Disable
+  variable sizing and dynamic allocation for that build. Both reviewed files
+  have zero Code Analyzer findings. Review public help, imperative comments,
+  logical blocks and the existing main-page contract; stage only the two MATLAB
+  files, that guide section and this plan. Leave SRP tables, asset-root edits,
+  other providers and all dependency pointers untouched. Save evidence under
+  `/tmp/simgears-panel-visibility-review-20260930-m3bxhb_c`. No simulation ran.
+- 30 September, validation-output discrepancy: The temporary MEX command used
+  a basename and placed its binary in the checkout root. Move that review-only
+  binary into the external evidence directory after validation and save the
+  corrected command with an absolute output path. Stage no generated artifact.
+- 30 September, final verification: Correct a malformed comment in the temporary
+  rerun script; the exact staged geometry harness, both analyzer checks and all
+  50 MEX comparisons then pass. Change no production source for that script
+  error. Detect concurrent cleanup of 39 pending paths in the main provider;
+  leave that checkout untouched and record before/after hashes. All seven
+  inspected HEADs, other indexes and dependency pointers remain unchanged.
 - 29 September, packaging/container staged review (`Codex gpt-6`): Verify the
   user's OBJ commit at `88fcf6a` and an empty index. Review the two pending
   build-support fixes together with their two focused suites. Add Google-style
@@ -765,3 +822,387 @@ under `/tmp/simgears-pr11-followup-plan-20260929-ijor5e4b`.
   also detects an independent update to the unstaged kernel-bundle test in main.
   Preserve that file and record unrelated baseline deltas in `final_review.json`;
   keep this extension confined to the three main-checkout paths.
+
+## RHS and Jacobian naming consolidation - 30 September 2026
+
+Standardize shared MATLAB providers and their active consumers on `EvalRHS_…`
+and `EvalJac_…`. Preserve model equations, argument contracts and numerical
+results. Rename source files, declarations, handles, code-generation entry
+points, test spies and current documentation together. Do not add aliases.
+
+### Stage 1 - Preserve and map
+
+- [x] Record provider and consumer branches, source snapshots and Git indexes.
+- [x] Identify 26 EstimationGears and three SimulationGears provider renames.
+- [x] Identify active callers, including the Bennu/Apophis validation worktree.
+- [x] Exclude independent RCS-1 filters, archived code, frozen outputs and
+      unrelated worktrees with their own provider revisions.
+
+### Stage 2 - Rename
+
+- [x] Rename provider files and public functions without changing equations.
+- [x] Update active callers, local Jacobian wrappers, test spies and MEX builders.
+- [x] Update current naming references and verify no old symbols remain in scope.
+- [x] Compare each edited source with its snapshot after reversing the renames.
+
+### Stage 3 - Validate
+
+- [x] Run affected existing MATLAB harnesses and generated-interface checks.
+- [x] Verify consumer resolution against the reviewed provider checkouts.
+- [x] Record unrelated failures separately; do not repair them in this batch.
+- [x] Skip MATLAB execution for consumers without existing MATLAB tests.
+
+### Stage 4 - Review and stage
+
+- [x] Review complete diffs, signatures, documentation, comments and readability.
+- [x] Stage only the naming batch and existing EstimationGears SRP corrections.
+- [x] Preserve protected SimulationGears and COSMICA indexes and all gitlinks.
+- [x] Report remaining provider-integration requirements before committing.
+
+Keep dependency revisions fixed. Updated consumer sources require the renamed
+provider sources when integrated; do not claim that old recorded dependencies
+supply the new names. No simulation campaign or numerical redesign is required.
+Evidence: `/tmp/matlab-eval-case-standardization-20260930-v1il4f89`.
+
+Reviewed by Codex (GPT-6). Preserve existing historical changelog attribution.
+
+#### Validation and integration limits
+
+Resolve all 29 renamed provider symbols. Pass 58 existing provider unit tests,
+the existing filter and orbital LUT harnesses, 13 backend unit tests, two
+FUTURE dependency tests, the guidance source/delegation/integration harnesses,
+and COSMICA truth/approach/interface harnesses. Pass three max-fidelity MEX
+contract tests, the complete existing filter code-generation harness (including
+48 runtime queries), and guidance MEX/runtime-degree checks. Check 105 edited
+MATLAB files with Code Analyzer; introduce no findings relative to the saved
+source. Confirm that every source edit is an identifier substitution.
+
+Export exact working sources to an external integration snapshot for these
+checks. Compose consumers with the reviewed EstimationGears, SimulationGears
+and MathCore sources there; preserve workspace dependency revisions. The first
+consumer attempt failed on missing snapshot kernel paths and provider path
+ordering. Correct only the temporary snapshot and test runner, then pass all
+checks. Retain the initial logs. Keep the wrapper teardown warning separate
+from the passing assertions. No unresolved failure caused by the rename.
+
+Skip MATLAB execution for the GTSAM triangulation and MSCKF callers, which
+have no matching MATLAB harnesses. Do not hand-edit tracked FUTURE generated
+C++ outputs (`cxx/` and `cxx_armv8/`); their old symbols form self-contained
+generated implementations. Regenerate deployment artifacts from the updated
+MATLAB sources during the consumer release. Skip the FUTURE time-update
+script: its unconditional early return prevents exercising its assertions.
+
+Integrate renamed providers and consumers together. Old nested dependency
+revisions do not expose the new names, so normal setup against those revisions
+remains an integration gate. Rebuild affected generated artifacts after that
+update. Do not add casing aliases or move gitlinks in this consolidation pass.
+
+#### Final staged review
+
+- [x] Complete the existing parent-GUI suites with `runtests`: seven unit tests
+      pass. Do not count the earlier suite-factory calls as test execution.
+- [x] Pass the SSTO discovery scaffold in the external snapshot; keep its
+      pre-existing untracked package files outside the index.
+- [x] Pass 83 unit tests and eleven existing assertion/code-generation
+      harnesses in total; introduce no new tests or configuration-value checks.
+- [x] Review every staged blob against the prior index; preserve unrelated
+      source hunks, documentation edits and all gitlinks.
+- [x] Remove trailing spaces from two renamed declaration/help lines; preserve
+      every equation and the remaining legacy formatting.
+- [x] Pass whitespace checks for all twelve inspected indexes.
+
+Stage 51 EstimationGears paths, retaining its prior SRP batch. Stage naming
+hunks in nav-backend (7), its embedded consumer checkout (5), GUI-System (3),
+gui-trajectory-generation (10), FUTURE (8), GTSAM SpaceNav (2) and MSCKF (1).
+Leave three pre-existing untracked EstimationGears plans unstaged. Preserve
+the protected SimulationGears and both COSMICA indexes; leave their naming
+edits unstaged. Keep the untracked SSTO package outside staging.
+
+The validation worktree advanced externally from `81ad4fd0` to `0132cf2`
+during this pass. Preserve that commit and its index content; make no commits
+here. Verify that all owned source edits remain mechanical substitutions.
+
+The consumer-test MATLAB process remained in wrapper teardown for more than
+fourteen minutes after saving passing results. Terminate only that owned
+process after checking its command and completed result files. Treat this
+exit behavior separately from assertion results; change no wrapper code.
+Keep the initial snapshot-setup errors and the suite-discovery-only attempt
+in the evidence. The remaining integration gate belongs to provider commits,
+dependency updates and generated deployment artifacts, outside this pass.
+
+### SRP acronym spelling - 1 October 2026
+
+- [x] Complete the user replacement with `EvalJac_SRPLutWithBias`,
+      `EvalRHS_SRPLutWithBias` and the filter adapter `EvalFilterSRPLutWithBias`.
+- [x] Rename files and update active callers, builders, examples and docs;
+      preserve equations, signatures, configuration keys and other SRP names.
+- [x] Pass existing source/code-generation harnesses and refresh only the
+      affected EstimationGears index; preserve the provider and COSMICA indexes.
+
+Reviewer: Codex GPT-6.
+
+Pass both existing source harnesses: twelve filter unit/mode cases, sixteen
+pole cases, optional bias/force reuse checks and thirty orbital composition
+cases. Pass seventeen fresh MEX/C++ builds and 48 runtime parity queries.
+Report no Code Analyzer findings in nine touched MATLAB files. Confirm all
+source changes are identifier substitutions plus changelog updates, with
+filenames matching their primary functions. Validate composed provider sources;
+keep recorded-dependency integration pending.
+
+Refresh eight affected EstimationGears entries, including two file renames;
+retain its 51-path batch and leave the unrelated plan prefix unstaged. Keep
+SimulationGears changes behind its existing four-file panel index. Preserve
+both COSMICA indexes. Create no commits or simulation runs.
+
+## SRP and dynamics consolidation - 1 October 2026
+
+Review and stage the completed panel-visibility, SRP lookup-table and orbital
+composition work together with the approved RHS/Jacobian naming migration.
+Use the explicit 42-path candidate list saved in the evidence folder. Keep
+rendering-asset root changes for the next batch. Create no commits, move no
+worktrees or dependency pointers, and run no mission simulations.
+
+### Stage 1 - Preserve and review
+
+- [x] Record branch, HEAD, complete index and candidate source snapshots.
+- [x] Separate the two rendering-asset path changes from the dynamics batch.
+- [x] Review every candidate and the existing four-file panel index for scope,
+      equations, component ownership, code conventions and documentation.
+- [x] Reuse MathCore's existing skew matrix function and remove its local copy;
+      clarify C++ interfaces and add missing purpose comments within scope.
+
+### Stage 2 - Validate
+
+- [x] Run existing panel/LUT source harnesses and affected dynamics unit tests.
+- [x] Run proportionate fresh generated-interface checks for reviewed changes;
+      reuse unchanged naming/cross-repo evidence and report its limits.
+- [x] Check Code Analyzer; introduce no configuration-value tests.
+- [x] Check the final working and staged diffs for whitespace errors.
+
+### Stage 3 - Stage and hand off
+
+- [x] Review the complete final index, documentation, imperative comments,
+      formatting and opportunities to simplify; preserve unrelated changes.
+- [x] Stage the candidate allowlist, including renamed files and linked tests;
+      preserve the EstimationGears and COSMICA indexes exactly.
+- [x] Suggest an imperative commit title/body and list remaining work.
+
+Reviewer: Codex GPT-6. Evidence:
+`/tmp/simgears-dynamics-consolidation-20261001-620dvkyg`.
+
+Validation: Pass six existing assertion harnesses and 20 dynamics unit tests.
+Check all 34 candidate MATLAB files with Code Analyzer; add no findings relative
+to their HEAD sources. Pass seven fresh builds: four MEX output specializations
+and three C++ physical-output libraries. Exercise 264 directions in both modes
+for each Jacobian MEX prefix; recover source/generated parity below the existing
+1e-12 tolerance. Check physical position, right-attitude and mass partials
+against independent finite differences. Preserve generated sources, binaries,
+timing and result packs outside the repository. Run no mission simulations.
+
+Reuse unchanged max-fidelity generated-code and cross-repo naming evidence from
+`/tmp/matlab-eval-case-standardization-20260930-v1il4f89`. Verify exact candidate
+source identity in `reuse_review.json`; keep the new orbital LUT/bias composition
+covered by the fresh source checks and the preceding uppercase-name filter
+builds in `/tmp/srp-capitalization-20261001-q0n8ymvg`.
+
+Review cleanup: Reuse MathCore's `skewSymm`, remove the duplicate local helper,
+separate host quadrature, table construction, provenance and packing steps,
+and clarify C++ interface documentation. Add explicit empty input contracts
+and purpose comments to the new no-input harnesses. Remove inherited trailing
+whitespace exposed by staging the orbital-header update. Preserve runtime
+schemas, force laws, units and legacy cannonball behavior.
+
+Dependency discrepancy: The recorded MathCore gitlink `e3a39c68` supplies
+`skewSymm` but lacks `ComputeFileSha256`. Validate against the reviewed composed
+MathCore source, as in the preceding source/interface checks. Verify that the
+hash helper is committed in standalone MathCore at `5bc1ccf`; keep its
+dependency-pointer integration pending. Do not claim that the recorded
+dependency alone supports host LUT generation. Leave both rendering-asset root
+edits outside this batch. Create no commits or change dependency pointers.
+
+Stage 39 entries after recognizing the three case-only renames. Preserve the
+existing panel source, tests and documentation in that related batch. Recheck
+every indexed MATLAB blob against the validated snapshot, and preserve both
+other repository indexes and all recorded dependency revisions. A repeat
+staging command included the old filenames after their deletion was already
+indexed; Git rejected that path list. Restage only the 39 existing allowlisted
+files and verify that all three old names remain absent. Change no source for
+this command correction. Retain the final source log and complete cached diff
+in the evidence directory.
+
+Suggested subject: `Add spacecraft SRP tables and standardize dynamics APIs (Codex)`
+
+- Generate fixed SRP response tables from panel geometry and self-shadowing
+
+- Share interpolation and analytical partials across force and Jacobian calls
+
+- Compose LUT SRP and additive bias in the orbital RHS while preserving
+  cannonball and residual-acceleration behavior
+
+- Standardize RHS/Jacobian names and cover source and generated interfaces
+
+## Correct transverse SRP tables - 1 October 2026
+
+Implement in this consolidation worktree. Propagate required interfaces through
+EstimationGears and COSMICA's `apophis-bennu-validation` analysis caller. Preserve
+unrelated changes, existing indices and historical results. Add no compatibility
+branches or legacy-specific checks. Reviewer: Codex GPT-6.
+
+### Stage 1 - Replace table representation
+
+- [x] Compute nodal transverse force per pressure using each node's Sun direction.
+- [x] Preserve scalar Cr; retain full panel-force samples only in host diagnostics.
+- [x] Pack scalar payloads without vector storage and transverse payloads with
+      `dTransverseForcePerPressure` in square metres.
+- [x] Update ordinary schema, orthogonality, seam, pole and padding validation.
+- [x] Record saved tables and generated binaries requiring regeneration.
+
+### Stage 2 - Correct evaluation and propagate interfaces
+
+- [x] Interpolate transverse samples and project onto the query transverse plane;
+      differentiate both operations while preserving scalar and boundary behavior.
+- [x] Specialize transverse inclusion at code generation and preserve output pruning.
+- [x] Move only the filter inclusion flag into constant configuration; pass it
+      separately through mixed-data helpers and the shared orbital/SRP interfaces.
+- [x] Update builders, generated types, consumers, fixtures and documentation in
+      both providers and COSMICA's affected analysis caller.
+- [x] Preserve runtime numerical inputs and runtime-table/embedded-table builds.
+
+### Stage 3 - Validate, review and stage
+
+- [x] Check radial response, nodal recovery, scalar parity, orthogonality and boundaries.
+- [x] Compare independent panel responses and grid-refinement errors.
+- [x] Check analytical derivatives and source/generated parity in both modes.
+- [x] Verify scalar generated targets omit transverse arrays and computations.
+- [x] Review complete relevant diffs and indices for formatting, documentation,
+      imperative comments, readability and simplification; stage only scoped changes.
+- [x] Report evidence, interface changes, regeneration needs and remaining limits.
+
+Evidence root: `/tmp/srp-transverse-correction-20261001-0160gjc4`.
+Save pre-edit indices, working patches and source hashes there. Run no full
+simulation and update no dependency pointers. Previously saved T037 `trial_004`
+and T040 `smoke_003` tables contain full-force vectors rather than transverse
+samples; regenerate their tables and associated binaries before new transverse
+validation. Preserve those historical outputs.
+
+Validation: Pass seven focused SimulationGears/EstimationGears source harnesses
+and COSMICA's existing comparison-input contract. Recover zero off-grid
+transverse response for constant and varying radial fixtures, unchanged scalar
+force/Jacobians, nodal force recovery, seam/pole behavior and orthogonality.
+Compare 256 independent one-plate panel directions at 10, 5 and 2 degrees:
+
+| Grid [deg] | Total RMS error [m²] | Transverse RMS error [m²] | Total maximum error [m²] |
+| --- | --- | --- | --- |
+| 10 | 0.00409035 | 0.00285697 | 0.0148638 |
+| 5 | 0.00106238 | 0.000712600 | 0.00419317 |
+| 2 | 0.000162462 | 0.000115003 | 0.000670403 |
+
+Pass analytical query Jacobians against finite differences with maximum
+relative error 2.50e-9 away from grid boundaries. Preserve the adjusted-pole
+contract; its maximum relative error is 8.15e-7. Check independent physical
+position, right-attitude and mass partials and the existing filter STM path.
+
+Pass 60 fresh MEX/C++ builds: 12 response/orbital targets, 14 output/physical
+specializations and 34 filter/dispatch targets across scalar/transverse modes.
+Check 246 directions per response mode and 264 per output-specialization mode;
+recover response/Jacobian source/generated agreement within 4.45e-16. Preserve
+metre/kilometre, optional-bias, considered-state and inactive-radiation behavior.
+Check generated scalar types and executable source for absent transverse storage
+and work. Change runtime table samples without changing the compiled interface
+and compare with source. Report zero Code Analyzer findings in 29 changed
+MATLAB files after the final documentation/formatting review.
+
+Interface decisions: Move only `bIncludeTransverseSrp` to filter constant
+configuration. Pass it as a fourth helper output and a separate constant argument
+through the shared SRP/orbital calls; keep consider-state flags and numerical
+inputs mutable. Keep the existing `SSrpResponseLut` name per separate generated
+target. Remove redundant input type naming in math helpers; name runtime inputs
+at the build boundary. Add no compatibility branch or legacy-specific check.
+
+Resolved discrepancies: MATLAB Coder does not accept `coder.Constant` as a
+`coder.StructType.Fields` entry. Record that probe and use the approved constant
+configuration instead. Repeated input type naming after caller control flow also
+fails Coder; remove the redundant declarations rather than adding types. Correct
+one outdated boundary fixture, an output argument-block ordering mistake and
+two missing MATLAB continuation markers before the passing checks. Repeat the
+source/analyzer checks after review cleanup; qualify generated numerical code
+before that comments/formatting-only cleanup. Keep failed logs for traceability.
+
+Regeneration: Inspect 29 saved T037-T040 table/assessment MAT files beneath
+`JGCD2026_AAS2026_followup/apophis_phase_d` in the external result root. Find
+28 tables with full-force samples and none with transverse samples; the other
+file contains assessment metrics only. Regenerate those tables and binaries
+before new transverse evaluations. Preserve historical files and archived
+launchers; save the exact inventory as `Saved_table_inventory.json` beside the
+validation evidence. Add no generated data to Git.
+
+Review cleanup: Correct stale runtime-selector documentation and argument order,
+keep sectioned API help and imperative block comments, separate interpolation
+and projection steps, align continuation lines, remove redundant type-name
+variables and redundant fixture selector assignments. Keep the fixture host and
+packed views consistent. Update SimulationGears, EstimationGears and the one
+required COSMICA analysis consumer; include its already requested provider-name
+correction so the staged caller resolves the renamed provider.
+
+Preserve all unrelated index entries, dirty files, HEADs, branches and gitlinks.
+Retain the existing MathCore integration limit: recorded revision `e3a39c68`
+lacks `ComputeFileSha256`; use the reviewed composed source for host generation,
+without changing the dependency pointer. Do not claim mission qualification,
+flight timing or complete-stack execution from these focused checks. Run no
+full simulation and create no commit.
+
+Suggested subject for the complete staged batch:
+`Add SRP response tables and standardize dynamics APIs (Codex)`
+
+- Generate panel SRP response tables with nodal transverse samples; preserve
+  scalar interpolation and cannonball behavior
+
+- Share force and analytical partials; differentiate transverse interpolation
+  and query-plane projection together
+
+- Compile transverse inclusion separately and omit its storage in scalar targets
+
+- Standardize RHS/Jacobian names, update shared/filter consumers and verify
+  source/generated parity and independent panel-response refinement
+
+
+## Unify selected SRP acceleration diagnostics - 1 October 2026
+
+Reviewer: Codex GPT-6.
+
+- [x] Report the selected force as `strAccelInfo.dAccSRP`; remove duplicate
+      cannonball, LUT and panel acceleration outputs without changing forces.
+- [x] Update the EstimationGears LEO record, COSMICA SRP replacement and
+      Nav-Backend force-analysis readers to use the shared field.
+- [x] Verify source force/layout invariants and fresh generated diagnostics.
+- [x] Review formatting, imperative comments, API help and the complete index;
+      stage only related changes and preserve unrelated work.
+
+Pass 23 source unit tests (8 LEO, 13 SimulationGears and 2 Nav-Backend),
+28 orbital LUT cases, the existing COSMICA comparison-input contract and
+one existing max-fidelity source/MEX parity test. Build eight fresh targets:
+two combined cannonball/LUT C++ MEX variants, four existing SH/polyhedron
+RHS/Jacobian MEX variants, and two panel/cannonball truth C++ MEX variants.
+Compare selected forces, diagnostic layouts, active flags and eclipse behavior.
+Keep the transverse specialization and numerical model inputs unchanged.
+
+Report no new MATLAB analyzer findings in thirteen changed files. Twelve files
+have zero findings; the diagnostic plotting script retains its existing
+unreachable-statement finding. Correct that script's stale `evalRHS_DynOrbit`
+call to `EvalRHS_InertialDynOrbit`; do not run its production-asset workflow.
+Remove one pre-existing trailing-space line in the staged SRP shadow-data
+builder; leave its code and other staged content unchanged.
+
+Resolve one validation-fixture issue: degree-zero Chebyshev storage fails in
+the existing generated recursive evaluator. Use the established degree-two
+constant-ephemeris fixture for the panel probe; preserve the initial failure
+log and leave the unrelated evaluator unchanged. Both corrected probes pass.
+Run the Nav-Backend tests through their existing setup, then select the
+reviewed SimulationGears source with a temporary test plugin. Keep all test
+helpers, generated artifacts and logs outside Git under
+`/tmp/srp-diagnostics-unification-20261001-kgidqwta`.
+
+Update diagnostic consumers together and rebuild dependent MEX targets before
+using the renamed output field. Preserve unrelated source/index work, all
+HEADs, branches and gitlinks. Keep recorded-dependency integration pending.
+Run no full simulation and create no commit.

@@ -1,16 +1,70 @@
-function [dPosVeldt, strAccelInfo] = evalRHS_InertialDynOrbit( dxState_IN, ...
-                                                                dDCMmainAtt_INfromTF, ...
-                                                                dMainGM, ...
-                                                                dRefRmain, ...
-                                                                dCoeffSRP, ...
-                                                                d3rdBodiesGM, ...
-                                                                dBodyEphemerides, ...
-                                                                dMainCSlmCoeffCols, ...
-                                                                ui32MaxSHdegree, ...
-                                                                ui16StatesIdx, ...
-                                                                dResidualAccel, ...
-                                                                bIsInEclipse) %#codegen
-arguments
+function [dPosVeldt, strAccelInfo] = ...
+    EvalRHS_InertialDynOrbit(dxState_IN, dDCMmainAtt_INfromTF, dMainGM, dRefRmain, ...
+                            dCoeffSRP, d3rdBodiesGM, dBodyEphemerides, dMainCSlmCoeffCols, ...
+                            ui32MaxSHdegree, ui16StatesIdx, dResidualAccel, bIsInEclipse, ...
+                            bUseSrpLut, strResponseLut, strSrpData, bIncludeTransverse) %#codegen
+%% SIGNATURE
+% [dPosVeldt, strAccelInfo] = EvalRHS_InertialDynOrbit(dxState_IN, dDCMmainAtt_INfromTF, ...
+%     dMainGM, dRefRmain, dCoeffSRP, d3rdBodiesGM, dBodyEphemerides, dMainCSlmCoeffCols, ...
+%     ui32MaxSHdegree, ui16StatesIdx, dResidualAccel, bIsInEclipse, ...
+%     bUseSrpLut, strResponseLut, strSrpData, bIncludeTransverse)
+% -------------------------------------------------------------------------------------------------------------
+%% DESCRIPTION
+% Evaluate inertial position/velocity dynamics about the main body. Third-body
+% gravity is the physical differential acceleration between the spacecraft and
+% the main body. The Sun is always the first entry in d3rdBodiesGM and its
+% matching ephemeris is always the first three elements of dBodyEphemerides.
+% Select cannonball SRP by default or LUT/bias SRP through the trailing inputs.
+% Compose either force here and keep residual acceleration independent.
+% Freeze the LUT selection/table for code generation; retain resolved physical
+% inputs at runtime. Preserve existing positional calls and report the selected
+% SRP acceleration through one model-independent diagnostic field.
+% -------------------------------------------------------------------------------------------------------------
+%% INPUT
+% dxState_IN           Inertial state [LU; LU/s], optionally with additional states.
+% dDCMmainAtt_INfromTF  Main-body-fixed to inertial rotation for harmonics.
+% dMainGM              Main-body gravitational parameter [LU^3/s^2].
+% dRefRmain            Harmonics reference radius [LU].
+% dCoeffSRP            Current-pressure cannonball coefficient [LU/s^2]; default empty.
+% d3rdBodiesGM         Sun-first third-body gravitational parameters [LU^3/s^2].
+% dBodyEphemerides     Matching packed inertial positions [LU].
+% dMainCSlmCoeffCols   Harmonic coefficients; default empty.
+% ui32MaxSHdegree      Requested harmonic degree; default empty.
+% ui16StatesIdx        Inclusive orbital-state bounds; MATLAB/MEX default is 1:6.
+% dResidualAccel       Independent residual acceleration [LU/s^2]; default zero.
+% bIsInEclipse         Suppress SRP when true; default false.
+% bUseSrpLut           Compile-time LUT selection; default false.
+% strResponseLut       Immutable numeric LUT; unused with cannonball SRP.
+% strSrpData           Resolved numerical inputs for EvalRHS_SRPLutWithBias;
+%                      unused with cannonball SRP. Supply no filter indices or modes.
+% bIncludeTransverse   Compile-time transverse selection; unused with cannonball SRP.
+% -------------------------------------------------------------------------------------------------------------
+%% OUTPUT
+% dPosVeldt            Six orbital derivatives [LU/s; LU/s^2].
+% strAccelInfo         Optional force components, SRP range and active flag.
+%                      Report dAccSRP for the selected cannonball or LUT model [LU/s^2].
+% -------------------------------------------------------------------------------------------------------------
+%% CHANGELOG
+% 01-10-2026  Pietro Califano, Codex GPT-6  Unify selected SRP acceleration diagnostics.
+% 01-10-2026  Pietro Califano, Codex GPT-6  Correct nodal transverse samples and constant inclusion.
+% 07-07-2024    Pietro Califano     First version, inherited from EvalRHS_DynLEO for more general orbital
+%                                   motion in small bodies environments.
+% 08-07-2024    Pietro Califano     Prototype coding completed (SH and SRP implementation). Test required.
+% 12-07-2024    Pietro Califano     Function debugging and verification completed.
+% 17-08-2024    Pietro Califano     Improved robustness, flexibility for filters, fixed design errors.
+% 20-06-2025    Pietro Califano     Major fix: incorrect 3rd bodies acceleration computation (sign)
+% 30-04-2026    Pietro Califano, Codex 5.5    Routed cannonball SRP through standalone acceleration kernel.
+% 22-07-2026    Pietro Califano, Codex 5.6    Correct the remaining global sign error in direct and indirect
+%                                             third-body gravity.
+% 23-07-2026    Pietro Califano, Codex        Enforce generated-code ephemeris column-vector indexing.
+% 30-09-2026    Pietro Califano, Codex gpt-6  Own LUT/bias selection and force reporting in the orbital RHS.
+% 01-10-2026    Pietro Califano, Codex gpt-6  Name the numeric LUT and acceleration diagnostics.
+% -------------------------------------------------------------------------------------------------------------
+%% DEPENDENCIES
+% ComputeCannonballSRP, EvalRHS_SRPLutWithBias, EvalExtSphHarmExpInWorldFrame.
+% -------------------------------------------------------------------------------------------------------------
+
+arguments (Input)
     dxState_IN
     dDCMmainAtt_INfromTF
     dMainGM
@@ -21,61 +75,25 @@ arguments
     dMainCSlmCoeffCols  double = []
     ui32MaxSHdegree     uint32 = []
     ui16StatesIdx       uint16 = []
-    dResidualAccel      double = zeros(3,1)
+    dResidualAccel      double = zeros(3, 1)
     bIsInEclipse        logical = false
+    bUseSrpLut (1, 1) logical {coder.mustBeConst} = false
+    strResponseLut (1, 1) struct {coder.mustBeConst} = struct()
+    strSrpData (1, 1) struct = struct()
+    bIncludeTransverse (1, 1) logical {coder.mustBeConst} = false
 end
-%% PROTOTYPE
-% [dPosVeldt, strAccelInfo] = evalRHS_InertialDynOrbit( dxState_IN, ...
-%                                                                 dDCMmainAtt_INfromTF, ...
-%                                                                 dMainGM, ...
-%                                                                 dRefRmain, ...
-%                                                                 dCoeffSRP, ...
-%                                                                 d3rdBodiesGM, ...
-%                                                                 dBodyEphemerides, ...
-%                                                                 dMainCSlmCoeffCols, ...
-%                                                                 ui32MaxSHdegree, ...
-%                                                                 ui16StatesIdx, ...
-%                                                                 dResidualAccel, ...
-%                                                                 bIsInEclipse) %#codegen
-% -------------------------------------------------------------------------------------------------------------
-%% DESCRIPTION
-% Evaluate inertial position/velocity dynamics about the main body. Third-body
-% gravity is the physical differential acceleration between the spacecraft and
-% the main body. The Sun is always the first entry in d3rdBodiesGM and its
-% matching ephemeris is always the first three elements of dBodyEphemerides.
-% -------------------------------------------------------------------------------------------------------------
-%% INPUT
-% dxState_IN
-% dDCMmainAtt_INfromTF
-% dMainGM
-% dRefRmain
-% dCoeffSRP           double = []
-% d3rdBodiesGM        double = []
-% dBodyEphemerides    double = []
-% dMainCSlmCoeffCols  double = []
-% ui32MaxSHdegree     uint32 = []
-% ui32StatesIdx       uint32 = []
-% dResidualAccel      double = zeros(3,1)
-% bIsInEclipse        logical = false
-% -------------------------------------------------------------------------------------------------------------
-%% OUTPUT
-% dPosVeldt
-% -------------------------------------------------------------------------------------------------------------
-%% CHANGELOG
-% 07-07-2024    Pietro Califano     First version, inherited from evalRHS_DynLEO for more general orbital 
-%                                   motion in small bodies environments.
-% 08-07-2024    Pietro Califano     Prototype coding completed (SH and SRP implementation). Test required.
-% 12-07-2024    Pietro Califano     Function debugging and verification completed.
-% 17-08-2024    Pietro Califano     Improved robustness, flexibility for filters, fixed design errors.
-% 20-06-2025    Pietro Califano     Major fix: incorrect 3rd bodies acceleration computation (sign)
-% 30-04-2026    Pietro Califano, Codex 5.5    Routed cannonball SRP through standalone acceleration kernel.
-% 22-07-2026    Pietro Califano, Codex 5.6    Correct the remaining global sign error in direct and indirect
-%                                             third-body gravity.
-% 23-07-2026    Pietro Califano, Codex        Enforce generated-code ephemeris column-vector indexing.
-% -------------------------------------------------------------------------------------------------------------
-%% DEPENDENCIES
-% [-]
-% -------------------------------------------------------------------------------------------------------------
+
+arguments (Output)
+    dPosVeldt (6, 1) double
+    strAccelInfo (1, 1) struct
+end
+
+% Name the selected local constant before handing it to the SRP model.
+% Keep the unused legacy input empty and avoid conditionally naming an entry input.
+if coder.const(bUseSrpLut)
+    strLutForModel = strResponseLut;
+    coder.cstructname(strLutForModel, 'SSrpResponseLut');
+end
 
 %% INPUT MANAGEMENT
 if coder.target('MATLAB') || coder.target('MEX')
@@ -247,14 +265,22 @@ if ~isempty(dBodyEphemerides)
     end
 end
 
-%% Cannonball SRP acceleration
-if ~isempty(dBodyEphemerides) && bSunPosValid && ~isempty(dCoeffSRP)
-    [dAccCannonBallSRP, dSRPdistToSun, bIsSRPActive] = ComputeCannonballSRP( ...
+%% Selected SRP acceleration
+% Evaluate SRP inside the orbital model; keep its components separate from residuals.
+dAccSRP = zeros(3, 1);
+if coder.const(bUseSrpLut)
+    if bSunPosValid
+        dSRPdistToSun = dSCdistToSun;
+        if ~bIsInEclipse
+            dAccSRP = EvalRHS_SRPLutWithBias(-dPosSunToSC, strSrpData, strLutForModel, bIncludeTransverse);
+            bIsSRPActive = any(dAccSRP ~= 0);
+        end
+    end
+elseif ~isempty(dBodyEphemerides) && bSunPosValid && ~isempty(dCoeffSRP)
+    [dAccSRP, dSRPdistToSun, bIsSRPActive] = ComputeCannonballSRP( ...
         dPosSunToSC, ...
         dCoeffSRP, ...
         bIsInEclipse);
-else
-    dAccCannonBallSRP = zeros(3,1);
 end
 
 %% Acceleration sum
@@ -264,14 +290,14 @@ if nargout > 1
     strAccelInfo.dAccMain           = dAccTot;
     strAccelInfo.dTotAcc3rdBody     = dTotAcc3rdBody;
     strAccelInfo.dAcc3rdSun         = dAcc3rdSun;
-    strAccelInfo.dAccCannonBallSRP  = dAccCannonBallSRP;
+    strAccelInfo.dAccSRP            = dAccSRP;
     strAccelInfo.dSRPdistToSun      = dSRPdistToSun;
     strAccelInfo.bIsSRPActive       = bIsSRPActive;
     strAccelInfo.dAccNonSphr_IN     = dAccNonSphr_IN;
     strAccelInfo.dAccPolyhedronPert_IN = zeros(3, 1);
 end
 
-dAccTot = dAccTot + dTotAcc3rdBody + dAcc3rdSun + dAccCannonBallSRP + dAccNonSphr_IN + dResidualAccel;
+dAccTot = dAccTot + dTotAcc3rdBody + dAcc3rdSun + dAccSRP + dAccNonSphr_IN + dResidualAccel;
 
 %% Compute output state time derivative
 dPosVeldt(1:6) = [dxState_IN(ui16posVelIdx(4:6));

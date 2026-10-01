@@ -289,3 +289,165 @@ in its metadata. Retain asset identity and transform provenance alongside this s
 When centering a rendering asset, apply the selected solid's centroid translation rigidly to
 every object. When rendering at the source origin, retain the gravity-origin offset and apply it
 when evaluating centroid-centered coefficients. Declare the target frame independently of OBJ.
+
+### Panel Sun visibility
+
+Use `ComputePanelSunVisibility` to estimate the illuminated fraction of each
+triangle from equally weighted samples. Supply the spacecraft-to-Sun direction,
+illuminated-side normals, sample positions and triangle vertices in one mesh
+frame. Use one length unit for positions and the positive ray offset; the
+spacecraft SRP preparation path uses metres. Face indices must agree across all
+arrays. Back-facing and grazing faces return zero.
+
+```matlab
+dLowerTriangle = [0, 1, 0; 0, 0, 1; 0, 0, 0];
+dFaceVertices = cat(3, dLowerTriangle, dLowerTriangle + [0; 0; 1]);
+dSamplePoints = reshape(mean(dFaceVertices, 2), 3, 1, 2);
+dNormals = repmat([0; 0; 1], 1, 2);
+dVisibleFraction = ComputePanelSunVisibility([0; 0; 1], dNormals, ...
+    dSamplePoints, dFaceVertices, 1e-8);  % Return [0; 1].
+```
+
+Treat occluding triangles as opaque on both sides, regardless of winding or
+illumination. Exclude each emitting face. Shift the ray origin toward the Sun
+by the supplied offset and count only intersections beyond that same tolerance
+from the shifted origin. This excludes blockers within twice the offset of the
+original sample. Use a point-source Sun; partial visibility is the fraction of
+unblocked samples. Apply external eclipse factors separately. This geometry
+utility leaves the existing propagation and panel-force models unchanged.
+
+Run `testComputePanelSunVisibility` after `SetupSimGears` and adding
+`tests/matlab/simulation_models` to the path. The harness checks analytic
+occlusion, transforms, unit conversion, face ordering and invalid geometry.
+
+### Spacecraft SRP response tables
+
+Prepare geometry/optics with the owning panel builder, then generate a table on
+the host. Keep file parsing, descriptor families and provenance outside runtime
+force inputs. The body-frame spacecraft-to-Sun direction is the table query;
+mass, pressure, attitude and eclipse remain separate physical inputs.
+
+Resolve MathCore's `ComputeFileSha256` before generating host artifacts. The
+generator records source-file and prepared-model identities; deploy the fixed
+numeric payload for runtime evaluation.
+
+Use `EvalRHS_SRPLutWithBias` for force and analytical partials in metre or
+kilometre dynamics units. Supply resolved reference pressure, mass, nominal
+acceleration bias, pointing data and transverse selection; keep filter state
+indices and consider-mode flags in the filter adapter.
+Select this model through the trailing `bUseSrpLut`, `strResponseLut`,
+`strSrpData` and `bIncludeTransverse` inputs of `EvalRHS_InertialDynOrbit`.
+Compose SRP independently of residual acceleration and report the selected
+model through `strAccelInfo.dAccSRP` in the dynamics acceleration units.
+Use the same field for cannonball and LUT calls, and for panel truth in
+`EvalRHS_InertialDynMaxFidelity`. Keep one SRP acceleration in the diagnostic
+record. Run `testOrbitalSrpLutModels` for composition, bias, unit, eclipse and
+force-reporting checks without a filter-library dependency.
+
+```matlab
+strLut = BuildSrpResponseLut(strPanel, dReferenceArea, 5, bIncludeTransverse=true);
+strPayload = strLut.strResponseLut;
+[dScalarForce, dCr] = EvaluateSrpResponseLut([1; 0.2; 0.3], strPayload);
+[dFullForce, dSameCr] = EvaluateSrpResponseLut([1; 0.2; 0.3], strPayload, true);
+[dJac, ~, ~, dForce] = EvalJac_SrpResponseLut([1; 0.2; 0.3], strPayload, true);
+```
+
+Return force divided by pressure in square metres, a dimensionless scalar
+coefficient and a 3-by-3 response/query partial. Preserve the scalar law and
+remove each node's parallel force before interpolating vector samples:
+
+```text
+s_i = node spacecraft-to-Sun unit direction in body coordinates
+h_i = direct panel force divided by pressure
+t_i = (I - s_i s_i') h_i
+s = normalized query spacecraft-to-Sun direction
+f_scalar = -A_ref C(s) s
+f_transverse = (I - s s') Interp(t_i)
+f_full = f_scalar + f_transverse
+```
+
+Store `t_i` as `dTransverseForcePerPressure`. Interpolate it and `C` with the
+same four bilinear weights; differentiate normalization, interpolation and
+projection analytically. Keep full nodal forces as `dForcePerPressure` only
+in the host artifact for independent diagnostics. Purely radial models then
+have zero transverse response even between nodes.
+
+#### Fixed storage and code generation
+
+Pack six numeric fields: active azimuth/elevation counts, their axes,
+`dEffectiveCr` and `dReferenceArea_m2`. Add `dTransverseForcePerPressure` only
+when `bIncludeTransverse=true`. Default both host generation and packing to
+scalar storage. Preserve finite values, uniform axes, exact seam/pole equality,
+zero padding and nodal transverse orthogonality through ordinary validation.
+
+Default packing capacity is 361 by 181 nodes. The host generator instead
+matches storage to grid dimensions by default. A five-degree grid uses 73 by
+37 nodes: 22,504 numeric bytes for scalar storage or 87,328 with transverse
+samples. At maximum capacity these sizes are 527,080 and 2,095,264 bytes,
+respectively, before any platform-specific struct padding. Validate prepared
+data once, outside repeated force calls.
+
+Use `SSrpResponseLut` for the selected fixed layout in each generated target.
+Keep scalar and transverse artifacts separate; use identical capacities and
+field order across entry points within a build. Name resolved physical inputs
+`SSrpData` and pointing data `SSrpPointing`. Pass transverse selection separately as a constant input
+through `EvalRHS_SRPLutWithBias` and `EvalRHS_InertialDynOrbit`; keep pressure,
+mass, bias, pointing and states as numerical inputs.
+
+```matlab
+CodegenSrpResponseLut(charScalarRoot, strPayload);
+CodegenSrpResponseLut(charTransverseRoot, strPayload, bIncludeTransverse=true);
+CodegenSrpResponseLut(charJacRoot, strPayload, bIncludeTransverse=true, ...
+    charEntryPoint='EvalJac_SrpResponseLut');
+CodegenSrpResponseLut(charLibraryRoot, strPayload, charTarget='lib', ...
+    bIncludeTransverse=true, bFreezeTable=false);
+```
+
+Freeze inclusion during code generation independently of table embedding.
+MEX interfaces omit the inclusion flag and, for embedded builds, the table.
+Runtime-table builds accept numerical values with the selected fixed layout;
+scalar targets contain neither the transverse array nor its computations.
+Use `GenerateSrpLutDirections` for deterministic independent sphere queries.
+
+MEX builds default to one output; select another leading output count with
+`ui8OutputCount`. C++ libraries retain all outputs by default. Fix the output
+prefix at generation time: requesting fewer outputs from an existing MEX does
+not specialize its compiled calculations. Disable dynamic allocation and
+variable sizing in numerical targets; MEX gateways allocate MATLAB outputs.
+
+#### Physical acceleration and derivative conventions
+
+`ComputeSrpLutAcceleration` evaluates SI acceleration and analytical position,
+attitude and mass partials. Supply spacecraft-to-Sun displacement in metres,
+body-to-inertial rotation, mass in kg, and current pressure in N/m². Select the
+inverse-square pressure partial explicitly. Supply `dR/dr` when attitude depends
+on position; otherwise attitude is fixed. Gate target eclipse through the
+calling dynamics model's `bIsInEclipse`. Retain spacecraft self-shadowing in the
+prepared table; no partial-eclipse fraction or gradient is required.
+Right body rotation error means `R(delta)=R exp(skew(delta))`.
+Request only the needed leading outputs: acceleration, position partial,
+attitude partial, mass partial, then regularity. Compile-time `nargout` removes
+unrequested derivative branches. Force-only calls skip all Jacobian work.
+
+At interpolation knots/seam, use the selected one-sided cell derivative and
+return false regularity. Near a pole, tilt only the lookup direction by 1e-8 rad
+on a fixed golden-angle meridian whenever normalized XY radius is below 2.5e-9.
+Use no random generator or mutable state. Preserve the physical Sun direction
+in scalar force and transverse projection, and include the constant lookup
+rotation in the derivative chain. Return false regularity to identify adjusted
+queries. This defines an artificial local branch with a small switch boundary;
+it does not establish a unique derivative of the original angular interpolant.
+The filter uses the adjusted force/Jacobian consistently without pole rejection.
+
+Run focused owner checks through `SetupSimGears` and the test directory
+`tests/matlab/simulation_models/accelerations/srp_lut`. Independent constant-law
+checks, regular-point finite differences, boundary semantics, compact/legacy
+payload parity and source/generated parity are separate validation gates.
+
+### MATLAB dynamics and Jacobian names
+
+Use `EvalRHS_…` for right-hand-side kernels and `EvalJac_…` for Jacobians.
+Match each primary function name to its source filename. Update callers,
+function handles and generated entry points with the provider; rebuild MEX
+artifacts compiled from these entry points. The previous case spellings have
+no forwarding aliases.

@@ -69,8 +69,8 @@ classdef testGaussMarkovAccelSeq < matlab.unittest.TestCase
             strModelConfigFlagsOn = strModelConfigFlagsOff;
             strModelConfigFlagsOn.bIncludeStochasticAcceleration = true;
 
-            dxOff = evalRHS_InertialDynMaxFidelity(0.0, dxState, strDynParams, strModelConfigFlagsOff);
-            [dxOn, strAccelInfo] = evalRHS_InertialDynMaxFidelity(0.0, dxState, strDynParams, strModelConfigFlagsOn);
+            dxOff = EvalRHS_InertialDynMaxFidelity(0.0, dxState, strDynParams, strModelConfigFlagsOff);
+            [dxOn, strAccelInfo] = EvalRHS_InertialDynMaxFidelity(0.0, dxState, strDynParams, strModelConfigFlagsOn);
 
             testCase.verifyEqual(dxOn(1:3), dxOff(1:3), 'AbsTol', 0.0);
             testCase.verifyEqual(dxOn(4:6) - dxOff(4:6), ...

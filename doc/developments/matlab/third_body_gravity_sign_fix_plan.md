@@ -20,9 +20,9 @@ exact negative of the physical differential acceleration in both the generic-bod
   opposite acceleration.
 - [x] Add an independent arbitrary three-dimensional generic-body oracle.
 - [x] Exercise the separately implemented Sun third-body block with an arbitrary three-dimensional oracle.
-- [x] Exercise `evalRHS_InertialDynMaxFidelity` to prove the source-owner correction reaches its principal wrapper.
-- [x] Correct the generic-body leading sign in `evalRHS_InertialDynOrbit`.
-- [x] Correct the Sun leading sign in `evalRHS_InertialDynOrbit`.
+- [x] Exercise `EvalRHS_InertialDynMaxFidelity` to prove the source-owner correction reaches its principal wrapper.
+- [x] Correct the generic-body leading sign in `EvalRHS_InertialDynOrbit`.
+- [x] Correct the Sun leading sign in `EvalRHS_InertialDynOrbit`.
 - [x] Document the shared main-body-relative differential-gravity convention in the source header and formula block.
 
 ## Verification evidence

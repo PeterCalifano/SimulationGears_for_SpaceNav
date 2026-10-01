@@ -1,4 +1,11 @@
 classdef testEvalRHS_InertialDynMaxFidelity < matlab.unittest.TestCase
+    %% DESCRIPTION
+    % Verify force-model selection and independent acceleration references.
+    % Check that the selected panel or cannonball force occupies dAccSRP.
+    % -------------------------------------------------------------------------------------------------------------
+    %% CHANGELOG
+    % 01-10-2026  Pietro Califano, Codex GPT-6  Verify shared selected-SRP diagnostics.
+    % -------------------------------------------------------------------------------------------------------------
     methods (Test)
         function testMatchesOrbitRHSWhenPerturbationsDisabled(testCase)
             dxState = [4; 0; 0; 0; 0.2; 0];
@@ -7,8 +14,8 @@ classdef testEvalRHS_InertialDynMaxFidelity < matlab.unittest.TestCase
                               'bIncludeSRP', false, ...
                               'bIncludeSphericalHarmonics', false);
 
-            dxMax = evalRHS_InertialDynMaxFidelity(0.0, dxState, strDynParams, strModelConfigFlags);
-            dxOrbit = evalRHS_InertialDynOrbit(dxState, eye(3), ...
+            dxMax = EvalRHS_InertialDynMaxFidelity(0.0, dxState, strDynParams, strModelConfigFlags);
+            dxOrbit = EvalRHS_InertialDynOrbit(dxState, eye(3), ...
                                                strDynParams.strMainData.dGM, ...
                                                strDynParams.strMainData.dRefRadius, ...
                                                [], [], [], [], uint32(0));
@@ -25,11 +32,11 @@ classdef testEvalRHS_InertialDynMaxFidelity < matlab.unittest.TestCase
                                          'bIncludeSRP', false, ...
                                          'bIncludeSphericalHarmonics', true);
 
-            dxWithZeroSH = evalRHS_InertialDynMaxFidelity(0.0, dxState, strDynParams, strModelConfigFlags);
+            dxWithZeroSH = EvalRHS_InertialDynMaxFidelity(0.0, dxState, strDynParams, strModelConfigFlags);
 
             strDynParams.strMainData.dSHcoeff = [];
             strDynParams.strMainData.ui16MaxSHdegree = uint16(0);
-            dxCentral = evalRHS_InertialDynMaxFidelity(0.0, dxState, strDynParams, strModelConfigFlags);
+            dxCentral = EvalRHS_InertialDynMaxFidelity(0.0, dxState, strDynParams, strModelConfigFlags);
 
             testCase.verifyEqual(dxWithZeroSH, dxCentral, 'AbsTol', 1e-14);
         end
@@ -44,7 +51,7 @@ classdef testEvalRHS_InertialDynMaxFidelity < matlab.unittest.TestCase
             strDynParamsMissingDegree.strMainData.dSHcoeff = zeros(4, 2);
             strDynParamsMissingDegree.strMainData = rmfield(strDynParamsMissingDegree.strMainData, 'ui16MaxSHdegree');
 
-            testCase.verifyError(@() evalRHS_InertialDynMaxFidelity(0.0, dxState, ...
+            testCase.verifyError(@() EvalRHS_InertialDynMaxFidelity(0.0, dxState, ...
                 strDynParamsMissingDegree, strModelConfigFlags), ...
                 'ResolveInertialDynMaxFidelityConfig:MissingSHDegree');
 
@@ -52,7 +59,7 @@ classdef testEvalRHS_InertialDynMaxFidelity < matlab.unittest.TestCase
             strDynParamsInvalidDegree.strMainData.dSHcoeff = zeros(4, 2);
             strDynParamsInvalidDegree.strMainData.ui16MaxSHdegree = uint16(1);
 
-            testCase.verifyError(@() evalRHS_InertialDynMaxFidelity(0.0, dxState, ...
+            testCase.verifyError(@() EvalRHS_InertialDynMaxFidelity(0.0, dxState, ...
                 strDynParamsInvalidDegree, strModelConfigFlags), ...
                 'ResolveInertialDynMaxFidelityConfig:InvalidSHDegree');
         end
@@ -67,8 +74,8 @@ classdef testEvalRHS_InertialDynMaxFidelity < matlab.unittest.TestCase
                                 'bIncludeSRP', false, ...
                                 'bIncludeSphericalHarmonics', false);
 
-            [dxOff, strInfoOff] = evalRHS_InertialDynMaxFidelity(0.0, dxState, strDynParams, strModelConfigFlagsOff);
-            [dxOn, strInfoOn] = evalRHS_InertialDynMaxFidelity(0.0, dxState, strDynParams, strModelConfigFlagsOn);
+            [dxOff, strInfoOff] = EvalRHS_InertialDynMaxFidelity(0.0, dxState, strDynParams, strModelConfigFlagsOff);
+            [dxOn, strInfoOn] = EvalRHS_InertialDynMaxFidelity(0.0, dxState, strDynParams, strModelConfigFlagsOn);
 
             testCase.verifyEqual(dxOff(4:6), zeros(3, 1), 'AbsTol', 0.0);
             testCase.verifyGreaterThan(norm(dxOn(4:6)), 0.0);
@@ -87,19 +94,21 @@ classdef testEvalRHS_InertialDynMaxFidelity < matlab.unittest.TestCase
                               'bIncludeEclipse', false, ...
                               'bIncludeSphericalHarmonics', false);
 
-            dxNear = evalRHS_InertialDynMaxFidelity(0.0, [1; 0; 0; 0; 0; 0], strDynParams, strModelConfigFlags);
+            dxNear = EvalRHS_InertialDynMaxFidelity(0.0, [1; 0; 0; 0; 0; 0], strDynParams, strModelConfigFlags);
             strDynParams.strBody3rdData(1).strOrbitData.dChbvPolycoeffs = testCase.constantChebPosition([21; 0; 0]);
-            dxFar = evalRHS_InertialDynMaxFidelity(0.0, [1; 0; 0; 0; 0; 0], strDynParams, strModelConfigFlags);
+            dxFar = EvalRHS_InertialDynMaxFidelity(0.0, [1; 0; 0; 0; 0; 0], strDynParams, strModelConfigFlags);
 
             testCase.verifyEqual(dxNear(4), -8.0, 'AbsTol', 1e-14);
             testCase.verifyEqual(dxFar(4), -2.0, 'AbsTol', 1e-14);
 
             strModelConfigFlags.bIncludeEclipse = true;
             strDynParams.strBody3rdData(1).strOrbitData.dChbvPolycoeffs = testCase.constantChebPosition([10; 0; 0]);
-            [dxEclipse, strInfo] = evalRHS_InertialDynMaxFidelity(0.0, [-2; 0; 0; 0; 0; 0], strDynParams, strModelConfigFlags);
+            [dxEclipse, strInfo] = EvalRHS_InertialDynMaxFidelity(0.0, [-2; 0; 0; 0; 0; 0], strDynParams, strModelConfigFlags);
 
             testCase.verifyTrue(strInfo.bIsInEclipse);
             testCase.verifyEqual(dxEclipse(4:6), zeros(3, 1), 'AbsTol', 0.0);
+            testCase.verifyEqual(strInfo.dAccSRP, zeros(3, 1), 'AbsTol', 0.0);
+            testCase.verifyFalse(strInfo.bIsSRPActive);
         end
 
         function testLegacyFixedPressureSRPDefaultsWithoutReferenceDistance(testCase)
@@ -116,9 +125,9 @@ classdef testEvalRHS_InertialDynMaxFidelity < matlab.unittest.TestCase
                                          'bIncludeSphericalHarmonics', false, ...
                                          'bIncludePolyhedronGravity', false);
 
-            [dDxDt, strAccelInfo] = evalRHS_InertialDynMaxFidelity(0.0, ...
+            [dDxDt, strAccelInfo] = EvalRHS_InertialDynMaxFidelity(0.0, ...
                 dxState, strDynParams, strModelConfigFlags);
-            dDynMatrix = evalJac_InertialDynMaxFidelity(0.0, ...
+            dDynMatrix = EvalJac_InertialDynMaxFidelity(0.0, ...
                 dxState, strDynParams, strModelConfigFlags, strAccelInfo);
 
             testCase.verifyEqual(dDxDt(4:6), [-8; 0; 0], 'AbsTol', 1e-14);
@@ -140,10 +149,11 @@ classdef testEvalRHS_InertialDynMaxFidelity < matlab.unittest.TestCase
                               'bIncludeSphericalHarmonics', false, ...
                               'bRecomputeSRPpressureFromDistance', true);
 
-            [dxCannonball, strInfoCannonball] = evalRHS_InertialDynMaxFidelity(0.0, ...
+            [dxCannonball, strInfoCannonball] = EvalRHS_InertialDynMaxFidelity(0.0, ...
                 [1; 0; 0; 0; 0; 0], strDynParams, strModelConfigFlags);
             testCase.verifyTrue(strInfoCannonball.bCannonballSRPSelected);
             testCase.verifyFalse(strInfoCannonball.bPanelSRPSelected);
+            testCase.verifyEqual(strInfoCannonball.dAccSRP, dxCannonball(4:6), 'AbsTol', 0.0);
 
             strDynParams.strSCdata.strSRPpanelData = struct( ...
                 'dSCquadsArea', 2.0, ...
@@ -153,13 +163,15 @@ classdef testEvalRHS_InertialDynMaxFidelity < matlab.unittest.TestCase
                 'charLengthUnit', 'm');
             strDynParams.strSCdata.dA_SRP = 999.0;
 
-            [dxPanel, strInfoPanel] = evalRHS_InertialDynMaxFidelity(0.0, ...
+            [dxPanel, strInfoPanel] = EvalRHS_InertialDynMaxFidelity(0.0, ...
                 [1; 0; 0; 0; 0; 0], strDynParams, strModelConfigFlags);
 
             testCase.verifyTrue(strInfoPanel.bPanelSRPSelected);
             testCase.verifyFalse(strInfoPanel.bCannonballSRPSelected);
-            testCase.verifyEqual(strInfoPanel.dAccCannonBallSRP, zeros(3, 1), 'AbsTol', 0.0);
-            testCase.verifyGreaterThan(norm(strInfoPanel.dAccPanelSRP_IN), 0.0);
+            testCase.verifyEqual(strInfoPanel.dAccSRP, dxPanel(4:6), 'AbsTol', 0.0);
+            testCase.verifyGreaterThan(norm(strInfoPanel.dAccSRP), 0.0);
+            testCase.verifyTrue(strInfoPanel.bIsSRPActive);
+            testCase.verifyEqual(fieldnames(strInfoPanel), fieldnames(strInfoCannonball));
             testCase.verifyNotEqual(dxPanel(4:6), dxCannonball(4:6));
         end
 
@@ -192,7 +204,7 @@ classdef testEvalRHS_InertialDynMaxFidelity < matlab.unittest.TestCase
                               'bIncludeSphericalHarmonics', false);
             dxState = [4.0; 0.3; -0.2; 0.0; 0.0; 0.0];
 
-            [dDxDt, strInfo] = evalRHS_InertialDynMaxFidelity(0.0, dxState, strDynParams, strModelConfigFlags);
+            [dDxDt, strInfo] = EvalRHS_InertialDynMaxFidelity(0.0, dxState, strDynParams, strModelConfigFlags);
             dAccPolyTotal = EvalPolyhedronGrav(dxState(1:3), ...
                 ui32Faces, dVerts, dDensity, ui32Edges, dEe, dFf, dGravConst);
             dAccCentral = -dGravParam * dxState(1:3) / norm(dxState(1:3))^3;
@@ -229,7 +241,7 @@ classdef testEvalRHS_InertialDynMaxFidelity < matlab.unittest.TestCase
                                          'bIncludePolyhedronGravity', true);
             dxState = [4.0; 0.3; -0.2; 0.0; 0.0; 0.0];
 
-            testCase.verifyError(@() evalRHS_InertialDynMaxFidelity( ...
+            testCase.verifyError(@() EvalRHS_InertialDynMaxFidelity( ...
                 0.0, dxState, strDynParams, strModelConfigFlags), ...
                 'ResolveInertialDynMaxFidelityConfig:ConflictingGravityModels');
         end
@@ -263,18 +275,18 @@ classdef testEvalRHS_InertialDynMaxFidelity < matlab.unittest.TestCase
                               'bIncludePolyhedronGravity', false);
             dxState = [4.0; 0.3; -0.2; 0.0; 0.0; 0.0];
 
-            [~, strInfoCentral] = evalRHS_InertialDynMaxFidelity(0.0, dxState, strDynParams, strFlags);
+            [~, strInfoCentral] = EvalRHS_InertialDynMaxFidelity(0.0, dxState, strDynParams, strFlags);
 
             strFlags.bIncludeMainGravity = false;
-            [~, strInfoNone] = evalRHS_InertialDynMaxFidelity(0.0, dxState, strDynParams, strFlags);
+            [~, strInfoNone] = EvalRHS_InertialDynMaxFidelity(0.0, dxState, strDynParams, strFlags);
 
             strFlags.bIncludeMainGravity = true;
             strFlags.bIncludeSphericalHarmonics = true;
-            [~, strInfoSH] = evalRHS_InertialDynMaxFidelity(0.0, dxState, strDynParams, strFlags);
+            [~, strInfoSH] = EvalRHS_InertialDynMaxFidelity(0.0, dxState, strDynParams, strFlags);
 
             strFlags.bIncludeSphericalHarmonics = false;
             strFlags.bIncludePolyhedronGravity = true;
-            [~, strInfoPolyhedron] = evalRHS_InertialDynMaxFidelity(0.0, dxState, strDynParams, strFlags);
+            [~, strInfoPolyhedron] = EvalRHS_InertialDynMaxFidelity(0.0, dxState, strDynParams, strFlags);
 
             cellAccelInfo = {strInfoNone, strInfoCentral, strInfoSH, strInfoPolyhedron};
             bHasSelectionDiagnostic = cellfun( ...

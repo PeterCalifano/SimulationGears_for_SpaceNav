@@ -10,14 +10,15 @@ classdef testInertialDynMaxFidelityMexParity < matlab.unittest.TestCase
     % A separate payload verifies runtime target-attitude degrees within fixed coefficient capacity.
     % -------------------------------------------------------------------------------------------------------------
     %% CHANGELOG
+    % 01-10-2026  Pietro Califano, Codex GPT-6  Compare selected-SRP diagnostics in generated targets.
     % 24-07-2026  Pietro Califano, Codex    Add generated-code ephemeris orientation and parity regression.
     % 10-09-2026  Pietro Califano, Codex gpt-6    Cover runtime attitude data and fixed degree bounds.
     % 11-09-2026  Pietro Califano, Codex gpt-6    Remove unused runtime sign-switch metadata.
     % -------------------------------------------------------------------------------------------------------------
     %% DEPENDENCIES
     % BuildMexTargets_InertialDynMaxFidelity()
-    % evalRHS_InertialDynMaxFidelity()
-    % evalJac_InertialDynMaxFidelity()
+    % EvalRHS_InertialDynMaxFidelity()
+    % EvalJac_InertialDynMaxFidelity()
     % -------------------------------------------------------------------------------------------------------------
 
     properties (SetAccess = private)
@@ -69,10 +70,10 @@ classdef testInertialDynMaxFidelityMexParity < matlab.unittest.TestCase
             % Guard the target ordering consumed by the parity loop so a
             % builder-interface change fails with an explicit diagnostic.
             cellExpectedTargets = { ...
-                'evalRHS_InertialDynMaxFidelity_mex', ...
-                'evalJac_InertialDynMaxFidelity_mex', ...
-                'evalRHS_InertialDynMaxFidelity_polyhedron_mex', ...
-                'evalJac_InertialDynMaxFidelity_polyhedron_mex'};
+                'EvalRHS_InertialDynMaxFidelity_mex', ...
+                'EvalJac_InertialDynMaxFidelity_mex', ...
+                'EvalRHS_InertialDynMaxFidelity_polyhedron_mex', ...
+                'EvalJac_InertialDynMaxFidelity_polyhedron_mex'};
             self.assertEqual(self.strMexInfo.cellMexTargets, ...
                 cellExpectedTargets);
         end
@@ -99,7 +100,7 @@ classdef testInertialDynMaxFidelityMexParity < matlab.unittest.TestCase
             % 10-09-2026  Pietro Califano, Codex gpt-6    Add attitude ephemeris codegen regression.
             % -----------------------------------------------------------------------------------------------------
             %% DEPENDENCIES
-            % evalRHS_InertialDynMaxFidelity, evalJac_InertialDynMaxFidelity, MATLAB Coder.
+            % EvalRHS_InertialDynMaxFidelity, EvalJac_InertialDynMaxFidelity, MATLAB Coder.
             % -----------------------------------------------------------------------------------------------------
 
             [dTime, dxState, strParams, strFlags, strInfo] = self.buildRepresentativeInputs_();
@@ -118,10 +119,10 @@ classdef testInertialDynMaxFidelityMexParity < matlab.unittest.TestCase
             objConfig.EnableVariableSizing = true;
             objConfig.EnableDynamicMemoryAllocation = true;
             cellInputs = {dTime, dxState, strParams, coder.Constant(strFlags)};
-            codegen('-config', objConfig, 'evalRHS_InertialDynMaxFidelity', ...
+            codegen('-config', objConfig, 'EvalRHS_InertialDynMaxFidelity', ...
                 '-args', cellInputs, '-o', fullfile(charBuildDir, 'AttitudeRHS_mex'), ...
                 '-d', fullfile(charBuildDir, 'rhs'));
-            codegen('-config', objConfig, 'evalJac_InertialDynMaxFidelity', ...
+            codegen('-config', objConfig, 'EvalJac_InertialDynMaxFidelity', ...
                 '-args', [cellInputs, {strInfo}], '-o', fullfile(charBuildDir, 'AttitudeJac_mex'), ...
                 '-d', fullfile(charBuildDir, 'jac'));
 
@@ -134,8 +135,8 @@ classdef testInertialDynMaxFidelityMexParity < matlab.unittest.TestCase
                 for dAngle = [0.0, 0.4]
                     dCoefficients([1, ui32Degree + 2]) = [cos(dAngle / 2); sin(dAngle / 2)];
                     strParams.strMainData.strAttData.dChbvPolycoeffs = dCoefficients;
-                    dRHS = evalRHS_InertialDynMaxFidelity(dTime, dxState, strParams, strFlags);
-                    dJac = evalJac_InertialDynMaxFidelity(dTime, dxState, strParams, strFlags, strInfo);
+                    dRHS = EvalRHS_InertialDynMaxFidelity(dTime, dxState, strParams, strFlags);
+                    dJac = EvalJac_InertialDynMaxFidelity(dTime, dxState, strParams, strFlags, strInfo);
                     self.verifyEqual(AttitudeRHS_mex(dTime, dxState, strParams, strFlags), ...
                         dRHS, 'AbsTol', 1e-13);
                     self.verifyEqual(AttitudeJac_mex(dTime, dxState, strParams, strFlags, strInfo), ...
@@ -171,8 +172,8 @@ classdef testInertialDynMaxFidelityMexParity < matlab.unittest.TestCase
             % 24-07-2026  Pietro Califano, Codex    First implementation.
             % -----------------------------------------------------------------------------------------------------
             %% DEPENDENCIES
-            % evalRHS_InertialDynMaxFidelity()
-            % evalJac_InertialDynMaxFidelity()
+            % EvalRHS_InertialDynMaxFidelity()
+            % EvalJac_InertialDynMaxFidelity()
             % -----------------------------------------------------------------------------------------------------
 
             [dStateTimetag, dxState_IN, strDynParams, ...
@@ -203,7 +204,7 @@ classdef testInertialDynMaxFidelityMexParity < matlab.unittest.TestCase
                 strSelectedFlags = cellModelConfigFlags{dModelIdx};
 
                 [dRHSsource, strInfoSource] = ...
-                    evalRHS_InertialDynMaxFidelity( ...
+                    EvalRHS_InertialDynMaxFidelity( ...
                         dStateTimetag, dxState_IN, strDynParams, ...
                         strSelectedFlags);
                 [dRHSmex, strInfoMex] = feval( ...
@@ -211,7 +212,7 @@ classdef testInertialDynMaxFidelityMexParity < matlab.unittest.TestCase
                     dStateTimetag, dxState_IN, strDynParams, ...
                     strSelectedFlags);
 
-                dJacSource = evalJac_InertialDynMaxFidelity( ...
+                dJacSource = EvalJac_InertialDynMaxFidelity( ...
                     dStateTimetag, dxState_IN, strDynParams, ...
                     strSelectedFlags, strAccelInfo);
                 dJacMex = feval(cellJacTargets{dModelIdx}, ...
@@ -221,6 +222,8 @@ classdef testInertialDynMaxFidelityMexParity < matlab.unittest.TestCase
                 self.verifyEqual(dRHSmex, dRHSsource, ...
                     'AbsTol', 1.0e-13, ...
                     sprintf('%s RHS source/MEX mismatch.', charModelName));
+                self.verifyEqual(strInfoMex.dAccSRP, strInfoSource.dAccSRP, 'AbsTol', 1.0e-13);
+                self.verifyEqual(strInfoMex.bIsSRPActive, strInfoSource.bIsSRPActive);
                 self.verifyEqual(dJacMex, dJacSource, ...
                     'AbsTol', 1.0e-12, ...
                     sprintf('%s Jacobian source/MEX mismatch.', ...
@@ -263,7 +266,7 @@ classdef testInertialDynMaxFidelityMexParity < matlab.unittest.TestCase
             %% DEPENDENCIES
             % CodegenInertialFixedStepProbe()
             % PropagateFixedStep()
-            % evalRHS_InertialDynMaxFidelity()
+            % EvalRHS_InertialDynMaxFidelity()
             % -----------------------------------------------------------------------------------------------------
 
             [~, dxInitialState, strDynParams, ...

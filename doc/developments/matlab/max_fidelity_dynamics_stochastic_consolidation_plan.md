@@ -23,10 +23,10 @@
 
 ## Current Open Changes Included In This Plan
 
-- [ ] **Staged SRP/Jacobian candidate:** `matlab/simulation_models/accelerations/EvalJac_QuadsModelSRP.m`, staged changes in `matlab/simulation_models/dynamics/evalJac_InertialDynMaxFidelity.m`, `tests/matlab/simulation_models/accelerations/testComputeQuadsModelSRP.m`, and `tests/matlab/simulation_models/dynamics/testEvalJac_InertialDynMaxFidelityPanelSRP.m` are the current analytical panel-SRP Jacobian batch.
+- [ ] **Staged SRP/Jacobian candidate:** `matlab/simulation_models/accelerations/EvalJac_QuadsModelSRP.m`, staged changes in `matlab/simulation_models/dynamics/EvalJac_InertialDynMaxFidelity.m`, `tests/matlab/simulation_models/accelerations/testComputeQuadsModelSRP.m`, and `tests/matlab/simulation_models/dynamics/testEvalJac_InertialDynMaxFidelityPanelSRP.m` are the current analytical panel-SRP Jacobian batch.
 - [ ] **Staged settings support:** `matlab/general_utils/datastructs/CBaseSettings.m` is staged but not obviously part of this dynamics batch; review before including it in any stage.
 - [ ] **Unstaged stochastic edit:** `matlab/simulation_models/accelerations/EvalGaussMarkovAccel.m` has an unstaged edit and must be reviewed before changing the stochastic data contract.
-- [ ] **Unstaged Jacobian edit:** `matlab/simulation_models/dynamics/evalJac_InertialDynMaxFidelity.m` has staged plus unstaged changes; inspect with cached and non-cached diffs before editing.
+- [ ] **Unstaged Jacobian edit:** `matlab/simulation_models/dynamics/EvalJac_InertialDynMaxFidelity.m` has staged plus unstaged changes; inspect with cached and non-cached diffs before editing.
 - [ ] **Untracked adjacent dynamics work:** finite-burn, RHS, SRP, photometry, propagator, generator, and `tools/gravity/` files are present but are not automatically part of this plan unless a task below names them explicitly.
 
 ## Current Direction
@@ -53,8 +53,8 @@
 **Files:**
 - Read: `matlab/simulation_models/accelerations/EvalJac_QuadsModelSRP.m`
 - Read: `matlab/simulation_models/accelerations/EvalGaussMarkovAccel.m`
-- Read: `matlab/simulation_models/dynamics/evalRHS_InertialDynMaxFidelity.m`
-- Read: `matlab/simulation_models/dynamics/evalJac_InertialDynMaxFidelity.m`
+- Read: `matlab/simulation_models/dynamics/EvalRHS_InertialDynMaxFidelity.m`
+- Read: `matlab/simulation_models/dynamics/EvalJac_InertialDynMaxFidelity.m`
 - Read: `matlab/simulation_models/dynamics/private/ResolveInertialDynMaxFidelityConfig.m`
 - Test: `tests/matlab/simulation_models/accelerations/testComputeQuadsModelSRP.m`
 - Test: `tests/matlab/simulation_models/dynamics/testEvalJac_InertialDynMaxFidelityPanelSRP.m`
@@ -65,8 +65,8 @@
 - Produces a written decision on whether `CBaseSettings.m` belongs to this dynamics commit stream.
 
 - [ ] Inspect cached and unstaged diffs separately:
-  - `git diff --cached -- matlab/simulation_models/accelerations/EvalJac_QuadsModelSRP.m matlab/simulation_models/dynamics/evalJac_InertialDynMaxFidelity.m tests/matlab/simulation_models/accelerations/testComputeQuadsModelSRP.m tests/matlab/simulation_models/dynamics/testEvalJac_InertialDynMaxFidelityPanelSRP.m`
-  - `git diff -- matlab/simulation_models/accelerations/EvalGaussMarkovAccel.m matlab/simulation_models/dynamics/evalJac_InertialDynMaxFidelity.m`
+  - `git diff --cached -- matlab/simulation_models/accelerations/EvalJac_QuadsModelSRP.m matlab/simulation_models/dynamics/EvalJac_InertialDynMaxFidelity.m tests/matlab/simulation_models/accelerations/testComputeQuadsModelSRP.m tests/matlab/simulation_models/dynamics/testEvalJac_InertialDynMaxFidelityPanelSRP.m`
+  - `git diff -- matlab/simulation_models/accelerations/EvalGaussMarkovAccel.m matlab/simulation_models/dynamics/EvalJac_InertialDynMaxFidelity.m`
 - [ ] Run focused baseline tests for the currently staged Jacobian candidate:
   - `runtests('tests/matlab/simulation_models/accelerations/testComputeQuadsModelSRP')`
   - `runtests('tests/matlab/simulation_models/dynamics/testEvalJac_InertialDynMaxFidelityPanelSRP')`
@@ -76,8 +76,8 @@
 
 **Files:**
 - Modify: `matlab/simulation_models/dynamics/private/ResolveInertialDynMaxFidelityConfig.m`
-- Modify: `matlab/simulation_models/dynamics/evalRHS_InertialDynMaxFidelity.m`
-- Modify: `matlab/simulation_models/dynamics/evalJac_InertialDynMaxFidelity.m`
+- Modify: `matlab/simulation_models/dynamics/EvalRHS_InertialDynMaxFidelity.m`
+- Modify: `matlab/simulation_models/dynamics/EvalJac_InertialDynMaxFidelity.m`
 - Test: `tests/matlab/simulation_models/dynamics/testEvalRHS_InertialDynMaxFidelity.m`
 
 **Interfaces:**
@@ -108,8 +108,8 @@
 **Files:**
 - Create: `matlab/simulation_models/dynamics/private/ResolveSCQuaternion.m`
 - Create: `matlab/simulation_models/accelerations/ComputePolyhedronGravityJacobianCorrection.m`
-- Modify: `matlab/simulation_models/dynamics/evalRHS_InertialDynMaxFidelity.m`
-- Modify: `matlab/simulation_models/dynamics/evalJac_InertialDynMaxFidelity.m`
+- Modify: `matlab/simulation_models/dynamics/EvalRHS_InertialDynMaxFidelity.m`
+- Modify: `matlab/simulation_models/dynamics/EvalJac_InertialDynMaxFidelity.m`
 - Test: `tests/matlab/simulation_models/dynamics/testEvalJac_InertialDynMaxFidelityPanelSRP.m`
 - Test: `tests/matlab/simulation_models/dynamics/testEvalRHS_InertialDynMaxFidelity.m`
 
@@ -150,8 +150,8 @@
 **Files:**
 - Create: `matlab/simulation_models/accelerations/EvalStochasticGravityRTNAccel.m`
 - Create: `matlab/simulation_models/accelerations/EvalJac_StochasticGravityRTNAccel.m`
-- Modify: `matlab/simulation_models/dynamics/evalRHS_InertialDynMaxFidelity.m`
-- Modify: `matlab/simulation_models/dynamics/evalJac_InertialDynMaxFidelity.m`
+- Modify: `matlab/simulation_models/dynamics/EvalRHS_InertialDynMaxFidelity.m`
+- Modify: `matlab/simulation_models/dynamics/EvalJac_InertialDynMaxFidelity.m`
 - Test: `tests/matlab/simulation_models/accelerations/testStochasticGravityRTNAccel.m`
 - Test: `tests/matlab/simulation_models/dynamics/testEvalJac_InertialDynMaxFidelityStochastic.m`
 
@@ -175,8 +175,8 @@
 **Files:**
 - Create: `matlab/simulation_models/accelerations/EvalStochasticSRPAccel.m`
 - Create: `matlab/simulation_models/accelerations/EvalJac_StochasticSRPAccel.m`
-- Modify: `matlab/simulation_models/dynamics/evalRHS_InertialDynMaxFidelity.m`
-- Modify: `matlab/simulation_models/dynamics/evalJac_InertialDynMaxFidelity.m`
+- Modify: `matlab/simulation_models/dynamics/EvalRHS_InertialDynMaxFidelity.m`
+- Modify: `matlab/simulation_models/dynamics/EvalJac_InertialDynMaxFidelity.m`
 - Test: `tests/matlab/simulation_models/accelerations/testStochasticSRPAccel.m`
 - Test: `tests/matlab/simulation_models/dynamics/testEvalJac_InertialDynMaxFidelityStochastic.m`
 
@@ -197,8 +197,8 @@
 ## Task 7: RHS And Jacobian Integration
 
 **Files:**
-- Modify: `matlab/simulation_models/dynamics/evalRHS_InertialDynMaxFidelity.m`
-- Modify: `matlab/simulation_models/dynamics/evalJac_InertialDynMaxFidelity.m`
+- Modify: `matlab/simulation_models/dynamics/EvalRHS_InertialDynMaxFidelity.m`
+- Modify: `matlab/simulation_models/dynamics/EvalJac_InertialDynMaxFidelity.m`
 - Modify: `matlab/simulation_models/dynamics/private/ResolveInertialDynMaxFidelityConfig.m`
 - Test: `tests/matlab/simulation_models/dynamics/testEvalRHS_InertialDynMaxFidelity.m`
 - Test: `tests/matlab/simulation_models/dynamics/testEvalJac_InertialDynMaxFidelityStochastic.m`
@@ -218,7 +218,7 @@
 - [ ] Add RHS tests that enabling each channel changes only the acceleration rows.
 - [ ] Add RHS tests that both channels add linearly after deterministic force selection.
 - [ ] Add RHS tests that SRP stochastic contribution is zero during eclipse while gravity stochastic contribution remains active.
-- [ ] Add Jacobian tests that RHS finite differences match `evalJac_InertialDynMaxFidelity(...)` when one or both stochastic channels are active.
+- [ ] Add Jacobian tests that RHS finite differences match `EvalJac_InertialDynMaxFidelity(...)` when one or both stochastic channels are active.
 - [ ] Add tests that legacy absolute inertial stochastic data still produces the existing behavior.
 
 ## Task 8: Documentation, Changelog, And Final Review
@@ -226,8 +226,8 @@
 **Files:**
 - Modify: `matlab/simulation_models/accelerations/GenerateGaussMarkovAccelSeq.m`
 - Modify: `matlab/simulation_models/accelerations/EvalGaussMarkovAccel.m`
-- Modify: `matlab/simulation_models/dynamics/evalRHS_InertialDynMaxFidelity.m`
-- Modify: `matlab/simulation_models/dynamics/evalJac_InertialDynMaxFidelity.m`
+- Modify: `matlab/simulation_models/dynamics/EvalRHS_InertialDynMaxFidelity.m`
+- Modify: `matlab/simulation_models/dynamics/EvalJac_InertialDynMaxFidelity.m`
 - Modify: `matlab/simulation_models/dynamics/private/ResolveInertialDynMaxFidelityConfig.m`
 - Review: all new helper/test files from Tasks 3-7.
 

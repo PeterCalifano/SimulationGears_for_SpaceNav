@@ -29,8 +29,8 @@ end
 %                                               Jacobian/STM and polyhedron perturbation support.
 % -------------------------------------------------------------------------------------------------------------
 %% DEPENDENCIES
-% evalRHS_InertialDynMaxFidelity()
-% evalJac_InertialDynMaxFidelity()
+% EvalRHS_InertialDynMaxFidelity()
+% EvalJac_InertialDynMaxFidelity()
 % -------------------------------------------------------------------------------------------------------------
 
 %% Function code
@@ -41,11 +41,11 @@ assert(numel(dxState) == 6 || numel(dxState) == 42, ...
 bPropagateSTM = numel(dxState) == 42;
 dxOrbitState = dxState(1:6);
 
-[dDxDtOrbit, strAccelInfo] = evalRHS_InertialDynMaxFidelity(dStateTimetag, dxOrbitState, strDynParams);
+[dDxDtOrbit, strAccelInfo] = EvalRHS_InertialDynMaxFidelity(dStateTimetag, dxOrbitState, strDynParams);
 
 dDynMatrix = zeros(6, 6);
 if nargout > 2 || bPropagateSTM
-    dDynMatrix = evalJac_InertialDynMaxFidelity(dStateTimetag, dxOrbitState, strDynParams, struct(), strAccelInfo);
+    dDynMatrix = EvalJac_InertialDynMaxFidelity(dStateTimetag, dxOrbitState, strDynParams, struct(), strAccelInfo);
 end
 
 if bPropagateSTM
