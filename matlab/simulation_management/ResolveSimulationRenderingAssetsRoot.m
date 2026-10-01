@@ -5,6 +5,7 @@ function charAssetRootPath = ResolveSimulationRenderingAssetsRoot(options)
 %% DESCRIPTION
 % Resolve the shared external simulation-rendering asset root. The root owns
 % large runtime payloads referenced by tracked SimulationGears manifests.
+% Use SPECTRA_RT_RENDERING_DATA unless an explicit root override is supplied.
 % -------------------------------------------------------------------------------------------------------------
 %% INPUT
 % options.charAssetRootPath (1,:) string = ""; explicit root override.
@@ -26,12 +27,12 @@ end
 if strlength(options.charAssetRootPath) > 0
     charAssetRootPath = string(options.charAssetRootPath);
 else
-    charAssetRootPath = string(getenv("RENDERING_DATA"));
+    charAssetRootPath = string(getenv("SPECTRA_RT_RENDERING_DATA"));
 end
 
 if strlength(charAssetRootPath) == 0 || ~isfolder(charAssetRootPath)
     error("ResolveSimulationRenderingAssetsRoot:MissingAssetRoot", ...
-        ["Simulation rendering asset root not found. Pass charAssetRootPath " ...
-         "or set RENDERING_DATA to the shared simulation_rendering_assets directory."]);
+        "Simulation rendering asset root not found. Pass charAssetRootPath " + ...
+        "or set SPECTRA_RT_RENDERING_DATA to the shared simulation_rendering_assets directory.");
 end
 end
