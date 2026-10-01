@@ -114,7 +114,7 @@
 - Test: `tests/matlab/simulation_models/dynamics/testEvalRHS_InertialDynMaxFidelity.m`
 
 **Interfaces:**
-- `ResolveSCQuaternion(strDynParams)` returns `dqSCBwrtIN` and owns the spacecraft-attitude default/fallback rule used by RHS and Jacobian.
+- `ResolveAttQuat_INfromSCB(strDynParams)` returns `dQuat_INfromSCB` and owns the spacecraft-attitude default/fallback rule used by RHS and Jacobian.
 - `ComputePolyhedronGravityJacobianCorrection(dPosSC_IN, dDCMmainAtt_INfromTF, dMainGM, strPolyhedronGravityData)` returns the inertial-frame polyhedron-over-central gravity Jacobian correction.
 
 - [ ] Move local `ResolveSCQuaternion_` to the dedicated private function without changing behavior.

@@ -7,7 +7,8 @@ function strFetchPlan = FetchScenarioData(enumOrName, options)
 % -------------------------------------------------------------------------------------------------------------
 %% INPUT
 % enumOrName                   (1,:) string, char, or EnumScenarioName identifying the scenario.
-% options.charDataRootPath     (1,:) string = ""; override for the SimulationGears data root.
+% options.charDataRootPath     (1,:) string = ""; tracked-manifest root override.
+% options.charAssetRootPath    (1,:) string = ""; external-payload root override.
 % options.cellAssetIds         (1,:) cell = {}; optional manifest asset ids to fetch or plan.
 % options.bDryRun              (1,1) logical = false; return the fetch plan without downloading.
 % options.bRequireLocalAssets  (1,1) logical = false; validate required local assets before planning.
@@ -16,15 +17,18 @@ function strFetchPlan = FetchScenarioData(enumOrName, options)
 % strFetchPlan                 (1,1) struct with scenario, data-root, dry-run, and per-asset plan fields.
 % -------------------------------------------------------------------------------------------------------------
 %% CHANGELOG
-% 01-07-2026    Pietro Califano     Add MATLAB-side scenario asset planning and fetch helper.
+% 21-09-2026  Pietro Califano, Codex gpt-5.6  Download payloads into the shared external asset root.
+% 01-07-2026  Pietro Califano     Add MATLAB-side scenario asset planning and fetch helper.
 % -------------------------------------------------------------------------------------------------------------
 %% DEPENDENCIES
-% CScenarioRegistry, ResolveSimGearsDataRoot, LoadScenarioDataManifest, ValidateScenarioDataManifest, websave.
+% CScenarioRegistry, ResolveSimGearsDataRoot, ResolveScenarioAssetPath,
+% LoadScenarioDataManifest, ValidateScenarioDataManifest, websave.
 % -------------------------------------------------------------------------------------------------------------
 
 arguments
     enumOrName (1,:) {mustBeA(enumOrName, ["string", "char", "EnumScenarioName"])}
     options.charDataRootPath (1,:) string = ""
+    options.charAssetRootPath (1,:) string = ""
     options.cellAssetIds (1,:) cell = {}
     options.bDryRun (1,1) logical = false
     options.bRequireLocalAssets (1,1) logical = false
@@ -37,9 +41,10 @@ charManifestPath = fullfile(charDataRootPath, strScenarioSpec.charDataManifestRe
 strManifest = LoadScenarioDataManifest(charCanonicalName, charDataRootPath=charDataRootPath);
 ValidateScenarioDataManifest(strManifest, charCanonicalName, ...
     charDataRootPath=charDataRootPath, ...
+    charAssetRootPath=options.charAssetRootPath, ...
     bRequireLocalAssets=options.bRequireLocalAssets);
 
-strAssets = strManifest.assets;
+strAssets = NormalizeManifestStructArray(strManifest.assets);
 if ~isempty(options.cellAssetIds)
     cellRequestedIds = string(options.cellAssetIds);
     bKeepAsset = ismember(string({strAssets.asset_id}), cellRequestedIds);
@@ -62,7 +67,13 @@ strFetchAssets = repmat(struct( ...
     "bDownloaded", false), 1, numel(strAssets));
 
 for idxAsset = 1:numel(strAssets)
-    charLocalPath = string(fullfile(charDataRootPath, string(strAssets(idxAsset).local_path)));
+    if double(strManifest.schema_version) >= 2
+        charLocalPath = ResolveScenarioAssetPath( ...
+            string(strAssets(idxAsset).local_path), ...
+            charAssetRootPath=options.charAssetRootPath);
+    else
+        charLocalPath = string(fullfile(charDataRootPath, string(strAssets(idxAsset).local_path)));
+    end
     bExists = isfile(charLocalPath) || isfolder(charLocalPath);
     bWouldDownload = ~bExists;
 
@@ -110,6 +121,8 @@ end
 strFetchPlan = struct( ...
     "charScenarioName", charCanonicalName, ...
     "charDataRootPath", charDataRootPath, ...
+    "charAssetRootPath", ResolveSimulationRenderingAssetsRoot( ...
+        charAssetRootPath=options.charAssetRootPath), ...
     "bDryRun", options.bDryRun, ...
     "strAssets", strFetchAssets);
 end

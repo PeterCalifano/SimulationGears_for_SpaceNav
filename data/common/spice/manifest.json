@@ -1,15 +1,15 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "collection_name": "common_spice",
   "assets": [
     {
       "asset_id": "naif0012_lsk",
       "asset_type": "spice",
-      "local_path": "common/spice/assets/naif0012.tls",
+      "local_path": "assets/common/spice/naif0012.tls",
       "source_url": "https://naif.jpl.nasa.gov/pub/naif/generic_kernels/lsk/",
       "download_url": "",
       "sha256": "",
-      "size_gb": 0.00001,
+      "size_gb": 1e-05,
       "fidelity": "standard",
       "required_for_shape_runnable": false
     }

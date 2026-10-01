@@ -27,6 +27,8 @@ end
 % dStateTimetag:       (1,1) double   Dynamics evaluation time.
 % dxState_IN:          (:,1) double   Inertial state; first six entries are Cartesian orbit states.
 % strDynParams:        (1,1) struct   Dynamics payload with enabled force-model data.
+%                                  Fixed coefficient storage bounds the interpolation workspace.
+%                                  Active degrees, coefficients and epochs remain runtime data.
 % strModelConfigFlags: (1,1) struct   Optional compile-time model-configuration overrides.
 % -------------------------------------------------------------------------------------------------------------
 %% OUTPUT
@@ -39,6 +41,8 @@ end
 % 01-07-2026    Pietro Califano, Codex 5.5      Add optional pre-generated stochastic residual acceleration hook.
 % 22-07-2026    Pietro Califano, Codex           Evaluate exactly one selected target-gravity model.
 % 23-07-2026    Pietro Califano, Codex           Fix generated-code Sun ephemeris column orientation.
+% 10-09-2026    Pietro Califano, Codex gpt-6    Derive codegen degree bounds from ephemeris storage.
+% 11-09-2026  Pietro Califano, Codex gpt-6    Remove unused runtime sign-switch metadata.
 % -------------------------------------------------------------------------------------------------------------
 %% DEPENDENCIES
 % ResolveInertialDynMaxFidelityConfig()
@@ -174,23 +178,17 @@ if ~coder.const(isfield(strAttData, 'dChbvPolycoeffs')) || isempty(strAttData.dC
     return
 end
 
+% Bound the workspace by fixed storage while retaining the runtime active degree.
+ui32AttMaxDegree = coder.const(uint32(floor(numel(strAttData.dChbvPolycoeffs) / 4)) - 1);
+
 dTimeEvalPoint = min(max(dStateTimetag, strAttData.dTimeLowBound), strAttData.dTimeUpBound);
 dQuat_INfromTF = evalAttQuatChbvPolyWithCoeffs(strAttData.ui32PolyDeg, ...
                                                4, ...
                                                dTimeEvalPoint, ...
                                                strAttData.dChbvPolycoeffs, ...
-                                               ResolveSignSwitchIntervals_(strAttData), ...
                                                strAttData.dTimeLowBound, ...
-                                               strAttData.dTimeUpBound);
+                                               strAttData.dTimeUpBound, ui32AttMaxDegree);
 dDCMmainAtt_INfromTF = Quat2DCM(dQuat_INfromTF, true);
-end
-
-function dsignSwitchIntervals = ResolveSignSwitchIntervals_(strAttData)
-% Return attitude quaternion sign-switch intervals with empty default.
-dsignSwitchIntervals = zeros(0, 2);
-if coder.const(isfield(strAttData, 'dsignSwitchIntervals'))
-    dsignSwitchIntervals = strAttData.dsignSwitchIntervals;
-end
 end
 
 function [dBodyEphemerides, d3rdBodiesGM] = ResolveThirdBodyData_(dStateTimetag, ...
@@ -253,13 +251,17 @@ end
 
 function dPosition_IN = EvalBodyOrbitData_(dStateTimetag, strOrbitData)
 % Evaluate Chebyshev body ephemeris with endpoint clamping.
+% Bound the workspace by fixed storage while retaining the runtime active degree.
+ui32OrbitMaxDegree = coder.const(uint32(floor(numel(strOrbitData.dChbvPolycoeffs) / 3)) - 1);
+ui32ActiveCoeffCount = uint32(3) * (strOrbitData.ui32PolyDeg + 1);
 dTimeEvalPoint = min(max(dStateTimetag, strOrbitData.dTimeLowBound), strOrbitData.dTimeUpBound);
 dPosition_IN = evalChbvPolyWithCoeffs(strOrbitData.ui32PolyDeg, ...
                                       3, ...
                                       dTimeEvalPoint, ...
                                       strOrbitData.dChbvPolycoeffs, ...
                                       strOrbitData.dTimeLowBound, ...
-                                      strOrbitData.dTimeUpBound);
+                                      strOrbitData.dTimeUpBound, ...
+                                      ui32ActiveCoeffCount, ui32OrbitMaxDegree);
 end
 
 function [dCoeffSRP, dSolarPressure, bHasSunEphemeris] = ResolveCannonballSRP_(dxOrbitState, ...

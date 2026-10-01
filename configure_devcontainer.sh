@@ -12,7 +12,7 @@ DEVCONTAINER_JSON_WRITER="${DEVCONTAINER_DIR}/update_devcontainer_json.py"
 # Define supported options
 BASE_OPTIONS=("ubuntu-24.04" "ubuntu-22.04" "ubuntu-20.04" "ubuntu-18.04" "debian-12" "debian-11" "custom")
 ROS1_DISTROS=("noetic" "melodic")
-ROS2_DISTROS=("jazzy" "humble" "iron" "rolling")
+ROS2_DISTROS=("humble" "iron" "jazzy" "rolling")
 ROS_PROFILES=("ros-base" "desktop" "desktop-full")
 ROS2_PROFILES=("ros-base" "desktop")
 GPU_RUNTIME_OPTIONS=("auto" "docker" "podman")
@@ -33,11 +33,11 @@ Usage: ./configure_devcontainer.sh [options]
 Options:
   --cuda               Enable CUDA support.
   --cuda-version <v>   CUDA toolkit version for the nvidia-cuda feature (default: 12.9).
-  --gpu-runtime <r>    GPU runArgs mode: auto, docker, or podman (default: auto).
+  --gpu-runtime <r>    GPU runArgs mode for CUDA devcontainers: auto, docker, or podman (default: auto).
   --base <name>        Base image tag (ubuntu-24.04, ubuntu-22.04, ubuntu-20.04, ubuntu-18.04, debian-12, debian-11, custom).
   --base-image <img>   Full base image name (overrides --base).
   --ros <distro>       Install ROS 1 with selected distro (noetic, melodic).
-  --ros2 <distro>      Install ROS 2 (jazzy default; also humble, iron, rolling).
+  --ros2 <distro>      Install ROS 2 with selected distro (humble, iron, jazzy, rolling).
   --ros-profile <p>    ROS package profile (ros-base, desktop, desktop-full).
   --non-interactive    Fail if required options are missing instead of prompting.
   -h, --help           Show this help.
@@ -50,9 +50,8 @@ Examples:
 
 Note:
   CUDA is off by default (use --cuda to enable).
-  GPU runtime auto-detection prefers docker when both engines are installed.
-  ROS 1 pairings are melodic/18.04 and noetic/20.04.
-  ROS 2 pairings are humble|iron/22.04 and jazzy|rolling/24.04.
+  GPU runtime auto-detection prefers docker when both docker and podman are installed.
+  ROS 1 supports Ubuntu 18.04/20.04; ROS 2 supports Ubuntu 22.04+.
 EOF
 }
 
@@ -177,34 +176,6 @@ resolve_gpu_runtime() {
   echo "docker"
 }
 
-validate_ros_ubuntu_pairing() {
-  local ros_mode="$1"
-  local ros_distro="$2"
-  local ubuntu_version="$3"
-  local required_version=""
-  local ros_label=""
-
-  if [[ "$ros_mode" == "ros2" ]]; then
-    ros_label="ROS 2"
-    case "$ros_distro" in
-      humble | iron) required_version="22.04" ;;
-      jazzy | rolling) required_version="24.04" ;;
-    esac
-  else
-    ros_label="ROS 1"
-    case "$ros_distro" in
-      melodic) required_version="18.04" ;;
-      noetic) required_version="20.04" ;;
-    esac
-  fi
-
-  if [[ -n "$required_version" && "$ubuntu_version" != "$required_version" ]]; then
-    echo "${ros_label} ${ros_distro} requires Ubuntu ${required_version} (detected ${ubuntu_version})."
-    return 1
-  fi
-  return 0
-}
-
 #######################################
 # Main script 
 #######################################
@@ -267,7 +238,6 @@ NON_INTERACTIVE="no"
 CUDA_SET="no"
 GPU_RUNTIME_SET="no"
 BASE_SET="no"
-BASE_IMAGE_SET="no"
 ROS_MODE_SET="no"
 ROS_DISTRO_SET="no"
 ROS_PROFILE_SET="no"
@@ -312,7 +282,6 @@ while [[ $# -gt 0 ]]; do
     --base-image)
       shift
       BASE_IMAGE="${1:-}"
-      BASE_IMAGE_SET="yes"
       ;;
     --ros)
       ROS_MODE="ros"
@@ -350,12 +319,13 @@ while [[ $# -gt 0 ]]; do
   shift
 done
 
-# Fill mode-specific defaults before either interactive prompting or
-# non-interactive validation. Jazzy is the approved ROS 2 default.
-if [[ "$ROS_MODE" == "ros" && -z "$ROS_DISTRO" ]]; then
-  ROS_DISTRO="${ROS1_DISTROS[0]}"
-elif [[ "$ROS_MODE" == "ros2" && -z "$ROS_DISTRO" ]]; then
-  ROS_DISTRO="${ROS2_DISTROS[0]}"
+# Pre-fill defaults for interactive prompts
+if [[ "$NON_INTERACTIVE" != "yes" ]]; then
+  if [[ "$ROS_MODE" == "ros" && -z "$ROS_DISTRO" ]]; then
+    ROS_DISTRO="${ROS1_DISTROS[0]}"
+  elif [[ "$ROS_MODE" == "ros2" && -z "$ROS_DISTRO" ]]; then
+    ROS_DISTRO="${ROS2_DISTROS[0]}"
+  fi
 fi
 
 # Prompt user for options
@@ -518,8 +488,24 @@ ubuntu_version="$(detect_ubuntu_version "$effective_base")"
 
 if [[ "$ROS_MODE" != "none" ]]; then
   if [[ -n "$ubuntu_version" ]]; then
-    if ! validate_ros_ubuntu_pairing "$ROS_MODE" "$ROS_DISTRO" "$ubuntu_version"; then
-      exit 1
+    if [[ "$ROS_MODE" == "ros2" ]]; then
+      if [[ "$ubuntu_version" != "22.04" && "$ubuntu_version" != "24.04" ]]; then
+        echo "ROS 2 requires Ubuntu 22.04 or newer (detected ${ubuntu_version})."
+        exit 1
+      fi
+    else
+      if [[ "$ubuntu_version" != "18.04" && "$ubuntu_version" != "20.04" ]]; then
+        echo "ROS 1 requires Ubuntu 18.04 or 20.04 (detected ${ubuntu_version})."
+        exit 1
+      fi
+      if [[ "$ROS_DISTRO" == "noetic" && "$ubuntu_version" != "20.04" ]]; then
+        echo "ROS 1 noetic requires Ubuntu 20.04 (detected ${ubuntu_version})."
+        exit 1
+      fi
+      if [[ "$ROS_DISTRO" == "melodic" && "$ubuntu_version" != "18.04" ]]; then
+        echo "ROS 1 melodic requires Ubuntu 18.04 (detected ${ubuntu_version})."
+        exit 1
+      fi
     fi
   else
     if [[ "$effective_base" == *debian* ]]; then
@@ -530,33 +516,17 @@ if [[ "$ROS_MODE" != "none" ]]; then
   fi
 fi
 
-# Render both outputs before replacing either tracked configuration file.
-tmp_dockerfile="$(mktemp "${DEVCONTAINER_DIR}/.Dockerfile.tmp.XXXXXX")"
-tmp_json="$(mktemp "${DEVCONTAINER_DIR}/.devcontainer.json.tmp.XXXXXX")"
-rollback_dockerfile=""
-rollback_json=""
-replacement_started="no"
-replacement_complete="no"
-cleanup_temporary_files() {
-  local temporary_file
+# Backup existing file
+timestamp="$(date +%Y%m%d%H%M%S)"
+if [[ -f "$DEVCONTAINER_JSON" ]]; then
+  cp "$DEVCONTAINER_JSON" "${DEVCONTAINER_JSON}.bak.${timestamp}"
+fi
+if [[ -f "$DOCKERFILE" ]]; then
+  cp "$DOCKERFILE" "${DOCKERFILE}.bak.${timestamp}"
+fi
 
-  if [[ "$replacement_started" == "yes" && "$replacement_complete" != "yes" ]]; then
-    if [[ -n "$rollback_dockerfile" && -f "$rollback_dockerfile" ]]; then
-      cp -p "$rollback_dockerfile" "$DOCKERFILE"
-    fi
-    if [[ -n "$rollback_json" && -f "$rollback_json" ]]; then
-      cp -p "$rollback_json" "$DEVCONTAINER_JSON"
-    fi
-  fi
-
-  for temporary_file in "$tmp_dockerfile" "$tmp_json" "$rollback_dockerfile" "$rollback_json"; do
-    if [[ -n "$temporary_file" && -e "$temporary_file" ]]; then
-      rm -f -- "$temporary_file"
-    fi
-  done
-}
-trap cleanup_temporary_files EXIT
-
+# Write updated Dockerfile
+tmp_dockerfile="$(mktemp)"
 if [[ -n "$BASE_IMAGE" ]]; then
   new_from="FROM ${BASE_IMAGE}"
 else
@@ -573,49 +543,26 @@ if ! awk -v new_from="$new_from" '
   { print }
   END { if (replaced==0) exit 1 }
 ' "$DOCKERFILE" > "$tmp_dockerfile"; then
+  rm -f "$tmp_dockerfile"
   echo "Failed to update Dockerfile base image."
   exit 1
 fi
-chmod --reference="$DOCKERFILE" "$tmp_dockerfile"
+mv "$tmp_dockerfile" "$DOCKERFILE"
 
-# The updater reads the original JSON while the rendered Dockerfile remains
-# temporary, so any render failure leaves both tracked inputs unchanged.
+# Write updated devcontainer.json using python script.
+# Render to a temp file first: the writer reads the existing devcontainer.json
+# to preserve unmanaged keys, so it must not be truncated by the redirection.
+tmp_json="$(mktemp)"
 if ! CUDA="$CUDA" CUDA_VERSION="$CUDA_VERSION" \
      DEVCONTAINER_GPU_RUNTIME="$RESOLVED_GPU_RUNTIME" \
      ROS_MODE="$ROS_MODE" ROS_DISTRO="$ROS_DISTRO" ROS_PROFILE="$ROS_PROFILE" \
      DEVCONTAINER_JSON_PATH="$DEVCONTAINER_JSON" \
      python3 "$DEVCONTAINER_JSON_WRITER" > "$tmp_json"; then
+  rm -f "$tmp_json"
   echo "Failed to update devcontainer.json."
   exit 1
 fi
-if ! python3 -m json.tool "$tmp_json" >/dev/null; then
-  echo "Generated devcontainer.json is not valid JSON."
-  exit 1
-fi
-chmod --reference="$DEVCONTAINER_JSON" "$tmp_json"
-
-# Preserve user-visible backups only after both candidate files are valid.
-timestamp="$(date +%Y%m%d%H%M%S)"
-cp "$DEVCONTAINER_JSON" "${DEVCONTAINER_JSON}.bak.${timestamp}"
-cp "$DOCKERFILE" "${DOCKERFILE}.bak.${timestamp}"
-
-# Keep private rollback copies for the narrow interval between the two final
-# replacements. Restore both originals if either replacement fails.
-rollback_dockerfile="$(mktemp "${DEVCONTAINER_DIR}/.Dockerfile.rollback.XXXXXX")"
-rollback_json="$(mktemp "${DEVCONTAINER_DIR}/.devcontainer.json.rollback.XXXXXX")"
-cp -p "$DOCKERFILE" "$rollback_dockerfile"
-cp -p "$DEVCONTAINER_JSON" "$rollback_json"
-
-replacement_started="yes"
-if ! mv "$tmp_dockerfile" "$DOCKERFILE"; then
-  echo "Failed to replace Dockerfile."
-  exit 1
-fi
-if ! mv "$tmp_json" "$DEVCONTAINER_JSON"; then
-  echo "Failed to replace devcontainer.json; restored both original files."
-  exit 1
-fi
-replacement_complete="yes"
+mv "$tmp_json" "$DEVCONTAINER_JSON"
 
 echo "Updated:"
 echo "  - ${DOCKERFILE}"

@@ -2,7 +2,8 @@ classdef CShapeModel < CBaseDatastruct
     %% DESCRIPTION
     % Unified object class representing triangular meshes in the standard format (vertices, triangles),
     % where vertices are a set of 3D points and triangles a set of indices indicating which vertices form
-    % each triangle.
+    % each triangle. The `file_obj` loading method preserves the established OBJ behavior, while
+    % `file_mesh` loads repaired geometry from OBJ or STL through the shared host-side reader.
     % -------------------------------------------------------------------------------------------------------------
     %% CHANGELOG
     % 05-10-2024    Pietro Califano     First implementation completed.
@@ -13,9 +14,11 @@ classdef CShapeModel < CBaseDatastruct
     %                                   shape model with known density and mass
     % 24-04-2026    Pietro Califano     Add mesh simplification utility and load-time keep-fraction option
     % 01-07-2026    Pietro Califano     Add workspace MICE resolution and support OBJ v//vn face syntax.
+    % 28-08-2026    Pietro Califano     Add validated general OBJ/STL geometry loading.
+    % 21-09-2026    Pietro Califano, Codex gpt-5.6  Parse large OBJ face payloads in bounded blocks.
     % -------------------------------------------------------------------------------------------------------------
     %% DEPENDENCIES
-    % [-]
+    % LoadShapeMesh for `file_mesh` and explicit OBJ repair.
     % -------------------------------------------------------------------------------------------------------------
 
 
@@ -66,7 +69,7 @@ classdef CShapeModel < CBaseDatastruct
                 options)
             arguments
                 enumLoadingMethod       (1,:) string {mustBeA(enumLoadingMethod, ["string", "char"]), ...
-                    mustBeMember(enumLoadingMethod, ["mat", "cspice", "struct", "file_obj"])} = "file_obj"
+                    mustBeMember(enumLoadingMethod, ["mat", "cspice", "struct", "file_obj", "file_mesh"])} = "file_obj"
                 varInputData            (1,:) = []
                 charInputUnit           {mustBeA(charInputUnit, ["string", "char", "EnumLengthUnits"])} = 'km'
                 charTargetUnitOutput    {mustBeA(charTargetUnitOutput, ["string", "char", "EnumLengthUnits"])} = 'm'
@@ -118,6 +121,9 @@ classdef CShapeModel < CBaseDatastruct
 
                 elseif strcmpi(enumLoadingMethod, 'file_obj')
                     [self] = self.LoadModelFromObj_(varInputData, bVertFacesOnly);
+
+                elseif strcmpi(enumLoadingMethod, 'file_mesh')
+                    [self] = self.LoadModelFromMeshFile_(varInputData, bVertFacesOnly);
 
                 end
             end
@@ -569,10 +575,7 @@ classdef CShapeModel < CBaseDatastruct
                 self.dTexCoords, self.ui32TrianglesTexIndex, ...
                 self.dNormals, self.ui32TrianglesNormalsIndex] = CShapeModel.LoadModelFromObj(charObjFilePath, bVertFacesOnly);
 
-            % Transpose vertices and triangles
-            self.ui32triangVertexPtr = self.ui32triangVertexPtr;
-            self.dVerticesPos        = self.dVerticesPos;
-
+            % The legacy parser already returns column-major geometry; transpose only auxiliary data.
             if not(bVertFacesOnly)
                 self.dTexCoords = transpose(self.dTexCoords);
                 self.ui32TrianglesTexIndex = transpose(self.ui32TrianglesTexIndex);
@@ -583,6 +586,57 @@ classdef CShapeModel < CBaseDatastruct
             self = self.UpdateDerivedGeometry_();
             self.bHasData_ = true;
 
+        end
+
+        function self = LoadModelFromMeshFile_(self, charMeshFilePath, bVertFacesOnly)
+            %% SIGNATURE
+            % self = LoadModelFromMeshFile_(self, charMeshFilePath, bVertFacesOnly)
+            % -------------------------------------------------------------------------------------------------------------
+            %% DESCRIPTION
+            % Load repaired geometry from a supported OBJ or STL mesh file.
+            % Texture and normal payloads are intentionally outside this
+            % geometry-only loading contract.
+            % -------------------------------------------------------------------------------------------------------------
+            %% INPUT
+            % self:             Shape-model instance to populate.
+            % charMeshFilePath: Path to a supported OBJ or STL mesh.
+            % bVertFacesOnly:   Must be true because the shared reader owns geometry only.
+            % -------------------------------------------------------------------------------------------------------------
+            %% OUTPUT
+            % self:             Populated shape-model instance.
+            % -------------------------------------------------------------------------------------------------------------
+            %% CHANGELOG
+            % 28-08-2026  Pietro Califano     Add shared repaired OBJ/STL geometry loading.
+            % -------------------------------------------------------------------------------------------------------------
+            %% DEPENDENCIES
+            % LoadShapeMesh.
+            % -------------------------------------------------------------------------------------------------------------
+
+            arguments(Input)
+                self
+                charMeshFilePath (1,:) {mustBeA(charMeshFilePath, ["string", "char"])}
+                bVertFacesOnly (1,1) logical
+            end
+
+            arguments(Output)
+                self
+            end
+
+            % Reject auxiliary payload before invoking the geometry-only shared reader.
+            if ~bVertFacesOnly
+                error('CShapeModel:MeshAuxiliaryDataUnsupported', ...
+                    'file_mesh loading supports geometry only; set bVertFacesOnly to true.');
+            end
+
+            % Load repaired row-major geometry and adapt it to the established object layout.
+            checkIfModelAlreadyLoaded(self);
+            strShapeMesh = LoadShapeMesh(char(charMeshFilePath), bRepairMesh=true);
+            self.ui32triangVertexPtr = transpose(strShapeMesh.ui32FaceVertexIds);
+            self.dVerticesPos = transpose(strShapeMesh.dVerticesPos);
+
+            % Refresh every property derived from geometry before publishing the loaded state.
+            self = self.UpdateDerivedGeometry_();
+            self.bHasData_ = true;
         end
 
         function [self] = UpdateDerivedGeometry_(self)
@@ -720,38 +774,66 @@ classdef CShapeModel < CBaseDatastruct
         end
 
         function [ui32TrianglesIndex, dVerticesCoords, dTexCoords, ...
-                ui32TrianglesTexIndex, dNormals, ui32TrianglesNormalsIndex] = LoadModelFromObj(charObjFilePath, bVertFacesOnly)
-            arguments
-                charObjFilePath (1,1) string {mustBeA(charObjFilePath, ["string", "char"])}
-                bVertFacesOnly  (1,1) logical = true;
-            end
+                ui32TrianglesTexIndex, dNormals, ui32TrianglesNormalsIndex] = LoadModelFromObj( ...
+                charObjFilePath, bVertFacesOnly, options)
             %% SIGNATURE
             % [ui32TrianglesIndex, dVerticesCoords, dTexCoords, ...
-            %  ui32TrianglesTexIndex, dNormals, ui32TrianglesNormalsIndex] = LoadModelFromObj(charObjFilePath, bVertFacesOnly)
+            %  ui32TrianglesTexIndex, dNormals, ui32TrianglesNormalsIndex] = ...
+            %     LoadModelFromObj(charObjFilePath, bVertFacesOnly, options)
             % -------------------------------------------------------------------------------------------------------------
             %% DESCRIPTION
-            % [ui32TrianglesIndex, dVerticesCoords] = LoadModelFromObj(charObjFilePath) reads the vertices and the
-            % triangles data as specified in the input Wavefront .obj file.
-            % This implementation uses vectorized regexp and sscanf on the entire file content, avoiding
-            % per-line loops and dynamic allocation. Output formats:
-            %     ui32TrianglesIndex    - R-by-3 uint32 array of face indices (v/vt/vn)
-            %     dVerticesCoords       - M-by-3 double array of vertex coordinates
-            %     dTexCoords            - P-by-2 double array of texture coordinates (if present)
-            %     dNormals              - Q-by-3 double array of normals (if present)
+            % Load Wavefront OBJ data into the established column-major CShapeModel layout. The
+            % default geometry-only path retains the optimized legacy parser. Explicit repair
+            % delegates geometry to LoadShapeMesh; repair is incompatible with texture/normal
+            % index loading because it changes vertex and face indices.
+            % -------------------------------------------------------------------------------------------------------------
+            %% INPUT
+            % charObjFilePath:       Path to a Wavefront OBJ file.
+            % bVertFacesOnly:        Load geometry only when true.
+            % options.bRepairMesh:   Weld duplicates and remove degenerate geometry when true.
+            % -------------------------------------------------------------------------------------------------------------
+            %% OUTPUT
+            % ui32TrianglesIndex:        Triangle vertex indices as 3-by-F uint32.
+            % dVerticesCoords:           Vertex coordinates as 3-by-N double.
+            % dTexCoords:                Texture coordinates as 2-by-T double when requested.
+            % ui32TrianglesTexIndex:     Triangle texture indices as 3-by-F uint32.
+            % dNormals:                  Normals as 3-by-Q double when requested.
+            % ui32TrianglesNormalsIndex: Triangle normal indices as 3-by-F uint32.
             % -------------------------------------------------------------------------------------------------------------
             %% CHANGELOG
-            % 03-01-2025    Pietro Califano         Function implemented for general obj format loading
-            % 16-11-2025    Pietro Califano, GTP-5   [MAJOR] Change core implementation to use sscanf and
-            %                                       reduce computational time when loading large obj files
+            % 03-01-2025  Pietro Califano          First general OBJ implementation.
+            % 16-11-2025  Pietro Califano, GPT-5   Use vectorized whole-file parsing.
+            % 28-08-2026  Pietro Califano          Add explicit shared geometry repair.
             % -------------------------------------------------------------------------------------------------------------
             %% DEPENDENCIES
-            % [-]
+            % LoadShapeMesh when options.bRepairMesh is true.
             % -------------------------------------------------------------------------------------------------------------
+
+            arguments(Input)
+                charObjFilePath (1,1) string {mustBeA(charObjFilePath, ["string", "char"])}
+                bVertFacesOnly (1,1) logical = true
+                options.bRepairMesh (1,1) logical = false
+            end
+
+            arguments(Output)
+                ui32TrianglesIndex uint32
+                dVerticesCoords double
+                dTexCoords double
+                ui32TrianglesTexIndex uint32
+                dNormals double
+                ui32TrianglesNormalsIndex uint32
+            end
 
             %% Function code
 
-            tic
-            % Check extension
+            % Repair remaps geometry indices, so auxiliary index arrays cannot remain valid.
+            if options.bRepairMesh && ~bVertFacesOnly
+                error('CShapeModel:RepairWithAuxiliaryDataUnsupported', ...
+                    ['Mesh repair changes geometry indices and cannot be combined with ', ...
+                     'OBJ texture or normal index loading.']);
+            end
+
+            % Preserve the established public error identifiers before choosing a parser path.
             [~,~, charFileExt] = fileparts(charObjFilePath);
 
             if ~strcmpi(charFileExt, '.obj')
@@ -762,7 +844,20 @@ classdef CShapeModel < CBaseDatastruct
                 error('LoadModelFromObj:FileNotFound', 'Cannot find file: %s', charObjFilePath);
             end
 
-            % Read entire file as text
+            % Keep repair opt-in and adapt the shared reader's rows to the legacy column layout.
+            if options.bRepairMesh
+                strShapeMesh = LoadShapeMesh(char(charObjFilePath), bRepairMesh=true);
+                ui32TrianglesIndex = transpose(strShapeMesh.ui32FaceVertexIds);
+                dVerticesCoords = transpose(strShapeMesh.dVerticesPos);
+                dTexCoords = zeros(0, 2);
+                ui32TrianglesTexIndex = zeros(0, 3, 'uint32');
+                dNormals = zeros(0, 3);
+                ui32TrianglesNormalsIndex = zeros(0, 3, 'uint32');
+                return
+            end
+
+            % Retain the measured vectorized parser for the default, unrepaired OBJ contract.
+            tic
             charFileText = fileread(charObjFilePath);
 
             % Vertex lines: 'v x y z'
@@ -795,46 +890,13 @@ classdef CShapeModel < CBaseDatastruct
                 dNormals = zeros(0,3);
             end
 
-            % Defaults
-            ui32TrianglesIndex          = zeros(0,3,'uint32');
-            ui32TrianglesTexIndex       = zeros(0,3,'uint32');
-            ui32TrianglesNormalsIndex   = zeros(0,3,'uint32');
-
-            fMatch = regexp(charFileText, '^f\s+.*$', 'match', 'lineanchors');
-            if ~isempty(fMatch)
-                charFBlock = sprintf('%s\n', fMatch{:});
-                charFirstFace = string(strtrim(fMatch{1}));
-
-                if ~isempty(regexp(charFirstFace, '^f\s+\d+//\d+', 'once'))
-                    ui32AllFaceLines = sscanf(charFBlock, 'f %u//%u %u//%u %u//%u\n', [6, Inf]);
-                    ui32AllFaceLines = uint32(ui32AllFaceLines);
-                    ui32TrianglesIndex = ui32AllFaceLines(1:2:end, :);
-                    if ~bVertFacesOnly
-                        ui32TrianglesNormalsIndex = ui32AllFaceLines(2:2:end, :);
-                    end
-
-                elseif ~isempty(regexp(charFirstFace, '^f\s+\d+/\d+/\d+', 'once'))
-                    ui32AllFaceLines = sscanf(charFBlock, 'f %u/%u/%u %u/%u/%u %u/%u/%u\n', [9, Inf]);
-                    ui32AllFaceLines = uint32(ui32AllFaceLines);
-                    ui32TrianglesIndex = ui32AllFaceLines(1:3:end, :);
-                    if ~bVertFacesOnly
-                        ui32TrianglesTexIndex = ui32AllFaceLines(2:3:end, :);
-                        ui32TrianglesNormalsIndex = ui32AllFaceLines(3:3:end, :);
-                    end
-
-                elseif ~isempty(regexp(charFirstFace, '^f\s+\d+/\d+', 'once'))
-                    ui32AllFaceLines = sscanf(charFBlock, 'f %u/%u %u/%u %u/%u\n', [6, Inf]);
-                    ui32AllFaceLines = uint32(ui32AllFaceLines);
-                    ui32TrianglesIndex = ui32AllFaceLines(1:2:end, :);
-                    if ~bVertFacesOnly
-                        ui32TrianglesTexIndex = ui32AllFaceLines(2:2:end, :);
-                    end
-
-                else
-                    ui32AllFaceLines = sscanf(charFBlock, 'f %u %u %u\n', [3, Inf]);
-                    ui32TrianglesIndex = uint32(ui32AllFaceLines);
-                end
-            end
+            % Parse bounded face blocks so large OBJ files do not exceed MATLAB's
+            % contiguous character or sscanf payload limits.
+            [dFaceLineStartIdx, dFaceLineEndIdx] = regexp(charFileText, ...
+                '^f[ \t]+[^\r\n]*$', 'start', 'end', 'lineanchors');
+            [ui32TrianglesIndex, ui32TrianglesTexIndex, ui32TrianglesNormalsIndex] = ...
+                CShapeModel.ParseObjFaceLines_(charFileText, dFaceLineStartIdx, ...
+                dFaceLineEndIdx, bVertFacesOnly);
 
             dElapsedTime = toc;
             fprintf("\nFile obj loaded in %.5g seconds\n", dElapsedTime);
@@ -843,6 +905,148 @@ classdef CShapeModel < CBaseDatastruct
     end
 
     methods (Static, Access = private)
+
+        function [ui32TrianglesIndex, ui32TrianglesTexIndex, ui32TrianglesNormalsIndex] = ...
+                ParseObjFaceLines_(charFileText, dFaceLineStartIdx, dFaceLineEndIdx, bVertFacesOnly)
+            %% SIGNATURE
+            % [ui32TrianglesIndex, ui32TrianglesTexIndex, ui32TrianglesNormalsIndex] = ...
+            %     CShapeModel.ParseObjFaceLines_(charFileText, dFaceLineStartIdx, ...
+            %     dFaceLineEndIdx, bVertFacesOnly)
+            % -------------------------------------------------------------------------------------------------
+            %% DESCRIPTION
+            % Parse triangular OBJ face records in bounded blocks while preserving source order and optional
+            % texture and normal indices.
+            % -------------------------------------------------------------------------------------------------
+            %% INPUT
+            % charFileText         Complete OBJ text payload.
+            % dFaceLineStartIdx    Start index of each face record in charFileText.
+            % dFaceLineEndIdx      End index of each face record in charFileText.
+            % bVertFacesOnly       True when auxiliary texture and normal indices are not required.
+            % -------------------------------------------------------------------------------------------------
+            %% OUTPUT
+            % ui32TrianglesIndex           Vertex indices as a 3-by-F array.
+            % ui32TrianglesTexIndex        Texture-coordinate indices as a 3-by-F array when requested.
+            % ui32TrianglesNormalsIndex    Normal indices as a 3-by-F array when requested.
+            % -------------------------------------------------------------------------------------------------
+            %% CHANGELOG
+            % 21-09-2026  Pietro Califano, Codex gpt-5.6  First implementation.
+            % -------------------------------------------------------------------------------------------------
+            %% DEPENDENCIES
+            % None.
+            % -------------------------------------------------------------------------------------------------
+            arguments (Input)
+                charFileText (1,:) char
+                dFaceLineStartIdx (1,:) double
+                dFaceLineEndIdx (1,:) double
+                bVertFacesOnly (1,1) logical
+            end
+            arguments (Output)
+                ui32TrianglesIndex uint32
+                ui32TrianglesTexIndex uint32
+                ui32TrianglesNormalsIndex uint32
+            end
+
+            ui32NumFaces = uint32(numel(dFaceLineStartIdx));
+            assert(numel(dFaceLineEndIdx) == double(ui32NumFaces), ...
+                'CShapeModel:InvalidObjFaceLineBounds', ...
+                'OBJ face line start and end index arrays must have equal lengths.');
+            ui32TrianglesIndex = zeros(0, 3, 'uint32');
+            ui32TrianglesTexIndex = zeros(0, 3, 'uint32');
+            ui32TrianglesNormalsIndex = zeros(0, 3, 'uint32');
+            if ui32NumFaces == uint32(0)
+                return
+            end
+            ui32TrianglesIndex = zeros(3, double(ui32NumFaces), 'uint32');
+
+            % Resolve the uniform face syntax once. Mixed face syntaxes remain
+            % outside the legacy vectorized loader contract.
+            charFirstFace = string(strtrim(charFileText( ...
+                dFaceLineStartIdx(1):dFaceLineEndIdx(1))));
+            bHasTextureIndices = false;
+            bHasNormalIndices = false;
+            if ~isempty(regexp(charFirstFace, '^f\s+\d+//\d+', 'once'))
+                charFaceFormat = 'f %u//%u %u//%u %u//%u\n';
+                ui32ValuesPerFace = uint32(6);
+                ui32VertexValueRows = uint32([1, 3, 5]);
+                ui32NormalValueRows = uint32([2, 4, 6]);
+                ui32TextureValueRows = zeros(1, 0, 'uint32');
+                bHasNormalIndices = true;
+            elseif ~isempty(regexp(charFirstFace, '^f\s+\d+/\d+/\d+', 'once'))
+                charFaceFormat = 'f %u/%u/%u %u/%u/%u %u/%u/%u\n';
+                ui32ValuesPerFace = uint32(9);
+                ui32VertexValueRows = uint32([1, 4, 7]);
+                ui32TextureValueRows = uint32([2, 5, 8]);
+                ui32NormalValueRows = uint32([3, 6, 9]);
+                bHasTextureIndices = true;
+                bHasNormalIndices = true;
+            elseif ~isempty(regexp(charFirstFace, '^f\s+\d+/\d+', 'once'))
+                charFaceFormat = 'f %u/%u %u/%u %u/%u\n';
+                ui32ValuesPerFace = uint32(6);
+                ui32VertexValueRows = uint32([1, 3, 5]);
+                ui32TextureValueRows = uint32([2, 4, 6]);
+                ui32NormalValueRows = zeros(1, 0, 'uint32');
+                bHasTextureIndices = true;
+            else
+                charFaceFormat = 'f %u %u %u\n';
+                ui32ValuesPerFace = uint32(3);
+                ui32VertexValueRows = uint32([1, 2, 3]);
+                ui32TextureValueRows = zeros(1, 0, 'uint32');
+                ui32NormalValueRows = zeros(1, 0, 'uint32');
+            end
+
+            if ~bVertFacesOnly && bHasTextureIndices
+                ui32TrianglesTexIndex = zeros(3, double(ui32NumFaces), 'uint32');
+            end
+            if ~bVertFacesOnly && bHasNormalIndices
+                ui32TrianglesNormalsIndex = zeros(3, double(ui32NumFaces), 'uint32');
+            end
+
+            % Keep each temporary text and numeric payload comfortably below
+            % MATLAB's contiguous-array limits.
+            ui32FaceParseChunkSize = uint32(250000);
+            ui32BlockStart = uint32(1);
+            while ui32BlockStart <= ui32NumFaces
+                ui32BlockEnd = min(ui32BlockStart + ui32FaceParseChunkSize - uint32(1), ui32NumFaces);
+
+                % Do not include object, group, or material records that separate
+                % otherwise contiguous face runs in a parsed text block.
+                if ui32BlockEnd > ui32BlockStart
+                    dFaceLineGaps = dFaceLineStartIdx(double(ui32BlockStart + uint32(1)):double(ui32BlockEnd)) - ...
+                        dFaceLineEndIdx(double(ui32BlockStart):double(ui32BlockEnd - uint32(1)));
+                    dFirstRunBreak = find(dFaceLineGaps > 3.0, 1, 'first');
+                    if ~isempty(dFirstRunBreak)
+                        ui32BlockEnd = ui32BlockStart + uint32(dFirstRunBreak) - uint32(1);
+                    end
+                end
+
+                ui32DestinationColumns = ui32BlockStart:ui32BlockEnd;
+                charFaceBlock = charFileText( ...
+                    dFaceLineStartIdx(double(ui32BlockStart)):dFaceLineEndIdx(double(ui32BlockEnd)));
+                dParsedFaceValues = sscanf(charFaceBlock, charFaceFormat, ...
+                    [double(ui32ValuesPerFace), Inf]);
+
+                ui32ExpectedBlockFaces = ui32BlockEnd - ui32BlockStart + uint32(1);
+                if size(dParsedFaceValues, 2) ~= double(ui32ExpectedBlockFaces)
+                    error('CShapeModel:MalformedObjFaceBlock', ...
+                        ['OBJ face block near face %u contains %u records but ', ...
+                         'the selected syntax parsed %u.'], ...
+                        ui32BlockStart, ui32ExpectedBlockFaces, uint32(size(dParsedFaceValues, 2)));
+                end
+
+                ui32ParsedFaceValues = uint32(dParsedFaceValues);
+                ui32TrianglesIndex(:, double(ui32DestinationColumns)) = ...
+                    ui32ParsedFaceValues(double(ui32VertexValueRows), :);
+                if ~bVertFacesOnly && bHasTextureIndices
+                    ui32TrianglesTexIndex(:, double(ui32DestinationColumns)) = ...
+                        ui32ParsedFaceValues(double(ui32TextureValueRows), :);
+                end
+                if ~bVertFacesOnly && bHasNormalIndices
+                    ui32TrianglesNormalsIndex(:, double(ui32DestinationColumns)) = ...
+                        ui32ParsedFaceValues(double(ui32NormalValueRows), :);
+                end
+                ui32BlockStart = ui32BlockEnd + uint32(1);
+            end
+        end
 
         function TryAddMiceFromWorkspace_()
             cellWorkspaceEnvNames = ["WS_SIMGEARS", "WS_NAVSYS"];

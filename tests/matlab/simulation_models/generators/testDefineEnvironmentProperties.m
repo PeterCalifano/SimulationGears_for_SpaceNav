@@ -1,5 +1,62 @@
 classdef testDefineEnvironmentProperties < matlab.unittest.TestCase
     methods (Test)
+        function testCarriesDatasetTargetAngularVelocity(testCase)
+            dTimestamps = [0.0, 15.0, 40.0];
+            dStateSC_IN = zeros(6, numel(dTimestamps));
+            dDCM_TBfromIN = repmat(eye(3), 1, 1, numel(dTimestamps));
+            dTargetPosition_IN = zeros(3, numel(dTimestamps));
+            dSunPosition_IN = repmat([1.495978707e11; 0.0; 0.0], 1, numel(dTimestamps));
+            dEarthPosition_IN = zeros(3, numel(dTimestamps));
+            dTargetAngVel_IN = repmat([0.8e-4; -0.4e-4; 1.7e-4], 1, numel(dTimestamps));
+            objDataset = SReferenceMissionDesign(EnumFrameName.IN, dTimestamps, dStateSC_IN, ...
+                dDCM_TBfromIN, dTargetPosition_IN, dSunPosition_IN, dEarthPosition_IN, ...
+                'dTargetAngVel_IN', dTargetAngVel_IN);
+
+            [~, strMainBodyRefData] = DefineEnvironmentProperties(dTimestamps, ...
+                "Itokawa", "J2000", objDataset=objDataset);
+
+            testCase.verifyEqual(strMainBodyRefData.dAngVel_IN, dTargetAngVel_IN, 'AbsTol', 0.0);
+        end
+
+        function testDefaultsTargetSpinAxisToBodyPlusZ(testCase)
+            [dTimestamps, dStateSC_IN, dDCM_TBfromIN, dTargetPosition_IN, ...
+                dSunPosition_IN, dEarthPosition_IN] = testCase.buildMinimalDatasetInputs();
+            objDataset = SReferenceMissionDesign(EnumFrameName.IN, dTimestamps, dStateSC_IN, ...
+                dDCM_TBfromIN, dTargetPosition_IN, dSunPosition_IN, dEarthPosition_IN);
+
+            [~, strMainBodyRefData] = DefineEnvironmentProperties(dTimestamps, ...
+                "Itokawa", "J2000", objDataset=objDataset);
+
+            testCase.verifyEqual(objDataset.dTargetSpinAxis_TB, [0.0; 0.0; 1.0], 'AbsTol', 0.0);
+            testCase.verifyEqual(objDataset.charTargetSpinAxisSource, "DEFAULT_PLUS_Z");
+            testCase.verifyEqual(strMainBodyRefData.dSpinAxis_TB, [0.0; 0.0; 1.0], 'AbsTol', 0.0);
+            testCase.verifyEqual(strMainBodyRefData.charSpinAxisSource, "DEFAULT_PLUS_Z");
+        end
+
+        function testNormalizesDeclaredTargetSpinAxis(testCase)
+            [dTimestamps, dStateSC_IN, dDCM_TBfromIN, dTargetPosition_IN, ...
+                dSunPosition_IN, dEarthPosition_IN] = testCase.buildMinimalDatasetInputs();
+            objDataset = SReferenceMissionDesign(EnumFrameName.IN, dTimestamps, dStateSC_IN, ...
+                dDCM_TBfromIN, dTargetPosition_IN, dSunPosition_IN, dEarthPosition_IN, ...
+                'dTargetSpinAxis_TB', [0.0; -3.0; 0.0]);
+
+            [~, strMainBodyRefData] = DefineEnvironmentProperties(dTimestamps, ...
+                "Itokawa", "J2000", objDataset=objDataset);
+
+            testCase.verifyEqual(strMainBodyRefData.dSpinAxis_TB, [0.0; -1.0; 0.0], 'AbsTol', 0.0);
+            testCase.verifyEqual(strMainBodyRefData.charSpinAxisSource, "SCENARIO_DECLARED");
+        end
+
+        function testRejectsZeroDeclaredTargetSpinAxis(testCase)
+            [dTimestamps, dStateSC_IN, dDCM_TBfromIN, dTargetPosition_IN, ...
+                dSunPosition_IN, dEarthPosition_IN] = testCase.buildMinimalDatasetInputs();
+
+            testCase.verifyError(@() SReferenceMissionDesign(EnumFrameName.IN, dTimestamps, dStateSC_IN, ...
+                dDCM_TBfromIN, dTargetPosition_IN, dSunPosition_IN, dEarthPosition_IN, ...
+                'dTargetSpinAxis_TB', zeros(3,1)), ...
+                'SReferenceMissionDesign:InvalidTargetSpinAxis');
+        end
+
         function testBuildsSpacecraftPanelsAndPolyhedronGravityDataFromObj(testCase)
             fixture = testCase.applyFixture(matlab.unittest.fixtures.TemporaryFolderFixture);
             charObjPath = fullfile(string(fixture.Folder), "cube_model.obj");
@@ -53,6 +110,16 @@ classdef testDefineEnvironmentProperties < matlab.unittest.TestCase
     end
 
     methods (Access = private)
+        function [dTimestamps, dStateSC_IN, dDCM_TBfromIN, dTargetPosition_IN, ...
+                dSunPosition_IN, dEarthPosition_IN] = buildMinimalDatasetInputs(~)
+            dTimestamps = [0.0, 15.0, 40.0];
+            dStateSC_IN = zeros(6, numel(dTimestamps));
+            dDCM_TBfromIN = repmat(eye(3), 1, 1, numel(dTimestamps));
+            dTargetPosition_IN = zeros(3, numel(dTimestamps));
+            dSunPosition_IN = repmat([1.495978707e11; 0.0; 0.0], 1, numel(dTimestamps));
+            dEarthPosition_IN = zeros(3, numel(dTimestamps));
+        end
+
         function [ui32Faces, dVerts] = buildCubeMesh(~)
             dVerts = [-1 -1 -1; ...
                        1 -1 -1; ...

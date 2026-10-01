@@ -19,9 +19,10 @@ coder_config.EnableOpenMP = true;
 coder_config.OptimizeReductions = true;
 coder_config.SIMDAcceleration = 'Full';
 
-% Common settings
-ui32MaxNumTriangs  = 2e6;
-ui32MaxNumVertices = 5e6;
+% Admit the highest-detail registered Bennu mesh while retaining bounded,
+% variable-size code-generation inputs.
+ui32MaxNumTriangs  = 20e6;
+ui32MaxNumVertices = 10e6;
 
 %% Target function: LaserRangefinderModel
 

@@ -23,6 +23,7 @@ on:
       - src/**
       - examples/**
       - tests/**
+      - lib/**
       - cmake/**
       - doc/**
       - CMakeLists.txt
@@ -40,6 +41,7 @@ on:
       - src/**
       - examples/**
       - tests/**
+      - lib/**
       - cmake/**
       - doc/**
       - CMakeLists.txt
@@ -49,12 +51,14 @@ on:
       - .github/workflows/build_linux.yml
 
 jobs:
-  build:
+  # Reuse the runner's build tree so CTest needs no artifact transfer.
+  build-and-test:
     runs-on: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.runner == 'self-hosted' && fromJSON('["self-hosted","Linux","X64"]') || 'ubuntu-latest' }}
     env:
       BUILD_DIR: build_ci
       BUILD_TYPE: RelWithDebInfo
       ENABLE_TBB: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.runner == 'self-hosted' && 'OFF' || 'ON' }}
+      CTEST_OUTPUT_ON_FAILURE: 1
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -71,9 +75,11 @@ jobs:
         if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.runner == 'self-hosted' }}
         run: |
           command -v cmake
+          command -v ctest
           command -v ninja
           command -v g++
           command -v ccache
+          command -v python3
           python3 -m pytest --version
           python3 -c 'import yaml'
 
@@ -88,7 +94,6 @@ jobs:
 
       - name: Configure
         run: |
-          # The downloaded build tree may run on another host, so keep CPU flags portable.
           cmake -S . -B "${BUILD_DIR}" -GNinja \
             -DCMAKE_BUILD_TYPE="${BUILD_TYPE}" \
             -DENABLE_TESTS=ON \
@@ -111,58 +116,5 @@ jobs:
       - name: Show ccache stats
         run: ccache --show-stats || true
 
-      - name: Upload build artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: simulation-gears-native-build
-          path: ${{ env.BUILD_DIR }}
-          if-no-files-found: error
-          retention-days: 3
-
-  test:
-    needs: build
-    runs-on: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.runner == 'self-hosted' && fromJSON('["self-hosted","Linux","X64"]') || 'ubuntu-latest' }}
-    env:
-      BUILD_DIR: build_ci
-      CTEST_OUTPUT_ON_FAILURE: 1
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Install test dependencies
-        if: ${{ github.event_name != 'workflow_dispatch' || github.event.inputs.runner == 'github-hosted' }}
-        run: |
-          sudo apt update
-          sudo apt install -y cmake ninja-build g++ libeigen3-dev libtbb-dev python3-dev python3-pytest python3-yaml
-
-      - name: Validate self-hosted prerequisites
-        if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.runner == 'self-hosted' }}
-        run: |
-          command -v ctest
-          python3 -m pytest --version
-          python3 -c 'import yaml'
-
-      - name: Download build artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: simulation-gears-native-build
-          path: ${{ env.BUILD_DIR }}
-
-      - name: Resolve downloaded build tree
-        run: |
-          if [ -d "${BUILD_DIR}/CMakeFiles" ]; then
-            echo "CTEST_DIR=${BUILD_DIR}" >> "$GITHUB_ENV"
-          elif [ -d "${BUILD_DIR}/${BUILD_DIR}/CMakeFiles" ]; then
-            echo "CTEST_DIR=${BUILD_DIR}/${BUILD_DIR}" >> "$GITHUB_ENV"
-          else
-            find "${BUILD_DIR}" -maxdepth 3 -type d | sort || true
-            exit 1
-          fi
-
-      - name: Restore test executable permissions
-        run: find "${CTEST_DIR}" -type f -path "*/tests/*" -exec chmod +x {} + || true
-
       - name: Test
-        run: ctest --test-dir "${CTEST_DIR}" --output-on-failure --parallel 2 --no-tests=error
+        run: ctest --test-dir "${BUILD_DIR}" --output-on-failure --parallel 2 --no-tests=error
