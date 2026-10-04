@@ -66,9 +66,10 @@ bBoundary = false;
 ui32BoundaryIndex = uint32(0);
 ui32ArcIndex = uint32(0);
 dEvaluatedEpoch = dRequestedEpoch;
+
 if ui32ArcCount > 1
-    [dDistance, dClosestBoundaryIndex] = min( ...
-        abs(dRequestedEpoch - dArcBounds(1, 2:end)));
+    [dDistance, dClosestBoundaryIndex] = min(abs(dRequestedEpoch - dArcBounds(1, 2:end)));
+    
     if dDistance <= kwargs.dBoundaryTolerance
         bBoundary = true;
         ui32BoundaryIndex = uint32(dClosestBoundaryIndex);
@@ -85,9 +86,8 @@ end
 % Require ordinary queries to lie within an arc; never interpolate missing
 % reference data across a coverage gap.
 if ~bBoundary
-    dMatchingArcs = find( ...
-        dRequestedEpoch >= dArcBounds(1, :) & ...
-        dRequestedEpoch <= dArcBounds(2, :));
+    dMatchingArcs = find(dRequestedEpoch >= dArcBounds(1, :) & ...
+                        dRequestedEpoch <= dArcBounds(2, :));
     if numel(dMatchingArcs) ~= 1
         error('EvaluateSegmentedSpkState:OutsideCoverage', ...
             'Requested reference ET does not lie within one SPK arc.');
