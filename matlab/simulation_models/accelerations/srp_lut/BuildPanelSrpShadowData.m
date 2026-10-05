@@ -5,21 +5,24 @@ function [dFaceVertices_SCB, dSamplePoints_SCB] = BuildPanelSrpShadowData(strPan
 %% DESCRIPTION
 % Prepare equal-area triangle-centroid quadrature for spacecraft self-shadowing.
 % Preserve the supplied face ordering and optical normals. Subdivide each face
-% into 4^level equal-area triangles in the input geometry's metre frame.
+% into 4^level equal-area triangles in the input geometry's declared length
+% unit. Preserve that unit in both outputs; use the same unit for ray offsets.
+% LUT generation supplies metre geometry; dynamics preparation may use kilometres.
 % Example: [dVertices, dSamples] = BuildPanelSrpShadowData(strPanel, uint32(3));
 % Output: Three vertices and 64 equal-area sample points per original triangle.
 % -------------------------------------------------------------------------------------------------------------
 %% INPUT
-% strPanel            Prepared metre-frame vertices and triangle indices.
+% strPanel            Prepared vertices and triangle indices in one length unit.
 % ui32ShadowLevel     Subdivision level from zero through five.
 % -------------------------------------------------------------------------------------------------------------
 %% OUTPUT
-% dFaceVertices_SCB   (3, 3, N) original triangle vertices [m].
-% dSamplePoints_SCB   (3, 4^level, N) equal-area sample coordinates [m].
+% dFaceVertices_SCB   (3, 3, N) original triangle vertices [panel length unit].
+% dSamplePoints_SCB   (3, 4^level, N) equal-area samples [panel length unit].
 % -------------------------------------------------------------------------------------------------------------
 %% CHANGELOG
 % 29-09-2026  Pietro Califano, Codex gpt-6  Move shared geometry preparation to its owner.
 % 01-10-2026  Pietro Califano, Codex gpt-6  Clarify variable roles and separate computation steps.
+% 04-10-2026  Pietro Califano, Codex GPT-6  Clarify unit-preserving truth preparation.
 % -------------------------------------------------------------------------------------------------------------
 %% DEPENDENCIES
 % None; host-side preparation for ComputePanelSunVisibility.

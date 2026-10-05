@@ -41,6 +41,7 @@ end
 % 23-07-2026    Pietro Califano, Codex           Fix generated-code Sun ephemeris column orientation.
 % 10-09-2026    Pietro Califano, Codex gpt-6    Derive codegen degree bounds from ephemeris storage.
 % 11-09-2026  Pietro Califano, Codex gpt-6    Remove unused runtime sign-switch metadata.
+% 04-10-2026  Pietro Califano, Codex GPT-6  Keep ephemeris/pressure storage fixed for codegen.
 % -------------------------------------------------------------------------------------------------------------
 %% DEPENDENCIES
 % ResolveInertialDynMaxFidelityConfig()
@@ -144,8 +145,8 @@ if ~isempty(dBodyEphemerides)
             continue;
         end
 
-        idxBody = (3 * (idB - 1) + 1):(3 * idB);
-        dPosBodyToSC_IN = dPosSC_IN - dBodyEphemerides(idxBody, 1);
+        dBodyRows = 3 * (idB - 1) + (1:3);
+        dPosBodyToSC_IN = dPosSC_IN - dBodyEphemerides(dBodyRows, 1);
         dDynMatrix(4:6, 1:3) = dDynMatrix(4:6, 1:3) + EvalPointMassJacobian_(dPosBodyToSC_IN, dGMbody);
     end
 end
@@ -161,7 +162,7 @@ if bHasPanelSRP && bHasSunEphemeris && ~bIsInEclipse
 end
 
 % Add cannonball SRP partial using RHS diagnostic state when available.
-if ~isempty(dBodyEphemerides) && ~isempty(dCoeffSRP) && ~bHasPanelSRP
+if strModelConfig.bIncludeSRP && bHasSunEphemeris && ~bHasPanelSRP
 
     dPosSunToSC_IN = zeros(3, 1);
     dPosSunToSC_IN(1) = dPosSC_IN(1) - dBodyEphemerides(1);
@@ -248,9 +249,10 @@ for idB = 1:ui32NumInputBodies
         bIncludePosition = bIncludeBodyGravity;
     end
 
-    idx = (3 * (idB - 1) + 1):(3 * idB);
+    % Keep row storage fixed at three entries for allocation-free codegen.
+    dBodyRows = 3 * (idB - 1) + (1:3);
     if bIncludePosition
-        dBodyEphemerides(idx, 1) = EvalBodyOrbitData_( ...
+        dBodyEphemerides(dBodyRows, 1) = EvalBodyOrbitData_( ...
             dStateTimetag, strDynParams.strBody3rdData(idB).strOrbitData);
     end
     if bIncludeBodyGravity && coder.const(isfield(strDynParams.strBody3rdData(idB), 'dGM'))
@@ -290,8 +292,8 @@ function [dCoeffSRP, dSolarPressure, bHasSunEphemeris] = ResolveCannonballSRP_(d
                                                                                dBodyEphemerides, ...
                                                                                bIncludeSRP, ...
                                                                                bRecomputePressureFromDistance)
-% Compute SRP pressure and cannonball coefficient from Sun-spacecraft range.
-dCoeffSRP = [];
+% Keep pressure/coefficient storage scalar across runtime inactive branches.
+dCoeffSRP = 0.0;
 dSolarPressure = 0.0;
 bHasSunEphemeris = ~isempty(dBodyEphemerides) && ...
     norm(dBodyEphemerides(1:3, 1)) > eps('single');

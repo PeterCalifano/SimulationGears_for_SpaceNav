@@ -1,71 +1,74 @@
-function [dAccPanelSRP_IN, dSRPtorque_SCB] = ComputePanelSRPFromDynParams(dPosSC_IN, ...
-                                                                          dSunPos_IN, ...
-                                                                          dSolarPressure, ...
-                                                                          strDynParams) %#codegen
-arguments
-    dPosSC_IN      (3,1) double {mustBeFinite}
-    dSunPos_IN     (3,1) double {mustBeFinite}
-    dSolarPressure (1,1) double {mustBeFinite, mustBeNonnegative}
-    strDynParams   (1,1) struct
-end
-%% PROTOTYPE
-% [dAccPanelSRP_IN, dSRPtorque_SCB] = ComputePanelSRPFromDynParams(dPosSC_IN, dSunPos_IN, dSolarPressure, strDynParams)
+function [dAccPanelSRP_IN, dSRPtorque_SCB] = ComputePanelSRPFromDynParams( ...
+    dPosSC_IN, dSunPos_IN, dSolarPressure, strDynParams) %#codegen
+%% SIGNATURE
+% [dAccPanelSRP_IN, dSRPtorque_SCB] = ComputePanelSRPFromDynParams( ...
+%     dPosSC_IN, dSunPos_IN, dSolarPressure, strDynParams)
 % -------------------------------------------------------------------------------------------------------------
 %% DESCRIPTION
-% Compute flat-panel SRP acceleration and torque from the max-fidelity dynamics payload.
-% This adapter resolves spacecraft attitude, center of mass, and unit normalization before calling
-% ComputeQuadsModelSRP.
+% Compute panel SRP acceleration and torque from max-fidelity dynamics inputs.
+% Resolve attitude, centre of mass and SI units before applying optional
+% prepared self-shadowing through visible face areas. Retain each geometric
+% face centre for torque; partial illumination does not relocate that centre,
+% so partially shadowed torque is approximate. Keep external eclipses in the
+% max-fidelity caller.
 % -------------------------------------------------------------------------------------------------------------
 %% INPUT
-% dPosSC_IN:      (3,1) double   Spacecraft position with respect to the target in inertial frame [LU].
-% dSunPos_IN:     (3,1) double   Sun position with respect to the target in inertial frame [LU].
-% dSolarPressure: (1,1) double   Current solar pressure from the dynamics payload.
-% strDynParams:   (1,1) struct   Dynamics payload with strSCdata.strSRPpanelData.
+% dPosSC_IN       (3,1) Spacecraft target-relative inertial position [LU].
+% dSunPos_IN      (3,1) Sun target-relative inertial position [LU].
+% dSolarPressure  (1,1) Current pressure in the dynamics unit convention.
+% strDynParams   Dynamics payload with strSCdata.strSRPpanelData and optional
+%                numeric strShadowData in the geometry's declared length unit.
 % -------------------------------------------------------------------------------------------------------------
 %% OUTPUT
-% dAccPanelSRP_IN:(3,1) double   Panel SRP acceleration in inertial dynamics units [LU/TU^2].
-% dSRPtorque_SCB: (3,1) double   Panel SRP torque in spacecraft body frame [N m].
+% dAccPanelSRP_IN (3,1) Inertial panel acceleration [LU/s^2].
+% dSRPtorque_SCB  (3,1) Body-frame torque about the supplied centre of mass [N m].
 % -------------------------------------------------------------------------------------------------------------
 %% CHANGELOG
-% 02-07-2026    Pietro Califano, Codex 5.5      Extract max-fidelity flat-panel SRP RHS adapter.
+% 02-07-2026  Pietro Califano, Codex 5.5    Extract max-fidelity panel SRP adapter.
+% 04-10-2026  Pietro Califano, Codex GPT-6  Consume prepared self-shadow geometry.
 % -------------------------------------------------------------------------------------------------------------
 %% DEPENDENCIES
-% ResolveAttQuat_INfromSCB()
-% ResolveSCCenterOfMass_SCB()
-% ResolvePanelSRPUnitsFromDynParams()
-% ComputeQuadsModelSRP()
-% Quat2DCM()   [MathCore_for_SpaceNav]
+% ResolveAttQuat_INfromSCB, ResolveSCCenterOfMass_SCB,
+% ResolvePanelSRPUnitsFromDynParams, ComputePanelVisibleAreas,
+% ComputeQuadsModelSRP, Quat2DCM [MathCore_for_SpaceNav].
 % -------------------------------------------------------------------------------------------------------------
 
-%% Function code
+arguments (Input)
+    dPosSC_IN (3, 1) double {mustBeFinite}
+    dSunPos_IN (3, 1) double {mustBeFinite}
+    dSolarPressure (1, 1) double {mustBeFinite, mustBeNonnegative}
+    strDynParams (1, 1) struct
+end
+
+arguments (Output)
+    dAccPanelSRP_IN (3, 1) double
+    dSRPtorque_SCB (3, 1) double
+end
+
+% Match the normalized attitude used by the shared panel force law.
 strPanel = strDynParams.strSCdata.strSRPpanelData;
 dQuat_INfromSCB = ResolveAttQuat_INfromSCB(strDynParams);
+dQuat_INfromSCB = dQuat_INfromSCB / max(norm(dQuat_INfromSCB), eps);
 dCoMpos_SCB = ResolveSCCenterOfMass_SCB(strDynParams);
 
+% Express the Sun direction in the frame of the prepared optical faces.
 dSCtoSun_IN = dSunPos_IN - dPosSC_IN;
 dDirSCtoSun_IN = dSCtoSun_IN / norm(dSCtoSun_IN);
 dDCM_INfromSCB = Quat2DCM(dQuat_INfromSCB);
 dDirSCtoSun_SCB = dDCM_INfromSCB.' * dDirSCtoSun_IN;
 
 [dArea, dPressCentre, dCoMpos, dPressureSI, dOutputScale] = ...
-    ResolvePanelSRPUnitsFromDynParams(strPanel, ...
-                                      dCoMpos_SCB, ...
-                                      dSolarPressure, ...
-                                      strDynParams);
+    ResolvePanelSRPUnitsFromDynParams(strPanel, dCoMpos_SCB, dSolarPressure, strDynParams);
 
 assert(size(dPressCentre, 2) == size(strPanel.dQuadsNormals_SCB, 2), ...
     'ComputePanelSRPFromDynParams:MissingPressureCenters', ...
-    'Panel SRP RHS requires strSRPpanelData.dQuadsPressCentre_SCB with one pressure-center column per panel.');
+    'Panel SRP requires one pressure-centre column per panel.');
 
+% Scale only area; preserve the established incidence and optical force law.
+dVisibleArea = ComputePanelVisibleAreas(dArea, dDirSCtoSun_SCB, strPanel);
 [dAccelPanel, dSRPtorque_SCB] = ComputeQuadsModelSRP(dDirSCtoSun_SCB, ...
-                                                     dQuat_INfromSCB, ...
-                                                     strDynParams.strSCdata.dSCmass, ...
-                                                     dCoMpos, ...
-                                                     dPressureSI, ...
-                                                     dArea, ...
-                                                     strPanel.dDiffSpecQuadsCoeffs, ...
-                                                     strPanel.dQuadsNormals_SCB, ...
-                                                     dPressCentre);
+    dQuat_INfromSCB, strDynParams.strSCdata.dSCmass, dCoMpos, dPressureSI, ...
+    dVisibleArea, strPanel.dDiffSpecQuadsCoeffs, strPanel.dQuadsNormals_SCB, dPressCentre);
 dAccPanelSRP_IN = dOutputScale * dAccelPanel;
 
 end

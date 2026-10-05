@@ -17,7 +17,7 @@ end
 %   strMainData       target GM, radius, optional SH/polyhedron gravity, optional attitude ephemeris
 %   strBody3rdData    Sun first, Earth second by convention, each with GM and orbit ephemeris
 %   strSRPdata        SRP pressure/reference-distance data
-%   strSCdata         cannonball data and optional strSRPpanelData
+%   strSCdata         cannonball data and optional strSRPpanelData/strShadowData
 %
 % This entry point owns compile-time model-configuration options while preserving EvalRHS_InertialDynOrbit for
 % estimator paths. Target gravity is exclusive and reported by ui8SelectedGravityModel: 0 none, 1 central,
@@ -36,7 +36,6 @@ end
 % strAccelInfo:        (1,1) struct   Acceleration diagnostics, including selected gravity and dAccSRP [LU/s^2].
 % -------------------------------------------------------------------------------------------------------------
 %% CHANGELOG
-% 01-10-2026  Pietro Califano, Codex GPT-6  Report selected panel/cannonball acceleration as dAccSRP.
 % 13-05-2026    Pietro Califano, Codex 5.5      Add max-fidelity RHS wrapper around shared orbit dynamics.
 % 28-05-2026    Pietro Califano, Codex 5.5      Centralize model configuration and schema-driven SH activation.
 % 01-07-2026    Pietro Califano, Codex 5.5      Add optional pre-generated stochastic residual acceleration hook.
@@ -44,6 +43,8 @@ end
 % 23-07-2026    Pietro Califano, Codex           Fix generated-code Sun ephemeris column orientation.
 % 10-09-2026    Pietro Califano, Codex gpt-6    Derive codegen degree bounds from ephemeris storage.
 % 11-09-2026  Pietro Califano, Codex gpt-6    Remove unused runtime sign-switch metadata.
+% 01-10-2026  Pietro Califano, Codex GPT-6  Report selected panel/cannonball acceleration as dAccSRP.
+% 04-10-2026  Pietro Califano, Codex GPT-6  Keep ephemeris/pressure storage fixed for codegen.
 % -------------------------------------------------------------------------------------------------------------
 %% DEPENDENCIES
 % ResolveInertialDynMaxFidelityConfig()
@@ -100,7 +101,7 @@ if strModelConfig.bIncludeSRP && strModelConfig.bIncludeEclipse && bHasSunEpheme
 end
 
 bHasPanelSRP = strModelConfig.bHasPanelSRP;
-if bHasPanelSRP
+if bHasPanelSRP || ~strModelConfig.bIncludeSRP
     dCoeffForOrbit = [];
 else
     dCoeffForOrbit = dCoeffSRP;
@@ -233,9 +234,10 @@ for idB = 1:ui32NumInputBodies
         bIncludePosition = bIncludeBodyGravity;
     end
 
-    idx = (3 * (idB - 1) + 1):(3 * idB);
+    % Keep row storage fixed at three entries for allocation-free codegen.
+    dBodyRows = 3 * (idB - 1) + (1:3);
     if bIncludePosition
-        dBodyEphemerides(idx, 1) = EvalBodyOrbitData_( ...
+        dBodyEphemerides(dBodyRows, 1) = EvalBodyOrbitData_( ...
             dStateTimetag, strDynParams.strBody3rdData(idB).strOrbitData);
     end
     if bIncludeBodyGravity && coder.const(isfield(strDynParams.strBody3rdData(idB), 'dGM'))
@@ -275,8 +277,9 @@ function [dCoeffSRP, dSolarPressure, bHasSunEphemeris] = ResolveCannonballSRP_(d
                                                                                dBodyEphemerides, ...
                                                                                bIncludeSRP, ...
                                                                                bRecomputePressureFromDistance)
-% Compute cannonball SRP coefficient and solar pressure from Sun-spacecraft range.
-dCoeffSRP = [];
+% Keep pressure/coefficient storage scalar across runtime inactive branches.
+% Omit cannonball SRP at the call site through constant model selectors.
+dCoeffSRP = 0.0;
 dSolarPressure = 0.0;
 bHasSunEphemeris = ~isempty(dBodyEphemerides) && ...
     norm(dBodyEphemerides(1:3, 1)) > eps('single');
