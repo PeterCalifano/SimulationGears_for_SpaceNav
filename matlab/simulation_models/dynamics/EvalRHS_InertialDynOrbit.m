@@ -34,7 +34,7 @@ function [dPosVeldt, strAccelInfo] = ...
 % dResidualAccel       Independent residual acceleration [LU/s^2]; default zero.
 % bIsInEclipse         Suppress SRP when true; default false.
 % bUseSrpLut           Compile-time LUT selection; default false.
-% strResponseLut       Immutable numeric LUT; unused with cannonball SRP.
+% strResponseLut       Fixed-size numeric LUT; unused with cannonball SRP.
 % strSrpData           Resolved numerical inputs for EvalRHS_SRPLutWithBias;
 %                      unused with cannonball SRP. Supply no filter indices or modes.
 % bIncludeTransverse   Compile-time transverse selection; unused with cannonball SRP.
@@ -78,7 +78,7 @@ arguments (Input)
     dResidualAccel      double = zeros(3, 1)
     bIsInEclipse        logical = false
     bUseSrpLut (1, 1) logical {coder.mustBeConst} = false
-    strResponseLut (1, 1) struct {coder.mustBeConst} = struct()
+    strResponseLut (1, 1) struct = struct()
     strSrpData (1, 1) struct = struct()
     bIncludeTransverse (1, 1) logical {coder.mustBeConst} = false
 end
@@ -88,7 +88,7 @@ arguments (Output)
     strAccelInfo (1, 1) struct
 end
 
-% Name the selected local constant before handing it to the SRP model.
+% Name the selected fixed-size numeric payload before SRP evaluation.
 % Keep the unused legacy input empty and avoid conditionally naming an entry input.
 if coder.const(bUseSrpLut)
     strLutForModel = strResponseLut;

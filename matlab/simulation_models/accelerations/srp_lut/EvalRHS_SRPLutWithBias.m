@@ -50,7 +50,7 @@ function [dSRPaccel_IN, dJacAccSRP_IN, dJacAccSRPWrtBias_IN, bDerivativeRegular]
 arguments (Input)
     dPosSCtoSun_IN (3, 1) double
     strSrpData (1, 1) struct
-    strResponseLut (1, 1) struct {coder.mustBeConst}
+    strResponseLut (1, 1) struct
     bIncludeTransverse (1, 1) logical {coder.mustBeConst}
 end
 
