@@ -5,11 +5,11 @@ function strCodegen = CodegenSrpResponseLut(charOutputRoot, strResponseLut, kwar
 %% DESCRIPTION
 % Generate and build the fixed-schema SRP evaluator as MEX or a C++ library.
 % Disable dynamic memory allocation and variable sizing. The default generated
-% interface embeds an immutable table to remove repeated MATLAB transport;
-% opt into a runtime const-pointer table for C++ or runtime-table validation.
+% interface accepts a fixed-size runtime table. Embed values only when an
+% explicitly frozen diagnostic interface is requested.
 % Freeze transverse inclusion independently of numerical table embedding.
-% Remove constant inputs from the generated signatures and omit transverse
-% storage and calculations in scalar builds.
+% Remove constant inputs from generated signatures and skip transverse
+% arithmetic in scalar builds; keep the supplied runtime table schema.
 % Specialize the generated signature to the requested output count. Default MEX
 % to one output and C++ libraries to the complete entry-point signature.
 % Example: strCodegen = CodegenSrpResponseLut(charOutputRoot, strResponseLut, ...
@@ -21,7 +21,7 @@ function strCodegen = CodegenSrpResponseLut(charOutputRoot, strResponseLut, kwar
 % strResponseLut          Validated fixed numeric payload from PackSrpResponseLut.
 % kwargs.charTarget       'mex' or 'lib'; default 'mex'.
 % kwargs.charKernelName   Output basename; empty derives the selected entry/target name.
-% kwargs.bFreezeTable     Embed an immutable table; default true. Set false for a C++ const-pointer API.
+% kwargs.bFreezeTable     Embed table values explicitly; default false keeps fixed-size runtime data.
 % kwargs.charEntryPoint   Force evaluator or analytical Jacobian evaluator; default force.
 % kwargs.bIncludeTransverse Compile transverse support; default false.
 % kwargs.ui8OutputCount   Number of leading outputs to generate; zero selects the target default.
@@ -30,12 +30,13 @@ function strCodegen = CodegenSrpResponseLut(charOutputRoot, strResponseLut, kwar
 % strCodegen              Target, paths, capacity and fixed-allocation settings.
 % -------------------------------------------------------------------------------------------------------------
 %% CHANGELOG
-% 01-10-2026  Pietro Califano, Codex GPT-6  Correct nodal transverse samples and constant inclusion.
 % 28-09-2026  Pietro Califano, Codex gpt-6  Add reproducible bounded lookup code generation.
 % 28-09-2026  Pietro Califano, Codex gpt-6  Derive the fixed type from the validated input.
 % 29-09-2026  Pietro Califano, Codex gpt-6  Embed immutable tables by default and generate derivatives.
 % 29-09-2026  Pietro Califano, Codex gpt-6  Compile only the requested output prefix.
+% 01-10-2026  Pietro Califano, Codex GPT-6  Correct nodal transverse samples and constant inclusion.
 % 01-10-2026  Pietro Califano, Codex gpt-6  Document the shared generated types and build steps.
+% 06-10-2026  Pietro Califano     Align runtime SRP response contracts.
 % -------------------------------------------------------------------------------------------------------------
 %% DEPENDENCIES
 % MATLAB Coder, EvaluateSrpResponseLut, EvalJac_SrpResponseLut, ValidateSrpResponseLut.
@@ -46,7 +47,7 @@ arguments (Input)
     kwargs.charTarget (1, :) char {mustBeMember(kwargs.charTarget, {'mex', 'lib'})} = 'mex'
     kwargs.charKernelName (1, :) char = ''
     kwargs.bIncludeTransverse (1, 1) logical = false
-    kwargs.bFreezeTable (1, 1) logical = true
+    kwargs.bFreezeTable (1, 1) logical = false
     kwargs.charEntryPoint (1, :) char {mustBeMember(kwargs.charEntryPoint, ...
         {'EvaluateSrpResponseLut', 'EvalJac_SrpResponseLut'})} = 'EvaluateSrpResponseLut'
     kwargs.ui8OutputCount (1, 1) uint8 = uint8(0)
@@ -61,8 +62,8 @@ ValidateSrpResponseLut(strResponseLut);
 if kwargs.bIncludeTransverse
     assert(isfield(strResponseLut, 'dTransverseForcePerPressure'), ...
         'CodegenSrpResponseLut:MissingTransverse', 'Supply transverse samples for this specialization.');
-elseif isfield(strResponseLut, 'dTransverseForcePerPressure')
-    % Exclude vector storage from scalar runtime-table interfaces as well as embedded builds.
+elseif kwargs.bFreezeTable && isfield(strResponseLut, 'dTransverseForcePerPressure')
+    % Prune unused vector storage only in explicitly frozen scalar builds.
     strResponseLut = rmfield(strResponseLut, 'dTransverseForcePerPressure');
 end
 assert(exist('codegen', 'file') ~= 0, 'CodegenSrpResponseLut:MissingCoder', ...
@@ -98,7 +99,7 @@ if isfolder(charOutputRoot)
 end
 mkdir(charOutputRoot);
 
-% Embed the table by default; opt into runtime const-pointer storage explicitly.
+% Fix table types and capacities; embed values only for an explicit diagnostic build.
 objConfig = coder.config(kwargs.charTarget);
 objConfig.TargetLang = 'C++';
 objConfig.GenerateReport = false;

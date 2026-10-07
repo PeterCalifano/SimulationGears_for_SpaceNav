@@ -18,9 +18,10 @@ function strVerification = testSrpLutOutputCodegen(charOutputRoot, strResponseLu
 % strVerification  Output counts, buffer counts, parity errors and timing [s/call].
 % -------------------------------------------------------------------------------------------------------------
 %% CHANGELOG
-% 01-10-2026  Pietro Califano, Codex GPT-6  Cover nodal transverse data and constant inclusion.
 % 29-09-2026  Pietro Califano, Codex gpt-6  Verify output-specialized SRP code generation.
+% 01-10-2026  Pietro Califano, Codex GPT-6  Cover nodal transverse data and constant inclusion.
 % 01-10-2026  Pietro Califano, Codex gpt-6  Update acceleration names and remove eclipse inputs.
+% 06-10-2026  Pietro Califano     Align runtime SRP response contracts.
 % -------------------------------------------------------------------------------------------------------------
 %% DEPENDENCIES
 % CodegenSrpResponseLut, EvalJac_SrpResponseLut, ComputeSrpLutAcceleration; MATLAB Coder.
@@ -60,7 +61,7 @@ for bTransverse = [false, true]
             ui8Option = uint8(0);  % Exercise the default Jacobian-only MEX contract.
         end
         cellBuilds{ui32Build} = CodegenSrpResponseLut(fullfile(charOutputRoot, charKernel), ...
-            strModeLut, bIncludeTransverse=bTransverse, charEntryPoint='EvalJac_SrpResponseLut', ...
+            strModeLut, bFreezeTable=true, bIncludeTransverse=bTransverse, charEntryPoint='EvalJac_SrpResponseLut', ...
             charKernelName=charKernel, ui8OutputCount=ui8Option);
         assert(cellBuilds{ui32Build}.ui8OutputCount == ui8Requested);
         addpath(cellBuilds{ui32Build}.charOutputRoot);
@@ -98,7 +99,7 @@ for bTransverse = [false, true]
 
     % Preserve force-only generation and reject unsupported counts before building.
     strForce = CodegenSrpResponseLut(fullfile(charOutputRoot, 'Force_only'), strModeLut, ...
-        bIncludeTransverse=bTransverse, charKernelName='EvalSrpForce_outputs1');
+        bFreezeTable=true, bIncludeTransverse=bTransverse, charKernelName='EvalSrpForce_outputs1');
     assert(strForce.ui8OutputCount == 1);
     addpath(strForce.charOutputRoot);
     dExpected = EvaluateSrpResponseLut(dDirections(:, 9), strModeLut, bTransverse);

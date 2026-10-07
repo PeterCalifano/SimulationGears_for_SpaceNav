@@ -21,7 +21,7 @@ function [dForcePerPressure_SCB, dEffectiveCr, dTransverseForcePerPressure_SCB, 
 % -------------------------------------------------------------------------------------------------------------
 %% INPUT
 % dPosSCtoSun_SCB                   Nonzero spacecraft-to-Sun query in body coordinates.
-% strResponseLut                    Validated immutable scalar/transverse fixed-capacity payload.
+% strResponseLut                    Validated runtime scalar/transverse fixed-capacity payload.
 % bIncludeTransverse                Compile-time selection of transverse support.
 % bComputeJacobian                  Compile-time selection of analytical partials.
 % -------------------------------------------------------------------------------------------------------------
@@ -35,10 +35,11 @@ function [dForcePerPressure_SCB, dEffectiveCr, dTransverseForcePerPressure_SCB, 
 % bDerivativeRegular                True away from grid knots, seam and exact poles.
 % -------------------------------------------------------------------------------------------------------------
 %% CHANGELOG
-% 01-10-2026  Pietro Califano, Codex GPT-6  Correct nodal transverse samples and constant inclusion.
 % 29-09-2026  Pietro Califano, Codex gpt-6  Share LUT force and analytical partials.
 % 29-09-2026  Pietro Califano, Codex gpt-6  Regularize pole lookup without random state.
+% 01-10-2026  Pietro Califano, Codex GPT-6  Correct nodal transverse samples and constant inclusion.
 % 01-10-2026  Pietro Califano, Codex gpt-6  Clarify query frames, interpolation and derivative steps.
+% 06-10-2026  Pietro Califano     Align runtime SRP response contracts.
 % -------------------------------------------------------------------------------------------------------------
 %% DEPENDENCIES
 % ValidateSrpResponseLut (host-side preparation).
@@ -60,7 +61,7 @@ arguments (Output)
     bDerivativeRegular (1, 1) logical
 end
 
-% Guard query and active counts without scanning or copying immutable arrays.
+% Guard query and active counts without scanning or copying complete runtime arrays.
 assert(all(isfinite(dPosSCtoSun_SCB)), 'EvaluateSrpResponseLut:InvalidDirection', ...
     'Supply finite spacecraft-to-Sun direction components.');
 assert(strResponseLut.ui32AzimuthCount >= 3 && ...

@@ -406,7 +406,8 @@ CodegenSrpResponseLut(charLibraryRoot, strPayload, charTarget='lib', ...
 Freeze inclusion during code generation independently of table embedding.
 MEX interfaces omit the inclusion flag and, for embedded builds, the table.
 Runtime-table builds accept numerical values with the selected fixed layout;
-scalar targets contain neither the transverse array nor its computations.
+scalar targets skip transverse arithmetic. Runtime storage follows the supplied
+fixed schema; explicit frozen scalar builds may omit unused vector storage.
 Use `GenerateSrpLutDirections` for deterministic independent sphere queries.
 
 MEX builds default to one output; select another leading output count with

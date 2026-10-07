@@ -20,10 +20,11 @@ function strVerification = testSrpResponseLutCodegen(charOutputRoot, strResponse
 % strVerification  Code generation settings, tested modes and maximum parity errors.
 % -------------------------------------------------------------------------------------------------------------
 %% CHANGELOG
+% 28-09-2026  Pietro Califano, Codex gpt-6  Verify bounded generated SRP evaluators.
 % 01-10-2026  Pietro Califano, Codex GPT-6  Compare shared SRP diagnostics across generated orbital models.
 % 01-10-2026  Pietro Califano, Codex GPT-6  Cover nodal transverse data and constant inclusion.
-% 28-09-2026  Pietro Califano, Codex gpt-6  Verify bounded generated SRP evaluators.
 % 01-10-2026  Pietro Califano, Codex gpt-6  Check shared type names and mixed orbital calls.
+% 06-10-2026  Pietro Califano     Align runtime SRP response contracts.
 % -------------------------------------------------------------------------------------------------------------
 %% DEPENDENCIES
 % CodegenSrpResponseLut, EvaluateSrpResponseLut, GenerateSrpLutDirections,
@@ -54,7 +55,8 @@ for bTransverse = [false, true]
     % Build both runtime-table and frozen-table interfaces before comparing their outputs.
     strMex = CodegenSrpResponseLut(fullfile(charOutputRoot, 'Runtime_mex'), strModeLut, ...
         bIncludeTransverse=bTransverse, charKernelName='EvaluateSrpResponseLut_runtime', ...
-        bFreezeTable=false, ui8OutputCount=uint8(3));
+        ui8OutputCount=uint8(3));
+    assert(~strMex.bFreezeTable);
     addpath(strMex.charOutputRoot);
     strFrozenMex = CodegenSrpResponseLut(fullfile(charOutputRoot, 'Frozen_mex'), strModeLut, ...
         bIncludeTransverse=bTransverse, charKernelName='EvaluateSrpResponseLut_frozen', ...

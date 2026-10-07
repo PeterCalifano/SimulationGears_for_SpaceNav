@@ -20,7 +20,7 @@ function [dJacForcePerPressWrtSunPos_SCB, dJacCrWrtSunPos_SCB, ...
 % -------------------------------------------------------------------------------------------------------------
 %% INPUT
 % dPosSCtoSun_SCB                   Nonzero spacecraft-to-Sun displacement in SCB [query unit].
-% strResponseLut                    Immutable payload validated during preparation.
+% strResponseLut                    Runtime payload validated during preparation.
 % bIncludeTransverse                Compile-time transverse selection; default false.
 % -------------------------------------------------------------------------------------------------------------
 %% OUTPUT
@@ -33,10 +33,11 @@ function [dJacForcePerPressWrtSunPos_SCB, dJacCrWrtSunPos_SCB, ...
 % bDerivativeRegular                True away from knots/seam/poles; see DESCRIPTION.
 % -------------------------------------------------------------------------------------------------------------
 %% CHANGELOG
-% 01-10-2026  Pietro Califano, Codex GPT-6  Correct nodal transverse samples and constant inclusion.
 % 29-09-2026  Pietro Califano, Codex gpt-6  Add analytical scalar/vector LUT partials.
 % 29-09-2026  Pietro Califano, Codex gpt-6  Differentiate deterministic pole lookup adjustment.
+% 01-10-2026  Pietro Califano, Codex GPT-6  Correct nodal transverse samples and constant inclusion.
 % 01-10-2026  Pietro Califano, Codex gpt-6  Clarify variable roles and separate computation steps.
+% 06-10-2026  Pietro Califano     Align runtime SRP response contracts.
 % -------------------------------------------------------------------------------------------------------------
 %% DEPENDENCIES
 % EvalSrpLutKernel, ValidateSrpResponseLut (host preparation).

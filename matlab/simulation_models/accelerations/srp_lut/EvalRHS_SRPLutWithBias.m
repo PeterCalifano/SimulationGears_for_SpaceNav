@@ -26,7 +26,7 @@ function [dSRPaccel_IN, dJacAccSRP_IN, dJacAccSRPWrtBias_IN, bDerivativeRegular]
 %                        bUseKilometersScale and strPointing.
 %                        Supply body-to-inertial dDCM_INfromSCB and dJacDCMWrtPos_INfromSCB
 %                        [1/LU]. Gate target eclipse before calling this function.
-% strResponseLut         Immutable numeric table; geometry/area use metres/square metres.
+% strResponseLut         Fixed-size runtime numeric table; geometry/area use metres/square metres.
 % bIncludeTransverse     Compile-time selection of transverse support.
 % -------------------------------------------------------------------------------------------------------------
 %% OUTPUT
@@ -37,12 +37,13 @@ function [dSRPaccel_IN, dJacAccSRP_IN, dJacAccSRPWrtBias_IN, bDerivativeRegular]
 %                        true when inactive through zero pressure or range.
 % -------------------------------------------------------------------------------------------------------------
 %% CHANGELOG
-% 04-10-2026  Pietro Califano     Align additive bias and its partials with selected SRP.
-% 01-10-2026  Pietro Califano, Codex GPT-6  Correct nodal transverse samples and constant inclusion.
 % 30-09-2026  Pietro Califano, Codex gpt-6  Own generic LUT/bias physics outside filter state mapping.
+% 01-10-2026  Pietro Califano, Codex GPT-6  Correct nodal transverse samples and constant inclusion.
 % 01-10-2026  Pietro Califano, Codex gpt-6  Standardize SRP acronym in entry-point names.
 % 01-10-2026  Pietro Califano, Codex gpt-6  Remove partial-eclipse scaling and gradient inputs.
 % 01-10-2026  Pietro Califano, Codex gpt-6  Clarify frames, physical inputs and generated struct types.
+% 04-10-2026  Pietro Califano     Align additive bias and its partials with selected SRP.
+% 06-10-2026  Pietro Califano     Align runtime SRP response contracts.
 % -------------------------------------------------------------------------------------------------------------
 %% DEPENDENCIES
 % ComputeSolarRadPressure, ComputeSrpLutAcceleration.

@@ -28,7 +28,7 @@ function [dSRPaccel_IN, dJacAccSRP_IN, dJacAccSRPatt_IN, dJacAccSRPmass_IN, bDer
 % dDCM_INfromSCB            Proper rotation from SCB to IN [-].
 % dMassSC                   Positive spacecraft mass [kg].
 % dSolarPressure            Current solar pressure [N/m^2].
-% strResponseLut            Prepared immutable numeric LUT.
+% strResponseLut            Fixed-size runtime numeric LUT.
 % bIncludeTransverse        Compile-time transverse selection; default false.
 % bIncludeSRPressureJacobian Include current pressure's range partial; default false.
 % dJacDCMWrtPos_INfromSCB   d(DCM_INfromSCB)/dr_j for SC position in IN [1/m].
@@ -42,12 +42,13 @@ function [dSRPaccel_IN, dJacAccSRP_IN, dJacAccSRPatt_IN, dJacAccSRPmass_IN, bDer
 % bDerivativeRegular        LUT derivative regularity; false at knots/poles.
 % -------------------------------------------------------------------------------------------------------------
 %% CHANGELOG
-% 01-10-2026  Pietro Califano, Codex GPT-6  Correct nodal transverse samples and constant inclusion.
 % 29-09-2026  Pietro Califano, Codex gpt-6  Add shared SI acceleration and derivative handoff.
 % 29-09-2026  Pietro Califano, Codex gpt-6  Skip unrequested physical partials.
+% 01-10-2026  Pietro Califano, Codex GPT-6  Correct nodal transverse samples and constant inclusion.
 % 01-10-2026  Pietro Califano, Codex gpt-6  Reuse the MathCore skew matrix implementation.
 % 01-10-2026  Pietro Califano, Codex gpt-6  Clarify vector frames and force-response partials.
 % 01-10-2026  Pietro Califano, Codex gpt-6  Remove unused partial-eclipse inputs.
+% 06-10-2026  Pietro Califano     Align runtime SRP response contracts.
 % -------------------------------------------------------------------------------------------------------------
 %% DEPENDENCIES
 % EvaluateSrpResponseLut, EvalJac_SrpResponseLut, skewSymm (MathCore).
