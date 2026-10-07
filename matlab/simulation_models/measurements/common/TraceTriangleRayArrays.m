@@ -68,6 +68,7 @@ dIntersectionPoint = zeros(3, 1);
 ui32TriangleId = uint32(0);
 dBestDistance = strQuery.dMaxDistance;
 dProjectedOrigin = zeros(2, 1);
+
 if isfield(strQuery, 'dProjectedMin')
     dProjectedOrigin = dOrigin(strQuery.ui8ProjectionAxes) - ...
         strQuery.dProjectionShear * dOrigin(strQuery.ui8DominantAxis);
@@ -77,12 +78,14 @@ if ui32TriangleCount == 0
 end
 
 if ~bUseBvh
-    % Retain a simple scan for small meshes and as the acceleration oracle.
+    % Simple flat scan of all triangles; ignore BVH nodes and bounds for small meshes.
     ui32IterationCount = ui32TriangleCount;
     if isfield(strQuery, 'ui32CandidateTriangles')
         ui32IterationCount = strQuery.ui32CandidateCount;
     end
+    
     for ui32Iteration = uint32(1):ui32IterationCount
+
         ui32Triangle = ui32Iteration;
         if isfield(strQuery, 'ui32CandidateTriangles')
             ui32Triangle = strQuery.ui32CandidateTriangles(ui32Iteration);
@@ -90,8 +93,10 @@ if ~bUseBvh
         if ui32Triangle == strQuery.ui32IgnoreTriangle
             continue
         end
+
         [bCandidate, dCandidate] = IntersectPreparedTriangle_( ...
             dVertex0, dEdge1, dEdge2, dOrigin, strQuery, ui32Triangle, dBestDistance, dProjectedOrigin);
+
         if bCandidate && (~bHit || dCandidate < dBestDistance || ...
                 (dCandidate == dBestDistance && ui32Triangle < ui32TriangleId))
             bHit = true;
@@ -102,14 +107,16 @@ if ~bUseBvh
             end
         end
     end
+
 else
-    % Reuse RCS-1's direction reciprocals and origin-scaled conservative slack.
+    % Use a fixed-size stack to traverse the BVH; order children along the dominant axis.
     dInverseDirection = zeros(3, 1);
     for ui8Axis = uint8(1):uint8(3)
         if strQuery.dDirection(ui8Axis) ~= 0
             dInverseDirection(ui8Axis) = 1 / strQuery.dDirection(ui8Axis);
         end
     end
+
     [~, dOrderAxis] = max(abs(strQuery.dDirection));
     dOriginSlack = 64 * eps * max(1, max(abs(dOrigin)));
 
@@ -120,27 +127,35 @@ else
     ui32StackCount = uint32(1);
 
     while ui32StackCount > 0
+
         ui32Node = ui32Stack(ui32StackCount);
         ui32StackCount = ui32StackCount - 1;
         [bBoundsHit, ~] = IntersectRayBounds(dOrigin, strQuery.dDirection, ...
             dNodeMin(:, ui32Node), dNodeMax(:, ui32Node), ...
             strQuery.dMinDistance, dBestDistance, dInverseDirection, dOriginSlack);
+        
         if ~bBoundsHit
             continue
         end
 
         if ui32LeafCount(ui32Node) > 0
+
             ui32Start = ui32LeafStart(ui32Node);
             ui32End = ui32Start + ui32LeafCount(ui32Node) - 1;
+
             for ui32LeafIndex = ui32Start:ui32End
+
                 ui32Triangle = ui32TriangleOrder(ui32LeafIndex);
                 if ui32Triangle == strQuery.ui32IgnoreTriangle
                     continue
                 end
+
                 [bCandidate, dCandidate] = IntersectPreparedTriangle_( ...
                     dVertex0, dEdge1, dEdge2, dOrigin, strQuery, ui32Triangle, dBestDistance, dProjectedOrigin);
+
                 if bCandidate && (~bHit || dCandidate < dBestDistance || ...
                         (dCandidate == dBestDistance && ui32Triangle < ui32TriangleId))
+
                     bHit = true;
                     dBestDistance = dCandidate;
                     ui32TriangleId = ui32Triangle;
@@ -156,6 +171,7 @@ else
             % Order children along the dominant ray axis; test their bounds when popped.
             ui32Left = ui32NodeLeft(ui32Node);
             ui32Right = ui32NodeRight(ui32Node);
+
             if strQuery.dDirection(dOrderAxis) > 0
                 bLeftFirst = dNodeMin(dOrderAxis, ui32Left) < ...
                     dNodeMin(dOrderAxis, ui32Right);
@@ -163,11 +179,13 @@ else
                 bLeftFirst = dNodeMax(dOrderAxis, ui32Left) > ...
                     dNodeMax(dOrderAxis, ui32Right);
             end
+
             if ~bLeftFirst
                 ui32Tmp = ui32Left;
                 ui32Left = ui32Right;
                 ui32Right = ui32Tmp;
             end
+
             ui32StackCount = ui32StackCount + 1;
             ui32Stack(ui32StackCount) = ui32Right;
             ui32StackCount = ui32StackCount + 1;
@@ -238,17 +256,23 @@ if isfield(strQuery, 'dProjectedMin')
         return
     end
 end
+
 % Reuse direction coefficients for parallel shadow rays; compute only visited
 % triangles for ordinary BVH queries.
 if isfield(strQuery, 'dCrossEdge2')
+
     dInverseDet = strQuery.dInverseDet(ui32Triangle);
+
     if dInverseDet == 0
         bHit = false;
         dDistance = 0;
         return
     end
+
     dCrossEdge2 = strQuery.dCrossEdge2(:, ui32Triangle);
+
 else
+
     dTriangleEdge1 = dEdge1(:, ui32Triangle);
     dTriangleEdge2 = dEdge2(:, ui32Triangle);
     dCrossEdge2 = cross(strQuery.dDirection, dTriangleEdge2);
@@ -259,9 +283,10 @@ else
         dInverseDet = 1 / dDet;
     end
 end
+
 dOriginFromVertex = dOrigin - dVertex0(:, ui32Triangle);
-[bHit, dDistance] = IntersectTriangleEdges( ...
-    dOriginFromVertex, strQuery.dDirection, ...
-    dEdge1(:, ui32Triangle), dEdge2(:, ui32Triangle), ...
-    dCrossEdge2, dInverseDet, strQuery.dMinDistance, dMaxDistance);
+
+[bHit, dDistance] = IntersectTriangleEdges(dOriginFromVertex, strQuery.dDirection, ...
+                    dEdge1(:, ui32Triangle), dEdge2(:, ui32Triangle), ...
+                    dCrossEdge2, dInverseDet, strQuery.dMinDistance, dMaxDistance);
 end

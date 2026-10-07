@@ -76,24 +76,31 @@ strNumericPanel = struct('dSCquadsArea', strPanel.dSCquadsArea(:), ...
     'strShadowData', struct('dSamplePoints_SCB', dSamplePoints_SCB, ...
         'dRayOffset', kwargs.dRayOffset, ...
         'strRayData', BuildTriangleRayData(dFaceVertices_SCB, false)));
+
 [dAzimuthNodes, dElevationNodes] = meshgrid(dAzimuth, dElevation);
 dDirections = [cosd(dElevationNodes(:)).'.*cosd(dAzimuthNodes(:)).'; ...
     cosd(dElevationNodes(:)).'.*sind(dAzimuthNodes(:)).'; sind(dElevationNodes(:)).'];
+
 dResponses = zeros(size(dDirections));
 ui32NodeCount = uint32(size(dDirections, 2));
+
 for ui32First = uint32(1):kwargs.ui32BatchCount:ui32NodeCount
+    
     ui32Last = min(ui32First + kwargs.ui32BatchCount - 1, ui32NodeCount);
     ui32ActiveCount = ui32Last - ui32First + 1;
     dBatch = repmat(dDirections(:, ui32First), 1, kwargs.ui32BatchCount);
+
     dBatch(:, 1:ui32ActiveCount) = dDirections(:, ui32First:ui32Last);
     dResponse = kwargs.fcnPanelResponse(dBatch, strNumericPanel, kwargs.bSelfShadowing);
     dResponses(:, ui32First:ui32Last) = dResponse(:, 1:ui32ActiveCount);
 end
+
 dForcePerPressure = reshape(dResponses, 3, numel(dElevation), numel(dAzimuth));
-dEffectiveCr = reshape(sum(-dResponses.*dDirections, 1)/dReferenceArea, ...
-    numel(dElevation), numel(dAzimuth));
-dTransverseForcePerPressure = reshape( ...
-    dResponses - dDirections.*sum(dDirections.*dResponses, 1), size(dForcePerPressure));
+dEffectiveCr = reshape(sum(- dResponses.* dDirections, 1) / dReferenceArea, ...
+                            numel(dElevation), numel(dAzimuth));
+
+dTransverseForcePerPressure = reshape(dResponses - dDirections .* sum(dDirections .* dResponses, 1), ...
+                                        size(dForcePerPressure));
 
 % Make periodic seam and pole values exact rather than relying on roundoff.
 dEffectiveCr(:, end) = dEffectiveCr(:, 1);

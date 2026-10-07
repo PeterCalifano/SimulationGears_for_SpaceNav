@@ -54,6 +54,7 @@ dSunVector_SCB = dDCM_INfromSCB.' * dSCtoSun_IN;
 
 [dArea, dPressCentre, ~, dPressureSI, dOutputScale] = ...
     ResolvePanelSRPUnitsFromDynParams(strPanel, zeros(3, 1), dSolarPressure, strDynParams);
+
 strPanel.dSCquadsArea = dArea;
 strPanel.dQuadsPressCentre_SCB = dPressCentre;
 
@@ -61,10 +62,10 @@ strPanel.dQuadsPressCentre_SCB = dPressCentre;
 [dForce, dResponseJacobian] = ComputePanelSrpResponse(dSunVector_SCB, strPanel, true);
 dScale = dOutputScale * dPressureSI / strDynParams.strSCdata.dSCmass;
 dJacPanelSRP_IN = -dScale * dDCM_INfromSCB * dResponseJacobian * dDCM_INfromSCB.';
+
 if bRecomputePressureFromDistance
     dAcceleration = dScale * (dDCM_INfromSCB * dForce);
-    dJacPanelSRP_IN = dJacPanelSRP_IN + ...
-        2 * dAcceleration * dSCtoSun_IN.' / dot(dSCtoSun_IN, dSCtoSun_IN);
+    dJacPanelSRP_IN = dJacPanelSRP_IN + 2 * dAcceleration * dSCtoSun_IN.' / dot(dSCtoSun_IN, dSCtoSun_IN);
 end
 
 end

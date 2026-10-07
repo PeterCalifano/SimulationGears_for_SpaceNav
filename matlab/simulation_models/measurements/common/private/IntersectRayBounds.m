@@ -49,14 +49,19 @@ coder.inline('always');
 dEntry = dMinDistance;
 dExit = dMaxDistance;
 bHit = false;
+
 for ui8Axis = uint8(1):uint8(3)
+
     dLower = dBoundsMin(ui8Axis) - dOriginSlack;
     dUpper = dBoundsMax(ui8Axis) + dOriginSlack;
+
     if dDirection(ui8Axis) == 0
         if dOrigin(ui8Axis) < dLower || dOrigin(ui8Axis) > dUpper
             return
         end
+
     else
+
         if isfinite(dInverseDirection(ui8Axis))
             dFirst = (dLower - dOrigin(ui8Axis)) * dInverseDirection(ui8Axis);
             dSecond = (dUpper - dOrigin(ui8Axis)) * dInverseDirection(ui8Axis);
@@ -65,13 +70,16 @@ for ui8Axis = uint8(1):uint8(3)
             dFirst = (dLower - dOrigin(ui8Axis)) / dDirection(ui8Axis);
             dSecond = (dUpper - dOrigin(ui8Axis)) / dDirection(ui8Axis);
         end
+
         dEntry = max(dEntry, min(dFirst, dSecond));
         dExit = min(dExit, max(dFirst, dSecond));
         dParameterSlack = 64 * eps * max(1, max(abs(dEntry), abs(dExit)));
+
         if dEntry > dExit + dParameterSlack
             return
         end
     end
 end
+
 bHit = true;
 end

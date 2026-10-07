@@ -61,6 +61,7 @@ dCandidateU = dot(dOriginFromVertex, dCrossEdge2) * dInverseDet;
 if dCandidateU < 0 || dCandidateU > 1
     return
 end
+
 dCrossEdge1 = cross(dOriginFromVertex, dEdge1);
 dCandidateV = dot(dDirection, dCrossEdge1) * dInverseDet;
 if dCandidateV < 0 || dCandidateU + dCandidateV > 1
@@ -72,8 +73,10 @@ dCandidateDistance = dot(dEdge2, dCrossEdge1) * dInverseDet;
 if dCandidateDistance <= dMinDistance || dCandidateDistance > dMaxDistance
     return
 end
+
 bHit = true;
 dDistance = dCandidateDistance;
 dU = dCandidateU;
 dV = dCandidateV;
+
 end

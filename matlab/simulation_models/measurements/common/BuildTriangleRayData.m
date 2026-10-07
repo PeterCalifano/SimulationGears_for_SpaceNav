@@ -78,6 +78,7 @@ strRayData.ui32NodeCount = uint32(1);
 ui32Node = uint32(1);
 
 while ui32Node <= strRayData.ui32NodeCount
+    
     ui32Start = ui32PendingStart(ui32Node);
     ui32Count = ui32PendingCount(ui32Node);
     ui32End = ui32Start + ui32Count - 1;
@@ -89,18 +90,21 @@ while ui32Node <= strRayData.ui32NodeCount
         strRayData.ui32LeafStart(ui32Node) = ui32Start;
         strRayData.ui32LeafCount(ui32Node) = ui32Count;
     else
-        % Partition source IDs in place, retaining RCS-1's balanced median split.
+        % Partition source IDs in place with alanced median split
         [~, dAxis] = max(strRayData.dNodeMax(:, ui32Node) - strRayData.dNodeMin(:, ui32Node));
         ui32LeftCount = idivide(ui32Count, uint32(2), 'floor');
         ui32Median = ui32Start + ui32LeftCount - 1;
         ui32Lower = ui32Start;
         ui32Upper = ui32End;
+
         while ui32Lower < ui32Upper
+        
             ui32PivotIndex = idivide(ui32Lower + ui32Upper, uint32(2), 'floor');
             ui32PivotId = strRayData.ui32TriangleOrder(ui32PivotIndex);
             dPivot = dCentres(dAxis, ui32PivotId);
             ui32First = ui32Lower;
             ui32Last = ui32Upper;
+
             while ui32First <= ui32Last
                 while ui32First <= ui32Upper && ...
                         (dCentres(dAxis, strRayData.ui32TriangleOrder(ui32First)) < dPivot || ...
@@ -122,6 +126,7 @@ while ui32Node <= strRayData.ui32NodeCount
                     ui32Last = ui32Last - 1;
                 end
             end
+
             if ui32Median <= ui32Last
                 ui32Upper = ui32Last;
             elseif ui32Median >= ui32First
@@ -130,6 +135,7 @@ while ui32Node <= strRayData.ui32NodeCount
                 break
             end
         end
+        
         ui32Left = strRayData.ui32NodeCount + 1;
         ui32Right = ui32Left + 1;
         strRayData.ui32NodeLeft(ui32Node) = ui32Left;

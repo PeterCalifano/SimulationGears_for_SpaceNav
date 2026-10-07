@@ -1,5 +1,4 @@
-function [bHit, dDistance, dIntersectionPoint, ui32TriangleId] = ...
-    TraceTriangleRay(strRayData, dOrigin, strQuery) %#codegen
+function [bHit, dDistance, dIntersectionPoint, ui32TriangleId] = TraceTriangleRay(strRayData, dOrigin, strQuery) %#codegen
 %% SIGNATURE
 % [bHit, dDistance, dIntersectionPoint, ui32TriangleId] = TraceTriangleRay(strRayData, dOrigin, strQuery)
 % -------------------------------------------------------------------------------------------------------------
