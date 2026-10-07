@@ -3,12 +3,12 @@ function [dDxDt, strAccelInfo] = EvalRHS_InertialDynMaxFidelity(dStateTimetag, .
                                                                  strDynParams, ...
                                                                  strModelConfigFlags) %#codegen
 arguments
-    dStateTimetag (1,1) double
-    dxState_IN    (:,1) double
-    strDynParams  (1,1) struct
-    strModelConfigFlags (1,1) struct = struct()
+    dStateTimetag (1, 1) double
+    dxState_IN    (:, 1) double
+    strDynParams  (1, 1) struct
+    strModelConfigFlags (1, 1) struct = struct()
 end
-%% PROTOTYPE
+%% SIGNATURE
 % [dDxDt, strAccelInfo] = EvalRHS_InertialDynMaxFidelity(dStateTimetag, dxState_IN, strDynParams, strModelConfigFlags)
 % -------------------------------------------------------------------------------------------------------------
 %% DESCRIPTION
@@ -22,6 +22,7 @@ end
 % This entry point owns compile-time model-configuration options while preserving EvalRHS_InertialDynOrbit for
 % estimator paths. Target gravity is exclusive and reported by ui8SelectedGravityModel: 0 none, 1 central,
 % 2 spherical harmonics, and 3 polyhedron.
+% Omit orbital diagnostics and panel torque when only the derivative is requested.
 % -------------------------------------------------------------------------------------------------------------
 %% INPUT
 % dStateTimetag:       (1,1) double   Dynamics evaluation time.
@@ -45,6 +46,7 @@ end
 % 11-09-2026  Pietro Califano, Codex gpt-6    Remove unused runtime sign-switch metadata.
 % 01-10-2026  Pietro Califano, Codex GPT-6  Report selected panel/cannonball acceleration as dAccSRP.
 % 04-10-2026  Pietro Califano, Codex GPT-6  Keep ephemeris/pressure storage fixed for codegen.
+% 05-10-2026  Pietro Califano, Codex (GPT-6)        Prune diagnostics and torque from force-only calls.
 % -------------------------------------------------------------------------------------------------------------
 %% DEPENDENCIES
 % ResolveInertialDynMaxFidelityConfig()
@@ -117,7 +119,8 @@ if ui8SelectedGravityModel == uint8(3)
 end
 
 % Evaluate shared inertial orbit RHS for point mass, SH, third bodies, cannonball SRP, and external acceleration.
-[dDxDt, strAccelInfo] = EvalRHS_InertialDynOrbit(dxOrbitState, ...
+if nargout > 1
+    [dDxDt, strAccelInfo] = EvalRHS_InertialDynOrbit(dxOrbitState, ...
                                                  dDCMmainAtt_INfromTF, ...
                                                  dMainGM, ...
                                                  strDynParams.strMainData.dRefRadius, ...
@@ -129,16 +132,33 @@ end
                                                  [], ...
                                                  dAccPolyhedronPert_IN, ...
                                                  bIsInEclipse);
+else
+    dDxDt = EvalRHS_InertialDynOrbit(dxOrbitState, ...
+                                                 dDCMmainAtt_INfromTF, ...
+                                                 dMainGM, ...
+                                                 strDynParams.strMainData.dRefRadius, ...
+                                                 dCoeffForOrbit, ...
+                                                 d3rdBodiesGM, ...
+                                                 dBodyEphemerides, ...
+                                                 dMainCSlmCoeffCols, ...
+                                                 ui32MaxSHdegree, ...
+                                                 [], ...
+                                                 dAccPolyhedronPert_IN, ...
+                                                 bIsInEclipse);
+end
 
 % Add panel SRP acceleration and torque when truth model has panel geometry and sunlight.
 dAccPanelSRP_IN = zeros(3, 1);
 dSRPtorque_SCB = zeros(3, 1);
 bPanelSRPActive = false;
 if bHasPanelSRP && bHasSunEphemeris && ~bIsInEclipse
-    [dAccPanelSRP_IN, dSRPtorque_SCB] = ComputePanelSRPFromDynParams(dxOrbitState(1:3), ...
-                                                                     dBodyEphemerides(1:3, 1), ...
-                                                                     dSolarPressure, ...
-                                                                     strDynParams);
+    if nargout > 1
+        [dAccPanelSRP_IN, dSRPtorque_SCB] = ComputePanelSRPFromDynParams( ...
+            dxOrbitState(1:3), dBodyEphemerides(1:3, 1), dSolarPressure, strDynParams);
+    else
+        dAccPanelSRP_IN = ComputePanelSRPFromDynParams( ...
+            dxOrbitState(1:3), dBodyEphemerides(1:3, 1), dSolarPressure, strDynParams);
+    end
     dDxDt(4:6) = dDxDt(4:6) + dAccPanelSRP_IN;
     bPanelSRPActive = any(abs(dAccPanelSRP_IN) > 0.0);
 end

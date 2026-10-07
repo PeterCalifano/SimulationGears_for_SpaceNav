@@ -14,12 +14,13 @@ function strResponseLut = PackSrpResponseLut(strTable, kwargs)
 %                          dReferenceArea_m2 and, when selected,
 %                          dTransverseForcePerPressure (3, Elevation, Azimuth) [m^2].
 % kwargs.bIncludeTransverse Include transverse samples; default false.
+% kwargs.bIncludeTorque     Include body-origin torque/pressure [m^3]; default false.
 % kwargs.ui32Capacity       Fixed [azimuth, elevation] capacity; default [361, 181].
 %                          Use [73, 37] for a compact 5-degree codegen specialization.
 % -------------------------------------------------------------------------------------------------------------
 %% OUTPUT
 % strResponseLut        Six numeric fields and an optional transverse array,
-%                       with fixed selected storage up to 361 x 181 nodes.
+%                       plus optional body-origin torque, up to 721 x 361 nodes.
 % -------------------------------------------------------------------------------------------------------------
 %% CHANGELOG
 % 01-10-2026  Pietro Califano, Codex GPT-6  Correct nodal transverse samples and constant inclusion.
@@ -27,6 +28,7 @@ function strResponseLut = PackSrpResponseLut(strTable, kwargs)
 % 28-09-2026  Pietro Califano, Codex gpt-6  Initialize the fixed payload directly.
 % 29-09-2026  Pietro Califano, Codex gpt-6  Support fixed capacities matched to the selected grid.
 % 01-10-2026  Pietro Califano, Codex gpt-6  Clarify variable roles and separate computation steps.
+% 06-10-2026  Codex (GPT-6)  Support half-degree truth grids and optional torque storage.
 % -------------------------------------------------------------------------------------------------------------
 %% DEPENDENCIES
 % ValidateSrpResponseLut.
@@ -34,6 +36,7 @@ function strResponseLut = PackSrpResponseLut(strTable, kwargs)
 arguments (Input)
     strTable (1, 1) struct
     kwargs.bIncludeTransverse (1, 1) logical = false
+    kwargs.bIncludeTorque (1,1) logical = false
     kwargs.ui32Capacity (1, 2) uint32 = uint32([361, 181])
 end
 
@@ -46,15 +49,15 @@ assert(all(isfield(strTable, {'dAzimuth', 'dElevation', 'dEffectiveCr', ...
                             'dReferenceArea_m2'})), ...
     'PackSrpResponseLut:MissingField', 'Supply all compact response values.');
 ui32Capacity = kwargs.ui32Capacity;
-assert(all(ui32Capacity >= 3) && all(ui32Capacity <= uint32([361, 181])), ...
-    'PackSrpResponseLut:CapacityExceeded', 'Keep fixed capacities within 361 by 181 nodes.');
+assert(all(ui32Capacity >= 3) && all(ui32Capacity <= uint32([721, 361])), ...
+    'PackSrpResponseLut:CapacityExceeded', 'Keep fixed capacities within 721 by 361 nodes.');
 
 % Keep active counts distinct from the selected storage capacities.
 ui32AzimuthCount = uint32(numel(strTable.dAzimuth));
 ui32ElevationCount = uint32(numel(strTable.dElevation));
 assert(ui32AzimuthCount >= 3 && ui32AzimuthCount <= ui32Capacity(1) && ...
     ui32ElevationCount >= 3 && ui32ElevationCount <= ui32Capacity(2), ...
-    'PackSrpResponseLut:CapacityExceeded', 'Require at most 361 azimuth and 181 elevation nodes.');
+    'PackSrpResponseLut:CapacityExceeded', 'Require populated nodes within the selected fixed capacity.');
 assert(isequal(size(strTable.dEffectiveCr), [double(ui32ElevationCount), double(ui32AzimuthCount)]), ...
     'PackSrpResponseLut:InvalidValues', 'Require compact values consistent with the axes.');
 
@@ -78,6 +81,13 @@ if kwargs.bIncludeTransverse
         strTable.dTransverseForcePerPressure;
 end
 
+if kwargs.bIncludeTorque
+    assert(isfield(strTable,'dTorquePerPressure') && ...
+        isequal(size(strTable.dTorquePerPressure),[3,double(ui32ElevationCount),double(ui32AzimuthCount)]), ...
+        'PackSrpResponseLut:InvalidValues','Require body-origin torque samples consistent with the axes.');
+    strResponseLut.dTorquePerPressure = zeros(3,ui32Capacity(2),ui32Capacity(1));
+    strResponseLut.dTorquePerPressure(:,1:ui32ElevationCount,1:ui32AzimuthCount) = strTable.dTorquePerPressure;
+end
 ValidateSrpResponseLut(strResponseLut);
 coder.cstructname(strResponseLut, 'SSrpResponseLut');
 end

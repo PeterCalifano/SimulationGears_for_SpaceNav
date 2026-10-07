@@ -84,6 +84,10 @@ ui8AvailableOutputs = uint8(nargout(kwargs.charEntryPoint));
 ui8OutputCount = kwargs.ui8OutputCount;
 if ui8OutputCount == 0
     ui8OutputCount = ui8AvailableOutputs;
+    if strcmp(kwargs.charEntryPoint,'EvaluateSrpResponseLut') && ...
+            ~isfield(strResponseLut,'dTorquePerPressure')
+        ui8OutputCount = min(ui8OutputCount,uint8(3));
+    end
     if strcmp(kwargs.charTarget, 'mex')
         ui8OutputCount = uint8(1);
     end

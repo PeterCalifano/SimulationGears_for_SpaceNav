@@ -1,7 +1,7 @@
-function [dForcePerPressure_SCB, dEffectiveCr, dTransverseForcePerPressure_SCB] = ...
+function [dForcePerPressure_SCB, dEffectiveCr, dTransverseForcePerPressure_SCB, dTorquePerPressure_SCB] = ...
     EvaluateSrpResponseLut(dPosSCtoSun_SCB, strResponseLut, bIncludeTransverse) %#codegen
 %% SIGNATURE
-% [dForcePerPressure_SCB, dEffectiveCr, dTransverseForcePerPressure_SCB] = ...
+% [dForcePerPressure_SCB, dEffectiveCr, dTransverseForcePerPressure_SCB, dTorquePerPressure_SCB] = ...
 %     EvaluateSrpResponseLut(dPosSCtoSun_SCB, strResponseLut, bIncludeTransverse)
 % -------------------------------------------------------------------------------------------------------------
 %% DESCRIPTION
@@ -27,6 +27,7 @@ function [dForcePerPressure_SCB, dEffectiveCr, dTransverseForcePerPressure_SCB] 
 % dForcePerPressure_SCB             Total body-frame force per unit pressure [m^2].
 % dEffectiveCr                      Interpolated dimensionless Sun-parallel reflectivity [-].
 % dTransverseForcePerPressure_SCB   Added transverse force per unit pressure; zero when disabled [m^2].
+% dTorquePerPressure_SCB           Optional body-origin torque/pressure [m^3]; zero without torque storage.
 % -------------------------------------------------------------------------------------------------------------
 %% CHANGELOG
 % 01-10-2026  Pietro Califano, Codex GPT-6  Correct nodal transverse samples and constant inclusion.
@@ -34,6 +35,7 @@ function [dForcePerPressure_SCB, dEffectiveCr, dTransverseForcePerPressure_SCB] 
 % 29-09-2026  Pietro Califano, Codex gpt-6  Share force interpolation with analytical derivatives.
 % 29-09-2026  Pietro Califano, Codex gpt-6  Share deterministic pole lookup with derivatives.
 % 01-10-2026  Pietro Califano, Codex gpt-6  Clarify variable roles and separate computation steps.
+% 06-10-2026  Codex (GPT-6)  Expose optional truth torque with the same interpolation weights.
 % -------------------------------------------------------------------------------------------------------------
 %% DEPENDENCIES
 % EvalSrpLutKernel, ValidateSrpResponseLut (caller-side table validation).
@@ -48,9 +50,16 @@ arguments (Output)
     dForcePerPressure_SCB (3, 1) double
     dEffectiveCr (1, 1) double
     dTransverseForcePerPressure_SCB (3, 1) double
+    dTorquePerPressure_SCB (3,1) double
 end
 
 % Specialize the shared kernel to avoid all analytical derivative work.
-[dForcePerPressure_SCB, dEffectiveCr, dTransverseForcePerPressure_SCB] = ...
-    EvalSrpLutKernel(dPosSCtoSun_SCB, strResponseLut, bIncludeTransverse, false);
+if nargout >= 4
+    [dForcePerPressure_SCB,dEffectiveCr,dTransverseForcePerPressure_SCB,~,~,~,~,dTorquePerPressure_SCB] = ...
+        EvalSrpLutKernel(dPosSCtoSun_SCB,strResponseLut,bIncludeTransverse,false);
+else
+    [dForcePerPressure_SCB,dEffectiveCr,dTransverseForcePerPressure_SCB] = ...
+        EvalSrpLutKernel(dPosSCtoSun_SCB,strResponseLut,bIncludeTransverse,false);
+    dTorquePerPressure_SCB = zeros(3,1);
+end
 end

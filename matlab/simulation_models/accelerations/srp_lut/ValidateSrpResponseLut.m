@@ -13,14 +13,15 @@ function ValidateSrpResponseLut(strResponseLut)
 % -------------------------------------------------------------------------------------------------------------
 %% INPUT
 % strResponseLut   Scalar or transverse numeric schema packed by PackSrpResponseLut, up to
-%                  361 x 181 nodes and uint32 active counts. Axes [deg],
-%                  Cr [-], force/pressure [m^2], reference area [m^2].
+%                  721 x 361 nodes and uint32 active counts. Axes [deg],
+%                  Cr [-], force/pressure [m^2], reference area [m^2], optional torque [m^3].
 % -------------------------------------------------------------------------------------------------------------
 %% OUTPUT
 % None. Reject malformed axes, response values, units or boundary conventions.
 % -------------------------------------------------------------------------------------------------------------
 %% CHANGELOG
 % 01-10-2026  Pietro Califano, Codex GPT-6  Correct nodal transverse samples and constant inclusion.
+% 06-10-2026  Codex (GPT-6)  Validate half-degree capacities and optional torque boundaries.
 % 28-09-2026  Pietro Califano, Codex gpt-6  Formalize the optional scalar/vector LUT.
 % 28-09-2026  Pietro Califano, Codex gpt-6  Check the schema without allocating a prototype.
 % 29-09-2026  Pietro Califano, Codex gpt-6  Validate compact capacities without changing fields.
@@ -40,6 +41,10 @@ bIncludeTransverse = isfield(strResponseLut, 'dTransverseForcePerPressure');
 if bIncludeTransverse
     cellRequiredFieldNames{end + 1} = 'dTransverseForcePerPressure';
 end
+bIncludeTorque = isfield(strResponseLut,'dTorquePerPressure');
+if bIncludeTorque
+    cellRequiredFieldNames{end+1} = 'dTorquePerPressure';
+end
 assert(all(isfield(strResponseLut, cellRequiredFieldNames)), 'ValidateSrpResponseLut:MissingField', ...
     'Supply every fixed-schema scalar/vector field.');
 assert(isequal(sort(fieldnames(strResponseLut)), sort(cellRequiredFieldNames)), ...
@@ -48,13 +53,16 @@ assert(isequal(sort(fieldnames(strResponseLut)), sort(cellRequiredFieldNames)), 
 % Check storage dimensions before constructing expected field shapes.
 dAzimuthCapacity = size(strResponseLut.dAzimuth, 2);
 dElevationCapacity = size(strResponseLut.dElevation, 2);
-assert(dAzimuthCapacity >= 3 && dAzimuthCapacity <= 361 && ...
-    dElevationCapacity >= 3 && dElevationCapacity <= 181, ...
-    'ValidateSrpResponseLut:CapacityExceeded', 'Keep fixed capacities within 361 by 181 nodes.');
+assert(dAzimuthCapacity >= 3 && dAzimuthCapacity <= 721 && ...
+    dElevationCapacity >= 3 && dElevationCapacity <= 361, ...
+    'ValidateSrpResponseLut:CapacityExceeded', 'Keep fixed capacities within 721 by 361 nodes.');
 cellExpectedFieldShapes = {[1, 1], [1, 1], [1, dAzimuthCapacity], [1, dElevationCapacity], ...
     [dElevationCapacity, dAzimuthCapacity], [1, 1]};
 if bIncludeTransverse
     cellExpectedFieldShapes{end + 1} = [3, dElevationCapacity, dAzimuthCapacity];
+end
+if bIncludeTorque
+    cellExpectedFieldShapes{end+1} = [3,dElevationCapacity,dAzimuthCapacity];
 end
 for ui32Field = uint32(1):uint32(numel(cellRequiredFieldNames))
     charFieldName = cellRequiredFieldNames{ui32Field};
@@ -127,5 +135,17 @@ if bIncludeTransverse
         'ValidateSrpResponseLut:InvalidPadding', 'Keep every inactive transverse sample zero.');
 end
 
+if bIncludeTorque
+    dTorqueGrid = strResponseLut.dTorquePerPressure(:,1:ui32ElevationCount,1:ui32AzimuthCount);
+    assert(all(isfinite(strResponseLut.dTorquePerPressure),'all'), ...
+        'ValidateSrpResponseLut:InvalidValues','Require finite body-origin torque samples.');
+    assert(isequal(dTorqueGrid(:,:,1),dTorqueGrid(:,:,end)) && ...
+        isequal(dTorqueGrid(:,1,:),repmat(dTorqueGrid(:,1,1),1,1,numel(dAzimuth))) && ...
+        isequal(dTorqueGrid(:,end,:),repmat(dTorqueGrid(:,end,1),1,1,numel(dAzimuth))), ...
+        'ValidateSrpResponseLut:InvalidBoundary','Require identical torque seam and pole values.');
+    assert(all(strResponseLut.dTorquePerPressure(:,ui32ElevationCount+1:end,:)==0,'all') && ...
+        all(strResponseLut.dTorquePerPressure(:,:,ui32AzimuthCount+1:end)==0,'all'), ...
+        'ValidateSrpResponseLut:InvalidPadding','Keep inactive torque values zero.');
+end
 coder.cstructname(strResponseLut, 'SSrpResponseLut');
 end

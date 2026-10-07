@@ -26,11 +26,12 @@ function [dAccPanelSRP_IN, dSRPtorque_SCB] = ComputePanelSRPFromDynParams( ...
 %% CHANGELOG
 % 02-07-2026  Pietro Califano, Codex 5.5    Extract max-fidelity panel SRP adapter.
 % 04-10-2026  Pietro Califano, Codex GPT-6  Consume prepared self-shadow geometry.
+% 06-10-2026  Codex (GPT-6)  Evaluate full-vector/torque truth LUTs in consistent units.
 % -------------------------------------------------------------------------------------------------------------
 %% DEPENDENCIES
 % ResolveAttQuat_INfromSCB, ResolveSCCenterOfMass_SCB,
-% ResolvePanelSRPUnitsFromDynParams, ComputePanelVisibleAreas,
-% ComputeQuadsModelSRP, Quat2DCM [MathCore_for_SpaceNav].
+% ResolvePanelSRPUnitsFromDynParams, ComputePanelSrpResponse,
+% EvaluateSrpResponseLut, Quat2DCM [MathCore_for_SpaceNav].
 % -------------------------------------------------------------------------------------------------------------
 
 arguments (Input)
@@ -64,11 +65,32 @@ assert(size(dPressCentre, 2) == size(strPanel.dQuadsNormals_SCB, 2), ...
     'ComputePanelSRPFromDynParams:MissingPressureCenters', ...
     'Panel SRP requires one pressure-centre column per panel.');
 
-% Scale only area; preserve the established incidence and optical force law.
-dVisibleArea = ComputePanelVisibleAreas(dArea, dDirSCtoSun_SCB, strPanel);
-[dAccelPanel, dSRPtorque_SCB] = ComputeQuadsModelSRP(dDirSCtoSun_SCB, ...
-    dQuat_INfromSCB, strDynParams.strSCdata.dSCmass, dCoMpos, dPressureSI, ...
-    dVisibleArea, strPanel.dDiffSpecQuadsCoeffs, strPanel.dQuadsNormals_SCB, dPressCentre);
-dAccPanelSRP_IN = dOutputScale * dAccelPanel;
+% A prepared truth LUT preserves the complete force and body-origin torque model.
+if coder.const(isfield(strPanel,'strResponseLut'))
+    dSRPtorque_SCB = zeros(3,1);
+    if nargout > 1
+        [dForce,~,~,dTorque] = EvaluateSrpResponseLut(dDirSCtoSun_SCB,strPanel.strResponseLut,true);
+        dSRPtorque_SCB = dPressureSI*(dTorque-cross(dCoMpos,dForce));
+    else
+        dForce = EvaluateSrpResponseLut(dDirSCtoSun_SCB,strPanel.strResponseLut,true);
+    end
+    dAccPanelSRP_IN = dOutputScale*dPressureSI/strDynParams.strSCdata.dSCmass * ...
+        (dDCM_INfromSCB*dForce);
+    return
+end
+
+% Evaluate SI panel responses and omit torque work for force-only propagation.
+strPanel.dSCquadsArea = dArea;
+strPanel.dQuadsPressCentre_SCB = dPressCentre;
+dSRPtorque_SCB = zeros(3, 1);
+if nargout > 1
+    [dForce, ~, dTorqueOrigin] = ComputePanelSrpResponse( ...
+        dDirSCtoSun_SCB, strPanel, true, zeros(0, 0), false);
+    dSRPtorque_SCB = dPressureSI * (dTorqueOrigin - cross(dCoMpos, dForce));
+else
+    dForce = ComputePanelSrpResponse(dDirSCtoSun_SCB, strPanel, true);
+end
+dAccPanelSRP_IN = dOutputScale * dPressureSI / strDynParams.strSCdata.dSCmass * ...
+    (dDCM_INfromSCB * dForce);
 
 end

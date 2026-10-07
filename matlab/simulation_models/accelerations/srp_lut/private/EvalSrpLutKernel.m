@@ -1,11 +1,11 @@
 function [dForcePerPressure_SCB, dEffectiveCr, dTransverseForcePerPressure_SCB, ...
     dJacForcePerPressWrtSunPos_SCB, dJacCrWrtSunPos_SCB, ...
-    dJacTransverseWrtSunPos_SCB, bDerivativeRegular] = ...
+    dJacTransverseWrtSunPos_SCB, bDerivativeRegular, dTorquePerPressure_SCB] = ...
     EvalSrpLutKernel(dPosSCtoSun_SCB, strResponseLut, bIncludeTransverse, bComputeJacobian) %#codegen
 %% SIGNATURE
 % [dForcePerPressure_SCB, dEffectiveCr, dTransverseForcePerPressure_SCB, ...
 %     dJacForcePerPressWrtSunPos_SCB, dJacCrWrtSunPos_SCB, dJacTransverseWrtSunPos_SCB, ...
-%     bDerivativeRegular] = EvalSrpLutKernel(dPosSCtoSun_SCB, strResponseLut, ...
+%     bDerivativeRegular, dTorquePerPressure_SCB] = EvalSrpLutKernel(dPosSCtoSun_SCB, strResponseLut, ...
 %     bIncludeTransverse, bComputeJacobian)
 % -------------------------------------------------------------------------------------------------------------
 %% DESCRIPTION
@@ -33,12 +33,14 @@ function [dForcePerPressure_SCB, dEffectiveCr, dTransverseForcePerPressure_SCB, 
 % dJacCrWrtSunPos_SCB               Scalar coefficient gradient [1/query unit].
 % dJacTransverseWrtSunPos_SCB       Transverse response partial [m^2/query unit].
 % bDerivativeRegular                True away from grid knots, seam and exact poles.
+% dTorquePerPressure_SCB           Optional body-origin torque/pressure [m^3].
 % -------------------------------------------------------------------------------------------------------------
 %% CHANGELOG
 % 29-09-2026  Pietro Califano, Codex gpt-6  Share LUT force and analytical partials.
 % 29-09-2026  Pietro Califano, Codex gpt-6  Regularize pole lookup without random state.
 % 01-10-2026  Pietro Califano, Codex GPT-6  Correct nodal transverse samples and constant inclusion.
 % 01-10-2026  Pietro Califano, Codex gpt-6  Clarify query frames, interpolation and derivative steps.
+% 06-10-2026  Codex (GPT-6)  Share interpolation weights with optional truth torque.
 % 06-10-2026  Pietro Califano     Align runtime SRP response contracts.
 % -------------------------------------------------------------------------------------------------------------
 %% DEPENDENCIES
@@ -59,6 +61,7 @@ arguments (Output)
     dJacCrWrtSunPos_SCB (1, 3) double
     dJacTransverseWrtSunPos_SCB (3, 3) double
     bDerivativeRegular (1, 1) logical
+    dTorquePerPressure_SCB (3,1) double
 end
 
 % Guard query and active counts without scanning or copying complete runtime arrays.
@@ -135,6 +138,16 @@ dBilinearWeights = [dElevationComplement * (1 - dAzimuthWeight), ...
                    dElevationWeight * (1 - dAzimuthWeight), ...
                    dElevationComplement * dAzimuthWeight, ...
                    dElevationWeight * dAzimuthWeight];
+
+% Torque has no Sun-transverse constraint; interpolate its Cartesian components directly.
+dTorquePerPressure_SCB = zeros(3,1);
+if nargout >= 8 && coder.const(isfield(strResponseLut,'dTorquePerPressure'))
+    dTorquePerPressure_SCB = ...
+        dBilinearWeights(1)*strResponseLut.dTorquePerPressure(:,ui32ElevationCell,ui32AzimuthCell) + ...
+        dBilinearWeights(2)*strResponseLut.dTorquePerPressure(:,ui32ElevationCell+1,ui32AzimuthCell) + ...
+        dBilinearWeights(3)*strResponseLut.dTorquePerPressure(:,ui32ElevationCell,ui32AzimuthCell+1) + ...
+        dBilinearWeights(4)*strResponseLut.dTorquePerPressure(:,ui32ElevationCell+1,ui32AzimuthCell+1);
+end
 
 % Read the scalar corners once and form the independent Sun-parallel force.
 dCrLowElevLowAz = strResponseLut.dEffectiveCr(ui32ElevationCell, ui32AzimuthCell);
