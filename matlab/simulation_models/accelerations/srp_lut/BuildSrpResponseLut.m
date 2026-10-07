@@ -18,7 +18,8 @@ function strLut = BuildSrpResponseLut(strPanel, dReferenceArea, dAngularGridStep
 % kwargs.ui32ShadowLevel    Equal-area subdivision level; default three.
 % kwargs.dRayOffset         Ray-origin offset/tolerance [m]; default 1e-8.
 % kwargs.bSelfShadowing     Enable opaque two-sided mesh occlusion; default true.
-% kwargs.fcnVisibility      Selected owner source/MEX visibility function.
+% kwargs.fcnPanelResponse   Selected complete owner source/MEX panel evaluator.
+% kwargs.ui32BatchCount      Fixed evaluator direction capacity; default one.
 % kwargs.bIncludeTransverse Include transverse storage in the numeric payload; default false.
 % kwargs.bCompactPayload    Match fixed capacity to grid dimensions; default true.
 % kwargs.strSpacecraftSrp   Optional validated descriptor identities/assignments.
@@ -27,12 +28,13 @@ function strLut = BuildSrpResponseLut(strPanel, dReferenceArea, dAngularGridStep
 % strLut                    Response arrays, numeric payload and host provenance.
 % -------------------------------------------------------------------------------------------------------------
 %% CHANGELOG
-% 01-10-2026  Pietro Califano, Codex GPT-6  Correct nodal transverse samples and constant inclusion.
 % 29-09-2026  Pietro Califano, Codex gpt-6  Move generic response construction to SimulationGears.
+% 01-10-2026  Pietro Califano, Codex GPT-6  Correct nodal transverse samples and constant inclusion.
 % 01-10-2026  Pietro Califano, Codex gpt-6  Clarify variable roles and separate computation steps.
+% 05-10-2026  Pietro Califano, Codex (GPT-6)        Batch the complete prepared panel evaluator.
 % -------------------------------------------------------------------------------------------------------------
 %% DEPENDENCIES
-% BuildPanelSrpShadowData, ComputeQuadsModelSRP, ComputePanelSunVisibility,
+% BuildPanelSrpShadowData, BuildTriangleRayData, ComputePanelSrpResponse,
 % PackSrpResponseLut, ComputeFileSha256; Java SHA-256 for host provenance.
 % -------------------------------------------------------------------------------------------------------------
 arguments (Input)
@@ -42,7 +44,8 @@ arguments (Input)
     kwargs.ui32ShadowLevel (1, 1) uint32 = uint32(3)
     kwargs.dRayOffset (1, 1) double {mustBeFinite, mustBePositive} = 1e-8
     kwargs.bSelfShadowing (1, 1) logical = true
-    kwargs.fcnVisibility (1, 1) function_handle = @ComputePanelSunVisibility
+    kwargs.fcnPanelResponse (1, 1) function_handle = @ComputePanelSrpResponse
+    kwargs.ui32BatchCount (1, 1) uint32 {mustBePositive} = uint32(1)
     kwargs.bIncludeTransverse (1, 1) logical = false
     kwargs.bCompactPayload (1, 1) logical = true
     kwargs.strSpacecraftSrp (1, 1) struct = struct()
@@ -63,47 +66,34 @@ end
 assert(abs(180 / dAngularGridStep - round(180 / dAngularGridStep)) < 1e-9);
 dAzimuth = -180:dAngularGridStep:180;
 dElevation = -90:dAngularGridStep:90;
-dEffectiveCr = zeros(numel(dElevation), numel(dAzimuth));
-dForcePerPressure = zeros(3, numel(dElevation), numel(dAzimuth));
-dTransverseForcePerPressure = zeros(size(dForcePerPressure));
 
-% Sample the panel law over the complete sphere before enforcing periodic boundaries.
-for ui32Elevation = uint32(1):uint32(numel(dElevation))
-
-    for ui32Azimuth = uint32(1):uint32(numel(dAzimuth))
-
-        dElevationCosine = cosd(dElevation(ui32Elevation));
-        dSunDir_SCB = [dElevationCosine * cosd(dAzimuth(ui32Azimuth)); ...
-                      dElevationCosine * sind(dAzimuth(ui32Azimuth)); ...
-                      sind(dElevation(ui32Elevation))];
-
-        dVisiblePanelAreas = strPanel.dSCquadsArea;
-
-        if kwargs.bSelfShadowing
-            % Scale each panel area by its own equal-area visibility samples.
-            dVisiblePanelAreas = dVisiblePanelAreas .* ...
-                kwargs.fcnVisibility(dSunDir_SCB, strPanel.dQuadsNormals_SCB, ...
-                                     dSamplePoints_SCB, dFaceVertices_SCB, kwargs.dRayOffset);
-        end
-
-        % Use unit mass and pressure so the panel acceleration equals force per pressure.
-        dForcePerPressure_SCB = ComputeQuadsModelSRP(dSunDir_SCB, [1;0;0;0], 1, zeros(3, 1), 1, ...
-                                                   dVisiblePanelAreas, strPanel.dDiffSpecQuadsCoeffs, ...
-                                                   strPanel.dQuadsNormals_SCB, ...
-                                                   strPanel.dQuadsPressCentre_SCB);
-
-        dForcePerPressure(:, ui32Elevation, ui32Azimuth) = dForcePerPressure_SCB;
-        dEffectiveCr(ui32Elevation, ui32Azimuth) = dot(dForcePerPressure_SCB, -dSunDir_SCB) / dReferenceArea;
-
-        % Remove the nodal parallel component before interpolating across directions.
-        dTransverseForcePerPressure(:, ui32Elevation, ui32Azimuth) = ...
-            dForcePerPressure_SCB - dSunDir_SCB * dot(dSunDir_SCB, dForcePerPressure_SCB);
-    end
-
-    if mod(ui32Elevation, 10) == 0
-        fprintf('LUT elevation row %u/%u complete.\n', ui32Elevation, numel(dElevation));
-    end
+% Evaluate the complete law in fixed batches, including the partially filled tail.
+% Keep parsing and rich metadata out of the generated response signature.
+strNumericPanel = struct('dSCquadsArea', strPanel.dSCquadsArea(:), ...
+    'dDiffSpecQuadsCoeffs', strPanel.dDiffSpecQuadsCoeffs, ...
+    'dQuadsNormals_SCB', strPanel.dQuadsNormals_SCB, ...
+    'dQuadsPressCentre_SCB', strPanel.dQuadsPressCentre_SCB, ...
+    'strShadowData', struct('dSamplePoints_SCB', dSamplePoints_SCB, ...
+        'dRayOffset', kwargs.dRayOffset, ...
+        'strRayData', BuildTriangleRayData(dFaceVertices_SCB, false)));
+[dAzimuthNodes, dElevationNodes] = meshgrid(dAzimuth, dElevation);
+dDirections = [cosd(dElevationNodes(:)).'.*cosd(dAzimuthNodes(:)).'; ...
+    cosd(dElevationNodes(:)).'.*sind(dAzimuthNodes(:)).'; sind(dElevationNodes(:)).'];
+dResponses = zeros(size(dDirections));
+ui32NodeCount = uint32(size(dDirections, 2));
+for ui32First = uint32(1):kwargs.ui32BatchCount:ui32NodeCount
+    ui32Last = min(ui32First + kwargs.ui32BatchCount - 1, ui32NodeCount);
+    ui32ActiveCount = ui32Last - ui32First + 1;
+    dBatch = repmat(dDirections(:, ui32First), 1, kwargs.ui32BatchCount);
+    dBatch(:, 1:ui32ActiveCount) = dDirections(:, ui32First:ui32Last);
+    dResponse = kwargs.fcnPanelResponse(dBatch, strNumericPanel, kwargs.bSelfShadowing);
+    dResponses(:, ui32First:ui32Last) = dResponse(:, 1:ui32ActiveCount);
 end
+dForcePerPressure = reshape(dResponses, 3, numel(dElevation), numel(dAzimuth));
+dEffectiveCr = reshape(sum(-dResponses.*dDirections, 1)/dReferenceArea, ...
+    numel(dElevation), numel(dAzimuth));
+dTransverseForcePerPressure = reshape( ...
+    dResponses - dDirections.*sum(dDirections.*dResponses, 1), size(dForcePerPressure));
 
 % Make periodic seam and pole values exact rather than relying on roundoff.
 dEffectiveCr(:, end) = dEffectiveCr(:, 1);
@@ -134,6 +124,13 @@ strLut.charTransversePolicy = 'Project interpolated nodal transverse samples; re
 strLut.charBodyMounting = 'Identity mounting in the spacecraft mesh frame';
 strLut.charNormalConvention = 'Caller-prepared optical normals; two-sided opaque occluders';
 strLut.charGeneratorSha256 = ComputeFileSha256([mfilename('fullpath'), '.m']);
+strLut.strResponseImplementation = struct( ...
+    'charPanelSha256', ComputeFileSha256(which('ComputePanelSrpResponse')), ...
+    'charVisibilitySha256', ComputeFileSha256(which('ComputePreparedPanelVisibility')), ...
+    'charTracingSha256', ComputeFileSha256(which('TraceTriangleRay')), ...
+    'charTracingArraysSha256', ComputeFileSha256(which('TraceTriangleRayArrays')), ...
+    'charGeometryBuilderSha256', ComputeFileSha256(which('BuildTriangleRayData')), ...
+    'charTraversal', 'Conservative projected flat scan');
 strLut.strSpacecraftModel = struct('dVertices', strPanel.dVerticesPos, ...
     'ui32Faces', strPanel.ui32FaceVertexIds, 'dAreas', strPanel.dSCquadsArea, ...
     'dNormals', strPanel.dQuadsNormals_SCB, 'dOptics', strPanel.dDiffSpecQuadsCoeffs, ...
@@ -160,8 +157,8 @@ if kwargs.bCompactPayload
     ui32GridCapacity = uint32([numel(dAzimuth), numel(dElevation)]);
 end
 
-strLut.strResponseLut = PackSrpResponseLut(strLut, ui32Capacity=ui32GridCapacity, ...
-                                           bIncludeTransverse=kwargs.bIncludeTransverse);
+strLut.strResponseLut = PackSrpResponseLut(strLut, ui32Capacity = ui32GridCapacity, ...
+                                           bIncludeTransverse = kwargs.bIncludeTransverse);
 coder.cstructname(strLut, 'SPanelSrpResponseLut');
 
 end

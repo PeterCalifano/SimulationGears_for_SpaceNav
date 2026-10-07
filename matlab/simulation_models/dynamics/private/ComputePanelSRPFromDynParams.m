@@ -26,11 +26,12 @@ function [dAccPanelSRP_IN, dSRPtorque_SCB] = ComputePanelSRPFromDynParams( ...
 %% CHANGELOG
 % 02-07-2026  Pietro Califano, Codex 5.5    Extract max-fidelity panel SRP adapter.
 % 04-10-2026  Pietro Califano, Codex GPT-6  Consume prepared self-shadow geometry.
+% 05-10-2026  Pietro Califano, Codex (GPT-6)        Prune torque from force-only panel evaluation.
 % -------------------------------------------------------------------------------------------------------------
 %% DEPENDENCIES
 % ResolveAttQuat_INfromSCB, ResolveSCCenterOfMass_SCB,
-% ResolvePanelSRPUnitsFromDynParams, ComputePanelVisibleAreas,
-% ComputeQuadsModelSRP, Quat2DCM [MathCore_for_SpaceNav].
+% ResolvePanelSRPUnitsFromDynParams,
+% ComputePanelSrpResponse, Quat2DCM [MathCore_for_SpaceNav].
 % -------------------------------------------------------------------------------------------------------------
 
 arguments (Input)
@@ -64,11 +65,18 @@ assert(size(dPressCentre, 2) == size(strPanel.dQuadsNormals_SCB, 2), ...
     'ComputePanelSRPFromDynParams:MissingPressureCenters', ...
     'Panel SRP requires one pressure-centre column per panel.');
 
-% Scale only area; preserve the established incidence and optical force law.
-dVisibleArea = ComputePanelVisibleAreas(dArea, dDirSCtoSun_SCB, strPanel);
-[dAccelPanel, dSRPtorque_SCB] = ComputeQuadsModelSRP(dDirSCtoSun_SCB, ...
-    dQuat_INfromSCB, strDynParams.strSCdata.dSCmass, dCoMpos, dPressureSI, ...
-    dVisibleArea, strPanel.dDiffSpecQuadsCoeffs, strPanel.dQuadsNormals_SCB, dPressCentre);
-dAccPanelSRP_IN = dOutputScale * dAccelPanel;
+% Evaluate the complete numeric response with SI optics and geometry centres.
+% Pressure, mass, frame rotation and the external eclipse remain outside it.
+strPanel.dSCquadsArea = dArea;
+strPanel.dQuadsPressCentre_SCB = dPressCentre;
+dSRPtorque_SCB = zeros(3, 1);
+if nargout > 1
+    [dForce, ~, dTorqueOrigin] = ComputePanelSrpResponse(dDirSCtoSun_SCB, strPanel, true);
+    dSRPtorque_SCB = dPressureSI * (dTorqueOrigin - cross(dCoMpos, dForce));
+else
+    dForce = ComputePanelSrpResponse(dDirSCtoSun_SCB, strPanel, true);
+end
+dAccPanelSRP_IN = dOutputScale * dPressureSI / strDynParams.strSCdata.dSCmass * ...
+    (dDCM_INfromSCB * dForce);
 
 end

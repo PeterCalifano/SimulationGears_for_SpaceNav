@@ -16,9 +16,11 @@ function testComputePanelSunVisibility()
 %% CHANGELOG
 % 28-09-2026  Pietro Califano, Codex gpt-6  First fixture harness.
 % 30-09-2026  Pietro Califano, Codex gpt-6  Extend geometry invariants and boundary coverage.
+% 08-10-2026  Pietro Califano, Codex (GPT-6)  Cover batched response and LUT tail handling.
 % -------------------------------------------------------------------------------------------------------------
 %% DEPENDENCIES
-% ComputePanelSunVisibility.
+% ComputePanelSunVisibility, ComputePanelSrpResponse, BuildSrpResponseLut,
+% BuildTriangleRayData, ComputeQuadsModelSRP.
 % -------------------------------------------------------------------------------------------------------------
 arguments (Input)
 end
@@ -99,11 +101,63 @@ ExpectFailure_(@() ComputePanelSunVisibility([0;0;1], dNormals, ...
     dSamples, dVertices(:, :, 1), 1e-8), 'ComputePanelSunVisibility:GeometrySizeMismatch');
 ExpectFailure_(@() ComputePanelSunVisibility([0;0;1], dNormals, ...
     zeros(3, 0, 2), dVertices, 1e-8), 'ComputePanelSunVisibility:GeometrySizeMismatch');
-fprintf('Panel Sun-visibility fixtures passed.\n');
+% Compare batched force and torque with the established per-direction panel law.
+dVertices = cat(3, dLowerTriangle, dLowerTriangle + [2; 0; 1]);
+dSamples  = cat(3, dLowerTriangle * dBarycentric, dVertices(:,:,2) * dBarycentric);
+strPanel  = struct('dSCquadsArea', [0.5; 0.5], ...
+                  'dDiffSpecQuadsCoeffs', [0.2, 0.3; 0.1, 0.6], ...
+                  'dQuadsNormals_SCB', dNormals, ...
+                  'dQuadsPressCentre_SCB', reshape(mean(dVertices,2),3,[]), ...
+                  'dVerticesPos', reshape(dVertices,3,[]).', ...
+                  'ui32FaceVertexIds', reshape(uint32(1:6),3,[]).', ...
+                  'strShadowData', struct('dSamplePoints_SCB', dSamples, ...
+                                         'dRayOffset', 1e-8, ...
+                                         'strRayData', BuildTriangleRayData(dVertices,false)));
+dDirections = [0, 0.25, -0.25; 0, 0.5, 0.5; 1, 1, 1];
+[dForce, dJacobian, dTorque] = ComputePanelSrpResponse(dDirections, strPanel, true);
+assert(isequal(dForce, ComputePanelSrpResponse(dDirections, strPanel, true)));
+
+for ui32Direction = uint32(1):uint32(size(dDirections,2))
+    dDirection = dDirections(:,ui32Direction) / norm(dDirections(:,ui32Direction));
+    dVisible   = ComputePanelSunVisibility(dDirection, dNormals, dSamples, dVertices, 1e-8);
+    [dOracleForce, dOracleTorque] = ComputeQuadsModelSRP( ...
+        dDirection, [1;0;0;0], 1, zeros(3,1), 1, strPanel.dSCquadsArea .* dVisible, ...
+        strPanel.dDiffSpecQuadsCoeffs, dNormals, strPanel.dQuadsPressCentre_SCB);
+    assert(norm(dForce(:,ui32Direction) - dOracleForce) < 1e-14);
+    assert(norm(dTorque(:,ui32Direction) - dOracleTorque) < 1e-14);
+    assert(all(isfinite(dJacobian(:,:,ui32Direction)), 'all'));
+end
+
+% A 15-node grid exercises a partially filled four-direction evaluator batch.
+strSingleLut = BuildSrpResponseLut(strPanel, 1, 90, ui32BatchCount=uint32(1));
+strBatchLut  = BuildSrpResponseLut(strPanel, 1, 90, ui32BatchCount=uint32(4));
+assert(isequal(strSingleLut.dForcePerPressure, strBatchLut.dForcePerPressure));
+assert(isequal(strSingleLut.dEffectiveCr, strBatchLut.dEffectiveCr));
+assert(isequal(strSingleLut.dTransverseForcePerPressure, strBatchLut.dTransverseForcePerPressure));
+
+fprintf('Panel visibility, batched response and LUT tail fixtures passed.\n');
 end
 
 function ExpectFailure_(fcnCall, charErrorId)
-% Require the advertised boundary failure rather than an incidental indexing error.
+%% SIGNATURE
+% ExpectFailure_(fcnCall, charErrorId)
+% -------------------------------------------------------------------------------------------------------------
+%% DESCRIPTION
+% Require the identified boundary failure from the tested public function.
+% -------------------------------------------------------------------------------------------------------------
+%% INPUT
+% fcnCall      Public function invocation.
+% charErrorId  Expected error identifier.
+% -------------------------------------------------------------------------------------------------------------
+%% OUTPUT
+% None; assert if the call succeeds or raises another identifier.
+% -------------------------------------------------------------------------------------------------------------
+%% CHANGELOG
+% 08-10-2026  Pietro Califano, Codex (GPT-6)  Document boundary-failure checks.
+% -------------------------------------------------------------------------------------------------------------
+%% DEPENDENCIES
+% None.
+% -------------------------------------------------------------------------------------------------------------
 arguments (Input)
     fcnCall (1, 1) function_handle
     charErrorId (1, :) char

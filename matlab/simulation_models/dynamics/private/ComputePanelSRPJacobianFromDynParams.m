@@ -25,10 +25,11 @@ function dJacPanelSRP_IN = ComputePanelSRPJacobianFromDynParams( ...
 %% CHANGELOG
 % 02-07-2026  Pietro Califano, Codex 5.5    Extract panel SRP Jacobian adapter.
 % 04-10-2026  Pietro Califano, Codex GPT-6  Freeze prepared self-shadow visibility.
+% 05-10-2026  Pietro Califano, Codex (GPT-6)        Reuse the complete response derivatives.
 % -------------------------------------------------------------------------------------------------------------
 %% DEPENDENCIES
 % ResolveAttQuat_INfromSCB, ResolvePanelSRPUnitsFromDynParams,
-% ComputePanelVisibleAreas, EvalJac_QuadsModelSRP, Quat2DCM [MathCore_for_SpaceNav].
+% ComputePanelSrpResponse, Quat2DCM [MathCore_for_SpaceNav].
 % -------------------------------------------------------------------------------------------------------------
 
 arguments (Input)
@@ -48,18 +49,22 @@ strPanel = strDynParams.strSCdata.strSRPpanelData;
 dQuat_INfromSCB = ResolveAttQuat_INfromSCB(strDynParams);
 dQuat_INfromSCB = dQuat_INfromSCB / max(norm(dQuat_INfromSCB), eps);
 dSCtoSun_IN = dSunPos_IN - dPosSC_IN;
-dSunDir_SCB = Quat2DCM(dQuat_INfromSCB).' * (dSCtoSun_IN / norm(dSCtoSun_IN));
+dDCM_INfromSCB = Quat2DCM(dQuat_INfromSCB);
+dSunVector_SCB = dDCM_INfromSCB.' * dSCtoSun_IN;
 
-[dArea, ~, ~, dPressureSI, dOutputScale] = ...
+[dArea, dPressCentre, ~, dPressureSI, dOutputScale] = ...
     ResolvePanelSRPUnitsFromDynParams(strPanel, zeros(3, 1), dSolarPressure, strDynParams);
-dVisibleArea = ComputePanelVisibleAreas(dArea, dSunDir_SCB, strPanel);
+strPanel.dSCquadsArea = dArea;
+strPanel.dQuadsPressCentre_SCB = dPressCentre;
 
-% Differentiate incidence/direction and optional live pressure on the current
-% visibility branch, leaving ray-hit and terminator switches undifferentiated.
-dJacPanel = EvalJac_QuadsModelSRP(dSCtoSun_IN, dQuat_INfromSCB, ...
-    strDynParams.strSCdata.dSCmass, dPressureSI, dVisibleArea, ...
-    strPanel.dDiffSpecQuadsCoeffs, strPanel.dQuadsNormals_SCB, ...
-    false, bRecomputePressureFromDistance);
-dJacPanelSRP_IN = dOutputScale * dJacPanel;
+% Differentiate the supplied Sun vector while holding sampled visibility fixed.
+[dForce, dResponseJacobian] = ComputePanelSrpResponse(dSunVector_SCB, strPanel, true);
+dScale = dOutputScale * dPressureSI / strDynParams.strSCdata.dSCmass;
+dJacPanelSRP_IN = -dScale * dDCM_INfromSCB * dResponseJacobian * dDCM_INfromSCB.';
+if bRecomputePressureFromDistance
+    dAcceleration = dScale * (dDCM_INfromSCB * dForce);
+    dJacPanelSRP_IN = dJacPanelSRP_IN + ...
+        2 * dAcceleration * dSCtoSun_IN.' / dot(dSCtoSun_IN, dSCtoSun_IN);
+end
 
 end

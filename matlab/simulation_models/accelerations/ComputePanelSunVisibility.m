@@ -1,8 +1,8 @@
 function dVisibleFraction = ComputePanelSunVisibility(dSunDir_SCB, dPanelNormals_SCB, ...
-    dSamplePoints_SCB, dFaceVertices_SCB, dRayOffset) %#codegen
+    dSamplePoints_SCB, dFaceVertices_SCB, dRayOffset, strRayData) %#codegen
 %% SIGNATURE
 % dVisibleFraction = ComputePanelSunVisibility(dSunDir_SCB, dPanelNormals_SCB, ...
-%     dSamplePoints_SCB, dFaceVertices_SCB, dRayOffset)
+%     dSamplePoints_SCB, dFaceVertices_SCB, dRayOffset, strRayData)
 % -------------------------------------------------------------------------------------------------------------
 %% DESCRIPTION
 % Estimate the directly illuminated fraction of each triangle from equal-area
@@ -20,6 +20,7 @@ function dVisibleFraction = ComputePanelSunVisibility(dSunDir_SCB, dPanelNormals
 % dSamplePoints_SCB   (3, Q, N)   Equal-area quadrature points on each triangle [length].
 % dFaceVertices_SCB   (3, 3, N)   Three vertices of each opaque occluding triangle [length].
 % dRayOffset          (1, 1)      Positive origin shift and hit-distance tolerance [length].
+% strRayData           Optional prepared triangle data; retain five-input callers.
 % -------------------------------------------------------------------------------------------------------------
 %% OUTPUT
 % dVisibleFraction    (N, 1)   Sun-visible sample fraction; back-facing faces are zero [-].
@@ -28,9 +29,10 @@ function dVisibleFraction = ComputePanelSunVisibility(dSunDir_SCB, dPanelNormals
 % 28-09-2026  Pietro Califano, Codex gpt-6  Add standalone panel self-shadowing geometry.
 % 30-09-2026  Pietro Califano, Codex gpt-6  Clarify ray tolerance and review geometry contracts.
 % 01-10-2026  Pietro Califano, Codex gpt-6  Clarify variable roles and separate computation steps.
+% 08-10-2026  Pietro Califano, Codex (GPT-6)  Reuse prepared geometry for panel visibility.
 % -------------------------------------------------------------------------------------------------------------
 %% DEPENDENCIES
-% RayTwoSidedTriangleIntersection_MollerTrembore.
+% BuildTriangleRayData, ComputePreparedPanelVisibility.
 % -------------------------------------------------------------------------------------------------------------
 arguments (Input)
     dSunDir_SCB (3, 1) double {mustBeFinite}
@@ -38,59 +40,32 @@ arguments (Input)
     dSamplePoints_SCB (3, :, :) double {mustBeFinite}
     dFaceVertices_SCB (3, 3, :) double {mustBeFinite}
     dRayOffset (1, 1) double {mustBeFinite, mustBePositive}
+    strRayData (1, 1) struct = struct()
 end
 
 arguments (Output)
     dVisibleFraction (:, 1) double
 end
 
-% Normalize once so ray distances share the geometry's length unit.
-dSunDirNorm = norm(dSunDir_SCB);
-assert(dSunDirNorm > eps, 'ComputePanelSunVisibility:ZeroSunDirection', ...
-    'Sun direction must be nonzero.');
-dSunDir_SCB = dSunDir_SCB / dSunDirNorm;
-
-% Enforce one shared triangle index and at least one quadrature sample per face.
+% Enforce matching face indices before entering the prepared numerical kernel.
 ui32FaceCount = uint32(size(dPanelNormals_SCB, 2));
-ui32SampleCount = uint32(size(dSamplePoints_SCB, 2));
+
 assert(size(dSamplePoints_SCB, 3) == ui32FaceCount && ...
-       size(dFaceVertices_SCB, 3) == ui32FaceCount && ui32SampleCount > 0, ...
-       'ComputePanelSunVisibility:GeometrySizeMismatch', ...
-       'Normals, samples and vertices must share triangle indices and nonempty quadrature.');
-dVisibleFraction = zeros(double(ui32FaceCount), 1);
+    size(dFaceVertices_SCB, 3) == ui32FaceCount && size(dSamplePoints_SCB, 2) > 0, ...
+    'ComputePanelSunVisibility:GeometrySizeMismatch', ...
+    'Normals, samples and vertices must share face indices and nonempty quadrature.');
 
-% Count visible equal-area samples only on optically illuminated faces.
-for ui32FaceIndex = uint32(1):ui32FaceCount
-    if dot(dPanelNormals_SCB(:, ui32FaceIndex), dSunDir_SCB) <= 0
-        continue
-    end
-
-    ui32VisibleCount = uint32(0);
-    for ui32SampleIndex = uint32(1):ui32SampleCount
-        % Stop at the first opaque blocker beyond the shifted-origin tolerance.
-        dRayOrigin_SCB = dSamplePoints_SCB(:, ui32SampleIndex, ui32FaceIndex) + dRayOffset * dSunDir_SCB;
-        bBlocked = false;
-        for ui32BlockerIndex = uint32(1):ui32FaceCount
-            if ui32BlockerIndex == ui32FaceIndex
-                continue
-            end
-
-            % Run ray-triangle intersection with the Möller–Trumbore algorithm, considering two-sided triangles. Return the distance to the intersection point along the ray.
-            [bHit, ~, ~, dRayHitDistance] = RayTwoSidedTriangleIntersection_MollerTrembore( ...
-                dRayOrigin_SCB, dSunDir_SCB, dFaceVertices_SCB(:, 1, ui32BlockerIndex), ...
-                dFaceVertices_SCB(:, 2, ui32BlockerIndex), dFaceVertices_SCB(:, 3, ui32BlockerIndex));
-
-            if bHit && dRayHitDistance > dRayOffset
-                bBlocked = true;
-                break
-            end
-        end
-
-        if ~bBlocked
-            ui32VisibleCount = ui32VisibleCount + uint32(1);
-        end
-    end
-
-    dVisibleFraction(ui32FaceIndex) = double(ui32VisibleCount) / double(ui32SampleCount);
+if ~isfield(strRayData, 'ui32TriangleCount')
+    % Keep legacy inputs usable; prepared callers avoid rebuilding static edges.
+    strPreparedRayData = BuildTriangleRayData(dFaceVertices_SCB, false);
+else
+    strPreparedRayData = strRayData;
 end
+
+assert(strPreparedRayData.ui32TriangleCount == ui32FaceCount, ...
+    'ComputePanelSunVisibility:GeometrySizeMismatch', 'Prepared geometry must match face indices.');
+
+strShadowData = struct('dSamplePoints_SCB', dSamplePoints_SCB, ...
+    'dRayOffset', dRayOffset, 'strRayData', strPreparedRayData);
+dVisibleFraction = ComputePreparedPanelVisibility(dSunDir_SCB, dPanelNormals_SCB, strShadowData);
 end
