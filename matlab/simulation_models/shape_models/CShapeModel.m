@@ -4,6 +4,8 @@ classdef CShapeModel < CBaseDatastruct
     % Use file_obj for the established OBJ/attribute reader and file_mesh for repaired OBJ/STL
     % geometry. Select exact OBJ objects with charObjObjectNames before unit conversion and
     % simplification; an empty array keeps all faces, and "" selects unnamed faces.
+    % Cache prepared target-frame triangle tracing separately from scene poses;
+    % invalidate it after geometry mutations and reject changed unit metadata.
     % -------------------------------------------------------------------------------------------------------------
     %% CHANGELOG
     % 05-10-2024    Pietro Califano     First implementation completed.
@@ -17,10 +19,13 @@ classdef CShapeModel < CBaseDatastruct
     % 28-08-2026    Pietro Califano     Add validated general OBJ/STL geometry loading.
     % 21-09-2026    Pietro Califano, Codex gpt-5.6  Parse large OBJ face payloads in bounded blocks.
     % 29-09-2026    Pietro Califano, Codex gpt-6    Select OBJ objects before shape and gravity preparation.
+    % 05-10-2026    Pietro Califano, Codex (GPT-6)  Cache reusable fixed-size flat/BVH ray geometry.
+    % 07-10-2026    Pietro Califano, Codex (GPT-6)  Reuse prepared caches and exclude them from exports.
     % -------------------------------------------------------------------------------------------------------------
     %% DEPENDENCIES
     % CBaseDatastruct, EnumLengthUnits, LoadShapeMesh, SelectObjFaceRecords,
-    % CompactShapeMeshVertices, FitSpherHarmCoeffToPolyhedrGrav
+    % CompactShapeMeshVertices, FitSpherHarmCoeffToPolyhedrGrav,
+    % BuildTriangleRayData, ValidateTriangleRayData
     % -------------------------------------------------------------------------------------------------------------
 
 
@@ -57,6 +62,11 @@ classdef CShapeModel < CBaseDatastruct
         bHasSpherHarmonicsGravityData_ = false;
         strSphHarmonicsGravityData_ struct = struct()
 
+    end
+
+    properties (Access = private, Transient)
+        % Rebuild runtime tracing data after loading; never serialize a second mesh.
+        strRayCache_ struct = struct()
     end
 
     methods (Access = public)
@@ -185,6 +195,102 @@ classdef CShapeModel < CBaseDatastruct
         end
 
         %% GETTERS
+        function self = prepareRayTracingData(self, bUseBvh)
+            %% SIGNATURE
+            % self = self.prepareRayTracingData(bUseBvh)
+            % -------------------------------------------------------------------------------------------------------------
+            %% DESCRIPTION
+            % Prepare a reusable exact ray model in the stored geometry length unit.
+            % Cache triangle edges and fixed numeric traversal data. Geometry changes
+            % clear the cache; rigid scene poses reuse it. Repeated preparation with
+            % the same units and traversal selection reuses the existing payload.
+            % -------------------------------------------------------------------------------------------------------------
+            %% INPUT
+            % self        Loaded shape model.
+            % bUseBvh     Select exact BVH traversal; default false.
+            % -------------------------------------------------------------------------------------------------------------
+            %% OUTPUT
+            % self        Shape model with prepared numeric ray data.
+            % -------------------------------------------------------------------------------------------------------------
+            %% CHANGELOG
+            % 05-10-2026  Pietro Califano, Codex (GPT-6)  Add reusable prepared triangle tracing.
+            % -------------------------------------------------------------------------------------------------------------
+            %% DEPENDENCIES
+            % BuildTriangleRayData, ValidateTriangleRayData.
+            % -------------------------------------------------------------------------------------------------------------
+            arguments (Input)
+                self (1, 1) CShapeModel
+                bUseBvh (1, 1) logical = false
+            end
+
+            arguments (Output)
+                self (1, 1) CShapeModel
+            end
+
+            % Keep preparation out of repeated acquisitions and startup re-entry.
+            if isfield(self.strRayCache_, 'strModelData') && ...
+                    strcmp(self.strRayCache_.charUnits, self.charTargetUnitOutput) && ...
+                    self.strRayCache_.strModelData.strRayData.bUseBvh == bUseBvh
+                return
+            end
+
+            % Validate source indices before preparing fixed triangle edges and bounds.
+            assert(self.bHasData_, 'CShapeModel:NoData', 'Load geometry before ray preparation.');
+            assert(all(self.ui32triangVertexPtr >= 1, 'all') && ...
+                all(self.ui32triangVertexPtr <= size(self.dVerticesPos, 2), 'all'), ...
+                'CShapeModel:RayIndices', 'Triangle indices must reference stored vertices.');
+                
+            dFaceVertices = reshape(self.dVerticesPos(:, self.ui32triangVertexPtr(:)), 3, 3, []);
+            strRayData = BuildTriangleRayData(dFaceVertices, bUseBvh);
+            ValidateTriangleRayData(strRayData);
+
+            % Retain unit metadata outside the fixed numeric payload.
+            self.strRayCache_ = struct('charUnits', self.charTargetUnitOutput, ...
+                                      'strModelData', struct('strRayData', strRayData));
+        end
+
+        function strModelData = getRayTracingModel(self)
+            %% SIGNATURE
+            % strModelData = self.getRayTracingModel()
+            % -------------------------------------------------------------------------------------------------------------
+            %% DESCRIPTION
+            % Return prepared numeric ray geometry or the compatible legacy mesh schema.
+            % Reject stale unit metadata instead of silently reinterpreting a prepared
+            % cache. Keep source/model metadata outside the numerical ray payload.
+            % -------------------------------------------------------------------------------------------------------------
+            %% INPUT
+            % self          Shape model.
+            % -------------------------------------------------------------------------------------------------------------
+            %% OUTPUT
+            % strModelData  Prepared strRayData, or raw vertices and signed triangle pointers.
+            % -------------------------------------------------------------------------------------------------------------
+            %% CHANGELOG
+            % 05-10-2026  Pietro Califano, Codex (GPT-6)  Add reusable prepared triangle tracing.
+            % -------------------------------------------------------------------------------------------------------------
+            %% DEPENDENCIES
+            % None.
+            % -------------------------------------------------------------------------------------------------------------
+            arguments (Input)
+                self (1, 1) CShapeModel
+            end
+
+            arguments (Output)
+                strModelData (1, 1) struct
+            end
+
+            if isfield(self.strRayCache_, 'strModelData')
+                assert(strcmp(self.strRayCache_.charUnits, self.charTargetUnitOutput), ...
+                    'CShapeModel:StaleRayUnits', 'Reprepare ray geometry after changing length units.');
+                strModelData = self.strRayCache_.strModelData;
+            else
+                % Retain legacy callers while keeping their conversion out of the prepared path.
+                assert(all(self.ui32triangVertexPtr <= uint32(intmax('int32')), 'all'), ...
+                    'CShapeModel:MeshIndexOverflow', 'Triangle indices exceed int32 capacity.');
+                strModelData = struct('dVerticesPositions', self.dVerticesPos, ...
+                                      'i32triangVertexPtrs', int32(self.ui32triangVertexPtr));
+            end
+        end
+
         % Get shape model vertices and indices
         function [strData] = getShapeStruct(self)
             strData = struct();
@@ -693,6 +799,9 @@ classdef CShapeModel < CBaseDatastruct
         end
 
         function [self] = UpdateDerivedGeometry_(self)
+            % Invalidate every ray cache after loading, scaling or simplifying geometry.
+            self.strRayCache_ = struct();
+
             % Method to update geometry-dependent attributes (number of vertices, shape radius) after loading or modifying the mesh. Called internally at the end of loading and simplification methods.
             self.ui32NumOfVertices = uint32(size(self.dVerticesPos, 2));
 
