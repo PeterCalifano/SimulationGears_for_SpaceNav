@@ -1,240 +1,75 @@
 function [bIntersectionFlag, dUbarycenCoord, dVbarycenCoord, ...
-          dtRangeToIntersection, dIntersectionPoint] =  RayTriangleIntersection_MollerTrumbore( ...
-                                                                dRayOrigin, ...
-                                                                dRayDirection, ...
-                                                                dTriangVert0, ...
-                                                                dTriangVert1, ...
-                                                                dTriangVert2, ...
-                                                                bTwoSidedTest) %#codegen
-arguments
-    dRayOrigin          %(3,1)  double   % {isvector, isnumeric} % Removed for speed up. Enable is debug.
-    dRayDirection       %(3,1)  double   % {isvector, isnumeric} % 
-    dTriangVert0        %(3,1)  double   % {isvector, isnumeric} % 
-    dTriangVert1        %(3,1)  double   % {isvector, isnumeric} % 
-    dTriangVert2        %(3,1)  double   % {isvector, isnumeric} % 
-    bTwoSidedTest       (1,1) logical = true
-end
+    dtRangeToIntersection, dIntersectionPoint] = RayTriangleIntersection_MollerTrumbore( ...
+    dRayOrigin, dRayDirection, dTriangVert0, dTriangVert1, dTriangVert2, bTwoSidedTest) %#codegen
 %% SIGNATURE
-% [bIntersectionFlag, dUbarycenCoord, dVbarycenCoord, ...
-%     dtRangeToIntersection, dIntersectionPoint] =  RayTriangleIntersection_MollerTrumbore( ...
-%                                                                               dRayOrigin, ...
-%                                                                               dRayDirection, ...
-%                                                                               dTriangVert0, ...
-%                                                                               dTriangVert1, ...
-%                                                                               dTriangVert2, ...
-%                                                                               bTwoSidedTest) %#codegen
+% [bHit, dU, dV, dRange, dPoint] = RayTriangleIntersection_MollerTrumbore(...)
 % -------------------------------------------------------------------------------------------------------------
 %% DESCRIPTION
-% Implementation of Ray-triangle intersection test algorithm by Moller and Trumbore, original version 
-% published in 1997. Reference: https://doi.org/10.1145/1198555.1198746
-% Additional optimizations varying the order of operations were later shown by Moller, Haines in blog post: 
-% https://fileadmin.cs.lth.se/cs/Personal/Tomas_Akenine-Moller/raytri/. This code does not implement them.
+% Intersect a forward ray using shared Moller-Trumbore mathematics.
+% Algorithm reference: Moller and Trumbore, 1997, doi:10.1145/1198555.1198746.
+% Preserve the established absolute determinant tolerance and sidedness.
+% Construct the point only when requested. Non-unit directions return a ray
+% parameter rather than a physical range.
+% Example: [bHit,~,~,dRange] = RayTriangleIntersection_MollerTrumbore( ...
+%     [0.2;0.2;1],[0;0;-1],[0;0;0],[1;0;0],[0;1;0],true);
+% Output: true and 1.
 % -------------------------------------------------------------------------------------------------------------
 %% INPUT
-% dRayOrigin            (3,1)  double   {isvector, isnumeric} Position vector of the ray origin
-% dRayDirection         (3,1)  double   {isvector, isnumeric} Unit vector from ray origin to point
-% dTriangVert0          (3,1)  double   {isvector, isnumeric} Position vector of triangle vertex 0
-% dTriangVert1          (3,1)  double   {isvector, isnumeric} Position vector of triangle vertex 1
-% dTriangVert2          (3,1)  double   {isvector, isnumeric} Position vector of triangle vertex 2
-% bTwoSidedTest         (1,1) logical = true;  % Perform full two-sided test (back-facing triang not culled)
+% dRayOrigin/dRayDirection  (3,1) ray in the triangle frame.
+% dTriangVert0/1/2         (3,1) triangle vertices [length].
+% bTwoSidedTest            Accept either winding; default true.
 % -------------------------------------------------------------------------------------------------------------
 %% OUTPUT
-% bIntersectionFlag:    (0) Miss, (1) Hit.
-% dUbarycenCoord:       X Barycentric coordinate of the intersection point 
-% dVbarycenCoord:       Y Barycentric coordinate of the intersection point 
-% dRangeToIntersection: Distance from the ray origin to the intersection
-% dIntersectionPoint:   Intersection point position in 3D reference frame (the same as triangle vertices)
+% bIntersectionFlag        Forward hit; false on a miss.
+% dUbarycenCoord/dVbarycenCoord  Barycentric coordinates; zero on a miss.
+% dtRangeToIntersection    Ray parameter; zero on a miss.
+% dIntersectionPoint       Hit position; zero on a miss.
 % -------------------------------------------------------------------------------------------------------------
 %% CHANGELOG
-% 03-02-2025    Pietro Califano     Implemented from original paper (Moore-Trumbore, 1997) with shadow rays
+% 03-02-2025  Pietro Califano        Implement the original paper with shadow rays.
+% 05-10-2026  Pietro Califano, Codex (GPT-6)  Reuse the shared barycentric kernel.
 % -------------------------------------------------------------------------------------------------------------
 %% DEPENDENCIES
-% [-]
+% IntersectTriangleEdges (private).
 % -------------------------------------------------------------------------------------------------------------
-% INPUT ASSERT CHECKS
-assert((iscolumn(dTriangVert0) && iscolumn(dTriangVert1) && iscolumn(dTriangVert2)) && ...
-    (length(dTriangVert0) == 3 && length(dTriangVert1) == 3 && length(dTriangVert2) == 3), ...
-    'ERROR: input vertex positions must be [3x1] vectors!');
 
-assert(iscolumn(dRayOrigin) && length(dRayOrigin) == 3, ...
-    'ERROR: input origin position must be [3x1] vectors!');
-
-assert(iscolumn(dRayDirection) && length(dRayDirection) == 3, ...
-    'ERROR: input ray direction must be [3x1] vectors!');
-
-% Determine machine precision to use
-EPS = eps('double');
-
-%% MAIN COMPUTATION BODY
-
-% Compute triangle edges
-dEdge1 = dTriangVert1 - dTriangVert0;
-dEdge2 = dTriangVert2 - dTriangVert0;
-
-% Compute auxiliary P = cross(D, E2) where D is the ray direction;
-% dP = [dRayDirection(2)*dEdge2(3) - dRayDirection(3)*dEdge2(2), ...
-%      dRayDirection(3)*dEdge2(1) - dRayDirection(1)*dEdge2(3), ...
-%      dRayDirection(1)*dEdge2(2) - dRayDirection(2)*dEdge2(1)];  
-
-dP = cross(dRayDirection, dEdge2);
-% Compute determinant of linear system
-dDet = dot(dEdge1, dP);
-% dDet = dEdge1(1)*dP(1) + dEdge1(2)*dP(2) + dEdge1(3)*dP(3); 
-
-% Determine condition to check based on test type
-if bTwoSidedTest
-    %% Two-sided test
-    % Check if ray is parallel to the plane (the intersection is at infinity)
-    if (dDet > -EPS && dDet < EPS)
-
-        bIntersectionFlag       = false;
-        dUbarycenCoord          = 0;
-        dVbarycenCoord          = 0;
-        dtRangeToIntersection   = 0;
-        dIntersectionPoint      = zeros(3,1);
-        return;
-    end
-    
-    % Compute inverse determinant to get "scale"
-    dInvDet = 1.0/dDet;
-
-    % Compute u barycentric coordinate
-    dRayOriginFromV0 = dRayOrigin - dTriangVert0;
-    dUbarycenCoord = dInvDet * dot(dRayOriginFromV0, dP);
-    % dUbarycenCoord = dInvDet * (dRayOriginFromV0(1)*dP(1) + dRayOriginFromV0(2)*dP(2) + dRayOriginFromV0(3)*dP(3));
-
-    if (dUbarycenCoord < 0.0)
-        % Triangle u-missed
-        bIntersectionFlag       = false;
-        dUbarycenCoord          = 0;
-        dVbarycenCoord          = 0;
-        dtRangeToIntersection   = 0;
-        dIntersectionPoint      = zeros(3,1);
-        return;
-    end
-
-    % Compute auxiliary Q = cross(T, E1) where T = O - V0, and O is the ray origin;
-    % T = dRayOriginFromV0 = dRayOrigin - dTriangVert0 here.
-    dQ = cross(dRayOriginFromV0, dEdge1);
-    % dQ = [dRayOriginFromV0(2)*dEdge1(3) - dRayOriginFromV0(3)*dEdge1(2), ...
-    %       dRayOriginFromV0(3)*dEdge1(1) - dRayOriginFromV0(1)*dEdge1(3), ...
-    %       dRayOriginFromV0(1)*dEdge1(2) - dRayOriginFromV0(2)*dEdge1(1)];
-    
-    % Compute V barycentric coordinate
-    % dVbarycenCoord = dInvDet*(dRayDirection(1)*dQ(1) + dRayDirection(2)*dQ(2) + dRayDirection(3)*dQ(3));
-    dVbarycenCoord = dInvDet * dot(dRayDirection, dQ);
-
-    if (dVbarycenCoord < 0.0 || dUbarycenCoord + dVbarycenCoord > 1.0)
-        % Triangle v-missed
-        bIntersectionFlag       = false;
-        dUbarycenCoord          = 0;
-        dVbarycenCoord          = 0;
-        dtRangeToIntersection   = 0;
-        dIntersectionPoint      = zeros(3,1);
-        return;
-    end
-
-    % Compute t parameter of intersection point in unscaled space
-    dtRangeToIntersection = dInvDet * dot(dEdge2, dQ);
-    
-    if dtRangeToIntersection <= EPS
-        % Valid triangle coordinates, but the intersection is behind the ray origin.
-        bIntersectionFlag       = false;
-        dUbarycenCoord          = 0;
-        dVbarycenCoord          = 0;
-        dtRangeToIntersection   = 0;
-        dIntersectionPoint      = zeros(3,1);
-        return;
-    end
-
-    % Both (u,v) and positive t valid --> Forward ray intersection exists
-    bIntersectionFlag = true;
-
-else
-    %% One-sided test
-    % Check if ray is parallel to the plane and if can be discarded because back-facing (one-sided test)
-    if dDet < EPS
-        bIntersectionFlag       = false;
-        dUbarycenCoord          = 0;
-        dVbarycenCoord          = 0;
-        dtRangeToIntersection   = 0;
-        dIntersectionPoint      = zeros(3,1);
-        return
-    end
-
-    % Compute T vector
-    dRayOriginFromV0 = dRayOrigin - dTriangVert0;
-
-    % Compute scaled U barycentric coordinate 
-    dUbarycenCoord = dot(dRayOriginFromV0, dP);
-
-    if (dUbarycenCoord < 0.0 || dUbarycenCoord > dDet)
-        % Triangle u-missed
-        bIntersectionFlag       = false;
-        dUbarycenCoord          = 0;
-        dVbarycenCoord          = 0;
-        dtRangeToIntersection   = 0;
-        dIntersectionPoint      = zeros(3,1);
-        return;
-    end
-
-    % Compute auxiliary Q = cross(T, E1) where T = O - V0, and O is the ray origin;
-    % T = dRayOriginFromV0 = dRayOrigin - dTriangVert0 here.
-    dQ = cross(dRayOriginFromV0, dEdge1);
-    
-    % [dRayOriginFromV0(2)*dEdge1(3) - dRayOriginFromV0(3)*dEdge1(2), ...
-    %       dRayOriginFromV0(3)*dEdge1(1) - dRayOriginFromV0(1)*dEdge1(3), ...
-    %       dRayOriginFromV0(1)*dEdge1(2) - dRayOriginFromV0(2)*dEdge1(1)];
-
-    % Compute scaled V barycentric coordinate
-    % dVbarycenCoord = (dRayDirection(1)*dQ(1) + dRayDirection(2)*dQ(2) + dRayDirection(3)*dQ(3));
-    dVbarycenCoord = dot(dRayDirection, dQ);
-
-
-    if (dVbarycenCoord < 0.0 || dUbarycenCoord + dVbarycenCoord > dDet)
-        % Triangle v-missed
-        bIntersectionFlag       = false;
-        dUbarycenCoord          = 0;
-        dVbarycenCoord          = 0;
-        dtRangeToIntersection   = 0;
-        dIntersectionPoint      = zeros(3,1);
-        return;
-    end
-
-    % Compute auxiliary quantity before division, for shadow rays
-    dEdge2dotQ = dot(dEdge2, dQ);
-
-    % Compute t parameter of intersection point in unscaled space
-    dInvDet = 1./dDet;
-    dtRangeToIntersection = dInvDet * dEdge2dotQ; 
-
-    if dtRangeToIntersection <= EPS
-        % Valid triangle coordinates, but the intersection is behind the ray origin.
-        bIntersectionFlag       = false;
-        dUbarycenCoord          = 0;
-        dVbarycenCoord          = 0;
-        dtRangeToIntersection   = 0;
-        dIntersectionPoint      = zeros(3,1);
-        return;
-    end
-    
-    % Scale (U,V) barycentric coordinates
-    dUbarycenCoord = dInvDet * dUbarycenCoord;
-    dVbarycenCoord = dInvDet * dVbarycenCoord;
-
-    % Both (u,v) and positive t valid --> Forward ray intersection exists
-    bIntersectionFlag = true;
-    
-end % End of intersection algorithm
-
-% Recover intersection point if required
-% Compute intersection point if intersection is found
-dIntersectionPoint = zeros(3,1);
-
-if nargout > 4 && bIntersectionFlag
-    dIntersectionPoint(1:3) = (1 - dUbarycenCoord - dVbarycenCoord) * dTriangVert0 + ...
-                                                     dUbarycenCoord * dTriangVert1 + ...
-                                                     dVbarycenCoord * dTriangVert2;
+arguments (Input)
+    dRayOrigin (3, 1) double
+    dRayDirection (3, 1) double
+    dTriangVert0 (3, 1) double
+    dTriangVert1 (3, 1) double
+    dTriangVert2 (3, 1) double
+    bTwoSidedTest (1, 1) logical = true
 end
 
+arguments (Output)
+    bIntersectionFlag (1, 1) logical
+    dUbarycenCoord (1, 1) double
+    dVbarycenCoord (1, 1) double
+    dtRangeToIntersection (1, 1) double
+    dIntersectionPoint (3, 1) double
+end
+
+% Reject parallel or culled faces before the shared barycentric test.
+dEdge1 = dTriangVert1 - dTriangVert0;
+dEdge2 = dTriangVert2 - dTriangVert0;
+dCrossEdge2 = cross(dRayDirection, dEdge2);
+dDet = dot(dEdge1, dCrossEdge2);
+dInverseDet = 0;
+
+if (bTwoSidedTest && abs(dDet) >= eps) || (~bTwoSidedTest && dDet >= eps)
+    dInverseDet = 1 / dDet;
+end
+
+[bIntersectionFlag, dtRangeToIntersection, dUbarycenCoord, dVbarycenCoord] = ...
+    IntersectTriangleEdges(dRayOrigin - dTriangVert0, dRayDirection, ...
+    dEdge1, dEdge2, dCrossEdge2, dInverseDet, eps, Inf);
+
+% Preserve barycentric reconstruction for the established public API.
+dIntersectionPoint = zeros(3, 1);
+
+if nargout >= 5 && bIntersectionFlag
+    dIntersectionPoint = (1 - dUbarycenCoord - dVbarycenCoord) * dTriangVert0 + ...
+        dUbarycenCoord * dTriangVert1 + dVbarycenCoord * dTriangVert2;
+end
 end
