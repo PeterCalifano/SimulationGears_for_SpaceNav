@@ -1,22 +1,72 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "scenario_name": "Itokawa",
   "canonical_name": "Itokawa",
-  "aliases": ["Itokawa"],
+  "aliases": [
+    "Itokawa"
+  ],
   "confidence": "high",
-  "tags": ["shape_runnable", "spice_dsk"],
-  "default_shape_asset_id": "hayabusa_itokawa_64q_dsk",
+  "tags": [
+    "shape_runnable",
+    "spice_dsk"
+  ],
+  "default_shape_asset_id": "itokawa_512icq_uv_obj",
   "assets": [
     {
       "asset_id": "hayabusa_itokawa_64q_dsk",
       "asset_type": "shape",
-      "local_path": "scenarios/Itokawa/assets/shape/hay_a_amica_5_itokawashape_v1_0_64q.bds",
+      "local_path": "assets/bodies/itokawa/shape/hay_a_amica_5_itokawashape_v1_0_64q.bds",
       "source_url": "PDS Hayabusa Itokawa shape DSK",
       "download_url": "",
       "sha256": "",
       "size_gb": 0.005,
       "fidelity": "public_dsk_q64",
+      "required_for_shape_runnable": false,
+      "content_format": "dsk",
+      "input_units": "km",
+      "body_fixed_frame": "ITOKAWA_FIXED",
+      "load_materials": false
+    },
+    {
+      "asset_id": "itokawa_512icq_uv_obj",
+      "asset_type": "shape",
+      "local_path": "assets/bodies/itokawa/shape/25143_Itokawa_512ICQ_WithNormalsUV_WithMtl.obj",
+      "source_url": "Hayabusa Itokawa 512 ICQ Blender export",
+      "download_url": "",
+      "sha256": "715d93b328620c916994f080208071b279d9d8fc1f6fdda1111e0fbafb9e1be9",
+      "size_gb": 0.333497734,
+      "fidelity": "project_high_detail_uv_mesh",
+      "required_for_shape_runnable": true,
+      "content_format": "obj",
+      "input_units": "km",
+      "body_fixed_frame": "ITOKAWA_FIXED",
+      "load_materials": true,
+      "material_path": "assets/bodies/itokawa/shape/25143_Itokawa_512ICQ_WithNormalsUV_WithMtl.mtl"
+    },
+    {
+      "asset_id": "itokawa_global_grayscale",
+      "asset_type": "albedo",
+      "local_path": "assets/bodies/itokawa/appearance/albedo/itokawa_grayscale.jpg",
+      "source_url": "Hayabusa Itokawa global grayscale texture",
+      "download_url": "",
+      "sha256": "10230e6bcb86c7fafd78a8b788bb2222c23871ebebdb28fb4b5772db1b33163e",
+      "size_gb": 0.001929031,
+      "fidelity": "global_grayscale_texture",
       "required_for_shape_runnable": true
+    }
+  ],
+  "default_appearance_profile_id": "global_grayscale",
+  "appearance_profiles": [
+    {
+      "profile_id": "global_grayscale",
+      "albedo_asset_ids": [
+        "itokawa_global_grayscale"
+      ],
+      "normal_asset_ids": [],
+      "albedo_mapping": "MESH_UV",
+      "normal_mapping": "NONE",
+      "albedo_color_space": "sRGB",
+      "normal_map_encoding": ""
     }
   ]
 }

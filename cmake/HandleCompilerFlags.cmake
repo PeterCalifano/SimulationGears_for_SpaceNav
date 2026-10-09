@@ -162,6 +162,8 @@ function(handle_compiler_flags_interface)
         message(FATAL_ERROR "handle_compiler_flags_interface TARGET does not exist: ${ARG_TARGET}")
     endif()
 
+    target_compile_features(${ARG_TARGET} INTERFACE cxx_std_20)
+
     if(NO_OPTIMIZATION)
         message(STATUS "NO_OPTIMIZATION keeps assertions enabled and emits profiler-friendly debug flags.")
     elseif(CMAKE_BUILD_TYPE_LOWER MATCHES "debug")

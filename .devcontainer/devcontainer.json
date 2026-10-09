@@ -15,10 +15,18 @@
         "ms-vscode.cpptools-themes",
         "ms-vscode.cmake-tools",
         "twxs.cmake",
-        "ms-python.python",
+        "njpwerner.autodocstring",
+        "ms-python.autopep8",
         "ms-python.vscode-pylance",
+        "ms-vscode.cpp-devtools",
+        "Anthropic.claude-code",
         "ms-python.debugpy",
-        "donjayamanne.python-extension-pack"
+        "openai.chatgpt",
+        "Gruntfuggly.todo-tree",
+        "ms-vscode.cpptools-extension-pack",
+        "ms-python.python",
+        "donjayamanne.python-extension-pack",
+        "llvm-vs-code-extensions.vscode-clangd"
       ]
     }
   },

@@ -27,6 +27,8 @@ end
 % -------------------------------------------------------------------------------------------------------------
 %% CHANGELOG
 % 05-04-2025    Pietro Califano     Adapted for use with casadi from computeRefDynFcn
+% 10-09-2026  Pietro Califano, Codex gpt-6    Separate runtime attitude degree from fixed capacity.
+% 11-09-2026  Pietro Califano, Codex gpt-6    Remove unused runtime sign-switch metadata.
 % -------------------------------------------------------------------------------------------------------------
 %% DEPENDENCIES
 % [-]
@@ -52,11 +54,13 @@ if not(isempty(strDynParams.strMainData.dSHcoeff))
     % Compute attitude of Main at current time instant
     dDCMmainAtt_INfromTF  = coder.nullcopy(zeros(3, 3));
 
+    % Keep the workspace bound fixed while the active degree remains runtime data.
+    ui32AttMaxDegree = coder.const(uint32(floor( ...
+        numel(strDynParams.strMainData.strAttData.dChbvPolycoeffs) / 4)) - 1);
     dTmpQuat = evalAttQuatChbvPolyWithCoeffs(strDynParams.strMainData.strAttData.ui32PolyDeg, 4, dTimeEvalPoint,...
                                             strDynParams.strMainData.strAttData.dChbvPolycoeffs, ...
-                                            strDynParams.strMainData.strAttData.dsignSwitchIntervals, ...
                                             strDynParams.strMainData.strAttData.dTimeLowBound, ...
-                                            strDynParams.strMainData.strAttData.dTimeUpBound);
+                                            strDynParams.strMainData.strAttData.dTimeUpBound, ui32AttMaxDegree);
 
     dDCMmainAtt_INfromTF(1:3, 1:3) = Quat2DCM(dTmpQuat, true);
 

@@ -13,8 +13,11 @@ classdef CScenarioGenerator < CGeneralPropagator
     % coefficient files remain caller-selected overrides.
     % -------------------------------------------------------------------------------------------------------------
     %% CHANGELOG
+    % 18-09-2026  Pietro Califano, Codex gpt-5.6  Preserve registered harmonic GM and radius with coefficients.
     % 12-03-2025        Pietro Califano     First experimental version (tested)
     % 24-07-2026        Pietro Califano, Codex     Document registry-owned embedded gravity defaults.
+    % 10-09-2026  Pietro Califano, Codex gpt-6    Separate runtime attitude degree from fixed capacity.
+    % 11-09-2026  Pietro Califano, Codex gpt-6    Remove unused runtime sign-switch metadata.
     % -------------------------------------------------------------------------------------------------------------
     %% METHODS
     % CScenarioGenerator: Construct a stateful reference-scenario generator.
@@ -221,11 +224,13 @@ classdef CScenarioGenerator < CGeneralPropagator
                     end
 
                     % Evaluate target ephemerides
+                    % Keep the workspace bound fixed while the active degree remains runtime data.
+                    ui32AttMaxDegree = coder.const(uint32(floor( ...
+                        numel(self.strDynParams.strMainData.strAttData.dChbvPolycoeffs) / 4)) - 1);
                     dTmpQuat = evalAttQuatChbvPolyWithCoeffs(self.strDynParams.strMainData.strAttData.ui32PolyDeg, 4, dEvalPoint,...
                                                             self.strDynParams.strMainData.strAttData.dChbvPolycoeffs, ...
-                                                            self.strDynParams.strMainData.strAttData.dsignSwitchIntervals, ...
                                                             self.strDynParams.strMainData.strAttData.dTimeLowBound, ...
-                                                            self.strDynParams.strMainData.strAttData.dTimeUpBound);
+                                                            self.strDynParams.strMainData.strAttData.dTimeUpBound, ui32AttMaxDegree);
 
                     dDCM_TBfromW(1:3, 1:3, idT) = Quat2DCM(dTmpQuat, true);
 
@@ -361,6 +366,7 @@ classdef CScenarioGenerator < CGeneralPropagator
             % strDynParams                           Dynamics payload with target constants and optional SH data.
             % -------------------------------------------------------------------------------------------------------------
             %% CHANGELOG
+            % 18-09-2026  Pietro Califano, Codex gpt-5.6  Apply harmonic-family GM and radius for all sources.
             % 14-03-2025    Pietro Califano     First version implemented from legacy codes
             % 15-06-2025    Pietro Califano     Fix incorrect measurement unit for Apophis radius
             % 22-07-2025    Pietro Califano     Add new scenarios, updates to support future-nav simulations
@@ -434,10 +440,6 @@ classdef CScenarioGenerator < CGeneralPropagator
                             char(strSHmeta.charLengthUnits), char(strSHmeta.charNormalization), ...
                             char(strSHmeta.charSource), char(strSHmeta.charSourceUrl));
 
-                        dTargetGravityParameter = strSHgravityData.dGravParam;
-                        dTargetReferenceRadius = strSHgravityData.dBodyRadiusRef;
-                        strDynParams.strMainData.dGM = dTargetGravityParameter;
-                        strDynParams.strMainData.dRefRadius = dTargetReferenceRadius;
                     else
                         % Load registry-backed spherical harmonics data
                         [strSHgravityData, strSHmeta] = CScenarioRegistry.GetSphericalHarmonicsGravityData( ...
@@ -459,6 +461,13 @@ classdef CScenarioGenerator < CGeneralPropagator
                             char(strSHmeta.charSource), char(strSHmeta.charSourceUrl));
                     end
 
+                    % The coefficient family and its normalization radius form
+                    % one gravity model, whether sourced from a file or the
+                    % registry. Keep the monopole and radius from that family.
+                    dTargetGravityParameter = strSHgravityData.dGravParam;
+                    dTargetReferenceRadius = strSHgravityData.dBodyRadiusRef;
+                    strDynParams.strMainData.dGM = dTargetGravityParameter;
+                    strDynParams.strMainData.dRefRadius = dTargetReferenceRadius;
                     strDynParams.strMainData.ui16MaxSHdegree = uint16(strSHgravityData.ui32MaxDegree);
                     strDynParams.strMainData.dSHcoeff = strSHgravityData.dCSlmCoeffCols;
                 end

@@ -1,49 +1,59 @@
 function [dP_SRP, dP_SRP0] = ComputeSolarRadPressure(dInvNormSunPositionFromSC, ...
-                                                bUseKilometersScale)%#codegen
-arguments
-    dInvNormSunPositionFromSC (1,1) double  {mustBePositive}
-    bUseKilometersScale       (1,1) logical {coder.mustBeConst} = false
-end
-%% PROTOTYPE
+                                                  bUseKilometersScale, ...
+                                                  dReferencePressure) %#codegen
+%% SIGNATURE
 % [dP_SRP, dP_SRP0] = ComputeSolarRadPressure(dInvNormSunPositionFromSC, ...
-%                                                     bUseKilometersScale)%#codegen
+%                                           bUseKilometersScale, dReferencePressure)
 % -------------------------------------------------------------------------------------------------------------
 %% DESCRIPTION
-% Function computing the average Solar radiation pressure value scaling depending on distance of
-% spacecraft from the Sun. Average P_SRP assuming 1367 W/m^2 at Earth @ 1 AU. Scaling to km is performed
-% depending on configuration (coder constant).
+% Scale a reference solar pressure at 1 AU by the inverse square of Sun-spacecraft distance.
+% Supply the reference pressure in units consistent with the selected length scale. Retain the
+% nominal 1367 W/m^2 irradiance divided by light speed when the third argument is omitted.
 % -------------------------------------------------------------------------------------------------------------
 %% INPUT
-% dInvNormSunPositionFromSC (1,1) double  {mustBePositive}
-% bUseKilometersScale       (1,1) logical {coder.mustBeConst} = false
+% dInvNormSunPositionFromSC (1,1) double   Positive inverse distance [1/m or 1/km].
+% bUseKilometersScale       (1,1) logical Constant length-scale selection; default false.
+% dReferencePressure        (1,1) double   Nonnegative pressure at 1 AU [kg/(m*s^2) or
+%                                       kg/(km*s^2)]. Multiply SI pressure by 1e3 for kilometre
+%                                       dynamics; this is not a pressure in N/km^2.
 % -------------------------------------------------------------------------------------------------------------
 %% OUTPUT
-% drvSRPwithBiasJac
+% dP_SRP                    (1,1) double   Pressure at spacecraft distance in selected units.
+% dP_SRP0                   (1,1) double   Unchanged reference pressure at 1 AU in selected units.
 % -------------------------------------------------------------------------------------------------------------
 %% CHANGELOG
 % 07-12-2025    Pietro Califano     First implementation from previous code. Part of refactoring of
 %                                   EstimationGears repository for better usage and validation.
+% 28-09-2026    Codex               Accept configured reference pressure; retain nominal legacy calls.
 % -------------------------------------------------------------------------------------------------------------
 %% DEPENDENCIES
 % [-]
 % -------------------------------------------------------------------------------------------------------------
 
+arguments (Input)
+    dInvNormSunPositionFromSC (1,1) double {mustBeFinite, mustBePositive}
+    bUseKilometersScale       (1,1) logical {coder.mustBeConst} = false
+    dReferencePressure        (1,1) double {mustBeFinite, mustBeNonnegative} = ...
+        (1367 / 299792458) * 1e3^double(bUseKilometersScale)
+end
+
+arguments (Output)
+    dP_SRP  (1,1) double
+    dP_SRP0 (1,1) double
+end
+
 %% Function code
+
+% Match the astronomical-unit distance to the caller's dynamics length scale.
 if coder.const(bUseKilometersScale)
-    % Assumes km scale
     dAU = coder.const(1.495978707E8);
-    dP_SRP0 = coder.const(1E3 * 1367 / 299792458);
 else
-    % Assumes m scale
     dAU = coder.const(1.495978707E11);
-    dP_SRP0 = coder.const(1367 / 299792458); % Approx. 4.54e-6 N/m^2
 end
 
-% Compute AU^2 as coder constant
+% Preserve the supplied reference while applying only geometric attenuation.
 dAU2 = coder.const(dAU * dAU);
-
-% Compute SRP value from SRP0 at 1AU
-dP_SRP = dP_SRP0 * (dAU2 * (dInvNormSunPositionFromSC^2)); % [N/m^2] or [N/km^2]
+dP_SRP0 = dReferencePressure;
+dP_SRP = dP_SRP0 * (dAU2 * dInvNormSunPositionFromSC^2);
 
 end
-
