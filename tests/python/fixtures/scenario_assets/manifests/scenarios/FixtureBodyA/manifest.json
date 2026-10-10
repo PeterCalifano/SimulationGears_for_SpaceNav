@@ -1,0 +1,46 @@
+{
+  "schema_version": 1,
+  "scenario_name": "FixtureBodyA",
+  "canonical_name": "FixtureBodyA",
+  "aliases": ["fixture-a"],
+  "confidence": "synthetic_test_fixture",
+  "tags": ["shape_runnable"],
+  "default_shape_asset_id": "fixture_required_shape",
+  "assets": [
+    {
+      "asset_id": "fixture_required_shape",
+      "asset_type": "shape",
+      "local_path": "assets/fixture_a/shape/triangle.obj",
+      "source_url": "fixture://triangle.tab",
+      "download_url": "fixture://triangle.tab",
+      "sha256": "697b00ab13410c52a542d2e9c63711fcc04e9cbf6c0d3439a9b43cc812e6e713",
+      "size_gb": 0.000000032,
+      "fidelity": "synthetic_triangle",
+      "required_for_shape_runnable": true,
+      "content_format": "wavefront_obj"
+    },
+    {
+      "asset_id": "fixture_optional_shape",
+      "asset_type": "shape",
+      "local_path": "assets/fixture_a/shape/optional.obj",
+      "source_url": "fixture://triangle.tab",
+      "download_url": "fixture://triangle.tab",
+      "sha256": "697b00ab13410c52a542d2e9c63711fcc04e9cbf6c0d3439a9b43cc812e6e713",
+      "size_gb": 0.000000032,
+      "fidelity": "synthetic_triangle",
+      "required_for_shape_runnable": false,
+      "content_format": "wavefront_obj"
+    },
+    {
+      "asset_id": "fixture_large_albedo",
+      "asset_type": "albedo",
+      "local_path": "assets/fixture_a/albedo/large.bin",
+      "source_url": "fixture://triangle.tab",
+      "download_url": "fixture://triangle.tab",
+      "sha256": "697b00ab13410c52a542d2e9c63711fcc04e9cbf6c0d3439a9b43cc812e6e713",
+      "size_gb": 2.5,
+      "fidelity": "synthetic_size_gate_metadata",
+      "required_for_shape_runnable": false
+    }
+  ]
+}
