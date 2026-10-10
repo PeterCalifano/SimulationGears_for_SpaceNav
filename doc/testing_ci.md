@@ -17,14 +17,16 @@ the authoritative batch command.
 ## Continuous integration
 
 The native CPU workflow uses full Git history for version resolution, disables
-host-specific CPU tuning, enables Catch2 and Python CTest discovery, and tests a
-downloaded build artifact in a separate job. Pull requests to `develop` and
-`dev*` branches are covered, and release tags match `v*.*.*`.
+host-specific CPU tuning, and enables Catch2 and Python CTest discovery. Configure,
+build, and CTest run sequentially in one job using the same local build tree.
+Pull requests to `develop` and `dev*` branches are covered, and release tags match
+`v*.*.*`.
 
 CUDA CI runs only for manual dispatch or release tags and only when the
-repository variable `CI_USE_SELF_HOSTED` is exactly `true`. Both CUDA jobs
-require the self-hosted Linux/X64/GPU/CUDA labels. A skipped workflow means CUDA
-coverage did not run; it is not evidence of a passing GPU build.
+repository variable `CI_USE_SELF_HOSTED` is exactly `true`. Its combined build/test
+job requires the self-hosted Linux/X64/GPU/CUDA labels. Both native workflows keep
+their build trees local to the runner. A skipped workflow means CUDA coverage did
+not run; it is not evidence of a passing GPU build.
 
 ROS 2 CI uses Jazzy, synchronizes project metadata, rejects manifest drift,
 resolves dependencies with rosdep, and runs
