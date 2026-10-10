@@ -32,6 +32,7 @@ function [dPotentialBasis, dGradUBasis, ui32CoeffRowIds, ui8CoeffColIds, dPlm] =
 % -------------------------------------------------------------------------------------------------------------
 %% CHANGELOG
 % 26-04-2026    Pietro Califano     Extract shared ExtSphHarm basis used by evaluator and fitter.
+% 07-10-2026    Pietro Califano, Codex  Use zero P(n,n+1) in the sectorial latitude derivative.
 % -------------------------------------------------------------------------------------------------------------
 %% DEPENDENCIES
 % buildSHEtrigLUT()
@@ -76,7 +77,11 @@ for idxDeg = uint32(2):ui32MaxDegree
 
         % Get the associated Legendre function value and its latitude derivative factor for this order
         dPlmVal = dPlm(idLm0 + idxOrd);
-        dPlmPlus1 = dPlm(idLm0 + idm);
+        % The sectorial P(n,n+1) is zero, not the next flattened degree's P(n+1,0).
+        dPlmPlus1 = 0.0;
+        if idxOrd < idxDeg
+            dPlmPlus1 = dPlm(idLm0 + idm);
+        end
         dLatFactor = dPlmPlus1 - dMTanLatLUT(idm) * dPlmVal;
 
         % Compute the unscaled potential and gradient contributions for this degree and order

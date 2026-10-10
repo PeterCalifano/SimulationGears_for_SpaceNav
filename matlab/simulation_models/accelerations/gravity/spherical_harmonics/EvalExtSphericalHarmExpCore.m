@@ -16,7 +16,7 @@ end
 %     dGravParam, dBodyRadiusRef) %#codegen
 % -------------------------------------------------------------------------------------------------------------
 %% DESCRIPTION
-% Shared core for the Exterior Spherical Harmonics Expansion model.
+% Spherical-coordinate evaluator for exterior spherical-harmonic reference checks.
 %
 % This function evaluates the non-spherical potential together with its
 % spherical-coordinate gradient at a target-body-fixed position specified
@@ -28,8 +28,9 @@ end
 % degree 2.
 %
 % This function uses BuildExtSphHarmExpBasis(), the same basis construction
-% used by the field-to-coefficients least-squares fitter. MATLAB, codegen,
-% evaluation, and fitting paths therefore share the same harmonic term math.
+% used by the field-to-coefficients least-squares fitter. Retain this interface
+% for spherical-gradient/Legendre outputs and independent Cartesian cross-checks.
+% Orbit dynamics use EvalExtSphHarmExpInTargetFrame and its Cartesian recurrence.
 %
 % REFERENCE:
 % 1) Fundamentals Of Astrodynamics And Applications, Vallado (chapters 8.6, 8.7)
@@ -50,8 +51,9 @@ end
 % dPlm:              [N x 1]   Flattened Legendre lookup table.
 % -------------------------------------------------------------------------------------------------------------
 %% CHANGELOG
-% 26-04-2026    Pietro Califano     Reuse shared ExtSphHarm basis construction.
 % 23-04-2026    Pietro Califano     Add shared SHE core for potential and gradient.
+% 26-04-2026    Pietro Califano     Reuse shared ExtSphHarm basis construction.
+% 10-10-2026    Pietro Califano     Clarify the retained spherical-coordinate interface.
 % -------------------------------------------------------------------------------------------------------------
 %% DEPENDENCIES
 % BuildExtSphHarmExpBasis()

@@ -15,8 +15,8 @@ end
 % -------------------------------------------------------------------------------------------------------------
 %% DESCRIPTION
 % Model-configured max-fidelity inertial orbit-state Jacobian matching EvalRHS_InertialDynMaxFidelity.
-% Point-mass, third-body, cannonball SRP, and polyhedron partials are analytical; the spherical-harmonics partial
-% is the finite-difference target-frame partial returned by EvalJac_ExtSphHarmExpInTargetFrame.
+% Point-mass, third-body, cannonball SRP, polyhedron and spherical-harmonic partials are analytical.
+% EvalJac_ExtSphHarmExpInTargetFrame supplies the analytical harmonic partials, including at the poles.
 % Panel SRP uses the analytical frozen-active-set partial returned by EvalJac_QuadsModelSRP.
 % Target-gravity partials follow the exclusive model ID resolved by ResolveInertialDynMaxFidelityConfig.
 % -------------------------------------------------------------------------------------------------------------
@@ -42,6 +42,7 @@ end
 % 10-09-2026    Pietro Califano, Codex gpt-6    Derive codegen degree bounds from ephemeris storage.
 % 11-09-2026  Pietro Califano, Codex gpt-6    Remove unused runtime sign-switch metadata.
 % 04-10-2026  Pietro Califano, Codex GPT-6  Keep ephemeris/pressure storage fixed for codegen.
+% 11-10-2026  Pietro Califano  Document analytical spherical-harmonic partials.
 % -------------------------------------------------------------------------------------------------------------
 %% DEPENDENCIES
 % ResolveInertialDynMaxFidelityConfig()
