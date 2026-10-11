@@ -4,9 +4,120 @@ classdef testEvalJac_InertialDynMaxFidelityPanelSRP < matlab.unittest.TestCase
     % actual dynamics entry points. Use independent plate-force/derivative
     % oracles, synthetic occlusion, SI/unit and attitude transformations,
     % model-selection gates and fixed-allocation source/MEX comparisons.
+    % Recompute ideal nadir/Sun pointing in RHS differences to validate the
+    % supplied attitude-position derivative for direct panels and response LUTs.
     % -------------------------------------------------------------------------------------------------------------
 
     methods (Test)
+        function TestStateDependentPointingChain(self)
+            %% SIGNATURE
+            % self.TestStateDependentPointingChain()
+            %% DESCRIPTION
+            % Recompute nadir/Sun attitude in each independent RHS perturbation.
+            % Cover direct panels and transverse LUTs with held/live pressure in m/km.
+            %% INPUT
+            % self  MATLAB assertion context.
+            %% OUTPUT
+            % None; verify the complete attitude-position chain and unit invariance.
+            %% CHANGELOG
+            % 07-10-2026  Pietro Califano  Validate exact truth pointing derivatives.
+            % 11-10-2026  Pietro Califano  Separate fixture, codegen and derivative checks.
+            %% DEPENDENCIES
+            % BuildSrpLutTestFixture, EvalNadirSunPointingWithJacobian, max-fidelity RHS/Jacobian.
+
+            % Reuse one optical response across both dynamics unit conventions.
+            [strLut, ~, strLutPanel] = BuildSrpLutTestFixture();
+            strLutPanel.charLengthUnit = 'm';
+            for bLut = [false, true]
+                for bLivePressure = [false, true]
+                    dReferenceJacobian = zeros(3);
+                    for dUnitScale = [1, 1e3]
+                        % Convert the physical fixture to metres or kilometres.
+                        dxState = [1e4; -5e3; 3e3; 0; 0; 0] / dUnitScale;
+                        dSunPosition = [1.2e11; 4e10; 3e10] / dUnitScale;
+                        strDynamics = self.buildPanelDynParams(dxState(1:3));
+                        strDynamics.strBody3rdData(1).strOrbitData = ...
+                            self.constantOrbitData(dSunPosition);
+                        strDynamics.strSRPdata.dReferenceDistance = 1.5e11 / dUnitScale;
+                        strDynamics.strSRPdata.dP_SRP0 = 4e-6 * dUnitScale;
+                        strDynamics.strSRPdata.dP_SRP = 4e-6 * dUnitScale;
+
+                        % Supply the same attitude and its derivative to the dynamics.
+                        [dRotation, dPointingJacobian] = EvalNadirSunPointingWithJacobian( ...
+                            dxState(1:3), dSunPosition, true);
+                        strDynamics.strSCdata.dQuat_INfromSCB = DCM2quat(dRotation, false);
+                        strDynamics.strSCdata.dJacDCMWrtPos_INfromSCB = dPointingJacobian;
+                        if bLut
+                            strDynamics.strSCdata.strSRPpanelData = strLutPanel;
+                            strDynamics.strSCdata.strSRPpanelData.strResponseLut = strLut;
+                        else
+                            strDynamics.strSCdata.strSRPpanelData.dQuadsNormals_SCB = ...
+                                [[1; 0; 0], [1; 0.4; 0.2], [-1; 0; 0]] ./ ...
+                                [1, norm([1; 0.4; 0.2]), 1];
+                        end
+
+                        strFlags = self.buildPanelModelFlags();
+                        strFlags.bRecomputeSRPpressureFromDistance = bLivePressure;
+                        dAnalyticJacobian = EvalJac_InertialDynMaxFidelity( ...
+                            0, dxState, strDynamics, strFlags);
+                        if dUnitScale == 1e3 && bLivePressure
+                            % Compile each optional response schema with a nonzero pointing tensor.
+                            charBuildFolder = tempname;
+                            mkdir(charBuildFolder);
+                            charMexName = sprintf('PointingSrpJac_%u_mex', uint32(bLut));
+                            codegen('-config', coder.config('mex'), ...
+                                '-d', charBuildFolder, '-o', charMexName, ...
+                                'EvalJac_InertialDynMaxFidelity', '-args', ...
+                                {0, dxState, strDynamics, coder.Constant(strFlags)});
+                            addpath(charBuildFolder);
+                            fcnJacobianMex = str2func(charMexName);
+                            dGeneratedJacobian = fcnJacobianMex(0, dxState, strDynamics, strFlags);
+                            self.verifyEqual(dGeneratedJacobian, dAnalyticJacobian, ...
+                                'RelTol', 2e-12, ...
+                                'AbsTol', 1e-25);
+                        end
+
+                        % Recompute the full frame in each independent RHS perturbation.
+                        dFiniteDifference = zeros(3);
+                        dPositionStep = 0.1 / dUnitScale;
+                        for ui32Axis = uint32(1):uint32(3)
+                            dPerturbation = zeros(6, 1);
+                            dPerturbation(ui32Axis) = dPositionStep;
+                            strPlus = strDynamics;
+                            strMinus = strDynamics;
+                            strPlus.strSCdata.dQuat_INfromSCB = DCM2quat( ...
+                                EvalNadirSunPointingWithJacobian( ...
+                                    dxState(1:3) + dPerturbation(1:3), dSunPosition), false);
+                            strMinus.strSCdata.dQuat_INfromSCB = DCM2quat( ...
+                                EvalNadirSunPointingWithJacobian( ...
+                                    dxState(1:3) - dPerturbation(1:3), dSunPosition), false);
+                            dPlus = EvalRHS_InertialDynMaxFidelity( ...
+                                0, dxState + dPerturbation, strPlus, strFlags);
+                            dMinus = EvalRHS_InertialDynMaxFidelity( ...
+                                0, dxState - dPerturbation, strMinus, strFlags);
+                            dFiniteDifference(:, ui32Axis) = ...
+                                (dPlus(4:6) - dMinus(4:6)) / (2 * dPositionStep);
+                        end
+
+                        % Compare raw derivatives, then check the unit-invariant da/dr.
+                        self.verifyGreaterThan(norm(dFiniteDifference, 'fro'), 0);
+                        dRelativeError = norm(dAnalyticJacobian(4:6, 1:3) - ...
+                            dFiniteDifference, 'fro') / norm(dFiniteDifference, 'fro');
+                        self.verifyLessThan(dRelativeError, 2e-6);
+                        fprintf('POINTING_SRP_CHAIN lut=%u live_pressure=%u unit_scale=%g error=%.9g\n', ...
+                            bLut, bLivePressure, dUnitScale, dRelativeError);
+                        if dUnitScale == 1
+                            dReferenceJacobian = dAnalyticJacobian(4:6, 1:3);
+                        else
+                            self.verifyEqual(dAnalyticJacobian(4:6, 1:3), dReferenceJacobian, ...
+                                'RelTol', 2e-12, ...
+                                'AbsTol', 1e-25);
+                        end
+                    end
+                end
+            end
+        end
+
         function testPanelSRPJacobianMatchesRhsFiniteDifference(testCase)
             %% SIGNATURE
             % testCase.testPanelSRPJacobianMatchesRhsFiniteDifference()

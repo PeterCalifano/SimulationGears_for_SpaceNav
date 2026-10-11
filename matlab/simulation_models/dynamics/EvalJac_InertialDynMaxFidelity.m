@@ -18,6 +18,8 @@ end
 % Point-mass, third-body, cannonball SRP, polyhedron and spherical-harmonic partials are analytical.
 % EvalJac_ExtSphHarmExpInTargetFrame supplies the analytical harmonic partials, including at the poles.
 % Panel SRP uses the analytical frozen-active-set partial returned by EvalJac_QuadsModelSRP.
+% Selected truth LUTs use the derivative of their actual scalar/vector interpolant.
+% A supplied spacecraft attitude-position tensor contributes its exact chain rule to panel/LUT partials.
 % Target-gravity partials follow the exclusive model ID resolved by ResolveInertialDynMaxFidelityConfig.
 % -------------------------------------------------------------------------------------------------------------
 %% INPUT
@@ -43,6 +45,7 @@ end
 % 11-09-2026  Pietro Califano, Codex gpt-6    Remove unused runtime sign-switch metadata.
 % 04-10-2026  Pietro Califano, Codex GPT-6  Keep ephemeris/pressure storage fixed for codegen.
 % 11-10-2026  Pietro Califano  Document analytical spherical-harmonic partials.
+% 11-10-2026  Pietro Califano  Document selected SRP and supplied attitude-position partials.
 % -------------------------------------------------------------------------------------------------------------
 %% DEPENDENCIES
 % ResolveInertialDynMaxFidelityConfig()
