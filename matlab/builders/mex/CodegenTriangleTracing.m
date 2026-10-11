@@ -4,14 +4,14 @@ function strBuild = CodegenTriangleTracing(charOutputRoot, strRayData, kwargs)
 % -------------------------------------------------------------------------------------------------------------
 %% DESCRIPTION
 % Compile generic tracing or the complete prepared LiDAR sensor model.
-% Validate geometry on the host and freeze dimensions. MEX builds use direct
+% Validate geometry on the host and bound variable triangle/node dimensions. MEX builds use direct
 % numeric arguments to remove struct-field marshalling. Generated argument
 % protection still copies shared arrays; include that cost in complete-call timing.
 % Generate a host facade that retains the public tracing or sensor interface.
-% Native libraries retain the prepared struct interface and fixed arrays.
+% Native libraries retain the prepared struct interface with the same bounded arrays.
 % Keep query values, geometry and sensor settings mutable. Reject populated destinations.
 % Example: strBuild = CodegenTriangleTracing(charRoot, strRayData, bLidar=true);
-% Output: A five-output LaserRangefinderPrepared_MEX and its capacity manifest.
+% Output: A five-output LaserRangefinderPrepared_MEX and its maximum-capacity manifest.
 % -------------------------------------------------------------------------------------------------------------
 %% INPUT
 % charOutputRoot       Empty artifact destination.
@@ -19,13 +19,16 @@ function strBuild = CodegenTriangleTracing(charOutputRoot, strRayData, kwargs)
 % kwargs.bLidar        Compile the complete sensor; false compiles TraceTriangleRay.
 % kwargs.charTarget    mex or lib; default mex.
 % kwargs.charKernelName Optional basename; empty selects the public default.
+% kwargs.ui32MaxTriangles Maximum triangle columns; zero uses the supplied geometry capacity.
+% kwargs.ui32MaxNodes     Maximum BVH node columns; zero uses the supplied geometry capacity.
 % -------------------------------------------------------------------------------------------------------------
 %% OUTPUT
-% strBuild             Build paths, fixed capacities and numeric prototype.
+% strBuild             Build paths, maximum capacities and numeric prototype.
 % -------------------------------------------------------------------------------------------------------------
 %% CHANGELOG
 % 05-10-2026  Pietro Califano, Codex (GPT-6)  Add reusable prepared triangle tracing.
 % 08-10-2026  Pietro Califano, Codex (GPT-6)  Generate direct-array MEX kernels and public facades.
+% 09-10-2026  Pietro Califano, Codex (GPT-6)  Accept variable geometry within explicit capacity bounds.
 % -------------------------------------------------------------------------------------------------------------
 %% DEPENDENCIES
 % MATLAB Coder, ValidateTriangleRayData, TraceTriangleRay, TraceTriangleRayArrays,
@@ -38,6 +41,8 @@ arguments (Input)
     kwargs.bLidar (1, 1) logical = false
     kwargs.charTarget (1, :) char {mustBeMember(kwargs.charTarget, {'mex', 'lib'})} = 'mex'
     kwargs.charKernelName (1, :) char = ''
+    kwargs.ui32MaxTriangles (1, 1) uint32 = uint32(0)
+    kwargs.ui32MaxNodes (1, 1) uint32 = uint32(0)
 end
 
 arguments (Output)
@@ -53,6 +58,17 @@ end
 
 % Validate capacities before creating or populating the output directory.
 ValidateTriangleRayData(strRayData);
+ui32TriangleCapacity = kwargs.ui32MaxTriangles;
+ui32NodeCapacity = kwargs.ui32MaxNodes;
+if ui32TriangleCapacity == 0
+    ui32TriangleCapacity = uint32(size(strRayData.dVertex0, 2));
+end
+if ui32NodeCapacity == 0
+    ui32NodeCapacity = uint32(size(strRayData.dNodeMin, 2));
+end
+assert(size(strRayData.dVertex0, 2) <= ui32TriangleCapacity && ...
+    size(strRayData.dNodeMin, 2) <= ui32NodeCapacity, ...
+    'CodegenTriangleTracing:Capacity', 'Geometry exceeds the requested maximum capacities.');
 charKernelName = kwargs.charKernelName;
 if isempty(charKernelName)
     charKernelName = 'TraceTriangleRay_MEX';
@@ -71,17 +87,30 @@ if ~isfolder(charOutputRoot)
     mkdir(charOutputRoot);
 end
 
-% Bound dimensions and primitive types without capturing constant geometry.
+% Bound only geometry columns; vector components, counters and flags stay fixed.
 objConfig = coder.config(kwargs.charTarget);
 objConfig.TargetLang = 'C++';
 objConfig.EnableDynamicMemoryAllocation = false;
-objConfig.EnableVariableSizing = false;
+objConfig.EnableVariableSizing = true;
 objConfig.GenerateReport = false;
 if strcmp(kwargs.charTarget, 'mex')
     objConfig.IntegrityChecks = false;
     objConfig.ResponsivenessChecks = false;
 end
 objRayType = coder.cstructname(coder.typeof(strRayData), 'STriangleRayData');
+cellTriangleFields = {'dVertex0', 'dEdge1', 'dEdge2', 'ui32TriangleOrder'};
+cellNodeFields = {'dNodeMin', 'dNodeMax', 'ui32NodeLeft', 'ui32NodeRight', ...
+                  'ui32LeafStart', 'ui32LeafCount'};
+cellBoundedFields = [cellTriangleFields, cellNodeFields];
+for ui32Field = uint32(1):uint32(numel(cellBoundedFields))
+    charField = cellBoundedFields{ui32Field};
+    dMaxColumns = double(ui32NodeCapacity);
+    if ui32Field <= numel(cellTriangleFields)
+        dMaxColumns = double(ui32TriangleCapacity);
+    end
+    objRayType.Fields.(charField) = coder.typeof(strRayData.(charField), ...
+        [size(strRayData.(charField), 1), dMaxColumns], [false, true]);
+end
 
 if kwargs.bLidar
     charEntryPoint = 'LaserRangefinderModel';
@@ -109,7 +138,7 @@ cellGeometryFields = {'ui32TriangleCount', 'dVertex0', 'dEdge1', 'dEdge2', ...
 if strcmp(kwargs.charTarget, 'mex')
     cellGeometryArgs = cell(1, numel(cellGeometryFields));
     for ui32Field = uint32(1):uint32(numel(cellGeometryFields))
-        cellGeometryArgs{ui32Field} = coder.typeof(strRayData.(cellGeometryFields{ui32Field}));
+        cellGeometryArgs{ui32Field} = objRayType.Fields.(cellGeometryFields{ui32Field});
     end
 
     charCompiledKernel = [charKernelName, '_kernel'];
@@ -135,19 +164,21 @@ if strcmp(kwargs.charTarget, 'mex')
                     cellGeometryFields, kwargs.bLidar);
 end
 
-% Record fixed capacities and the entry points used by each generated interface.
+% Record maximum capacities and separate builder provenance from numerical source identity.
 strBuild = struct('charOutputRoot', charOutputRoot, 'charKernelName', charKernelName, ...
     'charEntryPoint', charEntryPoint, 'charTarget', kwargs.charTarget, ...
     'charCompiledEntryPoint', charCompiledEntry, ...
     'charCompiledKernelName', charCompiledKernel, ...
     'bDirectGeometryInputs', strcmp(kwargs.charTarget, 'mex'), ...
-    'ui32TriangleCapacity', uint32(size(strRayData.dVertex0, 2)), ...
-    'ui32NodeCapacity', uint32(size(strRayData.dNodeMin, 2)), ...
+    'bVariableGeometryInputs', true, ...
+    'ui32TriangleCapacity', ui32TriangleCapacity, ...
+    'ui32NodeCapacity', ui32NodeCapacity, ...
     'strRayData', strRayData);
 if strcmp(kwargs.charTarget, 'mex')
     % Bind consumer selection to this builder and its numerical source dependencies.
     strSignature = rmfield(strBuild, 'strRayData');
-    strSignature.ui32SchemaVersion = uint32(1);
+    strSignature.ui32SchemaVersion = uint32(2);
+    strSignature.charBuilderSha256 = ComputeFileSha256([mfilename('fullpath'), '.m']);
     cellSourceNames = {charEntryPoint, charCompiledEntry, 'LaserRangefinderNoiseModel', ...
                       'ApplyLidarMeasurementError', 'RayTraceTriangMesh', ...
                       'TraceTriangleRay', 'TraceTriangleRayArrays'};
@@ -155,7 +186,7 @@ if strcmp(kwargs.charTarget, 'mex')
         cellSourceNames = {'TraceTriangleRay', 'TraceTriangleRayArrays'};
     end
     cellSourceNames = [cellSourceNames, ...
-        {'private/IntersectTriangleEdges.m', 'private/IntersectRayBounds.m', 'CodegenTriangleTracing'}];
+        {'private/IntersectTriangleEdges.m', 'private/IntersectRayBounds.m'}];
     strSignature.cellSources = cellSourceNames;
     strSignature.cellSourceHashes = cell(1, numel(cellSourceNames));
     charCommonRoot = fileparts(which('TraceTriangleRay'));

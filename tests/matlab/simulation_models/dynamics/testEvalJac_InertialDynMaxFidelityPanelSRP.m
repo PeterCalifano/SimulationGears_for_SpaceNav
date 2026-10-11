@@ -118,6 +118,31 @@ classdef testEvalJac_InertialDynMaxFidelityPanelSRP < matlab.unittest.TestCase
             end
         end
 
+        function TestThirdBodyJacobianSign(self)
+            %% SIGNATURE
+            % self.TestThirdBodyJacobianSign()
+            %% DESCRIPTION
+            % Verify attractive third-body position partials against the public RHS.
+            %% INPUT
+            % self  MATLAB assertion context.
+            %% OUTPUT
+            % None; assert against independent central finite differences.
+            %% CHANGELOG
+            % 06-10-2026  Codex (GPT-6)  Guard the body-to-spacecraft derivative sign.
+            %% DEPENDENCIES
+            % EvalRHS_InertialDynMaxFidelity, EvalJac_InertialDynMaxFidelity.
+            dxState = [1;-0.5;0.3;0;0;0];
+            strDynamics = self.buildPanelDynParams(dxState(1:3));
+            strDynamics.strBody3rdData(1).dGM = 1;
+            strFlags = self.buildPanelModelFlags();
+            strFlags.bIncludeSRP = false;
+            strFlags.bIncludeSunThirdBody = true;
+            strFlags.bIncludeThirdBodies = true;
+            dAnalytic = EvalJac_InertialDynMaxFidelity(0,dxState,strDynamics,strFlags);
+            dFinite = self.finiteDifferenceRhsJacobian(dxState,strDynamics,strFlags,1e-5);
+            self.verifyEqual(dAnalytic(4:6,1:3),dFinite,'RelTol',1e-6,'AbsTol',1e-12);
+        end
+
         function testPanelSRPJacobianMatchesRhsFiniteDifference(testCase)
             %% SIGNATURE
             % testCase.testPanelSRPJacobianMatchesRhsFiniteDifference()

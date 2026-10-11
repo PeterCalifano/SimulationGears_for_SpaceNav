@@ -44,6 +44,7 @@ end
 % 10-09-2026    Pietro Califano, Codex gpt-6    Derive codegen degree bounds from ephemeris storage.
 % 11-09-2026  Pietro Califano, Codex gpt-6    Remove unused runtime sign-switch metadata.
 % 04-10-2026  Pietro Califano, Codex GPT-6  Keep ephemeris/pressure storage fixed for codegen.
+% 06-10-2026  Codex (GPT-6)  Correct attractive third-body partials and support selected truth LUTs.
 % 11-10-2026  Pietro Califano  Document analytical spherical-harmonic partials.
 % 11-10-2026  Pietro Califano  Document selected SRP and supplied attitude-position partials.
 % -------------------------------------------------------------------------------------------------------------
@@ -151,7 +152,8 @@ if ~isempty(dBodyEphemerides)
 
         dBodyRows = 3 * (idB - 1) + (1:3);
         dPosBodyToSC_IN = dPosSC_IN - dBodyEphemerides(dBodyRows, 1);
-        dDynMatrix(4:6, 1:3) = dDynMatrix(4:6, 1:3) + EvalPointMassJacobian_(dPosBodyToSC_IN, dGMbody);
+        % Body-to-spacecraft coordinates use the same negative attractive-force sign as central gravity.
+        dDynMatrix(4:6, 1:3) = dDynMatrix(4:6, 1:3) + EvalPointMassJacobian_(dPosBodyToSC_IN,-dGMbody);
     end
 end
 
