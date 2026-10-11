@@ -361,10 +361,59 @@ and passing evidence under:
 
 ## Stage 6: Reconcile MSCKF gravity providers with the isolation stack
 
-- [ ] Compare point-mass/third-body helpers, polyhedron corrections and dynamics
+### Current-owner adaptation — 11 October 2026
+
+- [x] Verify main at `e02f966` with an empty index. The third-body sign correction
+  is already committed; preserve current SRP, pointing and harmonic implementations.
+- [x] Review the four isolated gravity kernels and adapt their six consumers to
+  current APIs and the `accelerations/gravity` layout. Preserve LUT Sun distance.
+- [x] Validate raw derivatives, far-field acceleration, current source/MEX
+  consumers and the isolated MSCKF numerical interface against an exact export.
+- [x] Stage one reviewed provider batch and record evidence. Leave donor sources,
+  MSCKF setup, editor settings, dependency pointers and worktree lifecycle untouched.
+
+Adapt the uncommitted provider work from the MSCKF isolation checkout at
+`d3d5936` to main at `e02f966`; do not replace current dynamics files with the
+older snapshots. Place four public kernels in `accelerations/gravity/point_mass`.
+Keep force and Jacobian entry points because the isolated MSCKF calls all four;
+delegate the third-body spacecraft-position derivative to the central-gradient
+kernel. Remove repeated formulas from two-body, orbital and polyhedron consumers.
+Use nonnegative GM and nonsingular geometry in the common interfaces.
+
+Retain the committed attractive third-body sign, current runtime LUT inputs and
+Sun-distance diagnostics, analytical spherical harmonics and supplied pointing
+derivatives. Replace the orbital Sun cutoff with the donor's factored differential
+acceleration. Match the Jacobian's unavailable-ephemeris handling to the RHS.
+Port the donor's scalar-last quaternion fixture and explicit propagator-test path;
+retain current capitalized APIs and generated runtime-dynamics interfaces.
+
+The exact export passes 41 tests with no failures or incomplete cases, including
+raw finite differences, axial far-field gravity, two-body STM, polyhedron and
+seven max-fidelity/propagation MEX builds. A further fixed-allocation orbital MEX
+passes four runtime-table/eclipse cases: force discrepancy `1.59917781919e-22`,
+Sun-distance discrepancy one floating-point unit (`3.0517578125e-5` at `1.54e11`).
+Thirteen scoped MATLAB files are Analyzer-clean. Both successful MATLAB runs
+exit zero. Final comment/spacing edits preserve all tested executable lines.
+
+Call the three existing isolated MSCKF relative-dynamics test methods directly
+with the candidate gravity provider; all pass, including the full numerical
+Jacobian comparison. This checks numerical consumers, not the complete MSCKF
+setup or navigation stack. `SetupMsckfSpaceNavTestPaths` still checks the old flat
+gravity path and must be adapted in its owner before switching that stack.
+Keep the isolated sources, index and worktree unchanged and available.
+
+Evidence: `/tmp/gravity-kernels-consolidation-20261011-cuzzf4lw`, including
+`Validation.log`, `Consumers3.log`, `StagedReview.json` and the exact patch.
+Preserve the failed disposable launcher attempts: the first omitted constant
+state indices; the second required bit-identical norms across MATLAB/MEX.
+Correct only the launcher, reuse its successful MEX and retain production code.
+Review and stage the fifteen-path provider batch; leave editor settings and all
+other owners' indexes untouched. Await the user's commit before advancing.
+
+- [x] Compare point-mass/third-body helpers, polyhedron corrections and dynamics
   consumers with main. Remove duplicate implementations only after checking
   contracts and codegen behavior.
-- [ ] Review and validate the SimulationGears batch with the related MSCKF
+- [x] Review and validate the SimulationGears batch with the related MSCKF
   consumer changes. Preserve that stack's ownership and existing isolation.
 - [ ] Close the worktree only after its unique work is committed and the
   dependent isolation stack no longer requires this checkout.

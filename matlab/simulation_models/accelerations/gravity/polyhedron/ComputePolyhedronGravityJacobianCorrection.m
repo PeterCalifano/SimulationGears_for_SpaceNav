@@ -2,13 +2,7 @@ function dJacPolyCorrection_IN = ComputePolyhedronGravityJacobianCorrection(dPos
                                                                             dDCMmainAtt_INfromTF, ...
                                                                             dMainGM, ...
                                                                             strPoly) %#codegen
-arguments
-    dPosSC_IN             (3,1) double {mustBeFinite}
-    dDCMmainAtt_INfromTF  (3,3) double {mustBeFinite}
-    dMainGM               (1,1) double {mustBeFinite, mustBeNonnegative}
-    strPoly               (1,1) struct
-end
-%% PROTOTYPE
+%% SIGNATURE
 % dJacPolyCorrection_IN = ComputePolyhedronGravityJacobianCorrection(dPosSC_IN, dDCMmainAtt_INfromTF, dMainGM, strPoly)
 % -------------------------------------------------------------------------------------------------------------
 %% DESCRIPTION
@@ -29,10 +23,23 @@ end
 % -------------------------------------------------------------------------------------------------------------
 %% CHANGELOG
 % 02-07-2026    Pietro Califano, Codex 5.5      Extract polyhedron gravity Jacobian correction.
+% 11-10-2026    Pietro Califano                Reuse the shared central-gravity derivative.
 % -------------------------------------------------------------------------------------------------------------
 %% DEPENDENCIES
 % EvalPolyhedronGrav()
+% EvalJac_PointMassGravity()
 % -------------------------------------------------------------------------------------------------------------
+
+arguments (Input)
+    dPosSC_IN             (3,1) double {mustBeFinite}
+    dDCMmainAtt_INfromTF  (3,3) double {mustBeFinite}
+    dMainGM               (1,1) double {mustBeFinite, mustBeNonnegative}
+    strPoly               (1,1) struct
+end
+
+arguments (Output)
+    dJacPolyCorrection_IN (3, 3) double
+end
 
 %% Function code
 dPosSC_TB = dDCMmainAtt_INfromTF.' * dPosSC_IN;
@@ -46,16 +53,9 @@ dPosSC_TB = dDCMmainAtt_INfromTF.' * dPosSC_IN;
                                            strPoly.dFaceDyadics, ...
                                            strPoly.dGravConst);
 
-dJacCentral_TB = EvalPointMassGravityJacobian_(dPosSC_TB, -dMainGM);
+% Subtract the same central gradient already included by the dynamics Jacobian.
+dJacCentral_TB = EvalJac_PointMassGravity(dPosSC_TB, dMainGM);
 dJacPolyCorrection_TB = dJacPolyTotal_TB - dJacCentral_TB;
 dJacPolyCorrection_IN = dDCMmainAtt_INfromTF * dJacPolyCorrection_TB * dDCMmainAtt_INfromTF.';
 
-end
-
-function dJac = EvalPointMassGravityJacobian_(dPos, dSignedGM)
-% Evaluate point-mass acceleration partial with caller-signed gravitational parameter.
-dRadius = norm(dPos);
-dInvRadius = 1.0 / dRadius;
-dInvRadius3 = dInvRadius^3;
-dJac = dSignedGM * (dInvRadius3 * eye(3) - 3.0 * dInvRadius3 * dInvRadius^2 * (dPos * dPos.'));
 end

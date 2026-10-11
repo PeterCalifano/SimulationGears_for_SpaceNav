@@ -1,13 +1,5 @@
 function [dxdt] = RHS_2BP(~, dPosVelState, strDynParams) %#codegen
-arguments (Input)
-    ~
-    dPosVelState    (6,1) double {mustBeNumeric}
-    strDynParams    (1,1) struct
-end
-arguments (Output)
-    dxdt            (6,1) double
-end
-%% PROTOTYPE
+%% SIGNATURE
 % [dxdt] = RHS_2BP(~, dPosVelState, strDynParams)
 % -------------------------------------------------------------------------------------------------------------
 %% DESCRIPTION
@@ -24,17 +16,27 @@ end
 %% CHANGELOG
 % 2022            Pietro Califano     Initial version.
 % 28-03-2026      Claude Code         Modernized header, arguments block, naming conventions.
+% 11-10-2026      Pietro Califano     Reuse the shared point-mass acceleration kernel.
 % -------------------------------------------------------------------------------------------------------------
 %% DEPENDENCIES
-% [-]
+% ComputePointMassGravity
 % -------------------------------------------------------------------------------------------------------------
 
-% Extract position vector and compute distance from central body
+arguments (Input)
+    ~
+    dPosVelState    (6,1) double {mustBeNumeric}
+    strDynParams    (1,1) struct
+end
+
+arguments (Output)
+    dxdt            (6,1) double
+end
+
+% Resolve position in the central body's inertial frame.
 dPosVec = dPosVelState(1:3);
-dDistNorm = norm(dPosVec);
 
 % Assemble state derivative: velocity and gravitational acceleration
 dxdt = [dPosVelState(4:6);
-        -strDynParams.dGravParam / dDistNorm^3 * dPosVec];
+        ComputePointMassGravity(dPosVec, strDynParams.dGravParam)];
 
 end

@@ -10,10 +10,11 @@ classdef testInertialDynMaxFidelityMexParity < matlab.unittest.TestCase
     % A separate payload verifies runtime target-attitude degrees within fixed coefficient capacity.
     % -------------------------------------------------------------------------------------------------------------
     %% CHANGELOG
-    % 01-10-2026  Pietro Califano, Codex GPT-6  Compare selected-SRP diagnostics in generated targets.
     % 24-07-2026  Pietro Califano, Codex    Add generated-code ephemeris orientation and parity regression.
     % 10-09-2026  Pietro Califano, Codex gpt-6    Cover runtime attitude data and fixed degree bounds.
     % 11-09-2026  Pietro Califano, Codex gpt-6    Remove unused runtime sign-switch metadata.
+    % 01-10-2026  Pietro Califano, Codex GPT-6  Compare selected-SRP diagnostics in generated targets.
+    % 11-10-2026  Pietro Califano  Consolidate fixture paths and scalar-last attitude inputs.
     % -------------------------------------------------------------------------------------------------------------
     %% DEPENDENCIES
     % BuildMexTargets_InertialDynMaxFidelity()
@@ -62,6 +63,8 @@ classdef testInertialDynMaxFidelityMexParity < matlab.unittest.TestCase
             self.applyFixture(matlab.unittest.fixtures.PathFixture( ...
                 fullfile(charRepoRoot, 'matlab', 'builders', 'mex')));
             self.applyFixture(matlab.unittest.fixtures.PathFixture( ...
+                fullfile(charRepoRoot, 'tests', 'matlab', 'simulation_models', 'propagators')));
+            self.applyFixture(matlab.unittest.fixtures.PathFixture( ...
                 self.charMexBuildDir));
 
             self.strMexInfo = BuildMexTargets_InertialDynMaxFidelity( ...
@@ -108,7 +111,8 @@ classdef testInertialDynMaxFidelityMexParity < matlab.unittest.TestCase
             strParams.strMainData.strAttData = struct('ui32PolyDeg', uint32(2), ...
                 'dChbvPolycoeffs', zeros(20, 1), 'dTimeLowBound', -100.0, ...
                 'dTimeUpBound', 100.0);
-            strParams.strMainData.strAttData.dChbvPolycoeffs(1) = 1.0;
+            % Encode identity with the scalar-last quaternion convention.
+            strParams.strMainData.strAttData.dChbvPolycoeffs(10) = 1.0;
 
             % These targets include attitude fields absent from the builder's default payload.
             charBuildDir = fullfile(self.charMexBuildDir, 'attitude');
@@ -133,7 +137,9 @@ classdef testInertialDynMaxFidelityMexParity < matlab.unittest.TestCase
                 dCoefficients = nan(20, 1);
                 dCoefficients(1:4 * (ui32Degree + 1)) = 0;
                 for dAngle = [0.0, 0.4]
-                    dCoefficients([1, ui32Degree + 2]) = [cos(dAngle / 2); sin(dAngle / 2)];
+                    ui32ScalarCoefficient = 3 * (ui32Degree + 1) + 1;
+                    dCoefficients([1, ui32ScalarCoefficient]) = ...
+                        [sin(dAngle / 2); cos(dAngle / 2)];
                     strParams.strMainData.strAttData.dChbvPolycoeffs = dCoefficients;
                     dRHS = EvalRHS_InertialDynMaxFidelity(dTime, dxState, strParams, strFlags);
                     dJac = EvalJac_InertialDynMaxFidelity(dTime, dxState, strParams, strFlags, strInfo);

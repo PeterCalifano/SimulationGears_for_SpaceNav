@@ -3,14 +3,7 @@ function dDynMatrix = EvalJac_InertialDynMaxFidelity(dStateTimetag, ...
                                                      strDynParams, ...
                                                      strModelConfigFlags, ...
                                                      strAccelInfo) %#codegen
-arguments
-    dStateTimetag (1,1) double
-    dxState_IN    (:,1) double
-    strDynParams  (1,1) struct
-    strModelConfigFlags (1,1) struct = struct()
-    strAccelInfo  (1,1) struct = struct()
-end
-%% PROTOTYPE
+%% SIGNATURE
 % dDynMatrix = EvalJac_InertialDynMaxFidelity(dStateTimetag, dxState_IN, strDynParams, strModelConfigFlags, strAccelInfo)
 % -------------------------------------------------------------------------------------------------------------
 %% DESCRIPTION
@@ -47,15 +40,29 @@ end
 % 06-10-2026  Codex (GPT-6)  Correct attractive third-body partials and support selected truth LUTs.
 % 11-10-2026  Pietro Califano  Document analytical spherical-harmonic partials.
 % 11-10-2026  Pietro Califano  Document selected SRP and supplied attitude-position partials.
+% 11-10-2026  Pietro Califano  Share gravity kernels and match RHS ephemeris rejection.
 % -------------------------------------------------------------------------------------------------------------
 %% DEPENDENCIES
 % ResolveInertialDynMaxFidelityConfig()
+% EvalJac_PointMassGravity(), EvalJac_ThirdBodyGravity()
 % EvalJac_ExtSphHarmExpInTargetFrame()
 % EvalJac_CannonballSRP()
 % IsInCylindricalTargetShadow()
 % ComputePolyhedronGravityJacobianCorrection()
 % ComputePanelSRPJacobianFromDynParams()
 % -------------------------------------------------------------------------------------------------------------
+
+arguments (Input)
+    dStateTimetag (1,1) double
+    dxState_IN    (:,1) double
+    strDynParams  (1,1) struct
+    strModelConfigFlags (1,1) struct = struct()
+    strAccelInfo  (1,1) struct = struct()
+end
+
+arguments (Output)
+    dDynMatrix (6, 6) double
+end
 
 %% Function code
 assert(numel(dxState_IN) >= 6, ...
@@ -115,7 +122,8 @@ dDynMatrix(1:3, 4:6) = eye(3);
 
 % Add central point-mass gravity partial.
 if dMainGM > 0.0
-    dDynMatrix(4:6, 1:3) = dDynMatrix(4:6, 1:3) + EvalPointMassJacobian_(dPosSC_IN, -dMainGM);
+    dDynMatrix(4:6, 1:3) = dDynMatrix(4:6, 1:3) + ...
+        EvalJac_PointMassGravity(dPosSC_IN, dMainGM);
 end
 
 % Add spherical-harmonic gravity partial transformed from target frame to inertial frame.
@@ -151,9 +159,15 @@ if ~isempty(dBodyEphemerides)
         end
 
         dBodyRows = 3 * (idB - 1) + (1:3);
-        dPosBodyToSC_IN = dPosSC_IN - dBodyEphemerides(dBodyRows, 1);
-        % Body-to-spacecraft coordinates use the same negative attractive-force sign as central gravity.
-        dDynMatrix(4:6, 1:3) = dDynMatrix(4:6, 1:3) + EvalPointMassJacobian_(dPosBodyToSC_IN,-dGMbody);
+        dBodyPosition_IN = dBodyEphemerides(dBodyRows, 1);
+
+        % Match the orbital RHS policy for unavailable body ephemerides.
+        if ~(all(isfinite(dBodyPosition_IN)) && any(abs(dBodyPosition_IN) > eps('single')))
+            continue;
+        end
+
+        dDynMatrix(4:6, 1:3) = dDynMatrix(4:6, 1:3) + ...
+            EvalJac_ThirdBodyGravity(dPosSC_IN, dBodyPosition_IN, dGMbody);
     end
 end
 
@@ -327,12 +341,4 @@ end
 
 dCoeffSRP = dSolarPressure * strDynParams.strSCdata.dReflCoeff * ...
     strDynParams.strSCdata.dA_SRP / strDynParams.strSCdata.dSCmass;
-end
-
-function dJac = EvalPointMassJacobian_(dPos, dSignedGM)
-% Evaluate point-mass acceleration partial with caller-signed gravitational parameter.
-dRadius = norm(dPos);
-dInvRadius = 1.0 / dRadius;
-dInvRadius3 = dInvRadius^3;
-dJac = dSignedGM * (dInvRadius3 * eye(3) - 3.0 * dInvRadius3 * dInvRadius^2 * (dPos * dPos.'));
 end

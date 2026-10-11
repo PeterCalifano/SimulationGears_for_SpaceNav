@@ -2,13 +2,7 @@ function dAccPolyhedronPert_IN = ComputePolyhedronGravityCorrection(dPosSC_IN, .
                                                                     dDCMmainAtt_INfromTF, ...
                                                                     dMainGM, ...
                                                                     strPoly) %#codegen
-arguments
-    dPosSC_IN             (3,1) double {mustBeFinite}
-    dDCMmainAtt_INfromTF  (3,3) double {mustBeFinite}
-    dMainGM               (1,1) double {mustBeFinite, mustBeNonnegative}
-    strPoly               (1,1) struct
-end
-%% PROTOTYPE
+%% SIGNATURE
 % dAccPolyhedronPert_IN = ComputePolyhedronGravityCorrection(dPosSC_IN, dDCMmainAtt_INfromTF, dMainGM, strPoly)
 % -------------------------------------------------------------------------------------------------------------
 %% DESCRIPTION
@@ -29,10 +23,23 @@ end
 % -------------------------------------------------------------------------------------------------------------
 %% CHANGELOG
 % 02-07-2026    Pietro Califano, Codex 5.5      Extract polyhedron gravity correction from max-fidelity RHS.
+% 11-10-2026    Pietro Califano                Reuse the shared central-gravity kernel.
 % -------------------------------------------------------------------------------------------------------------
 %% DEPENDENCIES
 % EvalPolyhedronGrav()
+% ComputePointMassGravity()
 % -------------------------------------------------------------------------------------------------------------
+
+arguments (Input)
+    dPosSC_IN             (3,1) double {mustBeFinite}
+    dDCMmainAtt_INfromTF  (3,3) double {mustBeFinite}
+    dMainGM               (1,1) double {mustBeFinite, mustBeNonnegative}
+    strPoly               (1,1) struct
+end
+
+arguments (Output)
+    dAccPolyhedronPert_IN (3, 1) double
+end
 
 %% Function code
 dPosSC_TB = dDCMmainAtt_INfromTF.' * dPosSC_IN;
@@ -46,8 +53,8 @@ dPosSC_TB = dDCMmainAtt_INfromTF.' * dPosSC_IN;
                                                  strPoly.dFaceDyadics, ...
                                                  strPoly.dGravConst);
 
-dRadius = norm(dPosSC_TB);
-dAccCentral_TB = -dMainGM * dPosSC_TB / dRadius^3;
+% Subtract the same central acceleration already included by the orbital RHS.
+dAccCentral_TB = ComputePointMassGravity(dPosSC_TB, dMainGM);
 dAccPolyhedronPert_IN = dDCMmainAtt_INfromTF * (dAccPolyhedronTotal_TB - dAccCentral_TB);
 
 end

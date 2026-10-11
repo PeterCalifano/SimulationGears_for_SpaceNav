@@ -45,8 +45,6 @@ function [dPosVeldt, strAccelInfo] = ...
 %                      Report dAccSRP for the selected cannonball or LUT model [LU/s^2].
 % -------------------------------------------------------------------------------------------------------------
 %% CHANGELOG
-% 01-10-2026  Pietro Califano, Codex GPT-6  Unify selected SRP acceleration diagnostics.
-% 01-10-2026  Pietro Califano, Codex GPT-6  Correct nodal transverse samples and constant inclusion.
 % 07-07-2024    Pietro Califano     First version, inherited from EvalRHS_DynLEO for more general orbital
 %                                   motion in small bodies environments.
 % 08-07-2024    Pietro Califano     Prototype coding completed (SH and SRP implementation). Test required.
@@ -58,10 +56,14 @@ function [dPosVeldt, strAccelInfo] = ...
 %                                             third-body gravity.
 % 23-07-2026    Pietro Califano, Codex        Enforce generated-code ephemeris column-vector indexing.
 % 30-09-2026    Pietro Califano, Codex gpt-6  Own LUT/bias selection and force reporting in the orbital RHS.
-% 01-10-2026    Pietro Califano, Codex gpt-6  Name the numeric LUT and acceleration diagnostics.
+% 01-10-2026  Pietro Califano, Codex GPT-6  Unify selected SRP acceleration diagnostics.
+% 01-10-2026  Pietro Califano, Codex GPT-6  Correct nodal transverse samples and constant inclusion.
+% 01-10-2026  Pietro Califano, Codex GPT-6  Name the numeric LUT and acceleration diagnostics.
+% 11-10-2026  Pietro Califano, Codex GPT-6  Share gravity kernels while preserving runtime SRP inputs.
 % -------------------------------------------------------------------------------------------------------------
 %% DEPENDENCIES
-% ComputeCannonballSRP, EvalRHS_SRPLutWithBias, EvalExtSphHarmExpInWorldFrame.
+% ComputePointMassGravity, ComputeThirdBodyGravity, ComputeCannonballSRP,
+% EvalRHS_SRPLutWithBias, EvalExtSphHarmExpInWorldFrame.
 % -------------------------------------------------------------------------------------------------------------
 
 arguments (Input)
@@ -117,7 +119,6 @@ if size(dBodyEphemerides, 1) > 3
 end
 
 d3rdBodiesPos_IN = zeros(3, ui8N3rdBodies);
-dMainBodyPos_IN = zeros(3,1);
 bHasValidEphemerides = false;
 bSunPosValid = false;
 
@@ -148,17 +149,9 @@ end
 dAccTot      = coder.nullcopy(zeros(3, 1));
 dPosVeldt    = coder.nullcopy(zeros(6, 1));
 
-% Compute auxiliary variables
-dPosNorm = sqrt( dxState_IN(ui16posVelIdx(1))^2 + ...
-                 dxState_IN(ui16posVelIdx(2))^2 + ...
-                 dxState_IN(ui16posVelIdx(3))^2 );
-
-dPosNorm2 = dPosNorm  * dPosNorm;
-dPosNorm3 = dPosNorm2 * dPosNorm;
-% dPosNorm4 = dPosNorm3 * dPosNorm;
-
 %% Gravity Main acceleration
-dAccTot(1:3) = - (dMainGM/dPosNorm3) * dxState_IN(ui16posVelIdx(1:3));
+% Reuse the central-gravity law of the two-body RHS and analytical Jacobians.
+dAccTot(1:3) = ComputePointMassGravity(dxState_IN(ui16posVelIdx(1:3)), dMainGM);
 
 %% Spherical Harmonics acceleration
 dAccNonSphr_IN = zeros(3,1);
@@ -190,8 +183,6 @@ if ~isempty(dBodyEphemerides)
 
             for idB = 1:ui8N3rdBodies
 
-                % Compute position wrt idBth body
-                dPos3rdBodiesToSC = zeros(3, 1); % TODO modify this for static sizing
                 d3rdBodyGM = d3rdBodiesGM(idB+1);
                 d3rdBodyPos_IN = d3rdBodiesPos_IN(1:3, idB);
 
@@ -206,21 +197,9 @@ if ~isempty(dBodyEphemerides)
                     continue;
                 end
 
-                dPos3rdBodiesToSC(:) = dxState_IN(ui16posVelIdx(1:3)) - d3rdBodyPos_IN;
-
-                if coder.target('MATLAB') || coder.target('MEX')
-                    assert(any(abs(dPos3rdBodiesToSC) > eps('single')), 'ERROR: distance to 3rd body cannot be near zero!')
-                end
-
-                % Compute 3rd body acceleration
-                d3rdBodyPosFromMain_IN = d3rdBodyPos_IN - dMainBodyPos_IN;
-
-                % dPos3rdBodiesToSC stores r_sc-r_body. Negating this
-                % stored-vector expression yields the physical differential
-                % acceleration mu*((r_body-r_sc)/rho^3-r_body/|r_body|^3).
-                dTotAcc3rdBody(:) = dTotAcc3rdBody(1:3) - d3rdBodyGM * ...
-                                                 ( dPos3rdBodiesToSC./( norm(dPos3rdBodiesToSC) )^3 + ...
-                                                 d3rdBodyPosFromMain_IN./(norm(d3rdBodyPosFromMain_IN)^3) );
+                % Compute 3rd body acceleration and add to total
+                dTotAcc3rdBody(:) = dTotAcc3rdBody(1:3) + ComputeThirdBodyGravity( ...
+                    dxState_IN(ui16posVelIdx(1:3)), d3rdBodyPos_IN, d3rdBodyGM);
             end
 
         end
@@ -228,30 +207,11 @@ if ~isempty(dBodyEphemerides)
     if bSunPosValid
         % Compute SC position relative to bodies
         dPosSunToSC(:) = dxState_IN(ui16posVelIdx(1:3)) - dSunPos_IN;
-        dPosSunFromMain_IN = dSunPos_IN - dMainBodyPos_IN;
+        dSCdistToSun = norm(dPosSunToSC);
 
-        dSCdistToSun(:) = norm(dPosSunToSC);
-
-        if coder.target('MATLAB') || coder.target('MEX')
-            assert(any(abs(dSunPos_IN) > eps('single')), 'ERROR: Sun position cannot be near zero!')
-            assert(any(abs(dSCdistToSun) > eps('single')), 'ERROR: distance to the Sun cannot be zero!')
-            assert(any(abs(dPosSunFromMain_IN) > eps('single')), 'ERROR: distance from main body to the Sun cannot be near zero!')
-        end
-
-        % DEVNOTE: replace with more accurate formula to handle it in double precision
-        % Current solution only bypasses the issue caused by the difference.
-        dAuxTerm1 = dPosSunToSC./(dSCdistToSun)^3;
-        dAuxTerm2 = dPosSunFromMain_IN./( norm(dPosSunFromMain_IN)^3);
-
-        if all(dAuxTerm1 < 1E-23, 'all') && all(dAuxTerm2 < 1e-23, 'all')
-            dAuxTerm3 = zeros(3,1);
-        else
-            dAuxTerm3 = dAuxTerm1 + dAuxTerm2;
-        end
-
-        % Sun 3rd Body acceleration
         if d3rdBodiesGM(1) > 0.0
-            dAcc3rdSun(1:3) = -d3rdBodiesGM(1) * dAuxTerm3;
+            dAcc3rdSun(1:3) = ComputeThirdBodyGravity( ...
+                dxState_IN(ui16posVelIdx(1:3)), dSunPos_IN, d3rdBodiesGM(1));
         end
 
     else
@@ -270,6 +230,7 @@ end
 dAccSRP = zeros(3, 1);
 if coder.const(bUseSrpLut)
     if bSunPosValid
+        % Use the LUT/bias SRP model with the selected fixed-size numeric LUT and resolved inputs.
         dSRPdistToSun = dSCdistToSun;
         if ~bIsInEclipse
             dAccSRP = EvalRHS_SRPLutWithBias(-dPosSunToSC, strSrpData, strLutForModel, bIncludeTransverse);
@@ -277,10 +238,10 @@ if coder.const(bUseSrpLut)
         end
     end
 elseif ~isempty(dBodyEphemerides) && bSunPosValid && ~isempty(dCoeffSRP)
-    [dAccSRP, dSRPdistToSun, bIsSRPActive] = ComputeCannonballSRP( ...
-        dPosSunToSC, ...
-        dCoeffSRP, ...
-        bIsInEclipse);
+    % Fixed coefficient cannonball SRP model + bias
+    [dAccSRP, dSRPdistToSun, bIsSRPActive] = ComputeCannonballSRP(dPosSunToSC, ...
+                                                                dCoeffSRP, ...
+                                                                bIsInEclipse);
 end
 
 %% Acceleration sum

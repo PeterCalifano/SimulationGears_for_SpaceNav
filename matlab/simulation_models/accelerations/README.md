@@ -7,6 +7,7 @@ and numerical interfaces are unchanged by this reorganization.
 
 | Folder | Responsibility |
 | --- | --- |
+| `gravity/point_mass` | Central and differential third-body acceleration and analytical Jacobians |
 | `gravity/spherical_harmonics` | Evaluate harmonic gravity and manage its coefficients |
 | `gravity/polyhedron` | Prepare and evaluate polyhedron gravity and gravity corrections |
 | `gravity/fitting` | Sample, fit and assess harmonic approximations to gravity fields |
@@ -42,3 +43,5 @@ Historical reports retain the paths used when their evidence was produced.
   code, public names, data assets and test paths.
 - 11 October 2026: Complete the layout after consolidating the harmonic models;
   document owner setup and preserve private LUT lookup scope.
+- 11 October 2026: Consolidate the isolated point-mass and third-body kernels
+  under `gravity/point_mass`; reuse them in dynamics and polyhedron corrections.
