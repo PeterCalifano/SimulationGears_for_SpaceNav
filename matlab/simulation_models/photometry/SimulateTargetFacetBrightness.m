@@ -139,11 +139,11 @@ dBrightness = sum(dFacetBrightness, 'all');
 
 dTargetToSunUnit_IN = dSunPosition_IN / max(norm(dSunPosition_IN), eps('double'));
 dTargetToObserverUnit_IN = dObserverPosition_IN / max(norm(dObserverPosition_IN), eps('double'));
-dPhaseAngleRad = acos(max(-1.0, min(1.0, dot(dTargetToSunUnit_IN, dTargetToObserverUnit_IN))));
+dPhaseAngle_rad = acos(max(-1.0, min(1.0, dot(dTargetToSunUnit_IN, dTargetToObserverUnit_IN))));
 
 strBrightnessData = struct();
-strBrightnessData.dPhaseAngleRad = dPhaseAngleRad;
-strBrightnessData.dPhaseAngleDeg = rad2deg(dPhaseAngleRad);
+strBrightnessData.dPhaseAngleRad = dPhaseAngle_rad;
+strBrightnessData.dPhaseAngleDeg = rad2deg(dPhaseAngle_rad);
 strBrightnessData.ui32NumActiveFacets = uint32(nnz(bActiveFacetMask));
 strBrightnessData.dFacetBrightness = dFacetBrightness;
 strBrightnessData.dCosIncidence = dCosIncidence;

@@ -175,9 +175,9 @@ classdef CTrajectoryArcAnalyzer < handle
             dPhaseColors = dPhaseColors(1:dNumPhases, :);
             dRange = vecnorm(dPos_W, 2, 1);
 
-            dPhaseAngleDeg = zeros(0, numel(dTimestamps));
+            dPhaseAngle_deg = zeros(0, numel(dTimestamps));
             if ~isempty(dSunPosition_W)
-                dPhaseAngleDeg = self.computePhaseAngleDeg_(dPos_W, dSunPosition_W);
+                dPhaseAngle_deg = self.computePhaseAngleDeg_(dPos_W, dSunPosition_W);
             end
 
             dPhaseIntervals = zeros(dNumPhases, 2);
@@ -202,7 +202,7 @@ classdef CTrajectoryArcAnalyzer < handle
             strAnalysis.dVel_W = dVel_W;
             strAnalysis.dSunPosition_W = dSunPosition_W;
             strAnalysis.dRange = dRange;
-            strAnalysis.dPhaseAngleDeg = dPhaseAngleDeg;
+            strAnalysis.dPhaseAngleDeg = dPhaseAngle_deg;
             strAnalysis.dManeuverTimes = dManeuverTimes(:);
             strAnalysis.dManeuverDeltaV_W = dManeuverDeltaV_W;
             strAnalysis.strPhases = strPhases;
@@ -360,11 +360,11 @@ classdef CTrajectoryArcAnalyzer < handle
             end
         end
 
-        function dPhaseAngleDeg = computePhaseAngleDeg_(self, dPos_W, dSunPosition_W) %#ok<INUSD>
+        function dPhaseAngle_deg = computePhaseAngleDeg_(self, dPos_W, dSunPosition_W) %#ok<INUSD>
             dCosAngle = dot(dPos_W, dSunPosition_W, 1) ./ ...
                 max(vecnorm(dPos_W, 2, 1) .* vecnorm(dSunPosition_W, 2, 1), eps);
             dCosAngle = min(max(dCosAngle, -1.0), 1.0);
-            dPhaseAngleDeg = acosd(dCosAngle);
+            dPhaseAngle_deg = acosd(dCosAngle);
         end
 
         function dIdx = closestIdx_(self, dTimestamps, dTime) %#ok<INUSD>
