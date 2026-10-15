@@ -10,6 +10,8 @@ function ValidateSrpResponseLut(strResponseLut)
 % rotation and external eclipse independently.
 % Example: ValidateSrpResponseLut(strResponseLut);
 % Output: Accept a consistent table or raise an identified contract error.
+% Inspect the fixed numeric schema without cell arrays, including when guidance
+% validates a runtime table update before atomic publication.
 % -------------------------------------------------------------------------------------------------------------
 %% INPUT
 % strResponseLut   Scalar or transverse numeric schema packed by PackSrpResponseLut, up to
@@ -20,12 +22,13 @@ function ValidateSrpResponseLut(strResponseLut)
 % None. Reject malformed axes, response values, units or boundary conventions.
 % -------------------------------------------------------------------------------------------------------------
 %% CHANGELOG
-% 01-10-2026  Pietro Califano, Codex GPT-6  Correct nodal transverse samples and constant inclusion.
-% 06-10-2026  Codex (GPT-6)  Validate half-degree capacities and optional torque boundaries.
-% 28-09-2026  Pietro Califano, Codex gpt-6  Formalize the optional scalar/vector LUT.
-% 28-09-2026  Pietro Califano, Codex gpt-6  Check the schema without allocating a prototype.
-% 29-09-2026  Pietro Califano, Codex gpt-6  Validate compact capacities without changing fields.
-% 01-10-2026  Pietro Califano, Codex gpt-6  Clarify variable roles and separate computation steps.
+% 28-09-2026  Pietro Califano, Codex GPT-6    Formalize the optional scalar/vector LUT.
+% 28-09-2026  Pietro Califano, Codex GPT-6    Check the schema without allocating a prototype.
+% 29-09-2026  Pietro Califano, Codex GPT-6    Validate compact capacities without changing fields.
+% 01-10-2026  Pietro Califano, Codex GPT-6    Correct nodal transverse samples and constant inclusion.
+% 01-10-2026  Pietro Califano, Codex GPT-6    Clarify variable roles and separate computation steps.
+% 06-10-2026  Pietro Califano, Codex GPT-6    Validate half-degree capacities and optional torque boundaries.
+% 14-10-2026  Pietro Califano, Codex GPT-6.1    Validate runtime schemas without cell reflection.
 % -------------------------------------------------------------------------------------------------------------
 %% DEPENDENCIES
 % None; validate host payloads before naming their generated SSrpResponseLut type.
@@ -35,19 +38,30 @@ arguments (Input)
 end
 
 % Require explicit dimensions and units before reading any grid coordinates.
-cellRequiredFieldNames = {'ui32AzimuthCount';'ui32ElevationCount';'dAzimuth';'dElevation'; ...
-    'dEffectiveCr';'dReferenceArea_m2'};
+assert(isfield(strResponseLut, 'ui32AzimuthCount') && ...
+    isfield(strResponseLut, 'ui32ElevationCount') && ...
+    isfield(strResponseLut, 'dAzimuth') && isfield(strResponseLut, 'dElevation') && ...
+    isfield(strResponseLut, 'dEffectiveCr') && isfield(strResponseLut, 'dReferenceArea_m2'), ...
+    'ValidateSrpResponseLut:MissingField', 'Supply every fixed-schema scalar/vector field.');
+
+% Build the permitted field set from existing values. MATLAB shares these arrays;
+% the comparison rejects extra fields without allocating a second response grid.
+strNumericSchema = struct( ...
+    'ui32AzimuthCount', strResponseLut.ui32AzimuthCount, ...
+    'ui32ElevationCount', strResponseLut.ui32ElevationCount, ...
+    'dAzimuth', strResponseLut.dAzimuth, ...
+    'dElevation', strResponseLut.dElevation, ...
+    'dEffectiveCr', strResponseLut.dEffectiveCr, ...
+    'dReferenceArea_m2', strResponseLut.dReferenceArea_m2);
 bIncludeTransverse = isfield(strResponseLut, 'dTransverseForcePerPressure');
 if bIncludeTransverse
-    cellRequiredFieldNames{end + 1} = 'dTransverseForcePerPressure';
+    strNumericSchema.dTransverseForcePerPressure = strResponseLut.dTransverseForcePerPressure;
 end
 bIncludeTorque = isfield(strResponseLut,'dTorquePerPressure');
 if bIncludeTorque
-    cellRequiredFieldNames{end+1} = 'dTorquePerPressure';
+    strNumericSchema.dTorquePerPressure = strResponseLut.dTorquePerPressure;
 end
-assert(all(isfield(strResponseLut, cellRequiredFieldNames)), 'ValidateSrpResponseLut:MissingField', ...
-    'Supply every fixed-schema scalar/vector field.');
-assert(isequal(sort(fieldnames(strResponseLut)), sort(cellRequiredFieldNames)), ...
+assert(isequaln(strResponseLut, strNumericSchema), ...
     'ValidateSrpResponseLut:InvalidSchema', 'Keep host metadata outside the numeric response schema.');
 
 % Check storage dimensions before constructing expected field shapes.
@@ -56,24 +70,19 @@ dElevationCapacity = size(strResponseLut.dElevation, 2);
 assert(dAzimuthCapacity >= 3 && dAzimuthCapacity <= 721 && ...
     dElevationCapacity >= 3 && dElevationCapacity <= 361, ...
     'ValidateSrpResponseLut:CapacityExceeded', 'Keep fixed capacities within 721 by 361 nodes.');
-cellExpectedFieldShapes = {[1, 1], [1, 1], [1, dAzimuthCapacity], [1, dElevationCapacity], ...
-    [dElevationCapacity, dAzimuthCapacity], [1, 1]};
+ValidateNumericField_(strResponseLut.ui32AzimuthCount, 'uint32', [1, 1]);
+ValidateNumericField_(strResponseLut.ui32ElevationCount, 'uint32', [1, 1]);
+ValidateNumericField_(strResponseLut.dAzimuth, 'double', [1, dAzimuthCapacity]);
+ValidateNumericField_(strResponseLut.dElevation, 'double', [1, dElevationCapacity]);
+ValidateNumericField_(strResponseLut.dEffectiveCr, 'double', [dElevationCapacity, dAzimuthCapacity]);
+ValidateNumericField_(strResponseLut.dReferenceArea_m2, 'double', [1, 1]);
 if bIncludeTransverse
-    cellExpectedFieldShapes{end + 1} = [3, dElevationCapacity, dAzimuthCapacity];
+    ValidateNumericField_(strResponseLut.dTransverseForcePerPressure, ...
+        'double', [3, dElevationCapacity, dAzimuthCapacity]);
 end
 if bIncludeTorque
-    cellExpectedFieldShapes{end+1} = [3,dElevationCapacity,dAzimuthCapacity];
-end
-for ui32Field = uint32(1):uint32(numel(cellRequiredFieldNames))
-    charFieldName = cellRequiredFieldNames{ui32Field};
-    charExpectedType = 'double';
-    if ui32Field <= 2
-        charExpectedType = 'uint32';
-    end
-    assert(isa(strResponseLut.(charFieldName), charExpectedType) && ...
-        isreal(strResponseLut.(charFieldName)) && ~issparse(strResponseLut.(charFieldName)) && ...
-        isequal(size(strResponseLut.(charFieldName)), cellExpectedFieldShapes{ui32Field}), ...
-        'ValidateSrpResponseLut:InvalidSchema', 'Require dense real numeric fields with fixed types and shapes.');
+    ValidateNumericField_(strResponseLut.dTorquePerPressure, ...
+        'double', [3, dElevationCapacity, dAzimuthCapacity]);
 end
 
 % Validate active counts before slicing populated interpolation axes.
@@ -148,4 +157,42 @@ if bIncludeTorque
         'ValidateSrpResponseLut:InvalidPadding','Keep inactive torque values zero.');
 end
 coder.cstructname(strResponseLut, 'SSrpResponseLut');
+end
+
+function ValidateNumericField_(dValue, charExpectedType, dExpectedShape)
+%% SIGNATURE
+% ValidateNumericField_(dValue, charExpectedType, dExpectedShape)
+% -------------------------------------------------------------------------------------------------------------
+%% DESCRIPTION
+% Enforce one fixed numeric field's storage type and shape.
+% -------------------------------------------------------------------------------------------------------------
+%% INPUT
+% dValue             Table field before validation.
+% charExpectedType    Required MATLAB numeric class.
+% dExpectedShape      Required dimensions, including scalar and vector fields.
+% -------------------------------------------------------------------------------------------------------------
+%% OUTPUT
+% None; reject sparse, complex, mistyped or incorrectly shaped fields.
+% -------------------------------------------------------------------------------------------------------------
+%% CHANGELOG
+% 14-10-2026  Pietro Califano, Codex GPT-6.1    Share explicit field checks without cell inspection.
+% -------------------------------------------------------------------------------------------------------------
+%% DEPENDENCIES
+% None.
+% -------------------------------------------------------------------------------------------------------------
+
+arguments (Input)
+    dValue
+    charExpectedType (1,:) char
+    dExpectedShape (1,:) double
+end
+
+arguments (Output)
+end
+
+assert(isa(dValue, charExpectedType) && isreal(dValue) && ~issparse(dValue) && ...
+    isequal(size(dValue), dExpectedShape), ...
+    'ValidateSrpResponseLut:InvalidSchema', ...
+    'Require dense real numeric fields with fixed types and shapes.');
+
 end
