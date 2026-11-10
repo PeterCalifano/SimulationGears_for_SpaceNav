@@ -1,6 +1,7 @@
 /*build*/
 /*debug*/
 /*install*/
+data/
 
 # ROS 2 overlay colcon outputs (root patterns above are anchored and do not cover subdirs)
 /ros2/build/
@@ -59,5 +60,6 @@ lib/wrap
 # Keep scenario manifests tracked while excluding fetched and derived assets.
 /data/scenarios/*/assets/**
 /data/scenarios/*/derived/**
+/data/scenarios/*/trajectories/**
 /data/common/spice/assets/**
 CONTEXT.md

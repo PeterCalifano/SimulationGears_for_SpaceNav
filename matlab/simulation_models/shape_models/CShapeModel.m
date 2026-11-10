@@ -1,8 +1,11 @@
 classdef CShapeModel < CBaseDatastruct
     %% DESCRIPTION
-    % Unified object class representing triangular meshes in the standard format (vertices, triangles),
-    % where vertices are a set of 3D points and triangles a set of indices indicating which vertices form
-    % each triangle.
+    % Store triangular meshes as 3-by-V vertex coordinates and 3-by-F vertex indices.
+    % Use file_obj for the established OBJ/attribute reader and file_mesh for repaired OBJ/STL
+    % geometry. Select exact OBJ objects with charObjObjectNames before unit conversion and
+    % simplification; an empty array keeps all faces, and "" selects unnamed faces.
+    % Cache prepared target-frame triangle tracing separately from scene poses;
+    % invalidate it after geometry mutations and reject changed unit metadata.
     % -------------------------------------------------------------------------------------------------------------
     %% CHANGELOG
     % 05-10-2024    Pietro Califano     First implementation completed.
@@ -13,9 +16,16 @@ classdef CShapeModel < CBaseDatastruct
     %                                   shape model with known density and mass
     % 24-04-2026    Pietro Califano     Add mesh simplification utility and load-time keep-fraction option
     % 01-07-2026    Pietro Califano     Add workspace MICE resolution and support OBJ v//vn face syntax.
+    % 28-08-2026    Pietro Califano     Add validated general OBJ/STL geometry loading.
+    % 21-09-2026    Pietro Califano, Codex gpt-5.6  Parse large OBJ face payloads in bounded blocks.
+    % 29-09-2026    Pietro Califano, Codex gpt-6    Select OBJ objects before shape and gravity preparation.
+    % 05-10-2026    Pietro Califano, Codex (GPT-6)  Cache reusable fixed-size flat/BVH ray geometry.
+    % 07-10-2026    Pietro Califano, Codex (GPT-6)  Reuse prepared caches and exclude them from exports.
     % -------------------------------------------------------------------------------------------------------------
     %% DEPENDENCIES
-    % [-]
+    % CBaseDatastruct, EnumLengthUnits, LoadShapeMesh, SelectObjFaceRecords,
+    % CompactShapeMeshVertices, FitSpherHarmCoeffToPolyhedrGrav,
+    % BuildTriangleRayData, ValidateTriangleRayData
     % -------------------------------------------------------------------------------------------------------------
 
 
@@ -54,19 +64,48 @@ classdef CShapeModel < CBaseDatastruct
 
     end
 
+    properties (Access = private, Transient)
+        % Rebuild runtime tracing data after loading; never serialize a second mesh.
+        strRayCache_ struct = struct()
+    end
+
     methods (Access = public)
         % CONSTRUCTOR
-        function self = CShapeModel(enumLoadingMethod, ...
-                varInputData, ...
-                charInputUnit, ...
-                charTargetUnitOutput, ...
-                bVertFacesOnly, ...
-                charModelName, ...
-                bLoadShapeModel, ...
-                options)
-            arguments
+        function self = CShapeModel(enumLoadingMethod, varInputData, charInputUnit, ...
+                charTargetUnitOutput, bVertFacesOnly, charModelName, bLoadShapeModel, options)
+            %% SIGNATURE
+            % self = CShapeModel(enumLoadingMethod, varInputData, charInputUnit, ...
+            %     charTargetUnitOutput, bVertFacesOnly, charModelName, bLoadShapeModel, options)
+            % -------------------------------------------------------------------------------------------------------------
+            %% DESCRIPTION
+            % Load geometry, convert length units and optionally simplify the selected mesh.
+            % Preserve the source frame and origin. Calling without inputs creates a placeholder.
+            % Select OBJ objects before computing geometry-dependent quantities; auxiliary OBJ
+            % attributes retain their independent corner indices until optional simplification.
+            % -------------------------------------------------------------------------------------------------------------
+            %% INPUT
+            % enumLoadingMethod             mat, cspice, struct, file_obj, or file_mesh.
+            % varInputData                  Source path or data accepted by the selected loader.
+            % charInputUnit                 Source coordinate unit, m or km.
+            % charTargetUnitOutput          Stored coordinate unit, m or km.
+            % bVertFacesOnly                Load geometry only; required by file_mesh.
+            % charModelName                 Model label.
+            % bLoadShapeModel               Load source data when true; otherwise retain an empty model.
+            % options.dMeshSimplifyFactor    Mesh keep fraction, clamped to [0,1].
+            % options.charObjObjectNames     Exact OBJ names; empty keeps all, "" selects unnamed faces.
+            % -------------------------------------------------------------------------------------------------------------
+            %% OUTPUT
+            % self                          Shape model in the requested output units.
+            % -------------------------------------------------------------------------------------------------------------
+            %% CHANGELOG
+            % 29-09-2026  Pietro Califano, Codex gpt-6    Document selection and loading order.
+            % -------------------------------------------------------------------------------------------------------------
+            %% DEPENDENCIES
+            % EnumLengthUnits, LoadShapeMesh, CShapeModel.LoadModelFromObj
+            % -------------------------------------------------------------------------------------------------------------
+            arguments (Input)
                 enumLoadingMethod       (1,:) string {mustBeA(enumLoadingMethod, ["string", "char"]), ...
-                    mustBeMember(enumLoadingMethod, ["mat", "cspice", "struct", "file_obj"])} = "file_obj"
+                    mustBeMember(enumLoadingMethod, ["mat", "cspice", "struct", "file_obj", "file_mesh"])} = "file_obj"
                 varInputData            (1,:) = []
                 charInputUnit           {mustBeA(charInputUnit, ["string", "char", "EnumLengthUnits"])} = 'km'
                 charTargetUnitOutput    {mustBeA(charTargetUnitOutput, ["string", "char", "EnumLengthUnits"])} = 'm'
@@ -74,13 +113,24 @@ classdef CShapeModel < CBaseDatastruct
                 charModelName           (1,:) char = ""
                 bLoadShapeModel         (1,1) logical = true;
             end
-            arguments
+            arguments (Input)
                 options.dMeshSimplifyFactor (1,1) double {mustBeFinite} = 1.0
+                options.charObjObjectNames (1,:) string {mustBeNonmissing} = strings(1, 0)
+            end
+            arguments (Output)
+                self (1,1) CShapeModel
             end
 
-            % For default (placeholder) construction
+            % Preserve placeholder construction without reading a source or resolving its units.
             if nargin < 1
                 return
+            end
+
+            % Reject object selection for loaders that have no OBJ object records.
+            if ~isempty(options.charObjObjectNames) && ...
+                    ~any(enumLoadingMethod == ["file_obj", "file_mesh"])
+                error('CShapeModel:ObjectSelectionRequiresObj', ...
+                    'OBJ object selection requires file_obj or an OBJ file_mesh source.');
             end
 
             charInputUnit = char(EnumLengthUnits.toString(charInputUnit));
@@ -88,7 +138,7 @@ classdef CShapeModel < CBaseDatastruct
             self.bDefaultConstructed  = false;
             self.dMeshSimplifyFactor  = min(max(double(options.dMeshSimplifyFactor), 0.0), 1.0);
 
-            % Determine scaling to match length unit
+            % Convert stored geometry exactly once after the source loader completes.
             if (strcmpi(charInputUnit, 'm') && strcmpi(self.charTargetUnitOutput, 'm')) || ...
                     strcmpi(charInputUnit, 'km') && strcmpi(self.charTargetUnitOutput, 'km')
                 self.unitScaler = 1;
@@ -117,19 +167,23 @@ classdef CShapeModel < CBaseDatastruct
                     [self] = self.LoadModelFromStruct(varInputData);
 
                 elseif strcmpi(enumLoadingMethod, 'file_obj')
-                    [self] = self.LoadModelFromObj_(varInputData, bVertFacesOnly);
+                    self = self.LoadModelFromObj_(varInputData, bVertFacesOnly, ...
+                                                 options.charObjObjectNames);
+
+                elseif strcmpi(enumLoadingMethod, 'file_mesh')
+                    self = self.LoadModelFromMeshFile_(varInputData, bVertFacesOnly, ...
+                                                      options.charObjObjectNames);
 
                 end
             end
 
-            % Write model name
+            % Retain the caller's label and derive counts from the selected geometry.
             self.charModelName = charModelName;
 
-            % Get number of vertices
             self.ui32NumOfVertices = size(self.dVerticesPos, 2);
 
+            % Apply scaling and simplification before updating geometry-derived quantities.
             if self.ui32NumOfVertices > 0
-                % Update unit scaling
                 self.dVerticesPos = self.unitScaler * self.dVerticesPos;
 
                 if self.dMeshSimplifyFactor < 1.0
@@ -141,6 +195,102 @@ classdef CShapeModel < CBaseDatastruct
         end
 
         %% GETTERS
+        function self = prepareRayTracingData(self, bUseBvh)
+            %% SIGNATURE
+            % self = self.prepareRayTracingData(bUseBvh)
+            % -------------------------------------------------------------------------------------------------------------
+            %% DESCRIPTION
+            % Prepare a reusable exact ray model in the stored geometry length unit.
+            % Cache triangle edges and fixed numeric traversal data. Geometry changes
+            % clear the cache; rigid scene poses reuse it. Repeated preparation with
+            % the same units and traversal selection reuses the existing payload.
+            % -------------------------------------------------------------------------------------------------------------
+            %% INPUT
+            % self        Loaded shape model.
+            % bUseBvh     Select exact BVH traversal; default false.
+            % -------------------------------------------------------------------------------------------------------------
+            %% OUTPUT
+            % self        Shape model with prepared numeric ray data.
+            % -------------------------------------------------------------------------------------------------------------
+            %% CHANGELOG
+            % 05-10-2026  Pietro Califano, Codex (GPT-6)  Add reusable prepared triangle tracing.
+            % -------------------------------------------------------------------------------------------------------------
+            %% DEPENDENCIES
+            % BuildTriangleRayData, ValidateTriangleRayData.
+            % -------------------------------------------------------------------------------------------------------------
+            arguments (Input)
+                self (1, 1) CShapeModel
+                bUseBvh (1, 1) logical = false
+            end
+
+            arguments (Output)
+                self (1, 1) CShapeModel
+            end
+
+            % Keep preparation out of repeated acquisitions and startup re-entry.
+            if isfield(self.strRayCache_, 'strModelData') && ...
+                    strcmp(self.strRayCache_.charUnits, self.charTargetUnitOutput) && ...
+                    self.strRayCache_.strModelData.strRayData.bUseBvh == bUseBvh
+                return
+            end
+
+            % Validate source indices before preparing fixed triangle edges and bounds.
+            assert(self.bHasData_, 'CShapeModel:NoData', 'Load geometry before ray preparation.');
+            assert(all(self.ui32triangVertexPtr >= 1, 'all') && ...
+                all(self.ui32triangVertexPtr <= size(self.dVerticesPos, 2), 'all'), ...
+                'CShapeModel:RayIndices', 'Triangle indices must reference stored vertices.');
+                
+            dFaceVertices = reshape(self.dVerticesPos(:, self.ui32triangVertexPtr(:)), 3, 3, []);
+            strRayData = BuildTriangleRayData(dFaceVertices, bUseBvh);
+            ValidateTriangleRayData(strRayData);
+
+            % Retain unit metadata outside the fixed numeric payload.
+            self.strRayCache_ = struct('charUnits', self.charTargetUnitOutput, ...
+                                      'strModelData', struct('strRayData', strRayData));
+        end
+
+        function strModelData = getRayTracingModel(self)
+            %% SIGNATURE
+            % strModelData = self.getRayTracingModel()
+            % -------------------------------------------------------------------------------------------------------------
+            %% DESCRIPTION
+            % Return prepared numeric ray geometry or the compatible legacy mesh schema.
+            % Reject stale unit metadata instead of silently reinterpreting a prepared
+            % cache. Keep source/model metadata outside the numerical ray payload.
+            % -------------------------------------------------------------------------------------------------------------
+            %% INPUT
+            % self          Shape model.
+            % -------------------------------------------------------------------------------------------------------------
+            %% OUTPUT
+            % strModelData  Prepared strRayData, or raw vertices and signed triangle pointers.
+            % -------------------------------------------------------------------------------------------------------------
+            %% CHANGELOG
+            % 05-10-2026  Pietro Califano, Codex (GPT-6)  Add reusable prepared triangle tracing.
+            % -------------------------------------------------------------------------------------------------------------
+            %% DEPENDENCIES
+            % None.
+            % -------------------------------------------------------------------------------------------------------------
+            arguments (Input)
+                self (1, 1) CShapeModel
+            end
+
+            arguments (Output)
+                strModelData (1, 1) struct
+            end
+
+            if isfield(self.strRayCache_, 'strModelData')
+                assert(strcmp(self.strRayCache_.charUnits, self.charTargetUnitOutput), ...
+                    'CShapeModel:StaleRayUnits', 'Reprepare ray geometry after changing length units.');
+                strModelData = self.strRayCache_.strModelData;
+            else
+                % Retain legacy callers while keeping their conversion out of the prepared path.
+                assert(all(self.ui32triangVertexPtr <= uint32(intmax('int32')), 'all'), ...
+                    'CShapeModel:MeshIndexOverflow', 'Triangle indices exceed int32 capacity.');
+                strModelData = struct('dVerticesPositions', self.dVerticesPos, ...
+                                      'i32triangVertexPtrs', int32(self.ui32triangVertexPtr));
+            end
+        end
+
         % Get shape model vertices and indices
         function [strData] = getShapeStruct(self)
             strData = struct();
@@ -561,18 +711,26 @@ classdef CShapeModel < CBaseDatastruct
 
         end
 
-        function [self] = LoadModelFromObj_(self, charObjFilePath, bVertFacesOnly)
-
+        function self = LoadModelFromObj_(self, charObjFilePath, bVertFacesOnly, charObjObjectNames)
+            % Populate geometry and independently indexed attributes before constructor unit scaling.
+            arguments (Input)
+                self
+                charObjFilePath (1,:) {mustBeA(charObjFilePath, ["string", "char"])}
+                bVertFacesOnly (1,1) logical
+                charObjObjectNames (1,:) string {mustBeNonmissing} = strings(1, 0)
+            end
+            arguments (Output)
+                self
+            end
             checkIfModelAlreadyLoaded(self);
 
             [self.ui32triangVertexPtr, self.dVerticesPos, ...
                 self.dTexCoords, self.ui32TrianglesTexIndex, ...
-                self.dNormals, self.ui32TrianglesNormalsIndex] = CShapeModel.LoadModelFromObj(charObjFilePath, bVertFacesOnly);
+                self.dNormals, self.ui32TrianglesNormalsIndex] = ...
+                CShapeModel.LoadModelFromObj(charObjFilePath, bVertFacesOnly, ...
+                                            charObjObjectNames=charObjObjectNames);
 
-            % Transpose vertices and triangles
-            self.ui32triangVertexPtr = self.ui32triangVertexPtr;
-            self.dVerticesPos        = self.dVerticesPos;
-
+            % Retain column-major geometry and transpose only the auxiliary parser outputs.
             if not(bVertFacesOnly)
                 self.dTexCoords = transpose(self.dTexCoords);
                 self.ui32TrianglesTexIndex = transpose(self.ui32TrianglesTexIndex);
@@ -585,7 +743,65 @@ classdef CShapeModel < CBaseDatastruct
 
         end
 
+        function self = LoadModelFromMeshFile_(self, charMeshFilePath, bVertFacesOnly, charObjObjectNames)
+            %% SIGNATURE
+            % self = LoadModelFromMeshFile_(self, charMeshFilePath, bVertFacesOnly, charObjObjectNames)
+            % -------------------------------------------------------------------------------------------------------------
+            %% DESCRIPTION
+            % Load repaired geometry from a supported OBJ or STL mesh file.
+            % Texture and normal payloads are intentionally outside this
+            % geometry-only loading contract.
+            % -------------------------------------------------------------------------------------------------------------
+            %% INPUT
+            % self:             Shape-model instance to populate.
+            % charMeshFilePath: Path to a supported OBJ or STL mesh.
+            % bVertFacesOnly:   Must be true because the shared reader owns geometry only.
+            % charObjObjectNames: Exact OBJ names selected before repair; empty means all objects.
+            % -------------------------------------------------------------------------------------------------------------
+            %% OUTPUT
+            % self:             Populated shape-model instance.
+            % -------------------------------------------------------------------------------------------------------------
+            %% CHANGELOG
+            % 28-08-2026  Pietro Califano     Add shared repaired OBJ/STL geometry loading.
+            % 29-09-2026  Pietro Califano, Codex gpt-6    Forward selection before repair and conversion.
+            % -------------------------------------------------------------------------------------------------------------
+            %% DEPENDENCIES
+            % LoadShapeMesh.
+            % -------------------------------------------------------------------------------------------------------------
+
+            arguments (Input)
+                self
+                charMeshFilePath (1,:) {mustBeA(charMeshFilePath, ["string", "char"])}
+                bVertFacesOnly (1,1) logical
+                charObjObjectNames (1,:) string {mustBeNonmissing} = strings(1, 0)
+            end
+
+            arguments (Output)
+                self
+            end
+
+            % Reject auxiliary payload before invoking the geometry-only shared reader.
+            if ~bVertFacesOnly
+                error('CShapeModel:MeshAuxiliaryDataUnsupported', ...
+                    'file_mesh loading supports geometry only; set bVertFacesOnly to true.');
+            end
+
+            % Load repaired row-major geometry and adapt it to the established object layout.
+            checkIfModelAlreadyLoaded(self);
+            strShapeMesh = LoadShapeMesh(char(charMeshFilePath), bRepairMesh=true, ...
+                charObjObjectNames=charObjObjectNames);
+            self.ui32triangVertexPtr = transpose(strShapeMesh.ui32FaceVertexIds);
+            self.dVerticesPos = transpose(strShapeMesh.dVerticesPos);
+
+            % Refresh every property derived from geometry before publishing the loaded state.
+            self = self.UpdateDerivedGeometry_();
+            self.bHasData_ = true;
+        end
+
         function [self] = UpdateDerivedGeometry_(self)
+            % Invalidate every ray cache after loading, scaling or simplifying geometry.
+            self.strRayCache_ = struct();
+
             % Method to update geometry-dependent attributes (number of vertices, shape radius) after loading or modifying the mesh. Called internally at the end of loading and simplification methods.
             self.ui32NumOfVertices = uint32(size(self.dVerticesPos, 2));
 
@@ -616,7 +832,45 @@ classdef CShapeModel < CBaseDatastruct
 
         function [objShapeModel, strSHgravityData] = BuildSphericalHarmonicsGravityDataFromObj( ...
                 charObjFilePath, ui32MaxDegree, options)
-            arguments
+            %% SIGNATURE
+            % [objShapeModel, strSHgravityData] = BuildSphericalHarmonicsGravityDataFromObj( ...
+            %     charObjFilePath, ui32MaxDegree, options)
+            % -------------------------------------------------------------------------------------------------------------
+            %% DESCRIPTION
+            % Load the selected OBJ geometry and fit exterior spherical-harmonics gravity from
+            % its polyhedron field. Select objects before unit conversion, simplification and
+            % fitting so excluded vertices cannot affect the fit radius. Optionally cache the
+            % fit on the returned shape model. Use RunFitSpherHarmonicsToPolyhedronGravityFromObj
+            % for holdout diagnostics and figures.
+            % -------------------------------------------------------------------------------------------------------------
+            %% INPUT
+            % charObjFilePath               Path to a supported OBJ source.
+            % ui32MaxDegree                 Maximum spherical-harmonics degree.
+            % options.charInputUnit         Source coordinate unit, m or km.
+            % options.charTargetUnitOutput  Stored coordinate unit, m or km.
+            % options.bVertFacesOnly        Load geometry only when true.
+            % options.charModelName         Optional label; empty uses the file stem.
+            % options.dGravParam            GM in output length units cubed per second squared.
+            % options.dDensity              Density in kg per output length unit cubed.
+            % options.dGravConst            G in output length units cubed per kg per second squared.
+            % options.dBodyRadiusRef        Reference radius in output length units.
+            %                               NaN uses the existing fitter's inference contract.
+            % options.ui32MaxFitIterations  Maximum adaptive fit iterations.
+            % options.dMeshSimplifyFactor   Mesh keep fraction, clamped by the constructor to [0,1].
+            % options.bCacheOnShapeModel    Cache the fitted gravity data when true.
+            % options.charObjObjectNames    Exact OBJ names; empty keeps all, "" selects unnamed faces.
+            % -------------------------------------------------------------------------------------------------------------
+            %% OUTPUT
+            % objShapeModel                 Loaded shape in the requested output units.
+            % strSHgravityData              Fitted coefficients, physical inputs and fit statistics.
+            % -------------------------------------------------------------------------------------------------------------
+            %% CHANGELOG
+            % 29-09-2026  Pietro Califano, Codex gpt-6    Document selected-geometry gravity preparation.
+            % -------------------------------------------------------------------------------------------------------------
+            %% DEPENDENCIES
+            % CShapeModel, CShapeModel.BuildSphericalHarmonicsGravityData
+            % -------------------------------------------------------------------------------------------------------------
+            arguments (Input)
                 charObjFilePath                 (1,:) string {mustBeA(charObjFilePath, ["string", "char"])}
                 ui32MaxDegree                   (1,1) uint32
                 options.charInputUnit          {mustBeA(options.charInputUnit, ["string", "char", "EnumLengthUnits"])} = "m"
@@ -630,19 +884,14 @@ classdef CShapeModel < CBaseDatastruct
                 options.ui32MaxFitIterations   (1,1) uint32 = uint32(5)
                 options.dMeshSimplifyFactor    (1,1) double {mustBeFinite} = 1.0
                 options.bCacheOnShapeModel     (1,1) logical = true
+                options.charObjObjectNames     (1,:) string {mustBeNonmissing} = strings(1, 0)
             end
-            %% DESCRIPTION
-            % Static compute-only utility that loads a shape model from a
-            % Wavefront .obj file and builds spherical harmonics gravity
-            % data from it.
-            %
-            % The method mirrors the compute-only style of
-            % BuildSphericalHarmonicsGravityData(): it performs no
-            % diagnostics plots and no workflow-side reporting. Use the
-            % returned object directly, or cache the fitted SH data on it
-            % by leaving options.bCacheOnShapeModel = true.
-            % -------------------------------------------------------------------------------------------------------------
+            arguments (Output)
+                objShapeModel (1,1) CShapeModel
+                strSHgravityData (1,1) struct
+            end
 
+            % Reject missing geometry before preparing a model label or gravity inputs.
             if ~isfile(charObjFilePath)
                 error('CShapeModel:ObjFileNotFound', ...
                     'Cannot find .obj file: %s', char(charObjFilePath));
@@ -656,33 +905,25 @@ classdef CShapeModel < CBaseDatastruct
                 charModelName = options.charModelName;
             end
 
-            % Clamp mesh simplification factor to [0,1]
-            dMeshSimplifyFactor = min(max(double(options.dMeshSimplifyFactor), 0.0), 1.0);
+            % Let the constructor select, scale and simplify geometry in its established order.
+            objShapeModel = CShapeModel("file_obj", charObjFilePath, options.charInputUnit, ...
+                options.charTargetUnitOutput, options.bVertFacesOnly, char(charModelName), true, ...
+                dMeshSimplifyFactor=options.dMeshSimplifyFactor, ...
+                charObjObjectNames=options.charObjObjectNames);
 
-            % Load shape model from obj file
-            objShapeModel = CShapeModel("file_obj", charObjFilePath, options.charInputUnit, options.charTargetUnitOutput, ...
-                                        options.bVertFacesOnly, char(charModelName), true, ...
-                                        dMeshSimplifyFactor=dMeshSimplifyFactor);
-
+            % Reuse the existing fitter with the caller's cache policy.
             if options.bCacheOnShapeModel
-
-                % Build SH gravity data and store it in the object cache
                 objShapeModel = objShapeModel.BuildAndSetSphericalHarmonicsGravityData(ui32MaxDegree, ...
-                    dGravParam=options.dGravParam, ...
-                    dDensity=options.dDensity, ...
+                    dGravParam=options.dGravParam, dDensity=options.dDensity, ...
+                    dGravConst=options.dGravConst, dBodyRadiusRef=options.dBodyRadiusRef, ...
+                    ui32MaxFitIterations=options.ui32MaxFitIterations);
+                strSHgravityData = objShapeModel.getSphericalHarmonicsGravityData();
+            else
+                strSHgravityData = CShapeModel.BuildSphericalHarmonicsGravityData(objShapeModel, ...
+                    ui32MaxDegree, dGravParam=options.dGravParam, dDensity=options.dDensity, ...
                     dGravConst=options.dGravConst, ...
                     dBodyRadiusRef=options.dBodyRadiusRef, ...
                     ui32MaxFitIterations=options.ui32MaxFitIterations);
-                
-                    strSHgravityData = objShapeModel.getSphericalHarmonicsGravityData();
-            else
-                % Just build SH gravity data without caching on the object
-                strSHgravityData = CShapeModel.BuildSphericalHarmonicsGravityData(objShapeModel, ui32MaxDegree, ...
-                                                        dGravParam=options.dGravParam, ...
-                                                        dDensity=options.dDensity, ...
-                                                        dGravConst=options.dGravConst, ...
-                                                        dBodyRadiusRef=options.dBodyRadiusRef, ...
-                                                        ui32MaxFitIterations=options.ui32MaxFitIterations);
             end
         end
 
@@ -720,38 +961,72 @@ classdef CShapeModel < CBaseDatastruct
         end
 
         function [ui32TrianglesIndex, dVerticesCoords, dTexCoords, ...
-                ui32TrianglesTexIndex, dNormals, ui32TrianglesNormalsIndex] = LoadModelFromObj(charObjFilePath, bVertFacesOnly)
-            arguments
-                charObjFilePath (1,1) string {mustBeA(charObjFilePath, ["string", "char"])}
-                bVertFacesOnly  (1,1) logical = true;
-            end
+                ui32TrianglesTexIndex, dNormals, ui32TrianglesNormalsIndex] = LoadModelFromObj( ...
+                charObjFilePath, bVertFacesOnly, options)
             %% SIGNATURE
             % [ui32TrianglesIndex, dVerticesCoords, dTexCoords, ...
-            %  ui32TrianglesTexIndex, dNormals, ui32TrianglesNormalsIndex] = LoadModelFromObj(charObjFilePath, bVertFacesOnly)
+            %  ui32TrianglesTexIndex, dNormals, ui32TrianglesNormalsIndex] = ...
+            %     LoadModelFromObj(charObjFilePath, bVertFacesOnly, options)
             % -------------------------------------------------------------------------------------------------------------
             %% DESCRIPTION
-            % [ui32TrianglesIndex, dVerticesCoords] = LoadModelFromObj(charObjFilePath) reads the vertices and the
-            % triangles data as specified in the input Wavefront .obj file.
-            % This implementation uses vectorized regexp and sscanf on the entire file content, avoiding
-            % per-line loops and dynamic allocation. Output formats:
-            %     ui32TrianglesIndex    - R-by-3 uint32 array of face indices (v/vt/vn)
-            %     dVerticesCoords       - M-by-3 double array of vertex coordinates
-            %     dTexCoords            - P-by-2 double array of texture coordinates (if present)
-            %     dNormals              - Q-by-3 double array of normals (if present)
+            % Load Wavefront OBJ data into the established column-major CShapeModel layout. The
+            % default geometry-only path retains the optimized legacy parser. Explicit repair
+            % delegates geometry to LoadShapeMesh; repair is incompatible with texture/normal
+            % index loading because it changes vertex and face indices.
+            % Exact object selection precedes face decoding and repair. It compacts only vertex
+            % indices; independently indexed vt/vn arrays and selected corner indices are preserved.
+            % -------------------------------------------------------------------------------------------------------------
+            %% INPUT
+            % charObjFilePath:       Path to a Wavefront OBJ file.
+            % bVertFacesOnly:        Load geometry only when true.
+            % options.bRepairMesh:   Weld duplicates and remove degenerate geometry when true.
+            % options.charObjObjectNames: Exact names; empty array keeps all, "" selects unnamed.
+            %                        Missing/empty selected objects raise SelectObjFaceRecords:MissingObjects.
+            % -------------------------------------------------------------------------------------------------------------
+            %% OUTPUT
+            % ui32TrianglesIndex:        Triangle vertex indices as 3-by-F uint32.
+            % dVerticesCoords:           Vertex coordinates as 3-by-N double.
+            % dTexCoords:                Texture coordinates as 2-by-T double when requested.
+            % ui32TrianglesTexIndex:     Triangle texture indices as 3-by-F uint32.
+            % dNormals:                  Normals as 3-by-Q double when requested.
+            % ui32TrianglesNormalsIndex: Triangle normal indices as 3-by-F uint32.
             % -------------------------------------------------------------------------------------------------------------
             %% CHANGELOG
-            % 03-01-2025    Pietro Califano         Function implemented for general obj format loading
-            % 16-11-2025    Pietro Califano, GTP-5   [MAJOR] Change core implementation to use sscanf and
-            %                                       reduce computational time when loading large obj files
+            % 03-01-2025  Pietro Califano          First general OBJ implementation.
+            % 16-11-2025  Pietro Califano, GPT-5   Use vectorized whole-file parsing.
+            % 28-08-2026  Pietro Califano          Add explicit shared geometry repair.
+            % 29-09-2026  Pietro Califano, Codex gpt-6    Select objects and preserve auxiliary indices.
             % -------------------------------------------------------------------------------------------------------------
             %% DEPENDENCIES
-            % [-]
+            % LoadShapeMesh, SelectObjFaceRecords, CompactShapeMeshVertices
             % -------------------------------------------------------------------------------------------------------------
+
+            arguments(Input)
+                charObjFilePath (1,1) string {mustBeA(charObjFilePath, ["string", "char"])}
+                bVertFacesOnly (1,1) logical = true
+                options.bRepairMesh (1,1) logical = false
+                options.charObjObjectNames (1,:) string {mustBeNonmissing} = strings(1, 0)
+            end
+
+            arguments(Output)
+                ui32TrianglesIndex uint32
+                dVerticesCoords double
+                dTexCoords double
+                ui32TrianglesTexIndex uint32
+                dNormals double
+                ui32TrianglesNormalsIndex uint32
+            end
 
             %% Function code
 
-            tic
-            % Check extension
+            % Repair remaps geometry indices, so auxiliary index arrays cannot remain valid.
+            if options.bRepairMesh && ~bVertFacesOnly
+                error('CShapeModel:RepairWithAuxiliaryDataUnsupported', ...
+                    ['Mesh repair changes geometry indices and cannot be combined with ', ...
+                     'OBJ texture or normal index loading.']);
+            end
+
+            % Preserve the established public error identifiers before choosing a parser path.
             [~,~, charFileExt] = fileparts(charObjFilePath);
 
             if ~strcmpi(charFileExt, '.obj')
@@ -762,7 +1037,21 @@ classdef CShapeModel < CBaseDatastruct
                 error('LoadModelFromObj:FileNotFound', 'Cannot find file: %s', charObjFilePath);
             end
 
-            % Read entire file as text
+            % Keep repair opt-in and adapt the shared reader's rows to the legacy column layout.
+            if options.bRepairMesh
+                strShapeMesh = LoadShapeMesh(char(charObjFilePath), bRepairMesh=true, ...
+                    charObjObjectNames=options.charObjObjectNames);
+                ui32TrianglesIndex = transpose(strShapeMesh.ui32FaceVertexIds);
+                dVerticesCoords = transpose(strShapeMesh.dVerticesPos);
+                dTexCoords = zeros(0, 2);
+                ui32TrianglesTexIndex = zeros(0, 3, 'uint32');
+                dNormals = zeros(0, 3);
+                ui32TrianglesNormalsIndex = zeros(0, 3, 'uint32');
+                return
+            end
+
+            % Retain the measured vectorized parser for the default, unrepaired OBJ contract.
+            tic
             charFileText = fileread(charObjFilePath);
 
             % Vertex lines: 'v x y z'
@@ -795,45 +1084,22 @@ classdef CShapeModel < CBaseDatastruct
                 dNormals = zeros(0,3);
             end
 
-            % Defaults
-            ui32TrianglesIndex          = zeros(0,3,'uint32');
-            ui32TrianglesTexIndex       = zeros(0,3,'uint32');
-            ui32TrianglesNormalsIndex   = zeros(0,3,'uint32');
+            % Parse bounded face blocks so large OBJ files do not exceed MATLAB's
+            % contiguous character or sscanf payload limits.
+            [dFaceLineStartIdx, dFaceLineEndIdx] = regexp(charFileText, ...
+                '^f[ \t]+[^\r\n]*$', 'start', 'end', 'lineanchors');
+            [dFaceLineStartIdx, dFaceLineEndIdx] = SelectObjFaceRecords(charFileText, ...
+                dFaceLineStartIdx, dFaceLineEndIdx, options.charObjObjectNames);
+            [ui32TrianglesIndex, ui32TrianglesTexIndex, ui32TrianglesNormalsIndex] = ...
+                CShapeModel.ParseObjFaceLines_(charFileText, dFaceLineStartIdx, ...
+                dFaceLineEndIdx, bVertFacesOnly);
 
-            fMatch = regexp(charFileText, '^f\s+.*$', 'match', 'lineanchors');
-            if ~isempty(fMatch)
-                charFBlock = sprintf('%s\n', fMatch{:});
-                charFirstFace = string(strtrim(fMatch{1}));
-
-                if ~isempty(regexp(charFirstFace, '^f\s+\d+//\d+', 'once'))
-                    ui32AllFaceLines = sscanf(charFBlock, 'f %u//%u %u//%u %u//%u\n', [6, Inf]);
-                    ui32AllFaceLines = uint32(ui32AllFaceLines);
-                    ui32TrianglesIndex = ui32AllFaceLines(1:2:end, :);
-                    if ~bVertFacesOnly
-                        ui32TrianglesNormalsIndex = ui32AllFaceLines(2:2:end, :);
-                    end
-
-                elseif ~isempty(regexp(charFirstFace, '^f\s+\d+/\d+/\d+', 'once'))
-                    ui32AllFaceLines = sscanf(charFBlock, 'f %u/%u/%u %u/%u/%u %u/%u/%u\n', [9, Inf]);
-                    ui32AllFaceLines = uint32(ui32AllFaceLines);
-                    ui32TrianglesIndex = ui32AllFaceLines(1:3:end, :);
-                    if ~bVertFacesOnly
-                        ui32TrianglesTexIndex = ui32AllFaceLines(2:3:end, :);
-                        ui32TrianglesNormalsIndex = ui32AllFaceLines(3:3:end, :);
-                    end
-
-                elseif ~isempty(regexp(charFirstFace, '^f\s+\d+/\d+', 'once'))
-                    ui32AllFaceLines = sscanf(charFBlock, 'f %u/%u %u/%u %u/%u\n', [6, Inf]);
-                    ui32AllFaceLines = uint32(ui32AllFaceLines);
-                    ui32TrianglesIndex = ui32AllFaceLines(1:2:end, :);
-                    if ~bVertFacesOnly
-                        ui32TrianglesTexIndex = ui32AllFaceLines(2:2:end, :);
-                    end
-
-                else
-                    ui32AllFaceLines = sscanf(charFBlock, 'f %u %u %u\n', [3, Inf]);
-                    ui32TrianglesIndex = uint32(ui32AllFaceLines);
-                end
+            % Compact geometry alone; selected texture and normal indices address separate arrays.
+            if ~isempty(options.charObjObjectNames)
+                [dSelectedVertices, ui32SelectedFaces] = ...
+                    CompactShapeMeshVertices(dVerticesCoords.', ui32TrianglesIndex.');
+                dVerticesCoords = dSelectedVertices.';
+                ui32TrianglesIndex = ui32SelectedFaces.';
             end
 
             dElapsedTime = toc;
@@ -843,6 +1109,148 @@ classdef CShapeModel < CBaseDatastruct
     end
 
     methods (Static, Access = private)
+
+        function [ui32TrianglesIndex, ui32TrianglesTexIndex, ui32TrianglesNormalsIndex] = ...
+                ParseObjFaceLines_(charFileText, dFaceLineStartIdx, dFaceLineEndIdx, bVertFacesOnly)
+            %% SIGNATURE
+            % [ui32TrianglesIndex, ui32TrianglesTexIndex, ui32TrianglesNormalsIndex] = ...
+            %     CShapeModel.ParseObjFaceLines_(charFileText, dFaceLineStartIdx, ...
+            %     dFaceLineEndIdx, bVertFacesOnly)
+            % -------------------------------------------------------------------------------------------------
+            %% DESCRIPTION
+            % Parse triangular OBJ face records in bounded blocks while preserving source order and optional
+            % texture and normal indices.
+            % -------------------------------------------------------------------------------------------------
+            %% INPUT
+            % charFileText         Complete OBJ text payload.
+            % dFaceLineStartIdx    Start index of each face record in charFileText.
+            % dFaceLineEndIdx      End index of each face record in charFileText.
+            % bVertFacesOnly       True when auxiliary texture and normal indices are not required.
+            % -------------------------------------------------------------------------------------------------
+            %% OUTPUT
+            % ui32TrianglesIndex           Vertex indices as a 3-by-F array.
+            % ui32TrianglesTexIndex        Texture-coordinate indices as a 3-by-F array when requested.
+            % ui32TrianglesNormalsIndex    Normal indices as a 3-by-F array when requested.
+            % -------------------------------------------------------------------------------------------------
+            %% CHANGELOG
+            % 21-09-2026  Pietro Califano, Codex gpt-5.6  First implementation.
+            % -------------------------------------------------------------------------------------------------
+            %% DEPENDENCIES
+            % None.
+            % -------------------------------------------------------------------------------------------------
+            arguments (Input)
+                charFileText (1,:) char
+                dFaceLineStartIdx (1,:) double
+                dFaceLineEndIdx (1,:) double
+                bVertFacesOnly (1,1) logical
+            end
+            arguments (Output)
+                ui32TrianglesIndex uint32
+                ui32TrianglesTexIndex uint32
+                ui32TrianglesNormalsIndex uint32
+            end
+
+            ui32NumFaces = uint32(numel(dFaceLineStartIdx));
+            assert(numel(dFaceLineEndIdx) == double(ui32NumFaces), ...
+                'CShapeModel:InvalidObjFaceLineBounds', ...
+                'OBJ face line start and end index arrays must have equal lengths.');
+            ui32TrianglesIndex = zeros(0, 3, 'uint32');
+            ui32TrianglesTexIndex = zeros(0, 3, 'uint32');
+            ui32TrianglesNormalsIndex = zeros(0, 3, 'uint32');
+            if ui32NumFaces == uint32(0)
+                return
+            end
+            ui32TrianglesIndex = zeros(3, double(ui32NumFaces), 'uint32');
+
+            % Resolve the uniform face syntax once. Mixed face syntaxes remain
+            % outside the legacy vectorized loader contract.
+            charFirstFace = string(strtrim(charFileText( ...
+                dFaceLineStartIdx(1):dFaceLineEndIdx(1))));
+            bHasTextureIndices = false;
+            bHasNormalIndices = false;
+            if ~isempty(regexp(charFirstFace, '^f\s+\d+//\d+', 'once'))
+                charFaceFormat = 'f %u//%u %u//%u %u//%u\n';
+                ui32ValuesPerFace = uint32(6);
+                ui32VertexValueRows = uint32([1, 3, 5]);
+                ui32NormalValueRows = uint32([2, 4, 6]);
+                ui32TextureValueRows = zeros(1, 0, 'uint32');
+                bHasNormalIndices = true;
+            elseif ~isempty(regexp(charFirstFace, '^f\s+\d+/\d+/\d+', 'once'))
+                charFaceFormat = 'f %u/%u/%u %u/%u/%u %u/%u/%u\n';
+                ui32ValuesPerFace = uint32(9);
+                ui32VertexValueRows = uint32([1, 4, 7]);
+                ui32TextureValueRows = uint32([2, 5, 8]);
+                ui32NormalValueRows = uint32([3, 6, 9]);
+                bHasTextureIndices = true;
+                bHasNormalIndices = true;
+            elseif ~isempty(regexp(charFirstFace, '^f\s+\d+/\d+', 'once'))
+                charFaceFormat = 'f %u/%u %u/%u %u/%u\n';
+                ui32ValuesPerFace = uint32(6);
+                ui32VertexValueRows = uint32([1, 3, 5]);
+                ui32TextureValueRows = uint32([2, 4, 6]);
+                ui32NormalValueRows = zeros(1, 0, 'uint32');
+                bHasTextureIndices = true;
+            else
+                charFaceFormat = 'f %u %u %u\n';
+                ui32ValuesPerFace = uint32(3);
+                ui32VertexValueRows = uint32([1, 2, 3]);
+                ui32TextureValueRows = zeros(1, 0, 'uint32');
+                ui32NormalValueRows = zeros(1, 0, 'uint32');
+            end
+
+            if ~bVertFacesOnly && bHasTextureIndices
+                ui32TrianglesTexIndex = zeros(3, double(ui32NumFaces), 'uint32');
+            end
+            if ~bVertFacesOnly && bHasNormalIndices
+                ui32TrianglesNormalsIndex = zeros(3, double(ui32NumFaces), 'uint32');
+            end
+
+            % Keep each temporary text and numeric payload comfortably below
+            % MATLAB's contiguous-array limits.
+            ui32FaceParseChunkSize = uint32(250000);
+            ui32BlockStart = uint32(1);
+            while ui32BlockStart <= ui32NumFaces
+                ui32BlockEnd = min(ui32BlockStart + ui32FaceParseChunkSize - uint32(1), ui32NumFaces);
+
+                % Do not include object, group, or material records that separate
+                % otherwise contiguous face runs in a parsed text block.
+                if ui32BlockEnd > ui32BlockStart
+                    dFaceLineGaps = dFaceLineStartIdx(double(ui32BlockStart + uint32(1)):double(ui32BlockEnd)) - ...
+                        dFaceLineEndIdx(double(ui32BlockStart):double(ui32BlockEnd - uint32(1)));
+                    dFirstRunBreak = find(dFaceLineGaps > 3.0, 1, 'first');
+                    if ~isempty(dFirstRunBreak)
+                        ui32BlockEnd = ui32BlockStart + uint32(dFirstRunBreak) - uint32(1);
+                    end
+                end
+
+                ui32DestinationColumns = ui32BlockStart:ui32BlockEnd;
+                charFaceBlock = charFileText( ...
+                    dFaceLineStartIdx(double(ui32BlockStart)):dFaceLineEndIdx(double(ui32BlockEnd)));
+                dParsedFaceValues = sscanf(charFaceBlock, charFaceFormat, ...
+                    [double(ui32ValuesPerFace), Inf]);
+
+                ui32ExpectedBlockFaces = ui32BlockEnd - ui32BlockStart + uint32(1);
+                if size(dParsedFaceValues, 2) ~= double(ui32ExpectedBlockFaces)
+                    error('CShapeModel:MalformedObjFaceBlock', ...
+                        ['OBJ face block near face %u contains %u records but ', ...
+                         'the selected syntax parsed %u.'], ...
+                        ui32BlockStart, ui32ExpectedBlockFaces, uint32(size(dParsedFaceValues, 2)));
+                end
+
+                ui32ParsedFaceValues = uint32(dParsedFaceValues);
+                ui32TrianglesIndex(:, double(ui32DestinationColumns)) = ...
+                    ui32ParsedFaceValues(double(ui32VertexValueRows), :);
+                if ~bVertFacesOnly && bHasTextureIndices
+                    ui32TrianglesTexIndex(:, double(ui32DestinationColumns)) = ...
+                        ui32ParsedFaceValues(double(ui32TextureValueRows), :);
+                end
+                if ~bVertFacesOnly && bHasNormalIndices
+                    ui32TrianglesNormalsIndex(:, double(ui32DestinationColumns)) = ...
+                        ui32ParsedFaceValues(double(ui32NormalValueRows), :);
+                end
+                ui32BlockStart = ui32BlockEnd + uint32(1);
+            end
+        end
 
         function TryAddMiceFromWorkspace_()
             cellWorkspaceEnvNames = ["WS_SIMGEARS", "WS_NAVSYS"];

@@ -7,10 +7,10 @@ classdef testFiniteBurnThrustModel < matlab.unittest.TestCase
             testCase.verifyEqual(strBurnData.dPropellantMass, 0.0, 'AbsTol', 0.0);
             testCase.verifyEqual(strBurnData.dBurnDirection_IN, zeros(3,1), 'AbsTol', 0.0);
 
-            [dAccel_IN, dMassKg, bIsActive] = EvalFiniteBurnAccel(10.0, strBurnData);
+            [dAccel_IN, dMass_kg, bIsActive] = EvalFiniteBurnAccel(10.0, strBurnData);
             testCase.verifyFalse(bIsActive);
             testCase.verifyEqual(dAccel_IN, zeros(3,1), 'AbsTol', 0.0);
-            testCase.verifyEqual(dMassKg, strBurnData.dInitialMass, 'AbsTol', 0.0);
+            testCase.verifyEqual(dMass_kg, strBurnData.dInitialMass, 'AbsTol', 0.0);
         end
 
         function testNonzeroDeltaVRequiresPositiveThrust(testCase)

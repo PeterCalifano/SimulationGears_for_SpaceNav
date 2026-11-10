@@ -46,10 +46,11 @@ classdef CSPICEkerLoader
             % self                  Kernel-loader object. Call delete explicitly to clear the SPICE pool.
             % -------------------------------------------------------------------------------------------------------------
             %% CHANGELOG
+            % 21-09-2026  Pietro Califano, Codex gpt-5.6  Resolve registered kernels from the shared asset root.
             % 03-08-2026  Pietro Califano, Codex     Prefer registry-owned scenario metakernels.
             % -------------------------------------------------------------------------------------------------------------
             %% DEPENDENCIES
-            % CScenarioRegistry, ResolveSimGearsDataRoot, cspice_kclear, cspice_furnsh
+            % CScenarioRegistry, ResolveScenarioAssetPath, cspice_kclear, cspice_furnsh
             % -------------------------------------------------------------------------------------------------------------
 
             arguments
@@ -69,8 +70,7 @@ classdef CSPICEkerLoader
             strScenarioSpec = CScenarioRegistry.GetScenarioSpec(enumScenarioName);
             if strlength(string( ...
                     strScenarioSpec.charDefaultSpiceMetaKernelRelativePath)) > 0
-                charDataRootPath = ResolveSimGearsDataRoot();
-                charMetaKernelPath = fullfile(charDataRootPath, ...
+                charMetaKernelPath = ResolveScenarioAssetPath( ...
                     strScenarioSpec.charDefaultSpiceMetaKernelRelativePath);
                 CSPICEkerLoader.LoadMetaKernel_(charMetaKernelPath);
                 CSPICEkerLoader.PrintLoadedKernelCount_();

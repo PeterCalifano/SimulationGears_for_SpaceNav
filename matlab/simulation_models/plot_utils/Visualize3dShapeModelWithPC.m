@@ -61,6 +61,7 @@ end
 % 11-02-2025    Pietro Califano     Complete release version.
 % 12-02-2025    Pietro Califano     Minor update to allow usage without camera position input.
 % 09-12-2025    Pietro Califano     Upgrade to use figure and axes handles
+% 21-09-2026    Pietro Califano, Codex gpt-5.6     Bound wireframe graphics memory to sampled geometry.
 % -------------------------------------------------------------------------------------------------------------
 %% DEPENDENCIES
 % [-]
@@ -120,15 +121,10 @@ else
 end
 
 
-% Rotate vertices if body attitude is not eye(3)
-assert(isfield(strShapeModel, "dVerticesPos") || isfield(strShapeModel, "ui32triangVertexPtr"), ...
-    "Input strShapeModel must have a field 'dVerticesPos' of size [3,Nv], and a field 'ui32triangVertexPtr' of sixze [3,Nt].")
-
-if dBodyDCM_NavFrameFromOF == eye(3)
-    dVerticesPos = strShapeModel.dVerticesPos';
-else
-    dVerticesPos = (dBodyDCM_NavFrameFromOF * strShapeModel.dVerticesPos)';
-end
+% Validate the shape representation before selecting data for visualization.
+assert(isfield(strShapeModel, "dVerticesPos") && isfield(strShapeModel, "ui32triangVertexPtr"), ...
+    ["Input strShapeModel must have a field 'dVerticesPos' of size [3,Nv] " ...
+     "and a field 'ui32triangVertexPtr' of size [3,Nt]."])
 
 % Plot the mesh using patch
 hold(objSceneAx, "on");
@@ -142,14 +138,29 @@ if kwargs.bShowMeshModel
         charEdgeColor = "none";
     end
     
-    if size(strShapeModel.ui32triangVertexPtr, 2) > 1e4 && kwargs.bShowAsWireframe 
-
-        ui32SubSampleIndices = uint32(ceil( linspace(1, size(strShapeModel.ui32triangVertexPtr, 2), 1e4) ));
-        % Select a subset of faces
+    if size(strShapeModel.ui32triangVertexPtr, 2) > 1e4 && kwargs.bShowAsWireframe
+        % Limit wireframe density, then retain only vertices referenced by the
+        % sampled faces so detailed source meshes do not reach MATLAB graphics.
+        ui32SubSampleIndices = uint32(ceil(linspace(1, ...
+            size(strShapeModel.ui32triangVertexPtr, 2), 1e4)));
         ui32SubSampledTriangleFaces = strShapeModel.ui32triangVertexPtr(:, ui32SubSampleIndices)';
+
+        [ui32ReferencedVertexIds, ~, dRemappedVertexIds] = unique( ...
+            ui32SubSampledTriangleFaces(:), "sorted");
+        ui32SubSampledTriangleFaces = reshape(uint32(dRemappedVertexIds), ...
+            size(ui32SubSampledTriangleFaces));
+        dSelectedVerticesPos = strShapeModel.dVerticesPos(:, ui32ReferencedVertexIds);
 
     else
         ui32SubSampledTriangleFaces = strShapeModel.ui32triangVertexPtr';
+        dSelectedVerticesPos = strShapeModel.dVerticesPos;
+    end
+
+    % Transform only the vertices that the diagnostic patch will consume.
+    if isequal(dBodyDCM_NavFrameFromOF, eye(3))
+        dVerticesPos = dSelectedVerticesPos';
+    else
+        dVerticesPos = (dBodyDCM_NavFrameFromOF * dSelectedVerticesPos)';
     end
 
     objShadedMeshPlot = patch(objSceneAx, 'Vertices', dVerticesPos, ...

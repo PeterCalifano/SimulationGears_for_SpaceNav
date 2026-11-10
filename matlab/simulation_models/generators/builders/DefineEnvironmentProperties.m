@@ -39,9 +39,8 @@ end
 %                                                                 kwargs)
 % -------------------------------------------------------------------------------------------------------------
 %% DESCRIPTION
-% Function defining the dynamical properties for the specified scenario. Timegrid and inertial frame are
-% specified to query specify or the input dataset object to define Sun and attitude ephemerides as position
-% and rotation matrices.
+% Define scenario dynamics and use SPICE or a supplied dataset for Sun and target-attitude ephemerides.
+% Preserve source-owned target rates in the attitude-model convention used by the onboard propagator.
 % -------------------------------------------------------------------------------------------------------------
 %% INPUT
 % dEphemeridesTimegrid  (1,:) double
@@ -62,11 +61,13 @@ end
 % strAdditionalData
 % -------------------------------------------------------------------------------------------------------------
 %% CHANGELOG
+% 18-09-2026    Pietro Califano, Codex gpt-5.6     Label default SRP area in the selected dynamics units.
 % 19-02-2025    Pietro Califano     First version copy-pasting previous implementation
 % 14-03-2025    Pietro Califano     Move code to CScenarioGenerator static method for standardization
 % 21-07-2025    Pietro Califano     Add support for 3rd body reference data and generalize implementation
 % 13-08-2026    Pietro Califano, Codex gpt-5.6     Preserve source-owned target angular velocity.
 % 13-08-2026    Pietro Califano, Codex gpt-5.6     Resolve and transport target spin-axis provenance.
+% 29-09-2026    Pietro Califano, Codex gpt-6      Clarify the SPICE rate frame and model sign.
 % -------------------------------------------------------------------------------------------------------------
 %% DEPENDENCIES
 % [-]
@@ -123,8 +124,8 @@ if kwargs.objDataset.bDefaultConstructed % Try to use SPICE kernels
         char(charTargetFixedFrame), dEphemeridesTimegrid);
     [~, dTargetFrameAngVel_IN] = cspice_xf2rav(dTargetStateTransforms);
 
-    % SPICE returns target-frame angular velocity relative to inertial. The
-    % onboard model uses R_INfromTB(t) = Exp(-omega_IN*t) R_INfromTB(0).
+    % Use the returned rate in the transform's input frame (IN); no additional frame rotation is needed.
+    % Apply the sign required by the current model: R_INfromTB(t) = Exp(-omega_IN*t) R_INfromTB(0).
     strMainBodyRefData.dAngVel_IN = -dTargetFrameAngVel_IN;
     strMainBodyRefData.dSpinAxis_TB = [0.0; 0.0; 1.0];
     strMainBodyRefData.charSpinAxisSource = "DEFAULT_PLUS_Z";
@@ -275,7 +276,7 @@ end
 %% Spacecraft data
 dDefaultReflCoeff = 1.29;  % Global CR
 dDefaultSCmass    = 12.5; %14.8; % 12; % [kg]
-dDefaultA_SRP     = 0.5329E-6 * (dUnitsScaling^2); % [m^2]
+dDefaultA_SRP     = 0.5329E-6 * (dUnitsScaling^2); % [dynamics length units^2]
 
 if isempty(strDynParams.strSCdata)
     warning('No spacecraft data provided in strDynParams.strSCdata. Default hardcoded values (RCS-1) will be used.')    
@@ -294,7 +295,8 @@ else
         strDynParams.strSCdata.dSCmass = dDefaultSCmass;
     end
     if not(isfield(strDynParams.strSCdata, "dA_SRP"))
-        warning('No spacecraft area provided in strDynParams.strSCdata.dA_SRP. Default value of %4.4g m^2 will be used.', dDefaultA_SRP)
+        warning('No spacecraft area provided in strDynParams.strSCdata.dA_SRP. Default value of %4.4g %s^2 will be used.', ...
+                dDefaultA_SRP, char(charDynamicsLengthUnit))
         strDynParams.strSCdata.dA_SRP = dDefaultA_SRP;
     end
 end

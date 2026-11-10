@@ -78,7 +78,7 @@ classdef CAttitudePointingGenerator < handle
             end
             arguments (Input)
                 options.bInputIsTargetDirectionFromCam  (1,1) logical = false
-                options.enumConstraintType              (1,:) string {mustBeMember(options.enumConstraintType, ["YorthogonalSun", "trackLVLH", "auxiliaryAxis"])} = "YorthogonalSun"
+                options.enumConstraintType              (1,:) string {mustBeMember(options.enumConstraintType, {'YorthogonalSun', 'trackLVLH', 'auxiliaryAxis'})} = "YorthogonalSun"
                 options.enumOutRot3Param                (1,1) EnumRotParams {isa(options.enumOutRot3Param, 'EnumRotParams')} = EnumRotParams.DCM
                 options.dDCM_displacedPoseFromPose      (3,3,:) double {mustBeNumeric} = zeros(3,3) % Custom rotation to apply to the rotation
                 options.dSigmaDegRotAboutBoresight      (1,:)   double {mustBeNumeric} = 0.0 % Sigma to scatter camera pose around boresight
@@ -403,7 +403,8 @@ classdef CAttitudePointingGenerator < handle
                 kwargs.dAuxiliaryAxis       (3, :) double = zeros(3,1);
             end
             arguments (Input)
-                options.enumConstraintType      (1,:) string {mustBeMember(options.enumConstraintType, ["YorthogonalSun", "trackLVLH", "auxiliaryAxis"])} = "YorthogonalSun"
+                % Keep membership labels compatible with MATLAB Coder.
+                options.enumConstraintType      (1,:) string {mustBeMember(options.enumConstraintType, {'YorthogonalSun', 'trackLVLH', 'auxiliaryAxis'})} = "YorthogonalSun"
             end
             % Function defining the Y axis of the camera frame according to the constraint mode
 

@@ -8,6 +8,10 @@ kept verbatim, so re-running the configure script never wipes project-specific
 settings. The default VS Code extension set (DEFAULT_EXTENSIONS) is seeded and
 guaranteed present, while any extra extensions in the file are preserved.
 Output is plain JSON (JSONC comments in the input are stripped).
+Preserve custom Docker build arguments and manage only the three ROS selection keys.
+
+Changelog:
+    29-09-2026  Pietro Califano, Codex gpt-6  Restore caller-owned Docker arguments.
 """
 import json
 import os
@@ -207,6 +211,18 @@ def load_existing(path: str) -> dict:
 
 
 def main() -> int:
+    """Write merged container settings while retaining caller-owned build arguments.
+
+    Read JSON or JSONC from DEVCONTAINER_JSON_PATH and print the merged JSON.
+    In build.args, update only ROS_MODE, ROS_DISTRO and ROS_PROFILE, or remove
+    those keys when ROS is disabled. Preserve unrelated build fields.
+
+    Returns:
+        Zero after writing the updated JSON to standard output.
+
+    Raises:
+        SystemExit: If the input JSON or requested GPU runtime is invalid.
+    """
     # Options come from the configure script via environment variables.
     cuda = os.environ.get("CUDA", "off")
     cuda_version = os.environ.get("CUDA_VERSION", DEFAULT_CUDA_VERSION)
@@ -225,17 +241,25 @@ def main() -> int:
 
     data.setdefault("name", "C++")
 
-    # Managed: build (dockerfile + ROS build args)
+    # Update the ROS selection without replacing unrelated Docker build arguments.
     build = data.get("build", {})
     if not isinstance(build, dict):
         build = {}
     build["dockerfile"] = "Dockerfile"
+    build_args = build.get("args", {})
+    if not isinstance(build_args, dict):
+        build_args = {}
     if ros_mode != "none":
-        build["args"] = {
+        build_args.update({
             "ROS_MODE": ros_mode,
             "ROS_DISTRO": ros_distro,
             "ROS_PROFILE": ros_profile,
-        }
+        })
+    else:
+        for argument in ("ROS_MODE", "ROS_DISTRO", "ROS_PROFILE"):
+            build_args.pop(argument, None)
+    if build_args:
+        build["args"] = build_args
     else:
         build.pop("args", None)
     data["build"] = build

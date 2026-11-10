@@ -39,7 +39,7 @@ adding a specialized interval-propagation API.
 - [x] Preserve timestamp tests for forward, backward, shortened-final-step,
   zero-duration, requested-grid, and adaptive propagation.
 - [x] Add a code-generation regression that binds
-  `evalRHS_InertialDynMaxFidelity`, runtime `strDynParams`, constant
+  `EvalRHS_InertialDynMaxFidelity`, runtime `strDynParams`, constant
   `strModelConfigFlags`, and constant `enumFixedStepScheme`.
 - [x] Run the focused tests before implementation. MATLAB execution failed
   with `MATLAB:TooManyInputs` at `PropagateRK2HeunStep`, and generated code

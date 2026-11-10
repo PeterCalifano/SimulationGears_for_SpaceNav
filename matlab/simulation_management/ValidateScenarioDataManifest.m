@@ -8,26 +8,30 @@ function strManifest = ValidateScenarioDataManifest(strManifest, enumOrName, opt
 %% INPUT
 % strManifest                         (1,1) struct decoded from a scenario manifest JSON file.
 % enumOrName                          (1,:) string, char, or EnumScenarioName identifying the expected scenario.
-% options.charDataRootPath            (1,:) string = ""; override for the SimulationGears data root.
+% options.charDataRootPath            (1,:) string = ""; tracked-manifest root override.
+% options.charAssetRootPath           (1,:) string = ""; external-payload root override.
 % options.bRequireLocalAssets         (1,1) logical = false; require local shape-runnable assets to exist.
-% options.dMaxPreferredShapeAssetSizeGB (1,1) double = 1.0; preferred upper bound for default shape assets.
+% options.dMaxPreferredShapeAssetSizeGB (1,1) double = Inf; optional upper bound for default shape assets.
 % -------------------------------------------------------------------------------------------------------------
 %% OUTPUT
 % strManifest                         (1,1) validated manifest struct, unchanged.
 % -------------------------------------------------------------------------------------------------------------
 %% CHANGELOG
-% 01-07-2026    Pietro Califano     Add manifest schema and registry-consistency validation.
+% 21-09-2026  Pietro Califano, Codex gpt-5.6  Validate external geometry and appearance metadata.
+% 01-07-2026  Pietro Califano     Add manifest schema and registry-consistency validation.
 % -------------------------------------------------------------------------------------------------------------
 %% DEPENDENCIES
-% CScenarioRegistry, ResolveSimGearsDataRoot.
+% CScenarioRegistry, ResolveSimGearsDataRoot, ResolveScenarioAssetPath,
+% NormalizeManifestStructArray.
 % -------------------------------------------------------------------------------------------------------------
 
 arguments
     strManifest (1,1) struct
     enumOrName (1,:) {mustBeA(enumOrName, ["string", "char", "EnumScenarioName"])}
     options.charDataRootPath (1,:) string = ""
+    options.charAssetRootPath (1,:) string = ""
     options.bRequireLocalAssets (1,1) logical = false
-    options.dMaxPreferredShapeAssetSizeGB (1,1) double {mustBePositive} = 1.0
+    options.dMaxPreferredShapeAssetSizeGB (1,1) double {mustBePositive} = Inf
 end
 
 [~, charCanonicalName] = CScenarioRegistry.ResolveScenario(enumOrName);
@@ -46,7 +50,7 @@ if isempty(strManifest.assets)
         "Manifest for %s must define at least one asset.", charCanonicalName);
 end
 
-strAssets = strManifest.assets;
+strAssets = NormalizeManifestStructArray(strManifest.assets);
 RequireFields_(strAssets, ["asset_id", "asset_type", "local_path", "source_url", ...
     "download_url", "sha256", "size_gb", "fidelity", "required_for_shape_runnable"]);
 
@@ -71,6 +75,17 @@ if string(strDefaultShapeAsset.asset_type) ~= "shape"
     error("ValidateScenarioDataManifest:InvalidDefaultShape", ...
         "Manifest for %s default asset %s is type %s, expected shape.", ...
         charCanonicalName, charDefaultShapeAssetId, string(strDefaultShapeAsset.asset_type));
+end
+
+if double(strManifest.schema_version) >= 2
+    RequireFields_(strDefaultShapeAsset, ...
+        ["content_format", "input_units", "body_fixed_frame", "load_materials"]);
+    EnumLengthUnits.fromAny(string(strDefaultShapeAsset.input_units));
+    if ~ismember(lower(string(strDefaultShapeAsset.content_format)), ["obj", "dsk"])
+        error("ValidateScenarioDataManifest:UnsupportedShapeFormat", ...
+            "Default shape asset %s uses unsupported format %s.", ...
+            charDefaultShapeAssetId, string(strDefaultShapeAsset.content_format));
+    end
 end
 
 if any(strcmp(string(strManifest.tags), "shape_runnable")) && ...
@@ -104,7 +119,13 @@ if options.bRequireLocalAssets
         if isfield(strAssets(idxAsset), "required_for_shape_runnable") && ...
                 logical(strAssets(idxAsset).required_for_shape_runnable)
 
-            charAssetPath = fullfile(charDataRootPath, string(strAssets(idxAsset).local_path));
+            if double(strManifest.schema_version) >= 2
+                charAssetPath = ResolveScenarioAssetPath( ...
+                    string(strAssets(idxAsset).local_path), ...
+                    charAssetRootPath=options.charAssetRootPath);
+            else
+                charAssetPath = fullfile(charDataRootPath, string(strAssets(idxAsset).local_path));
+            end
 
             if ~isfile(charAssetPath) && ~isfolder(charAssetPath)
                 charFetchCommand = sprintf('python3 tools/data/fetch_scenario_assets.py --scenario %s --asset-id %s', ...

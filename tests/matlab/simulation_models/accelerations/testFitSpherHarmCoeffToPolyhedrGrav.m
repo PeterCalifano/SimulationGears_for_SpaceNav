@@ -1,4 +1,15 @@
 classdef testFitSpherHarmCoeffToPolyhedrGrav < matlab.unittest.TestCase
+    %% DESCRIPTION
+    % Verify spherical-harmonic recovery, polyhedron fits and OBJ diagnostic workflows.
+    % Compare independent field evaluations and preserve fitted coefficients in shape-model caches.
+    % ---------------------------------------------------------------------------------------------------------
+    %% CHANGELOG
+    % 29-09-2026  Pietro Califano, Codex gpt-6    Test the class OBJ builder without a forwarding wrapper.
+    % ---------------------------------------------------------------------------------------------------------
+    %% DEPENDENCIES
+    % CShapeModel, FitSpherHarmCoeffToPolyhedrGrav, RunFitSpherHarmonicsToPolyhedronGravityFromObj
+    % ---------------------------------------------------------------------------------------------------------
+
     properties (Constant)
         dGravConst = 6.67430e-11; % [m^3/(kg*s^2)]
     end
@@ -244,25 +255,46 @@ classdef testFitSpherHarmCoeffToPolyhedrGrav < matlab.unittest.TestCase
             testCase.verifyLessThan(strSHgravityData.dGravParam, 1.0e-5);
         end
 
-        function testExampleFitPolyhedronGravitySHfromObjSmoke(testCase)
+        function TestObjGravityBuilderLoadsAndCachesFit(self)
+            %% SIGNATURE
+            % TestObjGravityBuilderLoadsAndCachesFit(self)
+            % -------------------------------------------------------------------------------------------------
+            %% DESCRIPTION
+            % Load a closed OBJ through the class builder and retain the fit in its shape-model cache.
+            % -------------------------------------------------------------------------------------------------
+            %% INPUT
+            % self    MATLAB test case.
+            % -------------------------------------------------------------------------------------------------
+            %% OUTPUT
+            % None. Report failures through the test framework.
+            % -------------------------------------------------------------------------------------------------
+            %% CHANGELOG
+            % 29-09-2026  Pietro Califano, Codex gpt-6    Replace the forwarding-wrapper smoke test.
+            % -------------------------------------------------------------------------------------------------
+            %% DEPENDENCIES
+            % CShapeModel.BuildSphericalHarmonicsGravityDataFromObj
+            % -------------------------------------------------------------------------------------------------
+
+            % Fit a disposable closed solid through the public OBJ builder.
             [ui32Faces, dVerts] = testFitSpherHarmCoeffToPolyhedrGrav.BuildRegularTetrahedron();
             charObjFilePath = testFitSpherHarmCoeffToPolyhedrGrav.WriteObjFileToTempDir( ...
                 ui32Faces, dVerts, 'shape_model_fit_example');
-            cleanupObj = onCleanup(@() delete(charObjFilePath)); %#ok<NASGU>
+            objFileCleanup = onCleanup(@() delete(charObjFilePath)); %#ok<NASGU>
 
-            [objShapeModel, strSHgravityData] = FitSpherHarmonicsToPolyhedronGravityFromObj( ...
+            [objShapeModel, strSHgravityData] = CShapeModel.BuildSphericalHarmonicsGravityDataFromObj( ...
                 charObjFilePath, uint32(4), ...
                 dDensity=2500.0, ...
-                dGravConst=testCase.dGravConst, ...
+                dGravConst=self.dGravConst, ...
                 ui32MaxFitIterations=uint32(3), ...
                 bCacheOnShapeModel=true);
 
+            % Retain the fitted coefficients and degree in the returned model's cache.
             strCachedSHgravityData = objShapeModel.getSphericalHarmonicsGravityData();
 
-            testCase.verifyEqual(strCachedSHgravityData.dCSlmCoeffCols, ...
+            self.verifyEqual(strCachedSHgravityData.dCSlmCoeffCols, ...
                 strSHgravityData.dCSlmCoeffCols, 'RelTol', 0.0, 'AbsTol', 0.0);
-            testCase.verifyEqual(strCachedSHgravityData.ui32MaxDegree, strSHgravityData.ui32MaxDegree);
-            testCase.verifyTrue(objShapeModel.hasData());
+            self.verifyEqual(strCachedSHgravityData.ui32MaxDegree, strSHgravityData.ui32MaxDegree);
+            self.verifyTrue(objShapeModel.hasData());
         end
 
         function testRunFitSpherHarmonicsToPolyhedronGravityFromObjSmoke(testCase)

@@ -1,6 +1,7 @@
 classdef (Abstract) CBaseDatastruct % < matlab.mixin.Copyable
     %% DESCRIPTION
-    % Base class for datastructs with import/export methods to struct, yaml, json and mat file.
+    % Base class for datastructs with import/export methods to struct, YAML, JSON and MAT files.
+    % Object-to-struct exports omit Transient properties, including runtime geometry caches.
     % -------------------------------------------------------------------------------------------------------------
     %% CHANGELOG
     % 01-02-2025    Pietro Califano     First placeholder implementation
@@ -20,6 +21,7 @@ classdef (Abstract) CBaseDatastruct % < matlab.mixin.Copyable
     %                                   move assignField_ method to instance methods
     % 07-01-2026    Pietro Califano     Minor fixes before pull request
     % 29-06-2026    Pietro Califano     Harden export of non-datastruct runtime objects.
+    % 07-10-2026    Pietro Califano, Codex (GPT-6)  Exclude transient runtime caches from object exports.
     % -------------------------------------------------------------------------------------------------------------
     %% METHODS
     % [-]
@@ -492,33 +494,68 @@ classdef (Abstract) CBaseDatastruct % < matlab.mixin.Copyable
             end % Endfor on fields
         end
 
-        function outDataStruct = toStructStatic(objDatastruct, bFlattenArrays)
-            arguments
-                objDatastruct (:,1) {CBaseDatastruct.validateObjectOrStruct_(objDatastruct)}
-                bFlattenArrays (1,1) logical = false;
+        function strOutputData = toStructStatic(objDatastruct, bFlattenArrays)
+            %% SIGNATURE
+            % strOutputData = CBaseDatastruct.toStructStatic(objDatastruct, bFlattenArrays)
+            % -------------------------------------------------------------------------------------------------------------
+            %% DESCRIPTION
+            % Recursively export objects or structs, removing empty fields and sorting keys.
+            % Exclude Transient object properties before flattening or recursive conversion.
+            % Struct inputs retain their fields because they have no property metadata.
+            % -------------------------------------------------------------------------------------------------------------
+            %% INPUT
+            % objDatastruct   Column array of objects or structs to export.
+            % bFlattenArrays  Apply the existing array-flattening policy; default false.
+            % -------------------------------------------------------------------------------------------------------------
+            %% OUTPUT
+            % strOutputData   Row struct array; empty when the input is empty.
+            % -------------------------------------------------------------------------------------------------------------
+            %% CHANGELOG
+            % 07-10-2026  Pietro Califano, Codex (GPT-6)  Exclude transient runtime properties.
+            % -------------------------------------------------------------------------------------------------------------
+            %% DEPENDENCIES
+            % FlattenArrayInStruct, CleanAndSortStructFields, convertValue_.
+            % -------------------------------------------------------------------------------------------------------------
+            arguments (Input)
+                objDatastruct (:, 1) {CBaseDatastruct.validateObjectOrStruct_(objDatastruct)}
+                bFlattenArrays (1, 1) logical = false;
             end
 
-            % Disable warning temporarily
-            warnState = warning('off', 'MATLAB:structOnObject');
-            objCleanupHandle = onCleanup(@() warning(warnState.state,'MATLAB:structOnObject'));
+            arguments (Output)
+                strOutputData (1, :) struct
+            end
+
+            % Restore the caller's warning state after MATLAB's shallow object cast.
+            strWarningState = warning('off', 'MATLAB:structOnObject');
+            objCleanupHandle = onCleanup(@() warning(strWarningState.state, ...
+                                                    'MATLAB:structOnObject')); %#ok<NASGU>
 
             % Normalize to struct array elementwise
-            ui32StructArraySize = numel(objDatastruct);
-            outDataStruct = struct.empty(1,0);
+            dInstanceCount = numel(objDatastruct);
+            strOutputData = struct.empty(1, 0);
 
-            if ui32StructArraySize == 0
-                warning('toStructStatic called with an empty array.')
+            if dInstanceCount == 0
+                warning('toStructStatic called with an empty array.');
                 return
             end
 
             % Loop over structured array entries
-            for idInstance = 1:ui32StructArraySize
+            for dInstanceId = 1:dInstanceCount
 
                 % Do shallow conversion to struct first
                 if isstruct(objDatastruct)
-                    strTmp_ = objDatastruct(idInstance);
+                    strTmp_ = objDatastruct(dInstanceId);
                 else
-                    strTmp_ = struct(objDatastruct(idInstance));
+                    strTmp_ = struct(objDatastruct(dInstanceId));
+
+                    % MATLAB's struct cast includes private and transient properties.
+                    objMetadata = metaclass(objDatastruct(dInstanceId));
+                    bTransient = [objMetadata.PropertyList.Transient];
+                    cellTransient = {objMetadata.PropertyList(bTransient).Name};
+                    cellTransient = intersect(cellTransient, fieldnames(strTmp_));
+                    if ~isempty(cellTransient)
+                        strTmp_ = rmfield(strTmp_, cellTransient);
+                    end
                 end
 
                 % Perform flattening of array fields if required
@@ -527,11 +564,12 @@ classdef (Abstract) CBaseDatastruct % < matlab.mixin.Copyable
                 end
 
                 % Recursively convert any nested object/cell/struct
-                cellFlds = fieldnames(strTmp_);
+                cellFieldNames = fieldnames(strTmp_);
 
-                for idi = 1:numel(cellFlds)
-                    charName = cellFlds{idi};
-                    strTmp_.(charName) = CBaseDatastruct.convertValue_(strTmp_.(charName));
+                for dFieldId = 1:numel(cellFieldNames)
+                    charFieldName = cellFieldNames{dFieldId};
+                    strTmp_.(charFieldName) = ...
+                        CBaseDatastruct.convertValue_(strTmp_.(charFieldName));
                 end
 
                 % Remove bDefaultConstructedField if existing
@@ -542,10 +580,11 @@ classdef (Abstract) CBaseDatastruct % < matlab.mixin.Copyable
                 % Remove empty fields and order struct, assign to out
                 strTmp_ = CBaseDatastruct.CleanAndSortStructFields(strTmp_);
 
-                if isempty(outDataStruct)
-                    outDataStruct = repmat(strTmp_, 1, ui32StructArraySize); % 1xN for predictable JSON/YAML order
+                if isempty(strOutputData)
+                    % Keep one row so JSON/YAML arrays have predictable ordering.
+                    strOutputData = repmat(strTmp_, 1, dInstanceCount);
                 else
-                    outDataStruct(idInstance) = strTmp_;
+                    strOutputData(dInstanceId) = strTmp_;
                 end
             end
         end

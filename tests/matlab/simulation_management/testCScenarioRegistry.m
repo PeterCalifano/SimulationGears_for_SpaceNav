@@ -105,6 +105,34 @@ classdef testCScenarioRegistry < matlab.unittest.TestCase
             testCase.verifyEqual(CScenarioRegistry.ResolveScenario("Toutatis"), EnumScenarioName.Toutatis);
         end
 
+        function testBennuPdsShapeGravityIsCompleteAndScaled(testCase)
+            [strDegree4, strMetadata] = CScenarioRegistry.GetSphericalHarmonicsGravityData( ...
+                "Bennu", uint32(4), "km");
+            [strDegree16, ~] = CScenarioRegistry.GetSphericalHarmonicsGravityData( ...
+                "Bennu", uint32(16), "km");
+            [strDegree16M, ~] = CScenarioRegistry.GetSphericalHarmonicsGravityData( ...
+                "Bennu", uint32(16), "m");
+
+            testCase.verifyTrue(strMetadata.bHasHardcodedCoefficients);
+            testCase.verifyEqual(strMetadata.ui32HardcodedMaxDegree, uint32(16));
+            testCase.verifySize(strDegree16.dCSlmCoeffCols, [151 2]);
+            testCase.verifyEqual(strDegree4.dCSlmCoeffCols, ...
+                strDegree16.dCSlmCoeffCols(1:13, :), AbsTol=0);
+            testCase.verifyTrue(all(isfinite(strDegree16.dCSlmCoeffCols), 'all'));
+            testCase.verifyGreaterThan(norm(strDegree16.dCSlmCoeffCols(2:end, :), 'fro'), 0);
+            testCase.verifyLessThan(norm(strDegree16.dCSlmCoeffCols(2:end, :), 'fro'), 1);
+            testCase.verifyGreaterThan(strDegree16.dGravParam, 1e-10);
+            testCase.verifyLessThan(strDegree16.dGravParam, 1e-7);
+            testCase.verifyGreaterThan(strDegree16.dBodyRadiusRef, 0.1);
+            testCase.verifyLessThan(strDegree16.dBodyRadiusRef, 1);
+            testCase.verifyEqual(strDegree16M.dCSlmCoeffCols, ...
+                strDegree16.dCSlmCoeffCols, AbsTol=0);
+            testCase.verifyEqual(strDegree16M.dGravParam, ...
+                1e9 * strDegree16.dGravParam, RelTol=1e-14);
+            testCase.verifyEqual(strDegree16M.dBodyRadiusRef, ...
+                1e3 * strDegree16.dBodyRadiusRef, RelTol=1e-14);
+        end
+
         function testLengthUnitsAcceptEnum(testCase)
             strMoonKm = CScenarioRegistry.GetScenarioSpec("Moon", charLengthUnits=EnumLengthUnits.km);
 
@@ -239,6 +267,28 @@ classdef testCScenarioRegistry < matlab.unittest.TestCase
             testCase.verifyEqual(strDynParams.strMainData.ui16MaxSHdegree, uint16(4));
             testCase.verifySize(strDynParams.strMainData.dSHcoeff, [13 2]);
             testCase.verifyFalse(isfield(strDynParams.strMainData, "strSHmetadata"));
+        end
+
+        function testRegistryHarmonicsKeepTheirDimensionalConstants(testCase)
+            % A coefficient family is only physically meaningful with its
+            % associated GM and reference radius, in either unit system.
+            for charLengthUnits = ["km", "m"]
+                bUseKilometersScale = charLengthUnits == "km";
+                [strGravityData, ~] = CScenarioRegistry.GetSphericalHarmonicsGravityData( ...
+                    "Bennu", uint32(4), charLengthUnits);
+                [~, ~, strDynParams] = CScenarioGenerator.LoadDefaultScenarioData( ...
+                    "Bennu", struct(), ...
+                    "bUseKilometersScale", bUseKilometersScale, ...
+                    "bAddNonSphericalGravityCoeffs", true, ...
+                    "ui16MaxSHdegree", uint16(4));
+
+                testCase.verifyEqual(strDynParams.strMainData.dGM, ...
+                    strGravityData.dGravParam, RelTol=1e-14);
+                testCase.verifyEqual(strDynParams.strMainData.dRefRadius, ...
+                    strGravityData.dBodyRadiusRef, RelTol=1e-14);
+                testCase.verifyEqual(strDynParams.strMainData.dSHcoeff, ...
+                    strGravityData.dCSlmCoeffCols, AbsTol=0.0);
+            end
         end
 
         function testScenarioDatasetBuilderSmoke(testCase)

@@ -22,8 +22,8 @@ function strMexInfo = BuildMexTargets_InertialDynMaxFidelity(charBuildDir)
 % 22-07-2026    Pietro Califano, Codex           Build separate compile-time SH and polyhedron gravity variants.
 % -------------------------------------------------------------------------------------------------------------
 %% DEPENDENCIES
-% evalRHS_InertialDynMaxFidelity()
-% evalJac_InertialDynMaxFidelity()
+% EvalRHS_InertialDynMaxFidelity()
+% EvalJac_InertialDynMaxFidelity()
 % ComputePolyhedronFaceEdgeData()
 % ComputeMeshModelVolumeAndCoM()
 % GenerateGaussMarkovAccelSeq()
@@ -59,10 +59,10 @@ strPolyhedronModelConfigFlags.bIncludePolyhedronGravity = true;
 
 cellGravityModelNames = {'spherical_harmonics', 'polyhedron'};
 cellModelConfigFlags = {strSHmodelConfigFlags, strPolyhedronModelConfigFlags};
-cellRHSTargets = {'evalRHS_InertialDynMaxFidelity_mex', ...
-                  'evalRHS_InertialDynMaxFidelity_polyhedron_mex'};
-cellJacTargets = {'evalJac_InertialDynMaxFidelity_mex', ...
-                  'evalJac_InertialDynMaxFidelity_polyhedron_mex'};
+cellRHSTargets = {'EvalRHS_InertialDynMaxFidelity_mex', ...
+                  'EvalRHS_InertialDynMaxFidelity_polyhedron_mex'};
+cellJacTargets = {'EvalJac_InertialDynMaxFidelity_mex', ...
+                  'EvalJac_InertialDynMaxFidelity_polyhedron_mex'};
 cellMexTargets = cell(1, 2 * numel(cellGravityModelNames));
 
 for ui32ModelIdx = uint32(1):uint32(numel(cellGravityModelNames))
@@ -73,7 +73,7 @@ for ui32ModelIdx = uint32(1):uint32(numel(cellGravityModelNames))
 
     try
         codegen('-config', cfg, '-d', charBuildDir, '-o', charRHSTarget, ...
-            'evalRHS_InertialDynMaxFidelity', ...
+            'EvalRHS_InertialDynMaxFidelity', ...
             '-args', {dStateTimetag, dxState_IN, strDynParams, coder.Constant(strSelectedModelConfigFlags)});
     catch objException
         ReportCodegenFailure_(charRHSTarget, objException);
@@ -82,7 +82,7 @@ for ui32ModelIdx = uint32(1):uint32(numel(cellGravityModelNames))
 
     try
         codegen('-config', cfg, '-d', charBuildDir, '-o', charJacTarget, ...
-            'evalJac_InertialDynMaxFidelity', ...
+            'EvalJac_InertialDynMaxFidelity', ...
             '-args', {dStateTimetag, dxState_IN, strDynParams, coder.Constant(strSelectedModelConfigFlags), strAccelInfo});
     catch objException
         ReportCodegenFailure_(charJacTarget, objException);

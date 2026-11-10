@@ -1,129 +1,51 @@
 function [ui32TrianglesIndex, dVerticesCoords, dTexCoords, ...
-    ui32TrianglesTexIndex, dNormals, ui32TrianglesNormalsIndex] = LoadModelFromObj(charObjFilePath, bVertFacesOnly) %#codegen
-arguments
-    charObjFilePath (1,1) string {mustBeA(charObjFilePath, ["string", "char"])}
-    bVertFacesOnly  (1,1) logical = true;
-end
+        ui32TrianglesTexIndex, dNormals, ui32TrianglesNormalsIndex] = LoadModelFromObj( ...
+        charObjFilePath, bVertFacesOnly)
 %% SIGNATURE
-% DEPRECATION warning: this function has been entirely replaced by CShapeModel class methods and is not
-% maintained anymore. However, it still works for obj files that are not too large.
 % [ui32TrianglesIndex, dVerticesCoords, dTexCoords, ...
-%  ui32TrianglesTexIndex, dNormals, ui32TrianglesNormalsIndex] = LoadModelFromObj(charObjFilePath, bVertFacesOnly) %#codegen
+%  ui32TrianglesTexIndex, dNormals, ui32TrianglesNormalsIndex] = ...
+%     LoadModelFromObj(charObjFilePath, bVertFacesOnly)
 % -------------------------------------------------------------------------------------------------------------
 %% DESCRIPTION
-% [ui32TrianglesIndex, dVerticesCoords] = LoadModelFromObj(charObjFilePath) reads the vertices and the
-% triangles data as specified in the input Wavefront .obj file.
-% This implementation uses vectorized regexp and sscanf on the entire file content, avoiding
-% per-line loops and dynamic allocation. Output formats:
-%     ui32TrianglesIndex    - R-by-3 uint32 array of face indices (v/vt/vn)
-%     dVerticesCoords       - M-by-3 double array of vertex coordinates
-%     dTexCoords            - P-by-2 double array of texture coordinates (if present)
-%     dNormals              - Q-by-3 double array of normals (if present)
+% Deprecated compatibility entry point for OBJ loading. The authoritative
+% implementation is CShapeModel.LoadModelFromObj.
+% -------------------------------------------------------------------------------------------------------------
+%% INPUT
+% charObjFilePath:       Path to a Wavefront OBJ file.
+% bVertFacesOnly:        Load only geometry when true.
+% -------------------------------------------------------------------------------------------------------------
+%% OUTPUT
+% ui32TrianglesIndex:        Triangle vertex indices as 3-by-F uint32.
+% dVerticesCoords:           Vertex coordinates as 3-by-N double.
+% dTexCoords:                Texture coordinates when requested.
+% ui32TrianglesTexIndex:     Triangle texture-coordinate indices.
+% dNormals:                  Vertex normals when requested.
+% ui32TrianglesNormalsIndex: Triangle normal indices.
 % -------------------------------------------------------------------------------------------------------------
 %% CHANGELOG
-% 03-01-2025    Pietro Califano     Function implemented for general obj format loading
+% 03-01-2025  Pietro Califano     First implementation for general OBJ loading.
+% 28-08-2026  Pietro Califano     Replace duplicate parser with class forwarder.
 % -------------------------------------------------------------------------------------------------------------
 %% DEPENDENCIES
-% [-]
+% CShapeModel.LoadModelFromObj
 % -------------------------------------------------------------------------------------------------------------
 
-%% Function code
-
-tic
-% Check extension
-[~,~, charFileExt] = fileparts(charObjFilePath);
-
-if ~strcmpi(charFileExt, '.obj')
-    error('LoadModelFromObj:InvalidExtension', 'Input file must have .obj extension.');
+arguments(Input)
+    charObjFilePath (1,1) string {mustBeA(charObjFilePath, ["string", "char"])}
+    bVertFacesOnly (1,1) logical = true
 end
 
-if not(isfile(charObjFilePath))
-    error('LoadModelFromObj:FileNotFound', 'Cannot find file: %s', charObjFilePath);
+arguments(Output)
+    ui32TrianglesIndex uint32
+    dVerticesCoords double
+    dTexCoords double
+    ui32TrianglesTexIndex uint32
+    dNormals double
+    ui32TrianglesNormalsIndex uint32
 end
 
-% Read entire file as text
-charFileText = fileread(charObjFilePath);
-
-% Vertex lines: 'v x y z'
-vPattern = '^v\s+([\-\d\.eE\+]+)\s+([\-\d\.eE\+]+)\s+([\-\d\.eE\+]+)';
-vLines = regexp(charFileText, vPattern, 'tokens', 'lineanchors');
-
-if ~isempty(vLines)
-    vTokens = vertcat(vLines{:});
-    dVerticesCoords = str2double(vTokens);
-    dVerticesCoords = reshape(dVerticesCoords', 3, []);
-else
-    dVerticesCoords = zeros(0,3);
-end
-
-% Texture-coordinate lines: 'vt u v'
-vtPattern = '^vt\s+([\-\d\.eE\+]+)\s+([\-\d\.eE\+]+)';
-vtLines = regexp(charFileText, vtPattern, 'tokens', 'lineanchors');
-
-if ~isempty(vtLines) && not(bVertFacesOnly)
-    vtTokens = vertcat(vtLines{:});
-    dTexCoords = str2double(vtTokens);
-    dTexCoords = reshape(dTexCoords', 2, []);
-else
-    dTexCoords = zeros(0,2);
-end
-
-% Normal lines: 'vn nx ny nz'
-vnPattern = '^vn\s+([\-\d\.eE\+]+)\s+([\-\d\.eE\+]+)\s+([\-\d\.eE\+]+)';
-vnLines = regexp(charFileText, vnPattern, 'tokens', 'lineanchors');
-
-
-if ~isempty(vnLines) && not(bVertFacesOnly)
-    vnTokens = vertcat(vnLines{:});
-    dNormals = str2double(vnTokens);
-    dNormals = reshape(dNormals', 3, []);
-else
-    dNormals = zeros(0,3);
-end
-
-
-% Defaults
-ui32TrianglesIndex          = zeros(0,3,'uint32');
-ui32TrianglesTexIndex       = zeros(0,3,'uint32');
-ui32TrianglesNormalsIndex   = zeros(0,3,'uint32');
-
-% Determine face format by presence of vt/vn
-bHasVT = ~isempty(dTexCoords);
-bHasVN = ~isempty(dNormals);
-
-% Build regex and index maps
-if bHasVT && bHasVN
-    charPattern = '^f\s+(\d+)/(\d+)/(\d+)\s+(\d+)/(\d+)/(\d+)\s+(\d+)/(\d+)/(\d+)';
-    vidx = 1:3:9; tidx = 2:3:9; nidx = 3:3:9;
-
-elseif bHasVT
-    charPattern = '^f\s+(\d+)/(\d+)\s+(\d+)/(\d+)\s+(\d+)/(\d+)';
-    vidx = 1:2:6; tidx = 2:2:6; nidx = [];
-
-elseif bHasVN
-    charPattern = '^f\s+(\d+)//(\d+)\s+(\d+)//(\d+)\s+(\d+)//(\d+)';
-    vidx = 1:2:6; tidx = [];    nidx = 2:2:6;
-
-else
-    charPattern = '^f\s+(\d+)\s+(\d+)\s+(\d+)';
-    vidx = 1:3; tidx = [];    nidx = [];
-end
-
-% Parse face lines
-fTokens = regexp(charFileText, charPattern, 'tokens', 'lineanchors');
-
-if ~isempty(fTokens)
-
-    dValues = str2double(vertcat(fTokens{:}));
-    dFacesMatrix = reshape(dValues', numel(vidx) + numel(tidx) + numel(nidx), []);
-    ui32TrianglesIndex = uint32(dFacesMatrix(vidx, :));
-
-    if not(bVertFacesOnly)
-        if bHasVT, ui32TrianglesTexIndex = uint32(dFacesMatrix(tidx, :)); end
-        if bHasVN, ui32TrianglesNormalsIndex   = uint32(dFacesMatrix(nidx, :)); end
-    end
-end
-
-dElapsedTime = toc;
-fprintf("\nFile obj loaded in %.5g seconds\n", dElapsedTime);
+% Preserve the deprecated API while keeping the class method as the sole parser implementation.
+[ui32TrianglesIndex, dVerticesCoords, dTexCoords, ...
+    ui32TrianglesTexIndex, dNormals, ui32TrianglesNormalsIndex] = ...
+    CShapeModel.LoadModelFromObj(charObjFilePath, bVertFacesOnly);
 end

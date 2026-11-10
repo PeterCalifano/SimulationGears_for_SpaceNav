@@ -29,7 +29,7 @@ function [dxStateHistory, dTimeGrid] = ...
 % 27-07-2026  Pietro Califano, Codex     First generated-code provider probe.
 % -------------------------------------------------------------------------------------------------------------
 %% DEPENDENCIES
-% PropagateFixedStep, evalRHS_InertialDynMaxFidelity
+% PropagateFixedStep, EvalRHS_InertialDynMaxFidelity
 % -------------------------------------------------------------------------------------------------------------
 
 arguments (Input)
@@ -47,7 +47,7 @@ arguments (Output)
 end
 
 [dxStateHistory, dTimeGrid] = PropagateFixedStep( ...
-    @evalRHS_InertialDynMaxFidelity, dTimeSpan, dxInitialState, ...
+    @EvalRHS_InertialDynMaxFidelity, dTimeSpan, dxInitialState, ...
     dMaximumStep, strDynParams, strModelConfigFlags, enumFixedStepScheme);
 
 end
