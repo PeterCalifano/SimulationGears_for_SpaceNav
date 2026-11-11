@@ -15,11 +15,11 @@
         "CMAKE_BUILD_TYPE": "RelWithDebInfo",
         "ENABLE_TESTS": "ON",
         "ENABLE_PYTHON_TESTS": "ON",
-        "SimulationGears_for_SpaceNav_ENABLE_CUDA": "OFF",
-        "SimulationGears_for_SpaceNav_ENABLE_OPTIX": "OFF",
+        "sim_gears_for_space_nav_ENABLE_CUDA": "OFF",
+        "sim_gears_for_space_nav_ENABLE_OPTIX": "OFF",
         "ENABLE_OPENGL": "OFF",
-        "SimulationGears_for_SpaceNav_BUILD_PROGRAMS": "OFF",
-        "SimulationGears_for_SpaceNav_BUILD_EXAMPLES": "OFF"
+        "sim_gears_for_space_nav_BUILD_PROGRAMS": "OFF",
+        "sim_gears_for_space_nav_BUILD_EXAMPLES": "OFF"
       }
     },
     {
@@ -31,15 +31,15 @@
         "CMAKE_BUILD_TYPE": "RelWithDebInfo",
         "ENABLE_TESTS": "OFF",
         "ENABLE_SUBMODULES": "OFF",
-        "SimulationGears_for_SpaceNav_ENABLE_CUDA": "OFF",
-        "SimulationGears_for_SpaceNav_ENABLE_OPTIX": "OFF",
+        "sim_gears_for_space_nav_ENABLE_CUDA": "OFF",
+        "sim_gears_for_space_nav_ENABLE_OPTIX": "OFF",
         "ENABLE_OPENGL": "OFF",
         "BUILD_DOC_HTML": "ON",
         "BUILD_DOC_XML": "ON",
         "BUILD_DOC_LATEX": "OFF",
         "DOC_WARN_AS_ERROR": "OFF",
-        "SimulationGears_for_SpaceNav_BUILD_PROGRAMS": "OFF",
-        "SimulationGears_for_SpaceNav_BUILD_EXAMPLES": "OFF"
+        "sim_gears_for_space_nav_BUILD_PROGRAMS": "OFF",
+        "sim_gears_for_space_nav_BUILD_EXAMPLES": "OFF"
       }
     }
   ],

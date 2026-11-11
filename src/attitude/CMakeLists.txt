@@ -23,5 +23,5 @@ set(srcLibFiles ${srcLibFiles} ${srcLibFiles_local} PARENT_SCOPE)
 set(srcCudaFilesToPTX ${srcCudaFilesToPTX} ${srcCudaFilesToPTX_local} PARENT_SCOPE)
 
 if(installable_headers)
-  install(FILES ${installable_headers} DESTINATION include/${project_name}/${relative_path_without_src})
+  install(FILES ${installable_headers} DESTINATION include/${NATIVE_LIBRARY_NAME}/${relative_path_without_src})
 endif()

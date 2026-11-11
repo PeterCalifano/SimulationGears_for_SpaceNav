@@ -14,7 +14,7 @@ find_package(rclcpp REQUIRED)
 find_package(rclcpp_components REQUIRED)
 find_package(rclcpp_lifecycle REQUIRED)
 find_package(lifecycle_msgs REQUIRED)
-find_package(SimulationGears_for_SpaceNav REQUIRED)
+find_package(sim-gears-for-space-nav REQUIRED)
 find_package(simulation_gears_interfaces REQUIRED)
 
 add_library(simulation_gears_ros_conversions SHARED
@@ -26,7 +26,7 @@ target_include_directories(simulation_gears_ros_conversions
     $<INSTALL_INTERFACE:include>
 )
 target_link_libraries(simulation_gears_ros_conversions
-  SimulationGears_for_SpaceNav::SimulationGears_for_SpaceNav
+  sim-gears-for-space-nav::sim-gears-for-space-nav
 )
 ament_target_dependencies(simulation_gears_ros_conversions
   simulation_gears_interfaces
@@ -42,7 +42,7 @@ target_include_directories(simulation_gears_ros_component
 )
 target_link_libraries(simulation_gears_ros_component
   simulation_gears_ros_conversions
-  SimulationGears_for_SpaceNav::SimulationGears_for_SpaceNav
+  sim-gears-for-space-nav::sim-gears-for-space-nav
 )
 ament_target_dependencies(simulation_gears_ros_component
   rclcpp
@@ -96,7 +96,7 @@ ament_export_dependencies(
   rclcpp_components
   rclcpp_lifecycle
   lifecycle_msgs
-  SimulationGears_for_SpaceNav
+  sim-gears-for-space-nav
   simulation_gears_interfaces
 )
 ament_package()

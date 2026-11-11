@@ -9,10 +9,10 @@ get_filename_component(SIMULATION_GEARS_REPOSITORY_ROOT
 option(SIMULATION_GEARS_ENABLE_CUDA "Enable CUDA support in the SimulationGears core." OFF)
 option(SIMULATION_GEARS_ENABLE_OPTIX "Enable OptiX support in the SimulationGears core." OFF)
 
-set(SimulationGears_for_SpaceNav_ENABLE_CUDA
+set(sim_gears_for_space_nav_ENABLE_CUDA
     "${SIMULATION_GEARS_ENABLE_CUDA}" CACHE BOOL
     "Enable CUDA in the SimulationGears core." FORCE)
-set(SimulationGears_for_SpaceNav_ENABLE_OPTIX
+set(sim_gears_for_space_nav_ENABLE_OPTIX
     "${SIMULATION_GEARS_ENABLE_OPTIX}" CACHE BOOL
     "Enable OptiX in the SimulationGears core." FORCE)
 set(ENABLE_TESTS OFF CACHE BOOL "Disable core tests in the ROS 2 overlay build." FORCE)

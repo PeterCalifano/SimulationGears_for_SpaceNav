@@ -1,4 +1,4 @@
-# SimulationGears_for_SpaceNav {#mainpage}
+# sim-gears-for-space-nav {#mainpage}
 
 SimulationGears provides spacecraft navigation simulation models in MATLAB and
 reusable native C++20 utilities, with optional CUDA, wrappers, and a ROS 2 Jazzy
@@ -16,9 +16,9 @@ ctest --preset native-cpu --output-on-failure --no-tests=error
 Installed consumers use:
 
 ```cmake
-find_package(SimulationGears_for_SpaceNav CONFIG REQUIRED)
+find_package(sim-gears-for-space-nav CONFIG REQUIRED)
 target_link_libraries(my_target PRIVATE
-  SimulationGears_for_SpaceNav::SimulationGears_for_SpaceNav)
+  sim-gears-for-space-nav::sim-gears-for-space-nav)
 ```
 
 Use `CPU_ENABLE_NATIVE_TUNING=OFF` for portable CPU artifacts. CUDA is enabled

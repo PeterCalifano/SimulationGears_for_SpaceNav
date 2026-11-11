@@ -14,4 +14,4 @@ set(srcCudaFilesToPTX ${srcCudaFilesToPTX} PARENT_SCOPE)
 
 install(
   FILES ${installable_headers}
-  DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/${project_name}/${relative_path_without_src})
+  DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/${NATIVE_LIBRARY_NAME}/${relative_path_without_src})

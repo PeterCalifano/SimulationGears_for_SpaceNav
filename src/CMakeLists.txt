@@ -2,6 +2,10 @@ set(lib_name ${LIB_TARGET_NAME}) # Override lets nested consumers avoid target n
 
 # Add config.h file to build
 configure_file(config.h.in config.h)
+configure_file(config.h.in "${_project_generated_include_root}/${NATIVE_LIBRARY_NAME}/config.h")
+
+# Keep native source-relative includes private to the library's source tree.
+include_directories("${PROJECT_SOURCE_DIR}/src")
 
 # Add src files to library
 set(SRC_PATTERN "*.cpp" "*.cu")
@@ -42,7 +46,7 @@ list(REMOVE_ITEM srcLibFiles ${EXCLUDED_LIST})
 file(GLOB installable_headers RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} "*.h" "*.cuh")
 if(installable_headers)
   install(FILES ${installable_headers}
-          DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/${project_name})
+          DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/${NATIVE_LIBRARY_NAME})
 endif()
 
 list(LENGTH srcLibFiles src_lib_files_count)
@@ -64,14 +68,16 @@ else()
   set_target_properties(${lib_name} PROPERTIES POSITION_INDEPENDENT_CODE ON)
 endif()
 
-set_target_properties(${lib_name} PROPERTIES EXPORT_NAME ${project_name})
+set_target_properties(${lib_name} PROPERTIES
+                      EXPORT_NAME ${NATIVE_LIBRARY_NAME}
+                      OUTPUT_NAME ${NATIVE_LIBRARY_NAME})
 target_compile_features(${lib_name} ${lib_link_scope} cxx_std_20)
 
 message(STATUS "Configured ${lib_name} as a ${lib_target_type} library target")
 set(PROJECT_LIBRARY_KIND "${lib_target_type}" PARENT_SCOPE)
 
-if(NOT TARGET ${LIB_NAMESPACE}::${project_name})
-  add_library(${LIB_NAMESPACE}::${project_name} ALIAS ${lib_name})
+if(NOT TARGET ${NATIVE_LIBRARY_NAME}::${NATIVE_LIBRARY_NAME})
+  add_library(${NATIVE_LIBRARY_NAME}::${NATIVE_LIBRARY_NAME} ALIAS ${lib_name})
 endif()
 
 if(NOT lib_is_header_only AND SANITIZE_BUILD AND SANITIZER_TARGET AND TARGET ${SANITIZER_TARGET})
@@ -155,43 +161,43 @@ message(NOTICE "Added target to installable list: ${installable_targets}")
 
 if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/global_includes.h")
   install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/global_includes.h"
-          DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/${project_name})
+          DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/${NATIVE_LIBRARY_NAME})
 endif()
 
 install(FILES "${CMAKE_CURRENT_BINARY_DIR}/config.h"
-        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/${project_name})
+        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/${NATIVE_LIBRARY_NAME})
 
 include(CMakePackageConfigHelpers)
 
 install(
   TARGETS ${installable_targets}
-  EXPORT ${project_name}
+  EXPORT ${NATIVE_LIBRARY_NAME}
   LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
   ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
   RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
   INCLUDES DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
 )
 
-install(EXPORT ${project_name}
-        FILE "${project_name}Target.cmake"
-        NAMESPACE ${project_name}::
-        DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/${project_name})
+install(EXPORT ${NATIVE_LIBRARY_NAME}
+        FILE "${NATIVE_LIBRARY_NAME}Target.cmake"
+        NAMESPACE ${NATIVE_LIBRARY_NAME}::
+        DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/${NATIVE_LIBRARY_NAME})
 
 write_basic_package_version_file(
-  "${PROJECT_BINARY_DIR}/${project_name}ConfigVersion.cmake"
+  "${PROJECT_BINARY_DIR}/${NATIVE_LIBRARY_NAME}ConfigVersion.cmake"
   VERSION ${PROJECT_VERSION}
   COMPATIBILITY AnyNewerVersion)
 
 configure_package_config_file(
-  "${CMAKE_CURRENT_SOURCE_DIR}/cmake/${project_name}Config.cmake.in"
-  "${PROJECT_BINARY_DIR}/${project_name}Config.cmake"
-  INSTALL_DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/${project_name})
+  "${CMAKE_CURRENT_SOURCE_DIR}/cmake/${NATIVE_LIBRARY_NAME}Config.cmake.in"
+  "${PROJECT_BINARY_DIR}/${NATIVE_LIBRARY_NAME}Config.cmake"
+  INSTALL_DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/${NATIVE_LIBRARY_NAME})
 
 install(FILES
-  "${PROJECT_BINARY_DIR}/${project_name}Config.cmake"
-  "${PROJECT_BINARY_DIR}/${project_name}ConfigVersion.cmake"
-  DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/${project_name})
+  "${PROJECT_BINARY_DIR}/${NATIVE_LIBRARY_NAME}Config.cmake"
+  "${PROJECT_BINARY_DIR}/${NATIVE_LIBRARY_NAME}ConfigVersion.cmake"
+  DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/${NATIVE_LIBRARY_NAME})
 
-export(EXPORT ${project_name}
-       FILE "${PROJECT_BINARY_DIR}/${project_name}Target.cmake"
-       NAMESPACE ${project_name}::)
+export(EXPORT ${NATIVE_LIBRARY_NAME}
+       FILE "${PROJECT_BINARY_DIR}/${NATIVE_LIBRARY_NAME}Target.cmake"
+       NAMESPACE ${NATIVE_LIBRARY_NAME}::)
