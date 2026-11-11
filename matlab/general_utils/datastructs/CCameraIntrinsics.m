@@ -1,51 +1,59 @@
 classdef CCameraIntrinsics < cameraIntrinsics
 %% DESCRIPTION
 % Class to store optical cameras intrinsic parameters (calibration) for pinhole projection model
+% Optional detector/radiometric metadata uses native units and does not affect
+% projection, feature selection or automatic noise-model configuration.
 % -------------------------------------------------------------------------------------------------------------
 %% CHANGELOG
 % 10-10-2024    Pietro Califano     Class implementation as wrapper of cameraIntrinsics
 % 09-06-2025    Pietro Califano     Update to add new conveniency methods and attributes
+% 16-10-2026    Pietro Califano, Codex gpt-6.1  Retain optional detector metadata.
+% 11-11-2026    Pietro Califano, Claude Opus 5.5  Readability pass.
 % -------------------------------------------------------------------------------------------------------------
 %% DEPENDENCIES
-% [-]
+% cameraIntrinsics, SCameraSensorMetadata.
 % -------------------------------------------------------------------------------------------------------------
     properties (SetAccess = protected, GetAccess = public)
         bDefaultConstructed logical     = true;
-        dPixelSize          double      = zeros(2,1); % [micro_m]
+        dPixelSize          double      = zeros(2,1); % Legacy unpopulated helper [micrometers].
         dFovHW              double      = zeros(2,1); % [rad]
-        dMeanIFovInRad          double  = zeros(2,1); % [rad]
+        dMeanIFovInRad      double      = zeros(2,1); % [rad]
         % TODO remove inheritance from cameraIntrinsics and add fields here
     end
 
     properties (SetAccess = public, GetAccess = public)
         ui32NumOfChannels   uint32  = 1;
+        % Optional physical pitch/response data live here, independently of geometry.
+        objSensorMetadata (1,1) SCameraSensorMetadata = SCameraSensorMetadata()
     end
 
     methods
         %% CONSTRUCTOR
         function self = CCameraIntrinsics(focalLength_uv, principalPoint_uv, imageSizeHW, ui32NumOfChannels)
-            arguments
+            % Build the camera from focal lengths [fx,fy], principal point [u,v] and image
+            % size [H,W], all in pixels; FoV and mean IFOV need all three.
+            arguments (Input)
                 focalLength_uv    (1,2) double = ones(1, 2) % Automatically broadcasts to [1,2] if scalar
                 principalPoint_uv (1,2) double = ones(1, 2)
-                imageSizeHW       (1,2) double = ones(1, 2) 
+                imageSizeHW       (1,2) double = ones(1, 2)
                 ui32NumOfChannels (1,1) uint32 = 1;
             end
 
             self = self@cameraIntrinsics(focalLength_uv, principalPoint_uv, imageSizeHW);
 
             if nargin > 2
-                % Compute FoV from intrinsics 
+                % Compute FoV from intrinsics
                 self.dFovHW(1) =  2*atan(0.5 * imageSizeHW(1) / focalLength_uv(1));
                 self.dFovHW(2) =  2*atan(0.5 * imageSizeHW(2) / focalLength_uv(2));
                 self.bDefaultConstructed = false;
-                
+
                 % Compute mean IFOV
                 self.dMeanIFovInRad = self.dFovHW ./ imageSizeHW(:);
 
             elseif nargin > 0 && nargin < 3
                 warning('You should specify all the intrinsic parameters for the instance to be a valid one. Make sure to do so before using it.')
             end
-            
+
             % Assign default number of channels (Grayscale)
             self.ui32NumOfChannels = ui32NumOfChannels;
         end
@@ -70,11 +78,11 @@ classdef CCameraIntrinsics < cameraIntrinsics
     methods (Static, Access = public)
 
         function self = fromCameraIntrinsics(objCameraIntrinsics, ui32NumOfChannels)
-            % BuildFromParent  Create CCameraIntrinsics from cameraIntrinsics
+            % fromCameraIntrinsics  Create CCameraIntrinsics from cameraIntrinsics
             % Inputs:
             %   objCameraIntrinsics (1,1) cameraIntrinsics
             %   ui32NumOfChannels   (1,1) uint32 = 1
-            arguments
+            arguments (Input)
                 objCameraIntrinsics (1,1) {mustBeA(objCameraIntrinsics, "cameraIntrinsics")}
                 ui32NumOfChannels   (1,1) uint32 = 1
             end
@@ -87,37 +95,42 @@ classdef CCameraIntrinsics < cameraIntrinsics
             % Construct derived object (FoV and IFOV computed in ctor)
             self = CCameraIntrinsics(dFocalLength_uv, dPrincipalPoint_uv, dImageSizeHW, ui32NumOfChannels);
 
+            % Copy the sensor metadata from a CCameraIntrinsics source.
+            % A plain toolbox camera carries geometry only, so its metadata stays unknown.
+            if isa(objCameraIntrinsics, 'CCameraIntrinsics')
+                self.objSensorMetadata = objCameraIntrinsics.objSensorMetadata;
+            end
+
             % Best-effort copy of optional calibration fields (if available)
             % Safe if read-only in superclass; errors ignored by try blocks
             if isprop(objCameraIntrinsics, 'RadialDistortion') && isprop(self, 'RadialDistortion')
-                try 
-                    self.RadialDistortion = objCameraIntrinsics.RadialDistortion; 
+                try
+                    self.RadialDistortion = objCameraIntrinsics.RadialDistortion;
                 catch
                 end
             end
             if isprop(objCameraIntrinsics, 'TangentialDistortion') && isprop(self, 'TangentialDistortion')
                 try
-                    self.TangentialDistortion = objCameraIntrinsics.TangentialDistortion; 
+                    self.TangentialDistortion = objCameraIntrinsics.TangentialDistortion;
                 catch
                 end
             end
             if isprop(objCameraIntrinsics, 'Skew') && isprop(self, 'Skew')
                 try
-                    self.Skew = objCameraIntrinsics.Skew; 
+                    self.Skew = objCameraIntrinsics.Skew;
                 catch
                 end
             end
         end
 
         function [dFocalLengthInPix] = computeFocalLenghInPix(dFov, dSensorSize, enumInputUnit)
-            arguments
+            % Compute the focal length (x,y) in pixels from sensor size (x,y) and field of view (x,y)
+            arguments (Input)
                 dFov        (:,1) double
                 dSensorSize (:,1) double
                 enumInputUnit (1,:) string {mustBeMember(enumInputUnit, ["deg", "rad"])} = "rad"
             end
-            % TODO: ensure that input is 
-            % Compute the focal length (x,y) in pixels from sensor size (x,y) and field of view (x,y)
-        
+
             if strcmpi(enumInputUnit, "deg")
                 dFov = deg2rad(dFov);
             end
@@ -126,11 +139,11 @@ classdef CCameraIntrinsics < cameraIntrinsics
 
             dFocalLengthInPix = zeros(size(dFov, 1), 1);
             dFocalLengthInPix(:) = 0.5 * dSensorSize ./ dTanHalfFov;
-               
+
         end
 
         function [dFovInDegrees] = computeFovInDegrees(dImageSizeHW, dFocalLengthInPix)
-            arguments
+            arguments (Input)
                 dImageSizeHW      (2,1) double
                 dFocalLengthInPix (2,1) double
             end
@@ -141,7 +154,8 @@ classdef CCameraIntrinsics < cameraIntrinsics
         end
 
         function [dMeanIFovInRad] = computeIFovInRad(dFovInRadHW, dImageSizeHW)
-            arguments
+            % Compute the mean IFOV per axis in rad/pixel from the FoV [H,W] and the image size [H,W]
+            arguments (Input)
                 dFovInRadHW       (2,1) double
                 dImageSizeHW      (2,1) double
             end
