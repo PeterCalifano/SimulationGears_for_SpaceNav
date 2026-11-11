@@ -16,9 +16,10 @@ function objTests = testRenderCameraFrame()
 % 19-10-2026  Pietro Califano, Codex GPT-6  Expect additive scalar signal diagnostics.
 % 19-10-2026  Pietro Califano, Codex GPT-6  Verify detector normalization diagnostics.
 % 11-11-2026  Pietro Califano, Claude Opus 5.5  Add the standard header; readability pass.
+% 11-11-2026  Pietro Califano, Claude Opus 5.5  Cover the RGBA byte order and the Blender frame name.
 % -------------------------------------------------------------------------------------------------------------
 %% DEPENDENCIES
-% SImageRequest, RenderCameraFrame, CCameraRendererFixture.
+% SImageRequest, RenderCameraFrame, CCameraRendererFixture, CCameraBlenderRendererFixture.
 % -------------------------------------------------------------------------------------------------------------
 objTests = functiontests(localfunctions);
 end
@@ -74,6 +75,36 @@ for dInvalidWord = [-1, 0.5, Inf, 2^32]
     verifyError(testCase, @() RenderCameraFrame(objRequest, objRenderer), ...
         'RenderCameraFrame:InvalidRendererImage');
 end
+end
+
+function testPackedWordsDecodeRedFromLowestByte(testCase)
+% Word 0xFFF08010 holds R=16, G=128, B=240. rgb2gray weights 0.298936, 0.587043 and 0.114021
+% give 107.29, so 107 DN; swapping red and blue would give 149 DN.
+objRequest = SImageRequest(uint32(1), int32(0), 0, [10; 0; 0], [0; 0; 10], eye(3), zeros(3, 1), eye(3));
+objRenderer = CCameraRendererFixture();
+objRenderer.ui32Image = repmat(uint32(hex2dec('FFF08010')), 2, 3);
+
+ui8Image = RenderCameraFrame(objRequest, objRenderer);
+
+verifyEqual(testCase, ui8Image, repmat(uint8(107), 2, 3));
+end
+
+function testBlenderProviderReceivesWorldGeometryInCustomFrame(testCase)
+% A Blender provider gets the world geometry unchanged and the frame name CUSTOM_FRAME as text.
+dRotation = [0, -1, 0; 1, 0, 0; 0, 0, 1];
+dTarget = [10; 20; 30];
+objRequest = SImageRequest(uint32(2), int32(1), 0.5, ...
+    dTarget + [100; 0; 0], dTarget + [0; 0; 10], eye(3), dTarget, dRotation);
+objRenderer = CCameraBlenderRendererFixture();
+
+RenderCameraFrame(objRequest, objRenderer, 'ui32TargetPort', uint32(51001));
+
+verifyEqual(testCase, objRenderer.dSunPosition_W, dTarget + [100; 0; 0]);
+verifyEqual(testCase, objRenderer.dCameraPosition_W, dTarget + [0; 0; 10]);
+verifyEqual(testCase, objRenderer.dTargetPosition_W, dTarget);
+verifyEqual(testCase, objRenderer.dDCM_WfromTB, dRotation);
+verifyEqual(testCase, objRenderer.strOptions.enumRenderingFrame, 'CUSTOM_FRAME');
+verifyEqual(testCase, objRenderer.strOptions.ui32TargetPort, uint32(51001));
 end
 
 function testInvalidRotationAndGeometry(testCase)

@@ -6,7 +6,7 @@ function objTests = testCameraSurfaceQueries()
 % Exercise real selected Spectra MEX queries and dense acquisitions on an analytic finite plane.
 % -------------------------------------------------------------------------------------------------------------
 %% INPUT
-% None. Add the selected Spectra wrapper and MEX directories before running.
+% None. Set SIM_GEARS_SPECTRA_RT_DIR before SetupSimGears; without it the renderer tests are skipped.
 % -------------------------------------------------------------------------------------------------------------
 %% OUTPUT
 % objTests    Function-based MATLAB tests using disposable, asset-independent scenes.
@@ -15,6 +15,7 @@ function objTests = testCameraSurfaceQueries()
 % 18-10-2026  Pietro Califano, Codex GPT-6  Qualify acquisition geometry, units and exact surface IDs.
 % 19-10-2026  Pietro Califano, Codex GPT-6  Preserve label output position with linear readout.
 % 11-11-2026  Pietro Califano, Claude Opus 5.5  Readability pass; typed loop counters; scene file via yaml.dumpFile.
+% 11-11-2026  Pietro Califano, Claude Opus 5.5  Skip the renderer tests when no capable Spectra build is set.
 % -------------------------------------------------------------------------------------------------------------
 %% DEPENDENCIES
 % QueryCameraSurface, RenderCameraFrame, spectra_rt.CSpectralRayTracerWrapper, yaml.
@@ -24,6 +25,7 @@ end
 
 function testMetricPointsAgreeAcrossTransformedAcquisitionUnits(testCase)
 % Metre and kilometre scenes give the same metric hits after the pose was moved away.
+RequireSpectraSurfaceQueries_(testCase);
 cellHits = cell(1, 2);
 for ui32CaseIdx = uint32(1):uint32(2)
     dUnit_m = [1, 1000];
@@ -58,6 +60,7 @@ end
 
 function testDenseAcquisitionLabelsMatchSparsePixelCentres(testCase)
 % Dense labels from the render match sparse queries at every pixel centre and the analytic plane.
+RequireSpectraSurfaceQueries_(testCase);
 [objRenderer, objCamera, objRequest, objCleanup] = BuildScene_(1, true); %#ok<ASGLU>
 [ui8Image, strIdentity, ui8RawImage, strLabels, fLinearDetectorImage] = ...
     RenderCameraFrame(objRequest, objRenderer, ...
@@ -91,6 +94,7 @@ end
 
 function testAsymmetricImageSupportMatchesLabelsAndQueries(testCase)
 % An off-centre plane appears at the same pixels in the image, the labels and the queries.
+RequireSpectraSurfaceQueries_(testCase);
 [objRenderer, objCamera, objRequest, objCleanup] = BuildScene_(1, true, true); %#ok<ASGLU>
 [~, ~, ui8RawImage, strLabels] = RenderCameraFrame(objRequest, objRenderer, ...
     'bCaptureSurfaceLabels', true);
@@ -113,6 +117,7 @@ end
 
 function testEmptyAndUnlabelledQueriesDoNotInventClasses(testCase)
 % An empty query returns empty columns; an unlabelled mesh reports class 0 with no label validity.
+RequireSpectraSurfaceQueries_(testCase);
 [objRenderer, objCamera, objRequest, objCleanup] = BuildScene_(1000, false); %#ok<ASGLU>
 
 strEmpty = QueryCameraSurface(objRequest, objRenderer, objCamera, zeros(2, 0));
@@ -138,6 +143,7 @@ end
 
 function testMisregisteredCalibrationFailsAtRealRendererBoundary(testCase)
 % The renderer rejects a principal point or focal length that differs from its viewport.
+RequireSpectraSurfaceQueries_(testCase);
 [objRenderer, ~, objRequest, objCleanup] = BuildScene_(1, true); %#ok<ASGLU>
 cellCameras = {CCameraIntrinsics([45, 60], [48, 32], [64, 96]), ...
     CCameraIntrinsics([40, 60], [48.5, 32.5], [64, 96])};
@@ -152,6 +158,20 @@ for ui32CaseIdx = uint32(1):uint32(numel(cellCameras))
     end
     verifyTrue(testCase, bRejected, 'Reject calibration that is not represented by the rendered image.');
 end
+end
+
+function RequireSpectraSurfaceQueries_(testCase)
+% Skip the test unless a Spectra-RT wrapper with surface queries and scene files is on the path.
+objClass = meta.class.fromName('spectra_rt.CSpectralRayTracerWrapper');
+bAvailable = ~isempty(objClass);
+if bAvailable
+    bAvailable = all(ismember({'queryPixels', 'loadSceneFromConfig', 'renderFrameWithLabels'}, ...
+        {objClass.MethodList.Name}));
+end
+
+assumeTrue(testCase, bAvailable, ['Needs a Spectra-RT build whose MATLAB wrapper has queryPixels, ', ...
+    'loadSceneFromConfig and renderFrameWithLabels. Set SIM_GEARS_SPECTRA_RT_DIR to that build ', ...
+    'before SetupSimGears.']);
 end
 
 function [objRenderer, objCamera, objRequest, objCleanup] = BuildScene_(dUnit_m, bLabels, bAsymmetric)

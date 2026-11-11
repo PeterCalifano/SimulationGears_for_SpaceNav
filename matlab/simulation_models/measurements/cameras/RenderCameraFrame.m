@@ -38,9 +38,10 @@ function [varImage, strDiagnostics, varRawImage, strSurfaceLabels, fLinearDetect
 % 19-10-2026  Pietro Califano, Codex GPT-6  Report detector signal normalization levels.
 % 19-10-2026  Pietro Califano, Codex GPT-6  Expose signed detector readout from one acquisition.
 % 11-11-2026  Pietro Califano, Claude Opus 5.5  Readability pass; image prefixes match the varying class.
+% 11-11-2026  Pietro Califano, Claude Opus 5.5  Decode packed RGBA locally; name the Blender frame as text.
 % -------------------------------------------------------------------------------------------------------------
 %% DEPENDENCIES
-% Image Processing Toolbox; Spectra ConvertRGBAtoRGB or Blender renderer adapter.
+% Image Processing Toolbox; a Spectra or Blender renderer object supplied by the caller.
 % See RunCameraFrameExample for executable use and representative output.
 % -------------------------------------------------------------------------------------------------------------
 
@@ -127,7 +128,12 @@ if ismethod(objRenderer, 'setLightPosition') && ismethod(objRenderer, 'setCamera
             'Packed RGBA doubles must be finite integers in the uint32 range.');
     end
 
-    varImage = im2gray(ConvertRGBAtoRGB(uint32(varPackedImage)));
+    % Split the packed RGBA8 words into RGB: red is the lowest byte, then green and blue; drop alpha
+    ui32PackedImage = uint32(varPackedImage);
+    ui8ImageRGB = cat(3, uint8(bitand(ui32PackedImage, 255)), ...
+                         uint8(bitand(bitshift(ui32PackedImage, -8), 255)), ...
+                         uint8(bitand(bitshift(ui32PackedImage, -16), 255)));
+    varImage = im2gray(ui8ImageRGB);
 
 elseif ismethod(objRenderer, 'renderImage')
 
@@ -136,13 +142,15 @@ elseif ismethod(objRenderer, 'renderImage')
         objRenderer.Initialize();
     end
 
+    % Name the frame as text so this file does not need CommManager4MATLAB's
+    % EnumRenderingFrame; BlenderPyCommManager converts the text to its enum.
     varImage = objRenderer.renderImage(objRequest.dSunPosition_W, ...
         objRequest.dCameraPosition_W, ...
         objRequest.dDCM_WfromCAM, ...
         objRequest.dTargetPosition_W, ...
         objRequest.dDCM_WfromTB, ...
         'ui32TargetPort', options.ui32TargetPort, ...
-        'enumRenderingFrame', EnumRenderingFrame.CUSTOM_FRAME, ...
+        'enumRenderingFrame', 'CUSTOM_FRAME', ...
         'bConvertCamQuatToBlenderQuat', options.bConvertCamQuatToBlenderQuat);
 else
     error('RenderCameraFrame:UnsupportedRenderer', ...

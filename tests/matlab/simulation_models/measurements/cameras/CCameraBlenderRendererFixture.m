@@ -15,9 +15,10 @@ classdef CCameraBlenderRendererFixture < handle
     % 19-10-2026  Pietro Califano, Codex GPT-6  Add host-only render fixture.
     % 19-10-2026  Pietro Califano, Codex GPT-6  Allow typed integer and float render fixtures.
     % 11-11-2026  Pietro Califano, Claude Opus 5.5  Readability pass.
+    % 11-11-2026  Pietro Califano, Claude Opus 5.5  Record the rendering frame as text.
     % -------------------------------------------------------------------------------------------------------------
     %% DEPENDENCIES
-    % RenderCameraFrame, EnumRenderingFrame
+    % RenderCameraFrame
     % -------------------------------------------------------------------------------------------------------------
 
     properties
@@ -52,7 +53,7 @@ classdef CCameraBlenderRendererFixture < handle
             % 11-11-2026  Pietro Califano, Claude Opus 5.5  Readability pass.
             % ---------------------------------------------------------------------------------------------------------
             %% DEPENDENCIES
-            % EnumRenderingFrame
+            % [-]
             % ---------------------------------------------------------------------------------------------------------
             arguments (Input)
                 self (1,1) CCameraBlenderRendererFixture
@@ -62,7 +63,8 @@ classdef CCameraBlenderRendererFixture < handle
                 dTargetPosition_W (3,1) double
                 dDCM_WfromTB (3,3) double
                 options.ui32TargetPort (1,1) uint32 = uint32(0)
-                options.enumRenderingFrame EnumRenderingFrame
+                options.enumRenderingFrame (1,:) char ...
+                    {mustBeMember(options.enumRenderingFrame, {'TARGET_BODY', 'CAMERA', 'CUSTOM_FRAME'})} = 'TARGET_BODY'
                 options.bConvertCamQuatToBlenderQuat (1,1) logical = true
             end
 

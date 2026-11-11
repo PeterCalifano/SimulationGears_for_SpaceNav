@@ -10,7 +10,7 @@ function [varImage, strHits, strLabels] = RunCameraSurfaceExample()
 % The example deletes its temporary input files and releases the renderer before returning.
 % -------------------------------------------------------------------------------------------------------------
 %% INPUT
-% None. Add SimulationGears, Spectra MATLAB helpers and its matching wrapper/MEX build first.
+% None. Set SIM_GEARS_SPECTRA_RT_DIR to a Spectra-RT build, then call SetupSimGears.
 % -------------------------------------------------------------------------------------------------------------
 %% OUTPUT
 % varImage   Grayscale image before any optional image-error pipeline.
@@ -20,6 +20,7 @@ function [varImage, strHits, strLabels] = RunCameraSurfaceExample()
 %% CHANGELOG
 % 18-10-2026  Pietro Califano, Codex GPT-6  Demonstrate acquisition-bound surface queries and dense labels.
 % 11-11-2026  Pietro Califano, Claude Opus 5.5  Readability pass; write the scene file with yaml.dumpFile.
+% 11-11-2026  Pietro Califano, Claude Opus 5.5  Name SIM_GEARS_SPECTRA_RT_DIR when no Spectra wrapper is found.
 % -------------------------------------------------------------------------------------------------------------
 %% DEPENDENCIES
 % SImageRequest, CCameraIntrinsics, RenderCameraFrame, QueryCameraSurface, Spectra MEX, yaml.
@@ -33,6 +34,12 @@ arguments (Output)
     varImage (:,:) {mustBeNumeric}
     strHits (1,1) struct
     strLabels (1,1) struct
+end
+
+% Require the Spectra-RT wrapper before writing any file
+if isempty(meta.class.fromName('spectra_rt.CSpectralRayTracerWrapper'))
+    error('RunCameraSurfaceExample:MissingSpectraRt', ...
+        'Set SIM_GEARS_SPECTRA_RT_DIR to a Spectra-RT build, then call SetupSimGears.');
 end
 
 % Write a labelled square plane and its scene description to a temporary folder

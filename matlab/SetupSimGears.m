@@ -3,13 +3,18 @@ function SetupSimGears()
 % Add all SimulationGears MATLAB source directories to the MATLAB path.
 % Can be called from any working directory. Excludes .deprecated/, generated
 % MEX artifacts, codegen/mex/, and experimental/ folders.
-% An explicitly selected camera-noise MEX installation may be added through
-% SIM_GEARS_CAMERA_NOISE_MEX_DIR; it is independent of any renderer provider.
+% Optional external dependencies are added only when their environment variable is set:
+%   SIM_GEARS_CAMERA_NOISE_MEX_DIR  camera-noise MEX installation (independent of any renderer);
+%   SIM_GEARS_SPECTRA_RT_DIR        Spectra-RT build root; adds wrap/spectra_rt and wrap/spectra_rt_mex;
+%   SIM_GEARS_COMM_MANAGER_DIR      CommManager4MATLAB root; adds src and its subfolders at the end.
+% The vendored lib/yaml package is added when no other yaml package is on the path.
 % -------------------------------------------------------------------------------------------------------------
 %% CHANGELOG
 % 28-03-2026    Pietro Califano     Initial version
 % 27-07-2026    Pietro Califano, Codex     Prioritize shared SimulationGears propagators.
 % 11-11-2026    Pietro Califano, Claude Opus 5.5  Record the optional camera-noise MEX directory.
+% 11-11-2026    Pietro Califano, Claude Opus 5.5  Add opt-in Spectra-RT and CommManager4MATLAB directories
+%                                                 and the yaml fallback.
 % -------------------------------------------------------------------------------------------------------------
 %% DEPENDENCIES
 % [-]
@@ -54,18 +59,25 @@ end
 
 fprintf('SimulationGears MATLAB paths added from: %s\n', charMatlabRoot);
 
-% Admit only an explicitly chosen sampler installation, never every generated build.
-charNoiseMexRoot = getenv('SIM_GEARS_CAMERA_NOISE_MEX_DIR');
-if ~isempty(charNoiseMexRoot)
-    if ~isfolder(charNoiseMexRoot)
-        error('SetupSimGears:MissingCameraNoiseMexDirectory', ...
-            'SIM_GEARS_CAMERA_NOISE_MEX_DIR does not identify a directory: %s', charNoiseMexRoot);
-    end
-    addpath(charNoiseMexRoot, '-begin');
+% Admit only explicitly chosen external installations, never every generated build.
+AddDirectoriesFromEnv_('SIM_GEARS_CAMERA_NOISE_MEX_DIR', {''}, ...
+    'SetupSimGears:MissingCameraNoiseMexDirectory', '-begin', false);
+AddDirectoriesFromEnv_('SIM_GEARS_SPECTRA_RT_DIR', ...
+    {fullfile('wrap', 'spectra_rt'), fullfile('wrap', 'spectra_rt_mex')}, ...
+    'SetupSimGears:MissingSpectraRtDirectory', '-begin', false);
+
+% Put CommManager4MATLAB last so its utilities never shadow SimulationGears functions
+AddDirectoriesFromEnv_('SIM_GEARS_COMM_MANAGER_DIR', {'src'}, ...
+    'SetupSimGears:MissingCommManagerDirectory', '-end', true);
+
+% Add the vendored yaml package unless another installation already provides it
+charRepoRoot = fileparts(charMatlabRoot);
+charYamlRoot = fullfile(charRepoRoot, 'lib', 'yaml');
+if isempty(which('yaml.dumpFile')) && isfolder(charYamlRoot)
+    addpath(charYamlRoot);
 end
 
 % Add MathCore MATLAB library (sibling of matlab/ under repo root)
-charRepoRoot    = fileparts(charMatlabRoot);
 cellMathCoreRootCandidates = { ...
     fullfile(charRepoRoot, 'lib', 'MathCore_for_ComputerVision', 'matlab'), ...
     fullfile(charRepoRoot, 'lib', 'MathCore_for_SpaceNav', 'matlab')};
@@ -116,5 +128,54 @@ if isfolder(charPropagatorRoot)
 end
 if isfolder(charIntegratorRoot)
     addpath(charIntegratorRoot, '-begin');
+end
+end
+
+function AddDirectoriesFromEnv_(charVariableName, cellRelativeFolders, charErrorId, charPosition, bRecursive)
+%% SIGNATURE
+% AddDirectoriesFromEnv_(charVariableName, cellRelativeFolders, charErrorId, charPosition, bRecursive)
+% -------------------------------------------------------------------------------------------------------------
+%% DESCRIPTION
+% Add folders under the directory named by an environment variable. Do nothing when the variable is
+% unset; raise charErrorId when a listed folder is missing.
+% -------------------------------------------------------------------------------------------------------------
+%% INPUT
+% charVariableName     Environment variable that holds the root directory.
+% cellRelativeFolders  Folders relative to that root; '' is the root itself.
+% charErrorId          Error identifier for a missing folder.
+% charPosition         '-begin' or '-end' of the MATLAB path.
+% bRecursive           Also add every subfolder.
+% -------------------------------------------------------------------------------------------------------------
+%% CHANGELOG
+% 11-11-2026  Pietro Califano, Claude Opus 5.5  Share the optional-directory handling.
+% -------------------------------------------------------------------------------------------------------------
+arguments (Input)
+    charVariableName (1,:) char
+    cellRelativeFolders (1,:) cell
+    charErrorId (1,:) char
+    charPosition (1,:) char {mustBeMember(charPosition, {'-begin', '-end'})}
+    bRecursive (1,1) logical
+end
+
+charRoot = getenv(charVariableName);
+if isempty(charRoot)
+    return
+end
+
+% Check every folder before changing the path
+cellFolders = fullfile(charRoot, cellRelativeFolders);
+for ui32FolderIdx = uint32(1):uint32(numel(cellFolders))
+    if ~isfolder(cellFolders{ui32FolderIdx})
+        error(charErrorId, '%s does not contain the expected directory: %s', ...
+            charVariableName, cellFolders{ui32FolderIdx});
+    end
+end
+
+for ui32FolderIdx = uint32(1):uint32(numel(cellFolders))
+    charFolder = cellFolders{ui32FolderIdx};
+    if bRecursive
+        charFolder = genpath(charFolder);
+    end
+    addpath(charFolder, charPosition);
 end
 end
