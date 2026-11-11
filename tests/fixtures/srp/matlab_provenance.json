@@ -1,0 +1,20 @@
+{
+  "generator": "GenerateNativeSrpFixtures.m",
+  "matlab": "R2024b",
+  "reference": {
+    "root": "/home/peterc/devDir/SimulationGears_for_SpaceNav",
+    "head": "595774b23ee41177b8306483e2f6337bc3a25cd0",
+    "files": {
+      "matlab/simulation_models/accelerations/ComputePanelSrpResponse.m": "06d24a82e9feaf4cc0950df4d8001758d885f846caacf894c6fd8009f91cdc05",
+      "matlab/simulation_models/accelerations/ComputePreparedPanelVisibility.m": "9be0865be6ec25a399dcbb21293909ab103ed0e7e6ea4a76b820281d2779d957",
+      "matlab/simulation_models/accelerations/srp_lut/BuildPanelSrpShadowData.m": "6d595455fa3255e8dab84dfdaad62b7aaf7c4668686fea0009c6e74fc19b2932",
+      "matlab/simulation_models/accelerations/srp_lut/private/EvalSrpLutKernel.m": "5360abcf25c56282ad0b7022a1791f53d8b4f24b4fa96d3c28378ea92ee971df",
+      "matlab/simulation_models/accelerations/EvalCartesianExtSHE.m": "577c4ae3c26457d01491854559bcd2f1a47bbbd3729644520a0c21df06ad9034"
+    }
+  },
+  "fixtures": {
+    "matlab_panel.csv": "e0f71eda82491a97410c2dde022203b07b69897e646453a42492f2731c250155",
+    "matlab_response.json": "4a022f4ae22f7b938c86b7750da662cb912c4b4eb4b9f57584a9f0d3dcd3a4d0",
+    "matlab_kernel.csv": "0ce0e0c017058688f318e04d5db44c086ac0cdecd64418c2d628783ace769865"
+  }
+}

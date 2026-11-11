@@ -1,0 +1,16 @@
+schema_version: 2
+mesh:
+  file: two_triangles.obj
+  sha256: 76ef7517546d82a59b7217ab5f19417c07f059161e82997ceb3bbd3ba212dfc7
+  length_unit: m
+  triangle_count: 2
+  triangle_indexing: obj_record_order_1_based
+families:
+  - name: Absorber
+    triangle_ranges: [[1, 1]]
+    reflectivity: {diffuse: 0.0, specular: 0.0}
+    back_reflectivity_family: Mirror
+  - name: Mirror
+    triangle_ranges: [[2, 2]]
+    reflectivity: {diffuse: 0.0, specular: 1.0}
+    back_reflectivity_family: ''

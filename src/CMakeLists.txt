@@ -18,6 +18,7 @@ get_filename_component(CURRENT_FOLDER_NAME ${CMAKE_CURRENT_SOURCE_DIR} NAME)
 message(STATUS "Library src files found in ${CURRENT_FOLDER_NAME}: ${srcLibFiles}")
 
 # Add subdirectories with src files
+add_subdirectory(srp)
 if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/utils/CMakeLists.txt")
   message(STATUS "Adding module: utils")
   add_subdirectory(utils)
@@ -72,6 +73,10 @@ set_target_properties(${lib_name} PROPERTIES
                       EXPORT_NAME ${NATIVE_LIBRARY_NAME}
                       OUTPUT_NAME ${NATIVE_LIBRARY_NAME})
 target_compile_features(${lib_name} ${lib_link_scope} cxx_std_20)
+target_include_directories(${lib_name} SYSTEM PRIVATE
+                           "${PROJECT_SOURCE_DIR}/lib/rapidjson/include"
+                           "${PROJECT_SOURCE_DIR}/lib/rapidyaml"
+                           "${PROJECT_SOURCE_DIR}/lib/picosha2")
 
 message(STATUS "Configured ${lib_name} as a ${lib_target_type} library target")
 set(PROJECT_LIBRARY_KIND "${lib_target_type}" PARENT_SCOPE)

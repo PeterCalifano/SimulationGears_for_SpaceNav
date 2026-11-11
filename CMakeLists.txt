@@ -468,6 +468,10 @@ message(STATUS "====================  Library composition  =====================
 # Add library
 add_subdirectory( src )
 
+if(BUILD_AS_MAIN_PROJECT AND ${BUILD_PROGRAMS_OPTION_NAME})
+  add_subdirectory(programs)
+endif()
+
 # Add examples to build
 if (BUILD_AS_MAIN_PROJECT AND ${${BUILD_EXAMPLES_OPTION_NAME}})
   add_subdirectory( examples )

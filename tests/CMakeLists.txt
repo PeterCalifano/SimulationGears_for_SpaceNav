@@ -20,6 +20,10 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 # Add tests to build
 if(Catch2_FOUND)
   add_tests(${project_name} EXCLUDED_LIST TESTS_LIST ${CUDA_COMPILE_TARGET} CATCH2_TEST_PROPERTIES Catch2::Catch2WithMain)
+  target_compile_definitions(testSrpLutData PRIVATE
+                            SRP_FIXTURE_DIRECTORY="${CMAKE_CURRENT_SOURCE_DIR}/fixtures/srp")
+  target_compile_definitions(testSrpPanelModel PRIVATE
+                            SRP_FIXTURE_DIRECTORY="${CMAKE_CURRENT_SOURCE_DIR}/fixtures/srp")
 else()
   message(STATUS "Catch2 not found. Skipping Catch2 unit tests.")
 endif()
