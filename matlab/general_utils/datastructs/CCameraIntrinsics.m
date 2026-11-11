@@ -8,6 +8,7 @@ classdef CCameraIntrinsics < cameraIntrinsics
 % 10-10-2024    Pietro Califano     Class implementation as wrapper of cameraIntrinsics
 % 09-06-2025    Pietro Califano     Update to add new conveniency methods and attributes
 % 16-10-2026    Pietro Califano, Codex gpt-6.1  Retain optional detector metadata.
+% 18-10-2026    Pietro Califano, Codex GPT-6  Align FoV with MATLAB [H,W] image order.
 % 11-11-2026    Pietro Califano, Claude Opus 5.5  Readability pass.
 % -------------------------------------------------------------------------------------------------------------
 %% DEPENDENCIES
@@ -16,7 +17,7 @@ classdef CCameraIntrinsics < cameraIntrinsics
     properties (SetAccess = protected, GetAccess = public)
         bDefaultConstructed logical     = true;
         dPixelSize          double      = zeros(2,1); % Legacy unpopulated helper [micrometers].
-        dFovHW              double      = zeros(2,1); % [rad]
+        dFovHW              double      = zeros(2,1); % [vertical, horizontal] rad, matching [H,W].
         dMeanIFovInRad      double      = zeros(2,1); % [rad]
         % TODO remove inheritance from cameraIntrinsics and add fields here
     end
@@ -42,9 +43,9 @@ classdef CCameraIntrinsics < cameraIntrinsics
             self = self@cameraIntrinsics(focalLength_uv, principalPoint_uv, imageSizeHW);
 
             if nargin > 2
-                % Compute FoV from intrinsics
-                self.dFovHW(1) =  2*atan(0.5 * imageSizeHW(1) / focalLength_uv(1));
-                self.dFovHW(2) =  2*atan(0.5 * imageSizeHW(2) / focalLength_uv(2));
+                % Keep FoV in MATLAB [H,W] order while focal length remains [fx,fy].
+                self.dFovHW(1) = 2*atan(0.5 * imageSizeHW(1) / focalLength_uv(2));
+                self.dFovHW(2) = 2*atan(0.5 * imageSizeHW(2) / focalLength_uv(1));
                 self.bDefaultConstructed = false;
 
                 % Compute mean IFOV
@@ -143,13 +144,16 @@ classdef CCameraIntrinsics < cameraIntrinsics
         end
 
         function [dFovInDegrees] = computeFovInDegrees(dImageSizeHW, dFocalLengthInPix)
+            % Compute the FoV in degrees from the image size [H,W] and focal lengths [fx,fy] in pixels
             arguments (Input)
                 dImageSizeHW      (2,1) double
                 dFocalLengthInPix (2,1) double
             end
 
-            dFovInDegrees(1) =  2*atand(0.5 * double(dImageSizeHW(1)) / dFocalLengthInPix(1));
-            dFovInDegrees(2) =  2*atand(0.5 * double(dImageSizeHW(2)) / dFocalLengthInPix(2));
+            % Return [vertical,horizontal] for MATLAB [H,W] and focal lengths [fx,fy].
+            dFovInDegrees = zeros(1, 2);
+            dFovInDegrees(1) = 2*atand(0.5 * double(dImageSizeHW(1)) / dFocalLengthInPix(2));
+            dFovInDegrees(2) = 2*atand(0.5 * double(dImageSizeHW(2)) / dFocalLengthInPix(1));
 
         end
 
