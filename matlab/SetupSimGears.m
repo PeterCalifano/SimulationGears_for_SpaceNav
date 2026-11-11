@@ -3,10 +3,13 @@ function SetupSimGears()
 % Add all SimulationGears MATLAB source directories to the MATLAB path.
 % Can be called from any working directory. Excludes .deprecated/, generated
 % MEX artifacts, codegen/mex/, and experimental/ folders.
+% An explicitly selected camera-noise MEX installation may be added through
+% SIM_GEARS_CAMERA_NOISE_MEX_DIR; it is independent of any renderer provider.
 % -------------------------------------------------------------------------------------------------------------
 %% CHANGELOG
 % 28-03-2026    Pietro Califano     Initial version
 % 27-07-2026    Pietro Califano, Codex     Prioritize shared SimulationGears propagators.
+% 11-11-2026    Pietro Califano, Claude Opus 5.5  Record the optional camera-noise MEX directory.
 % -------------------------------------------------------------------------------------------------------------
 %% DEPENDENCIES
 % [-]
@@ -50,6 +53,16 @@ for idP = 1:length(cellAllPaths)
 end
 
 fprintf('SimulationGears MATLAB paths added from: %s\n', charMatlabRoot);
+
+% Admit only an explicitly chosen sampler installation, never every generated build.
+charNoiseMexRoot = getenv('SIM_GEARS_CAMERA_NOISE_MEX_DIR');
+if ~isempty(charNoiseMexRoot)
+    if ~isfolder(charNoiseMexRoot)
+        error('SetupSimGears:MissingCameraNoiseMexDirectory', ...
+            'SIM_GEARS_CAMERA_NOISE_MEX_DIR does not identify a directory: %s', charNoiseMexRoot);
+    end
+    addpath(charNoiseMexRoot, '-begin');
+end
 
 % Add MathCore MATLAB library (sibling of matlab/ under repo root)
 charRepoRoot    = fileparts(charMatlabRoot);
