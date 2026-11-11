@@ -10,10 +10,16 @@
 			"path": "../CommManagersIndex/CommManager4MATLAB"
 		},
 		{
-			"path": "../simulationUtils"
+			"path": "../SimulationGears_for_SpaceNav-worktrees/landing-building-blocks"
 		},
 		{
-			"path": "../SLAM-repos/MSCKF_for_SpaceNav"
+			"path": "../SimulationGears_for_SpaceNav-worktrees/target-rotational-state-models"
+		},
+		{
+			"path": "../SimulationGears_for_SpaceNav-worktrees/cosmica-upgrade-consolidation"
+		},
+		{
+			"path": "../MathCore_for_SpaceNav"
 		}
 	],
 	"settings": {
