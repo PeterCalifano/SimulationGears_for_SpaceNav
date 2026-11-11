@@ -1,149 +1,179 @@
-function objFilename = untitled(model, filename, varargin)
-%WRITE_MODEL_TO_OBJ Export mesh struct to a Wavefront .obj file.
-%
-%   objFilename = WRITE_MODEL_TO_OBJ(model, filename) writes the
-%   vertices and faces from the mesh struct 'model' into the .obj file
-%   specified by 'filename'. Returns the actual filename used.
-%
-%   Optional name-value pair:
-%     'Overwrite' (logical) — overwrite existing files (default: false)
-%
-%   The 'model' struct must contain:
-%     - v    : M-by-3 double array of vertex coordinates
-%     - f.v  : N-by-K uint32 or double array of face vertex indices
-%   Optional fields:
-%     - vt   : M-by-2 double array of texture coordinates
-%     - vn   : M-by-3 double array of normals
-%     - f.vt : N-by-K texture-coordinate indices
-%     - f.vn : N-by-K normal indices
-%     - meta.mtllib : string for material library
-%     - meta.count  : number of objects
-%     - meta.o0, o1...oN with fields:
-%         name (string), idx_v, idx_vt, idx_vn, idx_f (1x2 index ranges)
+function charObjFilePath = WriteModelToObj(strModel, charFileName, varargin)
+%% SIGNATURE
+% charObjFilePath = WriteModelToObj(strModel, charFileName, 'Overwrite', bOverwrite)
+% -------------------------------------------------------------------------------------------------------------
+%% DESCRIPTION
+% Write the vertices and triangular faces of a mesh struct to a Wavefront OBJ file. A file name without
+% a folder writes into the current folder. Without Overwrite, an existing file is kept and the mesh goes
+% to <name>_1.obj, <name>_2.obj and so on. The written path is returned.
+% -------------------------------------------------------------------------------------------------------------
+%% INPUT
+% strModel      struct with the fields
+%                 v            M-by-3 double vertex coordinates
+%                 f.v          N-by-3 uint32 or double one-based vertex indices of the triangles
+%               and the optional fields
+%                 vt           M-by-2 double texture coordinates
+%                 vn           M-by-3 double normals
+%                 f.vt         N-by-3 texture-coordinate indices
+%                 f.vn         N-by-3 normal indices
+%                 meta.mtllib  material library name
+%                 meta.count   index of the last object: the objects are meta.o0 to meta.o<count>
+%                 meta.o0 ...  objects with name, idx_v, idx_vt, idx_vn and idx_f ([first, last] index
+%                              ranges), and optional mtl and s
+% charFileName  (1,:) char or string output path; the extension is .obj or empty
+% Overwrite     (1,1) logical name-value: overwrite an existing file (default false)
+% -------------------------------------------------------------------------------------------------------------
+%% OUTPUT
+% charObjFilePath  (1,:) char path of the written file
+% -------------------------------------------------------------------------------------------------------------
+%% CHANGELOG
+% 11-11-2026  Pietro Califano, Claude Opus 5.5  Fix the function name, the output folder and the line ends;
+%                                                close the file with onCleanup; standard header and names.
+% -------------------------------------------------------------------------------------------------------------
+%% DEPENDENCIES
+% [-]
+% -------------------------------------------------------------------------------------------------------------
+
+%% Function code
 
 % Parse inputs
-p = inputParser;
-addRequired(p, 'model', @isstruct);
-addRequired(p, 'filename', @(x) ischar(x)||isstring(x));
-addParameter(p, 'Overwrite', false, @(x) islogical(x)&&isscalar(x));
-parse(p, model, filename, varargin{:});
-overwrite = p.Results.Overwrite;
-model    = p.Results.model;
-filename = char(p.Results.filename);
+objParser = inputParser;
+addRequired(objParser, 'model', @isstruct);
+addRequired(objParser, 'filename', @(x) ischar(x) || isstring(x));
+addParameter(objParser, 'Overwrite', false, @(x) islogical(x) && isscalar(x));
+parse(objParser, strModel, charFileName, varargin{:});
+bOverwrite = objParser.Results.Overwrite;
+strModel = objParser.Results.model;
+charFileName = char(objParser.Results.filename);
 
-% Validate extension
-[base,~,ext] = fileparts(filename);
-if isempty(ext)
-    ext = '.obj';
-elseif ~strcmpi(ext, '.obj')
+% Check the extension and resolve the output path; a name without a folder goes to the current folder
+[charFolder, charBaseName, charExtension] = fileparts(charFileName);
+if isempty(charExtension)
+    charExtension = '.obj';
+elseif ~strcmpi(charExtension, '.obj')
     error('writeModelToObj:InvalidExtension', 'Filename must end with .obj');
 end
-objFilename = fullfile(pwd, [base, ext]);
+if isempty(charFolder)
+    charFolder = pwd;
+end
+charObjFilePath = fullfile(charFolder, [charBaseName, charExtension]);
 
-% Handle duplicates if not overwriting
-if ~overwrite
-    count = 0;
-    while isfile(objFilename)
-        count = count + 1;
-        objFilename = fullfile(pwd, sprintf('%s_%d.obj', base, count));
+% Without Overwrite, append _1, _2 and so on until the name is free
+if ~bOverwrite
+    dCopyCount = 0;
+    while isfile(charObjFilePath)
+        dCopyCount = dCopyCount + 1;
+        charObjFilePath = fullfile(charFolder, sprintf('%s_%d.obj', charBaseName, dCopyCount));
     end
 end
 
 % Open file for writing
-fileId = fopen(objFilename, 'w');
-if fileId < 0
-    error('writeModelToObj:FileOpenError', 'Cannot open file "%s" for writing.', objFilename);
+dFileID = fopen(charObjFilePath, 'w');
+if dFileID < 0
+    error('writeModelToObj:FileOpenError', 'Cannot open file "%s" for writing.', charObjFilePath);
 end
 
-try
-    % Write header
-    fprintf(fileId, '# Generated by writeModelToObj');
-    if isfield(model, 'meta') && isfield(model.meta, 'mtllib')
-        fprintf(fileId, 'mtllib %s', model.meta.mtllib);
-    end
+% Close the file on return and on error
+objFileCleanup = onCleanup(@() fclose(dFileID));
 
-    % Determine counts
-    objCount = 0;
-    if isfield(model, 'meta') && isfield(model.meta, 'count')
-        objCount = model.meta.count;
+% Write the header and the material library
+fprintf(dFileID, '# Generated by writeModelToObj\n');
+if isfield(strModel, 'meta') && isfield(strModel.meta, 'mtllib')
+    fprintf(dFileID, 'mtllib %s\n', strModel.meta.mtllib);
+end
+
+% Read the object list; without meta.count, write the whole model as one object named after the file
+dObjectCount = 0;
+if isfield(strModel, 'meta') && isfield(strModel.meta, 'count')
+    dObjectCount = strModel.meta.count;
+end
+if dObjectCount == 0
+    dNumTexCoords = 0;
+    if isfield(strModel, 'vt')
+        dNumTexCoords = size(strModel.vt, 1);
     end
-    % If no objects, assume single
-    if objCount == 0
-        objects = struct('name', base, 'idx_v', [1,size(model.v,1)], ...
-            'idx_vt', [1,size(getfield(model,'vt',zeros(0,2)),1)], ...
-            'idx_vn', [1,size(getfield(model,'vn',zeros(0,3)),1)], ...
-            'idx_f', [1,size(model.f.v,1)]);
+    dNumNormals = 0;
+    if isfield(strModel, 'vn')
+        dNumNormals = size(strModel.vn, 1);
+    end
+    strObjects = struct('name', charBaseName, 'idx_v', [1, size(strModel.v, 1)], ...
+        'idx_vt', [1, dNumTexCoords], ...
+        'idx_vn', [1, dNumNormals], ...
+        'idx_f', [1, size(strModel.f.v, 1)]);
+else
+    for dObjectIdx = 0:dObjectCount
+        strObjects(dObjectIdx + 1) = strModel.meta.(sprintf('o%d', dObjectIdx));
+    end
+end
+
+% Check which optional fields the model holds
+bHasTexCoords = isfield(strModel, 'vt') && ~isempty(strModel.vt);
+bHasNormals = isfield(strModel, 'vn') && ~isempty(strModel.vn);
+bHasFaceTexCoords = isfield(strModel.f, 'vt');
+bHasFaceNormals = isfield(strModel.f, 'vn');
+
+% Write each object
+for strObject = strObjects
+    fprintf(dFileID, 'o %s\n', strObject.name);
+    % Vertices
+    dVertexRange = strObject.idx_v(1):strObject.idx_v(2);
+    dVertexData = strModel.v(dVertexRange, :);  % M-by-3
+    fprintf(dFileID, 'v %.6f %.6f %.6f\n', dVertexData');
+    % Texture coordinates
+    if bHasTexCoords
+        dTexCoordRange = strObject.idx_vt(1):strObject.idx_vt(2);
+        dTexCoordData = strModel.vt(dTexCoordRange, :);
+        fprintf(dFileID, 'vt %.6f %.6f\n', dTexCoordData');
+    end
+    % Normals
+    if bHasNormals
+        dNormalRange = strObject.idx_vn(1):strObject.idx_vn(2);
+        dNormalData = strModel.vn(dNormalRange, :);
+        fprintf(dFileID, 'vn %.4f %.4f %.4f\n', dNormalData');
+    end
+    % Material and smoothing
+    if isfield(strObject, 'mtl')
+        fprintf(dFileID, 'usemtl %s\n', strObject.mtl);
+    end
+    if isfield(strObject, 's')
+        fprintf(dFileID, 's %s\n', strObject.s);
+    end
+    % Faces: triangles, with optional texture-coordinate and normal indices
+    dFaceRange = strObject.idx_f(1):strObject.idx_f(2);
+    varFaceV = strModel.f.v(dFaceRange, :);
+
+    if bHasFaceTexCoords
+        varFaceVt = strModel.f.vt(dFaceRange, :);
     else
-        for k = 0:objCount
-            objects(k+1) = model.meta.(sprintf('o%d', k));
-        end
+        varFaceVt = [];
     end
 
-    % Flags
-    hasVt = isfield(model, 'vt') && ~isempty(model.vt);
-    hasVn = isfield(model, 'vn') && ~isempty(model.vn);
-    hasFvt = isfield(model.f, 'vt');
-    hasFvn = isfield(model.f, 'vn');
-
-    % Write each object
-    for o = objects
-        fprintf(fileId, 'o %s', o.name);
-        % Vertices
-        vRange = o.idx_v(1):o.idx_v(2);
-        vData = model.v(vRange, :);  % M-by-3
-        fprintf(fileId, 'v %.6f %.6f %.6f', vData');
-        % Texture coords
-        if hasVt
-            vtRange = o.idx_vt(1):o.idx_vt(2);
-            vtData = model.vt(vtRange, :);
-            fprintf(fileId, 'vt %.6f %.6f', vtData');
-        end
-        % Normals
-        if hasVn
-            vnRange = o.idx_vn(1):o.idx_vn(2);
-            vnData = model.vn(vnRange, :);
-            fprintf(fileId, 'vn %.4f %.4f %.4f', vnData');
-        end
-        % Material and smoothing
-        if isfield(o, 'mtl')
-            fprintf(fileId, 'usemtl %s', o.mtl);
-        end
-        if isfield(o, 's')
-            fprintf(fileId, 's %s', o.s);
-        end
-        % Faces
-        fRange = o.idx_f(1):o.idx_f(2);
-        fv = model.f.v(fRange, :);
-        
-        if hasFvt
-            fvt =  model.f.vt(fRange, :) ;
-        else
-            fvt = [];
-        end
-
-        if hasFvn
-            fvn =  model.f.vn(fRange, :);
-        else
-            fvn = [];
-        end
-
-        for i = 1:size(fv,1)
-            if hasFvt && hasFvn
-                fprintf(fileId, 'f %d/%d/%d %d/%d/%d %d/%d/%d', ...
-                    fv(i,1),fvt(i,1),fvn(i,1), fv(i,2),fvt(i,2),fvn(i,2), fv(i,3),fvt(i,3),fvn(i,3));
-            elseif hasFvt
-                fprintf(fileId, 'f %d/%d %d/%d %d/%d', ...
-                    fv(i,1),fvt(i,1), fv(i,2),fvt(i,2), fv(i,3),fvt(i,3));
-            elseif hasFvn
-                fprintf(fileId, 'f %d//%d %d//%d %d//%d', ...
-                    fv(i,1),fvn(i,1), fv(i,2),fvn(i,2), fv(i,3),fvn(i,3));
-            else
-                fprintf(fileId, 'f %d %d %d', fv(i,1), fv(i,2), fv(i,3));
-            end
-        end
+    if bHasFaceNormals
+        varFaceVn = strModel.f.vn(dFaceRange, :);
+    else
+        varFaceVn = [];
     end
 
-finally
-    fclose(fileId);
+    for ui32FaceIdx = uint32(1):uint32(size(varFaceV, 1))
+        if bHasFaceTexCoords && bHasFaceNormals
+            fprintf(dFileID, 'f %d/%d/%d %d/%d/%d %d/%d/%d\n', ...
+                varFaceV(ui32FaceIdx, 1), varFaceVt(ui32FaceIdx, 1), varFaceVn(ui32FaceIdx, 1), ...
+                varFaceV(ui32FaceIdx, 2), varFaceVt(ui32FaceIdx, 2), varFaceVn(ui32FaceIdx, 2), ...
+                varFaceV(ui32FaceIdx, 3), varFaceVt(ui32FaceIdx, 3), varFaceVn(ui32FaceIdx, 3));
+        elseif bHasFaceTexCoords
+            fprintf(dFileID, 'f %d/%d %d/%d %d/%d\n', ...
+                varFaceV(ui32FaceIdx, 1), varFaceVt(ui32FaceIdx, 1), ...
+                varFaceV(ui32FaceIdx, 2), varFaceVt(ui32FaceIdx, 2), ...
+                varFaceV(ui32FaceIdx, 3), varFaceVt(ui32FaceIdx, 3));
+        elseif bHasFaceNormals
+            fprintf(dFileID, 'f %d//%d %d//%d %d//%d\n', ...
+                varFaceV(ui32FaceIdx, 1), varFaceVn(ui32FaceIdx, 1), ...
+                varFaceV(ui32FaceIdx, 2), varFaceVn(ui32FaceIdx, 2), ...
+                varFaceV(ui32FaceIdx, 3), varFaceVn(ui32FaceIdx, 3));
+        else
+            fprintf(dFileID, 'f %d %d %d\n', ...
+                varFaceV(ui32FaceIdx, 1), varFaceV(ui32FaceIdx, 2), varFaceV(ui32FaceIdx, 3));
+        end
+    end
 end
 end
