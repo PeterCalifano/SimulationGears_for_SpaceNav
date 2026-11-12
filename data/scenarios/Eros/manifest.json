@@ -55,6 +55,46 @@
       "size_gb": 2.5,
       "fidelity": "science_texture",
       "required_for_shape_runnable": false
+    },
+    {
+      "asset_id": "eros_gaskell_512q_uv_obj",
+      "asset_type": "shape",
+      "local_path": "assets/bodies/eros/shape/eros_gaskell_512q_uv_km.obj",
+      "source_url": "https://naif.jpl.nasa.gov/pub/naif/generic_kernels/dsk/asteroids/eros/ (exact 512q Gaskell DSK), UV registered to the 550 nm albedo map",
+      "download_url": "",
+      "sha256": "f6f1198b6d271a34e58c2bed81c5c6547abc85151989d54b2fbba2cd878be4d0",
+      "size_gb": 0.263783702,
+      "fidelity": "exact_geometry_uv_registered",
+      "required_for_shape_runnable": false,
+      "content_format": "obj",
+      "input_units": "km",
+      "body_fixed_frame": "EROS_FIXED",
+      "load_materials": true,
+      "material_path": "assets/bodies/eros/shape/eros_gaskell_512q_uv_km.mtl"
+    },
+    {
+      "asset_id": "eros_albedo_550nm_linear",
+      "asset_type": "albedo",
+      "local_path": "assets/bodies/eros/appearance/albedo/eros_albedo_550nm_linear.png",
+      "source_url": "https://astrogeology.usgs.gov/search/map/near_msi_albedo_mosaics",
+      "download_url": "https://asc-pds-individual-investigations.s3.us-west-2.amazonaws.com/eros_global-albedo-maps_golish_2023/eros_global-albedo-maps_golish_2023.zip",
+      "sha256": "e3f44f89e690a918971f69d52d84c6ff31a969d06a4443b452613404bef5986b",
+      "size_gb": 0.022744983,
+      "fidelity": "normal_albedo_to_linear_lambertian",
+      "required_for_shape_runnable": false
+    }
+  ],
+  "appearance_profiles": [
+    {
+      "profile_id": "global_albedo_550nm",
+      "albedo_asset_ids": [
+        "eros_albedo_550nm_linear"
+      ],
+      "normal_asset_ids": [],
+      "albedo_mapping": "MESH_UV",
+      "normal_mapping": "NONE",
+      "albedo_color_space": "linear",
+      "normal_map_encoding": ""
     }
   ]
 }

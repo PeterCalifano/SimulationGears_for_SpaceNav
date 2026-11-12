@@ -1,0 +1,214 @@
+{
+  "schema_version": 2,
+  "scenario_name": "Saturn",
+  "canonical_name": "Saturn",
+  "aliases": [
+    "Saturn"
+  ],
+  "confidence": "high",
+  "tags": [
+    "shape_runnable",
+    "scientific_texture_available"
+  ],
+  "default_shape_asset_id": "saturn_iau_ellipsoid_1440x720_uv_obj",
+  "assets": [
+    {
+      "asset_id": "naif0012_lsk",
+      "asset_type": "spice",
+      "local_path": "assets/common/spice/lsk/naif0012.tls",
+      "source_url": "https://naif.jpl.nasa.gov/pub/naif/generic_kernels/lsk/",
+      "download_url": "",
+      "sha256": "f15293b0747e5fb01a865596281cb0534f7c77274e78184bd64260cc92be3706",
+      "size_gb": 5.409e-06,
+      "fidelity": "naif_generic_current_crlf_copy",
+      "required_for_shape_runnable": false
+    },
+    {
+      "asset_id": "gm_de440_pck",
+      "asset_type": "spice",
+      "local_path": "assets/common/spice/pck/gm_de440.tpc",
+      "source_url": "https://naif.jpl.nasa.gov/pub/naif/generic_kernels/pck/",
+      "download_url": "https://naif.jpl.nasa.gov/pub/naif/generic_kernels/pck/gm_de440.tpc",
+      "sha256": "924ddf4fb9ead9fe8a1aa55780bcabde40b09d00065d58226e24b68d8092f140",
+      "size_gb": 1.2406e-05,
+      "fidelity": "naif_generic_current",
+      "required_for_shape_runnable": false
+    },
+    {
+      "asset_id": "pck00011_pck",
+      "asset_type": "spice",
+      "local_path": "assets/common/spice/pck/pck00011.tpc",
+      "source_url": "https://naif.jpl.nasa.gov/pub/naif/generic_kernels/pck/",
+      "download_url": "https://naif.jpl.nasa.gov/pub/naif/generic_kernels/pck/pck00011.tpc",
+      "sha256": "3dff7b1dbeceaa01f25467767d3fa25816051c85d162d1edf04acb310ee28bb1",
+      "size_gb": 0.000131226,
+      "fidelity": "naif_generic_current",
+      "required_for_shape_runnable": false
+    },
+    {
+      "asset_id": "de440s_spk",
+      "asset_type": "spice",
+      "local_path": "assets/common/spice/spk/de440s.bsp",
+      "source_url": "https://naif.jpl.nasa.gov/pub/naif/generic_kernels/spk/planets/",
+      "download_url": "https://naif.jpl.nasa.gov/pub/naif/generic_kernels/spk/planets/de440s.bsp",
+      "sha256": "c1c7feeab882263fc493a9d5a5b2ddd71b54826cdf65d8d17a76126b260a49f2",
+      "size_gb": 0.032726016,
+      "fidelity": "naif_generic_current",
+      "required_for_shape_runnable": false
+    },
+    {
+      "asset_id": "sat441_spk",
+      "asset_type": "spice",
+      "local_path": "assets/bodies/saturn/spice/kernels/sat441.bsp",
+      "source_url": "https://naif.jpl.nasa.gov/pub/naif/generic_kernels/spk/satellites/",
+      "download_url": "https://naif.jpl.nasa.gov/pub/naif/generic_kernels/spk/satellites/sat441.bsp",
+      "sha256": "d7e444a9ba7a52b8f448ff0747030789524d2f0c1212e4e2bd7f5fc3c96444d5",
+      "size_gb": 0.661592064,
+      "fidelity": "naif_generic_current",
+      "required_for_shape_runnable": false
+    },
+    {
+      "asset_id": "saturn_spice_metakernel",
+      "asset_type": "spice",
+      "local_path": "assets/bodies/saturn/spice/mk/metakernel.mk",
+      "source_url": "local: relative paths to the kernels declared in this manifest",
+      "download_url": "",
+      "sha256": "6271c57440a245d66f930c5d83d3cd3ae9522f881bc22e7c50022a73f6a897a4",
+      "size_gb": 5e-07,
+      "fidelity": "local_metakernel",
+      "required_for_shape_runnable": false
+    },
+    {
+      "asset_id": "saturn_cassini_iss_rgb_global_map_fits",
+      "asset_type": "albedo",
+      "local_path": "assets/bodies/saturn/appearance/albedo/source/Cassini_ISS_RGB_Saturn_global_color_map_original.fits",
+      "source_url": "doi:10.17189/rkkb-6y30 (Li, West, Jiang, Knowles 2023, PDS Atmospheres)",
+      "download_url": "https://atmos.nmsu.edu/PDS/data/PDS4/co_iss_global-maps/data_derived/Cassini_ISS_RGB_Saturn_global_color_map_original.fits",
+      "sha256": "32a62eca9b82255c7dd763ba0752cee1664ae73d5ec4d5d5260227deecd422af",
+      "size_gb": 0.07782912,
+      "fidelity": "max_public_global_disc_map_0p1deg",
+      "required_for_shape_runnable": false,
+      "map_projection": "equirectangular, planetocentric, west longitude 360->0, Float32, missing -999.9"
+    },
+    {
+      "asset_id": "saturn_cassini_iss_rgb_global_map_xml",
+      "asset_type": "albedo",
+      "local_path": "assets/bodies/saturn/appearance/albedo/source/Cassini_ISS_RGB_Saturn_global_color_map_original.xml",
+      "source_url": "doi:10.17189/rkkb-6y30",
+      "download_url": "https://atmos.nmsu.edu/PDS/data/PDS4/co_iss_global-maps/data_derived/Cassini_ISS_RGB_Saturn_global_color_map_original.xml",
+      "sha256": "0d1ab898d6811622688363c1fbe6ef4bd15541c8009a43ea5df6581f8e386a66",
+      "size_gb": 1.0595e-05,
+      "fidelity": "pds4_label",
+      "required_for_shape_runnable": false
+    },
+    {
+      "asset_id": "saturn_rings_rss_rev007e_x43_tau_1km_tab",
+      "asset_type": "ring_profile",
+      "local_path": "assets/bodies/saturn/appearance/rings/source/RSS_2005_123_X43_E_TAU_01KM.TAB",
+      "source_url": "https://pds-rings.seti.org/holdings/volumes/CORSS_8xxx/CORSS_8001/data/Rev007/Rev007E/Rev007E_RSS_2005_123_X43_E/",
+      "download_url": "https://pds-rings.seti.org/holdings/volumes/CORSS_8xxx/CORSS_8001/data/Rev007/Rev007E/Rev007E_RSS_2005_123_X43_E/RSS_2005_123_X43_E_TAU_01KM.TAB",
+      "sha256": "f76db8041aa063d9e18d96cdb88255970557c6c3b36c328540bd44e43400b5ea",
+      "size_gb": 0.05201172,
+      "fidelity": "normal_optical_depth_baseline_1km",
+      "required_for_shape_runnable": false
+    },
+    {
+      "asset_id": "saturn_rings_rss_rev007e_x43_tau_1km_lbl",
+      "asset_type": "ring_profile",
+      "local_path": "assets/bodies/saturn/appearance/rings/source/RSS_2005_123_X43_E_TAU_01KM.LBL",
+      "source_url": "https://pds-rings.seti.org/holdings/volumes/CORSS_8xxx/CORSS_8001/data/Rev007/Rev007E/Rev007E_RSS_2005_123_X43_E/",
+      "download_url": "https://pds-rings.seti.org/holdings/volumes/CORSS_8xxx/CORSS_8001/data/Rev007/Rev007E/Rev007E_RSS_2005_123_X43_E/RSS_2005_123_X43_E_TAU_01KM.LBL",
+      "sha256": "cbd3c749f3e8ed1a70f30eb9f1a672485c4fc2988851523dfe9f501fda48f2dc",
+      "size_gb": 1.9034e-05,
+      "fidelity": "pds3_label",
+      "required_for_shape_runnable": false
+    },
+    {
+      "asset_id": "saturn_rings_uvis_betcen_2008_231_tau_1km_tab",
+      "asset_type": "ring_profile",
+      "local_path": "assets/bodies/saturn/appearance/rings/source/UVIS_HSP_2008_231_BETCEN_I_TAU01KM.TAB",
+      "source_url": "https://pds-rings.seti.org/holdings/volumes/COUVIS_8xxx/COUVIS_8001/data/",
+      "download_url": "https://pds-rings.seti.org/holdings/volumes/COUVIS_8xxx/COUVIS_8001/data/UVIS_HSP_2008_231_BETCEN_I_TAU01KM.TAB",
+      "sha256": "107e00dc9ced58202e89c843427a75758172cb211516607a428f704813715881",
+      "size_gb": 0.009542302,
+      "fidelity": "normal_optical_depth_dense_b_ring_1km",
+      "required_for_shape_runnable": false
+    },
+    {
+      "asset_id": "saturn_rings_uvis_betcen_2008_231_tau_1km_lbl",
+      "asset_type": "ring_profile",
+      "local_path": "assets/bodies/saturn/appearance/rings/source/UVIS_HSP_2008_231_BETCEN_I_TAU01KM.LBL",
+      "source_url": "https://pds-rings.seti.org/holdings/volumes/COUVIS_8xxx/COUVIS_8001/data/",
+      "download_url": "https://pds-rings.seti.org/holdings/volumes/COUVIS_8xxx/COUVIS_8001/data/UVIS_HSP_2008_231_BETCEN_I_TAU01KM.LBL",
+      "sha256": "ca3d006592129a7d5a704328eaa9bf3d0508f4196ab972a2383d2163b7cc927c",
+      "size_gb": 1.201e-05,
+      "fidelity": "pds3_label",
+      "required_for_shape_runnable": false
+    },
+    {
+      "asset_id": "saturn_rings_voyager2_iss_if_10km_tab",
+      "asset_type": "ring_profile",
+      "local_path": "assets/bodies/saturn/appearance/rings/source/IS2_P0001_V01_KM010.TAB",
+      "source_url": "https://pds-rings.seti.org/holdings/volumes/VG_28xx/VG_2810/DATA/",
+      "download_url": "https://pds-rings.seti.org/holdings/volumes/VG_28xx/VG_2810/DATA/IS2_P0001_V01_KM010.TAB",
+      "sha256": "d274257639f52eb7f37ac457096263e25c1a8f04b6334513a4ae49fa77242e03",
+      "size_gb": 0.000187659,
+      "fidelity": "lit_side_observed_if_10km",
+      "required_for_shape_runnable": false
+    },
+    {
+      "asset_id": "saturn_rings_voyager2_iss_if_10km_lbl",
+      "asset_type": "ring_profile",
+      "local_path": "assets/bodies/saturn/appearance/rings/source/IS2_P0001_V01_KM010.LBL",
+      "source_url": "https://pds-rings.seti.org/holdings/volumes/VG_28xx/VG_2810/DATA/",
+      "download_url": "https://pds-rings.seti.org/holdings/volumes/VG_28xx/VG_2810/DATA/IS2_P0001_V01_KM010.LBL",
+      "sha256": "a421e8dc0267507f873dd716d4d22b628887709918a5387495d81a8baeb2972a",
+      "size_gb": 4.934e-06,
+      "fidelity": "pds3_label",
+      "required_for_shape_runnable": false
+    },
+    {
+      "asset_id": "saturn_iau_ellipsoid_1440x720_uv_obj",
+      "asset_type": "shape",
+      "local_path": "assets/bodies/saturn/shape/saturn_iau_ellipsoid_1440x720_uv_km.obj",
+      "source_url": "derived: ellipsoid grid from pck00011 BODY_RADII",
+      "download_url": "",
+      "sha256": "121204f857dd848bd272c82157f1d96f880a9fb68686cec72b35a5e86aacf71e",
+      "size_gb": 0.165766086,
+      "fidelity": "pck00011_ellipsoid_grid_1bar_level",
+      "required_for_shape_runnable": true,
+      "content_format": "obj",
+      "input_units": "km",
+      "body_fixed_frame": "IAU_SATURN",
+      "load_materials": true,
+      "material_path": "assets/bodies/saturn/shape/saturn_iau_ellipsoid_1440x720_uv_km.mtl",
+      "derived_from_asset_id": ""
+    },
+    {
+      "asset_id": "saturn_albedo_linear8_rgb",
+      "asset_type": "albedo",
+      "local_path": "assets/bodies/saturn/appearance/albedo/saturn_albedo_linear8_rgb.png",
+      "source_url": "doi:10.17189/rkkb-6y30 (Li, West, Jiang, Knowles 2023, PDS Atmospheres)",
+      "download_url": "",
+      "sha256": "bd4234d971866eaf642ebbd67607ac4d2576cb63729aca072a734954f9d42335",
+      "size_gb": 0.001863687,
+      "fidelity": "mosaic_dn_scaled_to_bond_albedo",
+      "required_for_shape_runnable": false,
+      "derived_from_asset_id": "saturn_cassini_iss_rgb_global_map_fits"
+    }
+  ],
+  "default_appearance_profile_id": "global_albedo",
+  "appearance_profiles": [
+    {
+      "profile_id": "global_albedo",
+      "albedo_asset_ids": [
+        "saturn_albedo_linear8_rgb"
+      ],
+      "normal_asset_ids": [],
+      "albedo_mapping": "MESH_UV",
+      "normal_mapping": "NONE",
+      "albedo_color_space": "linear",
+      "normal_map_encoding": ""
+    }
+  ]
+}

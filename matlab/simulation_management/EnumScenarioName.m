@@ -7,10 +7,12 @@ classdef EnumScenarioName < uint32
 % 12-02-2025    Pietro Califano     Add Apophis for RCS1
 % 30-06-2025    Pietro Califano     Extend to support new version of generation programs.
 % 01-07-2026    Pietro Califano     Add first-class tagged small-body scenarios.
+% 07-11-2026    Pietro Califano, Claude Opus 5.5  Append Phobos, Deimos, Enceladus and Saturn; existing values unchanged.
 % -------------------------------------------------------------------------------------------------------------
 %% ENUMERATIONS
 % Didymos, Itokawa, Eros, Bennu, Apophis, ApophisElongated, Moon, Mars,
-% Ceres, Earth, FromShape, NotDefined, Arrokoth, Comet67P, Toutatis.
+% Ceres, Earth, FromShape, NotDefined, Arrokoth, Comet67P, Toutatis, Phobos,
+% Deimos, Enceladus, Saturn.
 % -------------------------------------------------------------------------------------------------------------
 %% DEPENDENCIES
 % [-]
@@ -33,6 +35,10 @@ enumeration
     Arrokoth (14)
     Comet67P (15)
     Toutatis (16)
+    Phobos (17)
+    Deimos (18)
+    Enceladus (19)
+    Saturn (20)
 end
 
 end

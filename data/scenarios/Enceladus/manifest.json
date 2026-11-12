@@ -1,0 +1,202 @@
+{
+  "schema_version": 2,
+  "scenario_name": "Enceladus",
+  "canonical_name": "Enceladus",
+  "aliases": [
+    "Enceladus",
+    "Saturn II"
+  ],
+  "confidence": "high",
+  "tags": [
+    "shape_runnable",
+    "scientific_texture_available"
+  ],
+  "default_shape_asset_id": "enceladus_park_v2_0512icq_uv_obj",
+  "assets": [
+    {
+      "asset_id": "naif0012_lsk",
+      "asset_type": "spice",
+      "local_path": "assets/common/spice/lsk/naif0012.tls",
+      "source_url": "https://naif.jpl.nasa.gov/pub/naif/generic_kernels/lsk/",
+      "download_url": "",
+      "sha256": "f15293b0747e5fb01a865596281cb0534f7c77274e78184bd64260cc92be3706",
+      "size_gb": 5.409e-06,
+      "fidelity": "naif_generic_current_crlf_copy",
+      "required_for_shape_runnable": false
+    },
+    {
+      "asset_id": "gm_de440_pck",
+      "asset_type": "spice",
+      "local_path": "assets/common/spice/pck/gm_de440.tpc",
+      "source_url": "https://naif.jpl.nasa.gov/pub/naif/generic_kernels/pck/",
+      "download_url": "https://naif.jpl.nasa.gov/pub/naif/generic_kernels/pck/gm_de440.tpc",
+      "sha256": "924ddf4fb9ead9fe8a1aa55780bcabde40b09d00065d58226e24b68d8092f140",
+      "size_gb": 1.2406e-05,
+      "fidelity": "naif_generic_current",
+      "required_for_shape_runnable": false
+    },
+    {
+      "asset_id": "pck00011_pck",
+      "asset_type": "spice",
+      "local_path": "assets/common/spice/pck/pck00011.tpc",
+      "source_url": "https://naif.jpl.nasa.gov/pub/naif/generic_kernels/pck/",
+      "download_url": "https://naif.jpl.nasa.gov/pub/naif/generic_kernels/pck/pck00011.tpc",
+      "sha256": "3dff7b1dbeceaa01f25467767d3fa25816051c85d162d1edf04acb310ee28bb1",
+      "size_gb": 0.000131226,
+      "fidelity": "naif_generic_current",
+      "required_for_shape_runnable": false
+    },
+    {
+      "asset_id": "enceladus_ssd_v2_pck",
+      "asset_type": "spice",
+      "local_path": "assets/bodies/enceladus/spice/kernels/enceladus_ssd_250728_v2.tpc",
+      "source_url": "https://naif.jpl.nasa.gov/pub/naif/CASSINI/misc/enceladus_park2023/",
+      "download_url": "https://naif.jpl.nasa.gov/pub/naif/CASSINI/misc/enceladus_park2023/enceladus_ssd_250728_v2.tpc",
+      "sha256": "61ca1975472b421e5011f67b5c33a49a35e774548d8da066e53c4dec30000ce1",
+      "size_gb": 7.397e-06,
+      "fidelity": "mission_park_v2_rotation",
+      "required_for_shape_runnable": false
+    },
+    {
+      "asset_id": "cassini_v44_fk",
+      "asset_type": "spice",
+      "local_path": "assets/bodies/enceladus/spice/kernels/cas_v44.tf",
+      "source_url": "https://naif.jpl.nasa.gov/pub/naif/CASSINI/misc/enceladus_park2023/",
+      "download_url": "https://naif.jpl.nasa.gov/pub/naif/CASSINI/misc/enceladus_park2023/cas_v44.tf",
+      "sha256": "6f60fe36145bd05238ab3d465c5f684372a54a3662ead00d04f233b67bf26e1b",
+      "size_gb": 0.000198463,
+      "fidelity": "mission_frames",
+      "required_for_shape_runnable": false
+    },
+    {
+      "asset_id": "de440s_spk",
+      "asset_type": "spice",
+      "local_path": "assets/common/spice/spk/de440s.bsp",
+      "source_url": "https://naif.jpl.nasa.gov/pub/naif/generic_kernels/spk/planets/",
+      "download_url": "https://naif.jpl.nasa.gov/pub/naif/generic_kernels/spk/planets/de440s.bsp",
+      "sha256": "c1c7feeab882263fc493a9d5a5b2ddd71b54826cdf65d8d17a76126b260a49f2",
+      "size_gb": 0.032726016,
+      "fidelity": "naif_generic_current",
+      "required_for_shape_runnable": false
+    },
+    {
+      "asset_id": "sat441_spk",
+      "asset_type": "spice",
+      "local_path": "assets/bodies/saturn/spice/kernels/sat441.bsp",
+      "source_url": "https://naif.jpl.nasa.gov/pub/naif/generic_kernels/spk/satellites/",
+      "download_url": "https://naif.jpl.nasa.gov/pub/naif/generic_kernels/spk/satellites/sat441.bsp",
+      "sha256": "d7e444a9ba7a52b8f448ff0747030789524d2f0c1212e4e2bd7f5fc3c96444d5",
+      "size_gb": 0.661592064,
+      "fidelity": "naif_generic_current",
+      "required_for_shape_runnable": false
+    },
+    {
+      "asset_id": "enceladus_spice_metakernel",
+      "asset_type": "spice",
+      "local_path": "assets/bodies/enceladus/spice/mk/metakernel.mk",
+      "source_url": "local: relative paths to the kernels declared in this manifest",
+      "download_url": "",
+      "sha256": "7e13b26870c021676d00c831f2cc6b572edf182a0c95bc74d3d21c4a42b94d31",
+      "size_gb": 6.57e-07,
+      "fidelity": "local_metakernel",
+      "required_for_shape_runnable": false
+    },
+    {
+      "asset_id": "enceladus_park_spc_0512icq_v2_dsk",
+      "asset_type": "shape",
+      "local_path": "assets/bodies/enceladus/shape/source/cas_enceladus_ssd_spc_0512icq_v2.bds",
+      "source_url": "https://naif.jpl.nasa.gov/pub/naif/CASSINI/misc/enceladus_park2023/aareadme_250610.txt",
+      "download_url": "https://naif.jpl.nasa.gov/pub/naif/CASSINI/misc/enceladus_park2023/cas_enceladus_ssd_spc_0512icq_v2.bds",
+      "sha256": "801a99e27ac7d565cfc586ddc676523ae131c84ec8886c6fe5cf3d68b8c0a8ec",
+      "size_gb": 0.11231744,
+      "fidelity": "mission_spc_v2_global_icq512",
+      "required_for_shape_runnable": false,
+      "content_format": "dsk",
+      "input_units": "km",
+      "body_fixed_frame": "IAU_ENCELADUS",
+      "load_materials": false
+    },
+    {
+      "asset_id": "enceladus_park_spc_1024icq_v2_dsk",
+      "asset_type": "shape",
+      "local_path": "assets/bodies/enceladus/shape/source/cas_enceladus_ssd_spc_1024icq_v2.bds",
+      "source_url": "https://naif.jpl.nasa.gov/pub/naif/CASSINI/misc/enceladus_park2023/aareadme_250610.txt",
+      "download_url": "https://naif.jpl.nasa.gov/pub/naif/CASSINI/misc/enceladus_park2023/cas_enceladus_ssd_spc_1024icq_v2.bds",
+      "sha256": "882db83c7946a571b8651865bb310ca2d058aea38ac14a98112371ceb7ddfa75",
+      "size_gb": 0.42050048,
+      "fidelity": "mission_spc_v2_global_icq1024_alternate",
+      "required_for_shape_runnable": false,
+      "content_format": "dsk",
+      "input_units": "km",
+      "body_fixed_frame": "IAU_ENCELADUS",
+      "load_materials": false
+    },
+    {
+      "asset_id": "enceladus_schenk2024_mosaic_100m_tif",
+      "asset_type": "albedo",
+      "local_path": "assets/bodies/enceladus/appearance/albedo/source/Enceladus_Cassini_mosaic_global_100m_schenk2024.tif",
+      "source_url": "urn:nasa:pds:enceladus_cassini_iss_mosaic_schenk_2024:data:enceladus_cassini_mosaic_global_100m",
+      "download_url": "https://asc-astropedia.s3.us-west-2.amazonaws.com/Enceladus/Cassini/Enceladus_Cassini_mosaic_global_100m_schenk2024.tif",
+      "sha256": "1738c5cf8e856c7ae262d858261af0fbb32503a68a524884d36194afb23afcc5",
+      "size_gb": 0.518340175,
+      "fidelity": "max_public_source_mosaic_with_shading",
+      "required_for_shape_runnable": false,
+      "map_projection": "equirectangular, 0-360 E, centre 180 E, sphere 256.2 km, Float32, nodata -3.4e38"
+    },
+    {
+      "asset_id": "enceladus_schenk2024_mosaic_100m_cleaned_pizzetti2025_tif",
+      "asset_type": "albedo",
+      "local_path": "assets/bodies/enceladus/appearance/albedo/source/Enceladus_Cassini_mosaic_global_100m_schenk2024_cleaned_pizzetti2025.tif",
+      "source_url": "local: Pizzetti 2025 cleaned version of the Schenk 2024 mosaic, copied from /media/peterc/SCRATCH/ABRAM_MAPS/albedo/enceladus/ (no public archive found 3 Nov 2026)",
+      "download_url": "",
+      "sha256": "afb3b9a9c1aeb95688208998b0f22f6d5e3268a9154cbf3696ffc990f94e42c6",
+      "size_gb": 0.518291354,
+      "fidelity": "cleaned_mosaic_default_albedo_input",
+      "required_for_shape_runnable": false,
+      "map_projection": "same grid as enceladus_schenk2024_mosaic_100m_tif"
+    },
+    {
+      "asset_id": "enceladus_park_v2_0512icq_uv_obj",
+      "asset_type": "shape",
+      "local_path": "assets/bodies/enceladus/shape/enceladus_park_v2_0512icq_uv_km.obj",
+      "source_url": "https://naif.jpl.nasa.gov/pub/naif/CASSINI/misc/enceladus_park2023/aareadme_250610.txt",
+      "download_url": "",
+      "sha256": "4709b55a9b6e2d9b6c6cb512df776499bf5e85ac0ec405b3d4cbe6c09edb1f2c",
+      "size_gb": 0.264452045,
+      "fidelity": "exact_geometry_uv_registered",
+      "required_for_shape_runnable": true,
+      "content_format": "obj",
+      "input_units": "km",
+      "body_fixed_frame": "IAU_ENCELADUS",
+      "load_materials": true,
+      "material_path": "assets/bodies/enceladus/shape/enceladus_park_v2_0512icq_uv_km.mtl",
+      "derived_from_asset_id": "enceladus_park_spc_0512icq_v2_dsk"
+    },
+    {
+      "asset_id": "enceladus_albedo_linear16",
+      "asset_type": "albedo",
+      "local_path": "assets/bodies/enceladus/appearance/albedo/enceladus_albedo_linear16.png",
+      "source_url": "local: Pizzetti 2025 cleaned version of the Schenk 2024 mosaic, copied from /media/peterc/SCRATCH/ABRAM_MAPS/albedo/enceladus/ (no public archive found 3 Nov 2026)",
+      "download_url": "",
+      "sha256": "853fab9799ec9b2f791c608d7d7f8959da5010271685ec0cfa28884e228abc04",
+      "size_gb": 0.209944262,
+      "fidelity": "mosaic_dn_scaled_to_bond_albedo",
+      "required_for_shape_runnable": false,
+      "derived_from_asset_id": "enceladus_schenk2024_mosaic_100m_cleaned_pizzetti2025_tif"
+    }
+  ],
+  "default_appearance_profile_id": "global_albedo",
+  "appearance_profiles": [
+    {
+      "profile_id": "global_albedo",
+      "albedo_asset_ids": [
+        "enceladus_albedo_linear16"
+      ],
+      "normal_asset_ids": [],
+      "albedo_mapping": "MESH_UV",
+      "normal_mapping": "NONE",
+      "albedo_color_space": "linear",
+      "normal_map_encoding": ""
+    }
+  ]
+}

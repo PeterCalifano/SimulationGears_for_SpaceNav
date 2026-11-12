@@ -1,5 +1,16 @@
 classdef testCScenarioRegistry < matlab.unittest.TestCase
     methods (Test)
+        function testErosOwnsKernelPathAndPreservesCampaignRoutes(testCase)
+            strEros = CScenarioRegistry.GetScenarioSpec("Eros");
+            testCase.verifyEqual(string(strEros.charDefaultSpiceMetaKernelRelativePath), ...
+                fullfile("assets", "bodies", "eros", "spice", "mk", "metakernel.mk"));
+            for charBody = ["Itokawa", "Bennu"]
+                strCampaign = CScenarioRegistry.GetScenarioSpec(charBody);
+                testCase.verifyEqual(string(strCampaign.charDefaultSpiceMetaKernelRelativePath), "");
+            end
+            testCase.verifyEqual(strEros.dReferenceRadius_m, 16000);
+        end
+
         function testAliasResolution(testCase)
             [enumScenarioName, charCanonicalName] = CScenarioRegistry.ResolveScenario("Dydimos");
 
@@ -131,6 +142,79 @@ classdef testCScenarioRegistry < matlab.unittest.TestCase
                 1e9 * strDegree16.dGravParam, RelTol=1e-14);
             testCase.verifyEqual(strDegree16M.dBodyRadiusRef, ...
                 1e3 * strDegree16.dBodyRadiusRef, RelTol=1e-14);
+        end
+
+        function testPlanetaryMoonEnumValuesAreAppended(testCase)
+            % Execution plans store these numeric values, so existing ones must never move.
+            cellNames = ["Eros", "Mars", "Toutatis", "Phobos", "Deimos", "Enceladus", "Saturn"];
+            ui32Expected = uint32([4, 9, 16, 17, 18, 19, 20]);
+            for ui32NameIdx = uint32(1):uint32(numel(cellNames))
+                testCase.verifyEqual(uint32(CScenarioRegistry.ResolveScenario(cellNames(ui32NameIdx))), ...
+                    ui32Expected(ui32NameIdx), cellNames(ui32NameIdx));
+            end
+            testCase.verifyEqual(CScenarioRegistry.ResolveScenario("Mars I"), EnumScenarioName.Phobos);
+            testCase.verifyEqual(CScenarioRegistry.ResolveScenario("Saturn II"), EnumScenarioName.Enceladus);
+        end
+
+        function testPlanetaryMoonSpecsUseDe440Constants(testCase)
+            cellNames = ["Phobos", "Deimos", "Enceladus", "Saturn"];
+            dExpectedGM_km3s2 = [7.087546066894452e-04, 9.615569648120313e-05, ...
+                7.210366688598896, 3.793120623436167e+07];
+            for ui32NameIdx = uint32(1):uint32(numel(cellNames))
+                strSpec = CScenarioRegistry.GetScenarioSpec(cellNames(ui32NameIdx), charLengthUnits="km");
+                testCase.verifyEqual(strSpec.dGravParam, dExpectedGM_km3s2(ui32NameIdx), RelTol=1e-14);
+                testCase.verifyEqual(string(strSpec.charTargetFixedFrame), ...
+                    "IAU_" + upper(cellNames(ui32NameIdx)));
+                testCase.verifyEqual(string(strSpec.charDefaultSpiceMetaKernelRelativePath), ...
+                    string(fullfile("assets", "bodies", lower(cellNames(ui32NameIdx)), "spice", "mk", "metakernel.mk")));
+            end
+        end
+
+        function testMoonShapeFitGravityRows(testCase)
+            % Constant-density degree-16 fits of the SBMT plate models.
+            [strPhobos, strPhobosMeta] = CScenarioRegistry.GetSphericalHarmonicsGravityData( ...
+                "Phobos", uint32(16), "km");
+            testCase.verifySize(strPhobos.dCSlmCoeffCols, [151 2]);
+            testCase.verifyEqual(strPhobos.dBodyRadiusRef, 11.077, RelTol=1e-14);
+            testCase.verifyEqual(strPhobos.dCSlmCoeffCols(2, 1), -1.05108858112504158e-01, RelTol=1e-14);
+            testCase.verifyEqual(strPhobos.dCSlmCoeffCols(4, 1), 1.52974628173744211e-02, RelTol=1e-14);
+            testCase.verifyEqual(strPhobosMeta.charFieldKind, "shape-derived");
+
+            [strDeimos, strDeimosMeta] = CScenarioRegistry.GetSphericalHarmonicsGravityData( ...
+                "Deimos", uint32(16), "km");
+            testCase.verifySize(strDeimos.dCSlmCoeffCols, [151 2]);
+            testCase.verifyEqual(strDeimos.dBodyRadiusRef, 6.272, RelTol=1e-14);
+            testCase.verifyEqual(strDeimos.dCSlmCoeffCols(2, 1), -1.07207633656657766e-01, RelTol=1e-14);
+            testCase.verifyEqual(strDeimos.dCSlmCoeffCols(4, 1), 3.56379914595495520e-02, RelTol=1e-14);
+            testCase.verifyEqual(strDeimosMeta.charFieldKind, "shape-derived");
+        end
+
+        function testPublishedGravityRowsKeepTheirSources(testCase)
+            % Saturn: Iess et al. 2019, C_n0 = -J_n, R 60330 km.
+            [strSaturn, strSaturnMeta] = CScenarioRegistry.GetSphericalHarmonicsGravityData( ...
+                "Saturn", uint32(12), "km");
+            testCase.verifySize(strSaturn.dCSlmCoeffCols, [89 2]);
+            testCase.verifyEqual(strSaturn.dBodyRadiusRef, 60330, RelTol=1e-14);
+            testCase.verifyEqual(strSaturn.dCSlmCoeffCols(2, 1), -16290.573e-6, RelTol=1e-14);
+            testCase.verifyEqual(strSaturn.dCSlmCoeffCols(9, 1), 935.314e-6, RelTol=1e-14);
+            testCase.verifyEqual(strSaturnMeta.charFieldKind, "measured");
+
+            % Enceladus: Park et al. 2024, Table 8 Case 2, R 256.6 km.
+            [strEnceladus, ~] = CScenarioRegistry.GetSphericalHarmonicsGravityData( ...
+                "Enceladus", uint32(3), "km");
+            testCase.verifySize(strEnceladus.dCSlmCoeffCols, [8 2]);
+            testCase.verifyEqual(strEnceladus.dBodyRadiusRef, 256.6, RelTol=1e-14);
+            testCase.verifyEqual(strEnceladus.dCSlmCoeffCols(2, 1), -5477.45e-6, RelTol=1e-14);
+            testCase.verifyEqual(strEnceladus.dCSlmCoeffCols(4, :), [1517.90e-6, -275.31e-6], RelTol=1e-14);
+            testCase.verifyEqual(strEnceladus.dCSlmCoeffCols(5, 1), 177.82e-6, RelTol=1e-14);
+
+            % Mars: JGMRO_120G, the field of the Konopliv 2026 frame the Mars metakernel loads.
+            [strMars, strMarsMeta] = CScenarioRegistry.GetSphericalHarmonicsGravityData( ...
+                "Mars", uint32(16), "km");
+            testCase.verifySize(strMars.dCSlmCoeffCols, [151 2]);
+            testCase.verifyEqual(strMars.dGravParam, 42828.37509235890, RelTol=1e-14);
+            testCase.verifyEqual(strMars.dCSlmCoeffCols(2, 1), -1.9566069453409813e-3, RelTol=1e-12);
+            testCase.verifyTrue(contains(strMarsMeta.charSource, "JGMRO_120G"));
         end
 
         function testLengthUnitsAcceptEnum(testCase)

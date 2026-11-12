@@ -1,0 +1,204 @@
+{
+  "schema_version": 2,
+  "scenario_name": "Phobos",
+  "canonical_name": "Phobos",
+  "aliases": [
+    "Phobos",
+    "Mars I"
+  ],
+  "confidence": "high",
+  "tags": [
+    "shape_runnable",
+    "scientific_texture_available"
+  ],
+  "default_shape_asset_id": "phobos_sbmt_v004_036m_uv_obj",
+  "assets": [
+    {
+      "asset_id": "naif0012_lsk",
+      "asset_type": "spice",
+      "local_path": "assets/common/spice/lsk/naif0012.tls",
+      "source_url": "https://naif.jpl.nasa.gov/pub/naif/generic_kernels/lsk/",
+      "download_url": "",
+      "sha256": "f15293b0747e5fb01a865596281cb0534f7c77274e78184bd64260cc92be3706",
+      "size_gb": 5.409e-06,
+      "fidelity": "naif_generic_current_crlf_copy",
+      "required_for_shape_runnable": false
+    },
+    {
+      "asset_id": "gm_de440_pck",
+      "asset_type": "spice",
+      "local_path": "assets/common/spice/pck/gm_de440.tpc",
+      "source_url": "https://naif.jpl.nasa.gov/pub/naif/generic_kernels/pck/",
+      "download_url": "https://naif.jpl.nasa.gov/pub/naif/generic_kernels/pck/gm_de440.tpc",
+      "sha256": "924ddf4fb9ead9fe8a1aa55780bcabde40b09d00065d58226e24b68d8092f140",
+      "size_gb": 1.2406e-05,
+      "fidelity": "naif_generic_current",
+      "required_for_shape_runnable": false
+    },
+    {
+      "asset_id": "pck00011_pck",
+      "asset_type": "spice",
+      "local_path": "assets/common/spice/pck/pck00011.tpc",
+      "source_url": "https://naif.jpl.nasa.gov/pub/naif/generic_kernels/pck/",
+      "download_url": "https://naif.jpl.nasa.gov/pub/naif/generic_kernels/pck/pck00011.tpc",
+      "sha256": "3dff7b1dbeceaa01f25467767d3fa25816051c85d162d1edf04acb310ee28bb1",
+      "size_gb": 0.000131226,
+      "fidelity": "naif_generic_current",
+      "required_for_shape_runnable": false
+    },
+    {
+      "asset_id": "mars_konopliv_2026_pck",
+      "asset_type": "spice",
+      "local_path": "assets/bodies/mars/spice/kernels/mars_konopliv_2026_v1.tpc",
+      "source_url": "https://naif.jpl.nasa.gov/pub/naif/generic_kernels/pck/",
+      "download_url": "https://naif.jpl.nasa.gov/pub/naif/generic_kernels/pck/mars_konopliv_2026_v1.tpc",
+      "sha256": "3b545d79690cc513cc19d290d9e2f85a89a733ee82bd26e067f3e1cc22f382bb",
+      "size_gb": 1.8923e-05,
+      "fidelity": "naif_generic_current",
+      "required_for_shape_runnable": false
+    },
+    {
+      "asset_id": "de440s_spk",
+      "asset_type": "spice",
+      "local_path": "assets/common/spice/spk/de440s.bsp",
+      "source_url": "https://naif.jpl.nasa.gov/pub/naif/generic_kernels/spk/planets/",
+      "download_url": "https://naif.jpl.nasa.gov/pub/naif/generic_kernels/spk/planets/de440s.bsp",
+      "sha256": "c1c7feeab882263fc493a9d5a5b2ddd71b54826cdf65d8d17a76126b260a49f2",
+      "size_gb": 0.032726016,
+      "fidelity": "naif_generic_current",
+      "required_for_shape_runnable": false
+    },
+    {
+      "asset_id": "mar099s_spk",
+      "asset_type": "spice",
+      "local_path": "assets/bodies/mars/spice/kernels/mar099s.bsp",
+      "source_url": "https://naif.jpl.nasa.gov/pub/naif/generic_kernels/spk/satellites/",
+      "download_url": "https://naif.jpl.nasa.gov/pub/naif/generic_kernels/spk/satellites/mar099s.bsp",
+      "sha256": "997dc93ba640e476da7a494d2237dcdeb145e528db37be8ccee588c615e4e1ff",
+      "size_gb": 0.06759424,
+      "fidelity": "naif_generic_current",
+      "required_for_shape_runnable": false
+    },
+    {
+      "asset_id": "phobos_spice_metakernel",
+      "asset_type": "spice",
+      "local_path": "assets/bodies/phobos/spice/mk/metakernel.mk",
+      "source_url": "local: relative paths to the kernels declared in this manifest",
+      "download_url": "",
+      "sha256": "35c26a64ce291ad03377ec89e1c58da375dfb98a790e43236df8bd09be78c6d9",
+      "size_gb": 6.31e-07,
+      "fidelity": "local_metakernel",
+      "required_for_shape_runnable": false
+    },
+    {
+      "asset_id": "phobos_sbmt_v004_036m_obj",
+      "asset_type": "shape",
+      "local_path": "assets/bodies/phobos/shape/source/phobos_g_036m_spc_obj_0000n00000_v004.obj",
+      "source_url": "https://sbmt.jhuapl.edu/shared-files/ (Ernst et al. 2023, EPS 75:103, doi:10.1186/s40623-023-01814-7)",
+      "download_url": "https://sbmt.jhuapl.edu/shared-files/files/phobos_g_036m_spc_obj_0000n00000_v004.obj.zip",
+      "archive_member": "phobos_g_036m_spc_obj_0000n00000_v004.obj",
+      "compressed_sha256": "31c02c7201ddf602c259b9bd4621e140aeca8e8aff818010945c6db170f275c0",
+      "sha256": "35cdeac1ff3c552815032ccdc01224f4e7903388a72c041da1252badee0de00e",
+      "size_gb": 0.23121432,
+      "fidelity": "max_public_source_spc_default_resolution",
+      "required_for_shape_runnable": false,
+      "content_format": "obj",
+      "input_units": "km",
+      "body_fixed_frame": "IAU_PHOBOS",
+      "load_materials": false,
+      "plate_count": 3145728,
+      "label_url": "https://sbmt.jhuapl.edu/shared-files/files/phobos_g_036m_spc_obj_0000n00000_v004.lbl",
+      "frame_note": "v004 label: migrated from pck00010 to pck00011, COM-COF offset removed"
+    },
+    {
+      "asset_id": "phobos_sbmt_v004_296m_obj",
+      "asset_type": "shape",
+      "local_path": "assets/bodies/phobos/shape/source/phobos_g_296m_spc_obj_0000n00000_v004.obj",
+      "source_url": "https://sbmt.jhuapl.edu/shared-files/ (Ernst et al. 2023, EPS 75:103, doi:10.1186/s40623-023-01814-7)",
+      "download_url": "https://sbmt.jhuapl.edu/shared-files/files/phobos_g_296m_spc_obj_0000n00000_v004.obj.zip",
+      "archive_member": "phobos_g_296m_spc_obj_0000n00000_v004.obj",
+      "compressed_sha256": "c74212d6a9952d7cad9068d1f5bd3c4a90b664474767bb7e71e038a182fee055",
+      "sha256": "13529d461608b5f1555004f275b978be7c00bea1f353df61a02888da16c2cf21",
+      "size_gb": 0.003615949,
+      "fidelity": "reduced_resolution_for_gravity_fit",
+      "required_for_shape_runnable": false,
+      "content_format": "obj",
+      "input_units": "km",
+      "body_fixed_frame": "IAU_PHOBOS",
+      "load_materials": false,
+      "plate_count": 49152,
+      "label_url": "https://sbmt.jhuapl.edu/shared-files/files/phobos_g_296m_spc_obj_0000n00000_v004.lbl",
+      "frame_note": "v004 label: migrated from pck00010 to pck00011, COM-COF offset removed"
+    },
+    {
+      "asset_id": "phobos_sbmt_v004_036m_facet_albedo_csv",
+      "asset_type": "albedo",
+      "local_path": "assets/bodies/phobos/appearance/albedo/source/phobos_g_036m_spc_obj_0000n00000_v004.csv",
+      "source_url": "https://sbmt.jhuapl.edu/shared-files/ (Ernst et al. 2023, EPS 75:103, doi:10.1186/s40623-023-01814-7)",
+      "download_url": "https://sbmt.jhuapl.edu/shared-files/files/phobos_g_036m_spc_obj_0000n00000_v004.csv.zip",
+      "archive_member": "phobos_g_036m_spc_obj_0000n00000_v004.csv",
+      "compressed_sha256": "32bd688d00895abd3bf02d79751d4fa409d22077e8eb59beba4f474bbf7e7404",
+      "sha256": "677889085800096823c9d49611f4e78deafd82849d21eb9fb70432bf5e4a3b7a",
+      "size_gb": 1.270083798,
+      "fidelity": "spc_per_facet_relative_albedo_coregistered_with_shape",
+      "required_for_shape_runnable": false,
+      "storage_note": "source cache on /media/peterc/SCRATCH/simulation_rendering_sources; symlinked here",
+      "content_note": "per-facet SPC Albedo column, lon 0-360 E, full coverage"
+    },
+    {
+      "asset_id": "phobos_sbmt_v004_036m_uv_obj",
+      "asset_type": "shape",
+      "local_path": "assets/bodies/phobos/shape/phobos_sbmt_v004_036m_uv_km.obj",
+      "source_url": "https://sbmt.jhuapl.edu/shared-files/ (Ernst et al. 2023, EPS 75:103, doi:10.1186/s40623-023-01814-7)",
+      "download_url": "",
+      "sha256": "fb1f1111de24f42bf8847ee858fc3e404a92af54467f1ff49fb56864f937f1c7",
+      "size_gb": 0.25691209,
+      "fidelity": "exact_geometry_uv_registered",
+      "required_for_shape_runnable": true,
+      "content_format": "obj",
+      "input_units": "km",
+      "body_fixed_frame": "IAU_PHOBOS",
+      "load_materials": true,
+      "material_path": "assets/bodies/phobos/shape/phobos_sbmt_v004_036m_uv_km.mtl",
+      "derived_from_asset_id": "phobos_sbmt_v004_036m_obj"
+    },
+    {
+      "asset_id": "phobos_albedo_linear16",
+      "asset_type": "albedo",
+      "local_path": "assets/bodies/phobos/appearance/albedo/phobos_albedo_linear16.png",
+      "source_url": "https://sbmt.jhuapl.edu/shared-files/ (Ernst et al. 2023, EPS 75:103, doi:10.1186/s40623-023-01814-7)",
+      "download_url": "",
+      "sha256": "798a9f1b3fb28463872cba88d10f3642e9e370b27f2c78c54e62f8775cebaeb1",
+      "size_gb": 0.017131516,
+      "fidelity": "spc_relative_albedo_as_lambertian_rho",
+      "required_for_shape_runnable": false,
+      "derived_from_asset_id": "phobos_sbmt_v004_036m_facet_albedo_csv"
+    },
+    {
+      "asset_id": "phobos_sh_deg16_sbmt_v004_296m_mat",
+      "asset_type": "gravity",
+      "local_path": "assets/bodies/phobos/gravity/phobos_sh_deg16_sbmt_v004_296m.mat",
+      "source_url": "derived: GenerateScenarioSHGravityCoefficients from phobos_sbmt_v004_296m_obj",
+      "download_url": "",
+      "sha256": "0a85e2724a5720c39af9941bfda1ba7c64e8eb10bcb50f98f3364c3d86a39170",
+      "size_gb": 0.00019504,
+      "fidelity": "constant_density_shape_fit_degree16",
+      "required_for_shape_runnable": false,
+      "derived_from_asset_id": "phobos_sbmt_v004_296m_obj"
+    }
+  ],
+  "default_appearance_profile_id": "global_albedo",
+  "appearance_profiles": [
+    {
+      "profile_id": "global_albedo",
+      "albedo_asset_ids": [
+        "phobos_albedo_linear16"
+      ],
+      "normal_asset_ids": [],
+      "albedo_mapping": "MESH_UV",
+      "normal_mapping": "NONE",
+      "albedo_color_space": "linear",
+      "normal_map_encoding": ""
+    }
+  ]
+}

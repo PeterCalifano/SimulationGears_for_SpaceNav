@@ -3,7 +3,9 @@
 
 This script is intentionally outside the MATLAB runtime path. Scenario
 builders keep failing fast when assets are missing; users can run this CLI when
-they explicitly want to synchronize data under the SimGears data root.
+they explicitly want to synchronize data. Manifests are read from the SimGears
+data root; asset payloads are written under the asset root
+(``SPECTRA_RT_RENDERING_DATA``), with one acquisition receipt per fetched file.
 
 Examples:
     Dry-run the runnable shape assets for Eros::
@@ -14,6 +16,11 @@ Examples:
 
         python3 tools/data/fetch_scenario_assets.py --data-root /data/simgears \
             --scenario Eros --asset-id naif_eros_dsk_q64
+
+    Fetch all Phobos SPICE assets into an explicit asset root::
+
+        python3 tools/data/fetch_scenario_assets.py --scenario Phobos \
+            --include spice --assets-root /data/simulation_rendering_assets
 """
 
 from __future__ import annotations
@@ -28,8 +35,8 @@ import tempfile
 import urllib.request
 import zipfile
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from pathlib import Path
-
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_MAX_SIZE_GB = 1.0
@@ -54,7 +61,8 @@ REQUIRED_ASSET_FIELDS = {
     "fidelity",
     "required_for_shape_runnable",
 }
-SUPPORTED_CONTENT_FORMATS = {"wavefront_obj"}
+SUPPORTED_CONTENT_FORMATS = {"wavefront_obj", "obj", "dsk"}
+ASSET_TYPES = ("shape", "albedo", "normal", "displacement", "gravity", "ring_profile", "spectral", "spice")
 
 
 class FetchError(RuntimeError):
@@ -86,7 +94,7 @@ class AssetPlan:
         scenario_name: Canonical scenario name.
         asset_id: Manifest asset identifier.
         asset_type: Asset category such as ``shape`` or ``albedo``.
-        data_root: Absolute SimulationGears data root.
+        assets_root: Absolute asset-payload root.
         local_path: Absolute destination path for the asset.
         manifest_path: Absolute path to the owning manifest.
         download_url: Direct download URL, if available.
@@ -98,7 +106,7 @@ class AssetPlan:
     scenario_name: str
     asset_id: str
     asset_type: str
-    data_root: Path
+    assets_root: Path
     local_path: Path
     manifest_path: Path
     download_url: str
@@ -123,6 +131,7 @@ def main(argv: list[str] | None = None) -> int:
 
     try:
         data_root = resolve_data_root(args.data_root)
+        assets_root = resolve_assets_root(args.assets_root, data_root)
         selected_manifests = select_manifests(data_root, args.scenario, args.all)
         include_types = set(args.include or ["shape"])
         required_shape_only = args.asset_id is None and args.include is None
@@ -130,7 +139,7 @@ def main(argv: list[str] | None = None) -> int:
         for manifest in selected_manifests:
             plans.extend(
                 build_asset_plans(
-                    data_root=data_root,
+                    assets_root=assets_root,
                     manifest=manifest,
                     asset_ids=args.asset_id,
                     include_types=include_types,
@@ -165,12 +174,18 @@ def build_parser() -> argparse.ArgumentParser:
     scenario_group = parser.add_mutually_exclusive_group(required=True)
     scenario_group.add_argument("--scenario", action="append", help="Scenario name or alias. May be repeated.")
     scenario_group.add_argument("--all", action="store_true", help="Process all scenario manifests.")
-    parser.add_argument("--data-root", type=Path, default=None, help="SimulationGears data root.")
+    parser.add_argument("--data-root", type=Path, default=None, help="SimulationGears data root holding scenarios/.")
+    parser.add_argument(
+        "--assets-root",
+        type=Path,
+        default=None,
+        help="Asset-payload root. Defaults to SPECTRA_RT_RENDERING_DATA, then to the data root.",
+    )
     parser.add_argument("--asset-id", action="append", help="Specific asset id to process. May be repeated.")
     parser.add_argument(
         "--include",
         action="append",
-        choices=("shape", "albedo", "spectral", "spice"),
+        choices=ASSET_TYPES,
         help=(
             "Asset type to include when --asset-id is omitted. When omitted, "
             "only required shape-runnable assets are selected."
@@ -211,6 +226,36 @@ def resolve_data_root(cli_data_root: Path | None) -> Path:
             "Create it, pass --data-root, or set SIMGEARS_DATA_ROOT."
         )
     return data_root
+
+
+def resolve_assets_root(cli_assets_root: Path | None, data_root: Path) -> Path:
+    """Resolve and validate the root under which manifest ``local_path`` values live.
+
+    Args:
+        cli_assets_root: Optional path from ``--assets-root``.
+        data_root: Resolved SimulationGears data root, used as the last fallback.
+
+    Returns:
+        Absolute asset-payload root.
+
+    Raises:
+        FetchError: If the resolved root does not exist.
+    """
+
+    if cli_assets_root is not None:
+        assets_root = cli_assets_root
+    elif os.environ.get("SPECTRA_RT_RENDERING_DATA"):
+        assets_root = Path(os.environ["SPECTRA_RT_RENDERING_DATA"])
+    else:
+        assets_root = data_root
+
+    assets_root = assets_root.expanduser().resolve()
+    if not assets_root.is_dir():
+        raise FetchError(
+            f"Asset root not found: {assets_root}\n"
+            "Pass --assets-root or set SPECTRA_RT_RENDERING_DATA."
+        )
+    return assets_root
 
 
 def select_manifests(data_root: Path, scenario_names: list[str] | None, process_all: bool) -> list[ScenarioManifest]:
@@ -341,7 +386,7 @@ def manifest_aliases(payload: dict) -> set[str]:
 
 
 def build_asset_plans(
-    data_root: Path,
+    assets_root: Path,
     manifest: ScenarioManifest,
     asset_ids: list[str] | None,
     include_types: set[str],
@@ -352,7 +397,7 @@ def build_asset_plans(
     """Build local fetch/verify plans for selected assets.
 
     Args:
-        data_root: Absolute SimulationGears data root.
+        assets_root: Absolute asset-payload root.
         manifest: Loaded scenario manifest.
         asset_ids: Explicit asset ids requested by the user.
         include_types: Asset types requested when no explicit ids are given.
@@ -365,7 +410,7 @@ def build_asset_plans(
         Resolved asset plans.
 
     Raises:
-        FetchError: If an asset id is unknown, a path escapes the data root, or
+        FetchError: If an asset id is unknown, a path escapes the asset root, or
         a selected asset exceeds the configured size limit.
     """
 
@@ -400,8 +445,8 @@ def build_asset_plans(
                 scenario_name=manifest.name,
                 asset_id=asset_id,
                 asset_type=str(asset["asset_type"]),
-                data_root=data_root,
-                local_path=resolve_local_asset_path(data_root, str(asset["local_path"]), manifest.path, asset_id),
+                assets_root=assets_root,
+                local_path=resolve_local_asset_path(assets_root, str(asset["local_path"]), manifest.path, asset_id),
                 manifest_path=manifest.path,
                 download_url=str(asset["download_url"]),
                 sha256=str(asset["sha256"]),
@@ -413,11 +458,11 @@ def build_asset_plans(
     return plans
 
 
-def resolve_local_asset_path(data_root: Path, local_path: str, manifest_path: Path, asset_id: str) -> Path:
+def resolve_local_asset_path(assets_root: Path, local_path: str, manifest_path: Path, asset_id: str) -> Path:
     """Resolve a manifest local path and prevent path traversal.
 
     Args:
-        data_root: Absolute SimulationGears data root.
+        assets_root: Absolute asset-payload root.
         local_path: Manifest-relative asset path.
         manifest_path: Manifest path used in diagnostics.
         asset_id: Asset id used in diagnostics.
@@ -426,16 +471,16 @@ def resolve_local_asset_path(data_root: Path, local_path: str, manifest_path: Pa
         Absolute local asset path.
 
     Raises:
-        FetchError: If the path resolves outside ``data_root``.
+        FetchError: If the path resolves outside ``assets_root``.
     """
 
-    resolved_path = (data_root / local_path).resolve()
+    resolved_path = (assets_root / local_path).resolve()
     try:
-        resolved_path.relative_to(data_root)
+        resolved_path.relative_to(assets_root)
     except ValueError as exc:
         raise FetchError(
             f"Asset {asset_id} in {manifest_path} has local_path {local_path!r}, "
-            f"which resolves outside data root {data_root}: {resolved_path}"
+            f"which resolves outside asset root {assets_root}: {resolved_path}"
         ) from exc
     return resolved_path
 
@@ -481,9 +526,10 @@ def process_asset_plan(plan: AssetPlan, dry_run: bool, verify_only: bool, overwr
             f"  {verify_command}"
         )
 
-    fetch_asset(plan, overwrite=overwrite)
+    compressed_sha256 = fetch_asset(plan, overwrite=overwrite)
     verify_asset(plan)
-    print(f"FETCHED {plan.scenario_name} {plan.asset_id} {plan.local_path}")
+    receipt_path = write_acquisition_receipt(plan, compressed_sha256)
+    print(f"FETCHED {plan.scenario_name} {plan.asset_id} {plan.local_path} receipt={receipt_path}")
 
 
 def verify_existing_asset(plan: AssetPlan) -> None:
@@ -588,8 +634,83 @@ def verify_asset_content(plan: AssetPlan, candidate_path: Path | None = None) ->
         return
 
     asset_path = candidate_path if candidate_path is not None else plan.local_path
-    if content_format == "wavefront_obj":
+    if content_format in {"wavefront_obj", "obj"}:
         verify_wavefront_obj_content(plan, asset_path)
+    elif content_format == "dsk":
+        verify_dsk_content(plan, asset_path)
+
+
+def verify_dsk_content(plan: AssetPlan, candidate_path: Path) -> None:
+    """Require the SPICE DAS/DSK file identifier at the start of a binary DSK.
+
+    Args:
+        plan: Resolved asset work item, used in diagnostics.
+        candidate_path: File to check.
+
+    Raises:
+        FetchError: If the first 8 bytes are not ``DAS/DSK ``.
+    """
+
+    with candidate_path.open("rb") as file_obj:
+        file_id = file_obj.read(8)
+    if file_id != b"DAS/DSK ":
+        raise FetchError(
+            f"Content validation failed for asset {plan.asset_id}: file identifier {file_id!r} is not DAS/DSK.\n"
+            f"Candidate path:   {candidate_path}\n"
+            "Declared format: dsk\n"
+            f"Manifest:         {plan.manifest_path}"
+        )
+
+
+def acquisition_receipt_path(plan: AssetPlan) -> Path:
+    """Return the path of the acquisition receipt of one asset.
+
+    Assets under ``assets/bodies/<body>/`` get their receipt in that body's ``provenance/`` folder. Other assets
+    get a ``<file>.acquisition.json`` sidecar next to the file.
+
+    Args:
+        plan: Resolved asset work item.
+
+    Returns:
+        Absolute receipt path.
+    """
+
+    relative_parts = plan.local_path.relative_to(plan.assets_root).parts
+    if len(relative_parts) > 3 and relative_parts[:2] == ("assets", "bodies"):
+        return plan.assets_root.joinpath(*relative_parts[:3], "provenance", f"{plan.asset_id}_acquisition.json")
+    return plan.local_path.with_name(plan.local_path.name + ".acquisition.json")
+
+
+def write_acquisition_receipt(plan: AssetPlan, compressed_sha256: str = "") -> Path:
+    """Record source, retrieval time, size and SHA-256 of a freshly fetched asset.
+
+    Args:
+        plan: Resolved asset work item whose ``local_path`` was just fetched.
+        compressed_sha256: SHA-256 of the downloaded archive, or empty for a direct file.
+
+    Returns:
+        Path of the written JSON receipt.
+    """
+
+    receipt_path = acquisition_receipt_path(plan)
+    receipt_path.parent.mkdir(parents=True, exist_ok=True)
+    receipt = {
+        "scenario_name": plan.scenario_name,
+        "asset_id": plan.asset_id,
+        "asset_type": plan.asset_type,
+        "local_path": plan.local_path.relative_to(plan.assets_root).as_posix(),
+        "source_url": str(plan.payload.get("source_url", "")),
+        "download_url": plan.download_url,
+        "retrieved_utc": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "bytes": plan.local_path.stat().st_size if plan.local_path.is_file() else None,
+        "sha256": sha256_file(plan.local_path) if plan.local_path.is_file() else "",
+        "manifest_sha256": plan.sha256,
+        "manifest": str(plan.manifest_path),
+    }
+    if compressed_sha256:
+        receipt["compressed_sha256"] = compressed_sha256
+    receipt_path.write_text(json.dumps(receipt, indent=2) + "\n", encoding="utf-8")
+    return receipt_path
 
 
 def verify_wavefront_obj_content(plan: AssetPlan, candidate_path: Path) -> None:
@@ -628,12 +749,15 @@ def verify_wavefront_obj_content(plan: AssetPlan, candidate_path: Path) -> None:
         )
 
 
-def fetch_asset(plan: AssetPlan, overwrite: bool) -> None:
+def fetch_asset(plan: AssetPlan, overwrite: bool) -> str:
     """Fetch one asset using direct-file or explicit archive metadata.
 
     Args:
         plan: Resolved asset work item.
         overwrite: Replace an existing destination.
+
+    Returns:
+        SHA-256 of the downloaded archive, or an empty string for a direct file.
 
     Raises:
         FetchError: If an archive lacks explicit extraction metadata or the
@@ -647,9 +771,9 @@ def fetch_asset(plan: AssetPlan, overwrite: bool) -> None:
         )
 
     if has_archive_metadata(plan):
-        fetch_archive_asset(plan, overwrite=overwrite)
-    else:
-        fetch_direct_file(plan, overwrite=overwrite)
+        return fetch_archive_asset(plan, overwrite=overwrite)
+    fetch_direct_file(plan, overwrite=overwrite)
+    return ""
 
 
 def is_archive_download(plan: AssetPlan) -> bool:
@@ -685,48 +809,55 @@ def fetch_direct_file(plan: AssetPlan, overwrite: bool) -> None:
     try:
         download_to_path(plan.download_url, tmp_path)
         verify_asset(plan, tmp_path)
-        tmp_path.replace(plan.local_path)
+        install_temporary_file(tmp_path, plan.local_path)
     except Exception:
         tmp_path.unlink(missing_ok=True)
         raise
 
 
-def fetch_archive_asset(plan: AssetPlan, overwrite: bool) -> None:
+def fetch_archive_asset(plan: AssetPlan, overwrite: bool) -> str:
     """Download a ZIP asset and extract only explicitly declared content.
+
+    The archive is downloaded beside the destination, so large archives use the
+    asset disk instead of the system temporary folder.
 
     Args:
         plan: Resolved asset work item with ``archive_member`` or ``unpack_to``.
         overwrite: Replace an existing destination.
 
+    Returns:
+        SHA-256 of the downloaded archive.
+
     Raises:
         FetchError: If checksum validation or extraction fails.
     """
 
-    with tempfile.TemporaryDirectory(prefix="simgears-asset-") as tmp_dir:
+    plan.local_path.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix="simgears-asset-", dir=plan.local_path.parent) as tmp_dir:
         archive_path = Path(tmp_dir) / "asset.zip"
         download_to_path(plan.download_url, archive_path)
 
+        actual_sha256 = sha256_file(archive_path)
         compressed_sha256 = str(plan.payload.get("compressed_sha256", ""))
-        if compressed_sha256:
-            actual_sha256 = sha256_file(archive_path)
-            if actual_sha256.casefold() != compressed_sha256.casefold():
-                raise FetchError(
-                    f"Archive checksum mismatch for asset {plan.asset_id}.\n"
-                    f"Expected sha256: {compressed_sha256}\n"
-                    f"Actual sha256:   {actual_sha256}\n"
-                    f"Manifest:        {plan.manifest_path}"
-                )
+        if compressed_sha256 and actual_sha256.casefold() != compressed_sha256.casefold():
+            raise FetchError(
+                f"Archive checksum mismatch for asset {plan.asset_id}.\n"
+                f"Expected sha256: {compressed_sha256}\n"
+                f"Actual sha256:   {actual_sha256}\n"
+                f"Manifest:        {plan.manifest_path}"
+            )
 
         if plan.payload.get("archive_member"):
             extract_archive_member(archive_path, str(plan.payload["archive_member"]), plan.local_path, overwrite)
         else:
             unpack_to = resolve_local_asset_path(
-                plan.data_root,
+                plan.assets_root,
                 str(plan.payload["unpack_to"]),
                 plan.manifest_path,
                 plan.asset_id,
             )
             extract_archive_tree(archive_path, unpack_to, overwrite)
+    return actual_sha256
 
 
 def extract_archive_member(archive_path: Path, member_name: str, local_path: Path, overwrite: bool) -> None:
@@ -756,10 +887,26 @@ def extract_archive_member(archive_path: Path, member_name: str, local_path: Pat
             tmp_path = Path(target.name)
 
     try:
-        tmp_path.replace(local_path)
+        install_temporary_file(tmp_path, local_path)
     except Exception:
         tmp_path.unlink(missing_ok=True)
         raise
+
+
+def install_temporary_file(tmp_path: Path, local_path: Path) -> None:
+    """Move a completed temporary file into place with the process umask permissions.
+
+    ``NamedTemporaryFile`` creates mode 0600; shared asset roots need the usual read access.
+
+    Args:
+        tmp_path: Completed temporary file in the destination folder.
+        local_path: Final local path.
+    """
+
+    current_umask = os.umask(0)
+    os.umask(current_umask)
+    tmp_path.chmod(0o666 & ~current_umask)
+    tmp_path.replace(local_path)
 
 
 def extract_archive_tree(archive_path: Path, unpack_to: Path, overwrite: bool) -> None:
@@ -767,7 +914,7 @@ def extract_archive_tree(archive_path: Path, unpack_to: Path, overwrite: bool) -
 
     Args:
         archive_path: Downloaded ZIP archive.
-        unpack_to: Destination folder under the data root.
+        unpack_to: Destination folder under the asset root.
         overwrite: Replace an existing destination folder.
 
     Raises:

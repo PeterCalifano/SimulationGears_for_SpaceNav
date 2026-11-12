@@ -11,6 +11,42 @@ classdef testCSPICEkerLoader < matlab.unittest.TestCase
     % -------------------------------------------------------------------------------------------------------------
 
     methods (Test)
+        function testErosUsesIsolatedExternalAssetRoot(testCase)
+            % The existing registry route needs no production asset replacement or legacy scenario switch.
+            testCase.assumeNotEmpty(which('cspice_furnsh'), 'MICE is required.');
+            testCase.addTeardown(@cspice_kclear);
+            objFixture = testCase.applyFixture(matlab.unittest.fixtures.TemporaryFolderFixture);
+            charMetaFolder = fullfile(objFixture.Folder, 'assets', 'bodies', 'eros', 'spice', 'mk');
+            mkdir(charMetaFolder);
+            testCSPICEkerLoader.WriteMinimalMetaKernel_(fullfile(charMetaFolder, 'metakernel.mk'));
+            charOriginalAssetRoot = getenv('SPECTRA_RT_RENDERING_DATA');
+            testCase.addTeardown(@setenv, 'SPECTRA_RT_RENDERING_DATA', charOriginalAssetRoot);
+            setenv('SPECTRA_RT_RENDERING_DATA', objFixture.Folder);
+            objLoader = CSPICEkerLoader(fullfile(objFixture.Folder, 'absent_legacy_root'), ...
+                EnumScenarioName.Eros, false); %#ok<NASGU>
+            testCase.verifyGreaterThanOrEqual(cspice_ktotal('META'), int32(1));
+            cspice_kclear();
+        end
+
+        function testPlanetaryBodiesUseExternalAssetRoot(testCase)
+            % Moons and planets take their metakernels from the shared asset root, like Eros.
+            testCase.assumeNotEmpty(which('cspice_furnsh'), 'MICE is required.');
+            testCase.addTeardown(@cspice_kclear);
+            objFixture = testCase.applyFixture(matlab.unittest.fixtures.TemporaryFolderFixture);
+            charOriginalAssetRoot = getenv('SPECTRA_RT_RENDERING_DATA');
+            testCase.addTeardown(@setenv, 'SPECTRA_RT_RENDERING_DATA', charOriginalAssetRoot);
+            setenv('SPECTRA_RT_RENDERING_DATA', objFixture.Folder);
+            for charBody = ["Phobos", "Deimos", "Enceladus", "Mars", "Saturn"]
+                charMetaFolder = fullfile(objFixture.Folder, 'assets', 'bodies', char(lower(charBody)), 'spice', 'mk');
+                mkdir(charMetaFolder);
+                testCSPICEkerLoader.WriteMinimalMetaKernel_(fullfile(charMetaFolder, 'metakernel.mk'));
+                objLoader = CSPICEkerLoader(fullfile(objFixture.Folder, 'absent_legacy_root'), ...
+                    EnumScenarioName.(charBody), false); %#ok<NASGU>
+                testCase.verifyGreaterThanOrEqual(cspice_ktotal('META'), int32(1), charBody);
+                cspice_kclear();
+            end
+        end
+
         function testApophisUsesRegistryOwnedDataRoot(testCase)
             % A temporary minimal metakernel isolates registry routing from the
             % contents of the production Apophis kernel pack.
@@ -73,7 +109,7 @@ classdef testCSPICEkerLoader < matlab.unittest.TestCase
             assert(i32MetaKernelFileId ~= -1, ...
                 'Unable to create temporary SPICE metakernel fixture.');
             objMetaKernelCleanup = onCleanup( ...
-                @() fclose(i32MetaKernelFileId)); %#ok<NASGU>
+                @() fclose(i32MetaKernelFileId));
             fprintf(i32MetaKernelFileId, [ ...
                 'KPL/MK\n\n', ...
                 '\\begindata\n\n', ...
@@ -86,7 +122,7 @@ classdef testCSPICEkerLoader < matlab.unittest.TestCase
             assert(i32TextKernelFileId ~= -1, ...
                 'Unable to create temporary SPICE text-kernel fixture.');
             objTextKernelCleanup = onCleanup( ...
-                @() fclose(i32TextKernelFileId)); %#ok<NASGU>
+                @() fclose(i32TextKernelFileId));
             fprintf(i32TextKernelFileId, [ ...
                 'KPL/PCK\n\n', ...
                 '\\begindata\n\n', ...

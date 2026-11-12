@@ -1,0 +1,187 @@
+{
+  "schema_version": 2,
+  "scenario_name": "Mars",
+  "canonical_name": "Mars",
+  "aliases": [
+    "Mars"
+  ],
+  "confidence": "high",
+  "tags": [
+    "shape_runnable",
+    "scientific_texture_available"
+  ],
+  "default_shape_asset_id": "mars_iau_ellipsoid_1440x720_uv_obj",
+  "assets": [
+    {
+      "asset_id": "naif0012_lsk",
+      "asset_type": "spice",
+      "local_path": "assets/common/spice/lsk/naif0012.tls",
+      "source_url": "https://naif.jpl.nasa.gov/pub/naif/generic_kernels/lsk/",
+      "download_url": "",
+      "sha256": "f15293b0747e5fb01a865596281cb0534f7c77274e78184bd64260cc92be3706",
+      "size_gb": 5.409e-06,
+      "fidelity": "naif_generic_current_crlf_copy",
+      "required_for_shape_runnable": false
+    },
+    {
+      "asset_id": "gm_de440_pck",
+      "asset_type": "spice",
+      "local_path": "assets/common/spice/pck/gm_de440.tpc",
+      "source_url": "https://naif.jpl.nasa.gov/pub/naif/generic_kernels/pck/",
+      "download_url": "https://naif.jpl.nasa.gov/pub/naif/generic_kernels/pck/gm_de440.tpc",
+      "sha256": "924ddf4fb9ead9fe8a1aa55780bcabde40b09d00065d58226e24b68d8092f140",
+      "size_gb": 1.2406e-05,
+      "fidelity": "naif_generic_current",
+      "required_for_shape_runnable": false
+    },
+    {
+      "asset_id": "pck00011_pck",
+      "asset_type": "spice",
+      "local_path": "assets/common/spice/pck/pck00011.tpc",
+      "source_url": "https://naif.jpl.nasa.gov/pub/naif/generic_kernels/pck/",
+      "download_url": "https://naif.jpl.nasa.gov/pub/naif/generic_kernels/pck/pck00011.tpc",
+      "sha256": "3dff7b1dbeceaa01f25467767d3fa25816051c85d162d1edf04acb310ee28bb1",
+      "size_gb": 0.000131226,
+      "fidelity": "naif_generic_current",
+      "required_for_shape_runnable": false
+    },
+    {
+      "asset_id": "mars_konopliv_2026_pck",
+      "asset_type": "spice",
+      "local_path": "assets/bodies/mars/spice/kernels/mars_konopliv_2026_v1.tpc",
+      "source_url": "https://naif.jpl.nasa.gov/pub/naif/generic_kernels/pck/",
+      "download_url": "https://naif.jpl.nasa.gov/pub/naif/generic_kernels/pck/mars_konopliv_2026_v1.tpc",
+      "sha256": "3b545d79690cc513cc19d290d9e2f85a89a733ee82bd26e067f3e1cc22f382bb",
+      "size_gb": 1.8923e-05,
+      "fidelity": "naif_generic_current",
+      "required_for_shape_runnable": false
+    },
+    {
+      "asset_id": "de440s_spk",
+      "asset_type": "spice",
+      "local_path": "assets/common/spice/spk/de440s.bsp",
+      "source_url": "https://naif.jpl.nasa.gov/pub/naif/generic_kernels/spk/planets/",
+      "download_url": "https://naif.jpl.nasa.gov/pub/naif/generic_kernels/spk/planets/de440s.bsp",
+      "sha256": "c1c7feeab882263fc493a9d5a5b2ddd71b54826cdf65d8d17a76126b260a49f2",
+      "size_gb": 0.032726016,
+      "fidelity": "naif_generic_current",
+      "required_for_shape_runnable": false
+    },
+    {
+      "asset_id": "mar099s_spk",
+      "asset_type": "spice",
+      "local_path": "assets/bodies/mars/spice/kernels/mar099s.bsp",
+      "source_url": "https://naif.jpl.nasa.gov/pub/naif/generic_kernels/spk/satellites/",
+      "download_url": "https://naif.jpl.nasa.gov/pub/naif/generic_kernels/spk/satellites/mar099s.bsp",
+      "sha256": "997dc93ba640e476da7a494d2237dcdeb145e528db37be8ccee588c615e4e1ff",
+      "size_gb": 0.06759424,
+      "fidelity": "naif_generic_current",
+      "required_for_shape_runnable": false
+    },
+    {
+      "asset_id": "mars_spice_metakernel",
+      "asset_type": "spice",
+      "local_path": "assets/bodies/mars/spice/mk/metakernel.mk",
+      "source_url": "local: relative paths to the kernels declared in this manifest",
+      "download_url": "",
+      "sha256": "583a661a6eea73d8aa93f01e245b4d590891c1546999412b6889092bbdac8491",
+      "size_gb": 5.97e-07,
+      "fidelity": "local_metakernel",
+      "required_for_shape_runnable": false
+    },
+    {
+      "asset_id": "mars_viking_mdim21_color_232m_tif",
+      "asset_type": "albedo",
+      "local_path": "assets/bodies/mars/appearance/albedo/source/Mars_Viking_MDIM21_ClrMosaic_global_232m.tif",
+      "source_url": "https://astrogeology.usgs.gov/search/map/mars_viking_global_color_mosaic_232m",
+      "download_url": "https://planetarymaps.usgs.gov/mosaic/Mars_Viking_MDIM21_ClrMosaic_global_232m.tif",
+      "sha256": "554f1170998b4cd00359defa48600307e52c49f921c282d842361ad45082aa31",
+      "size_gb": 12.742411029,
+      "fidelity": "max_public_controlled_global_colour",
+      "required_for_shape_runnable": false,
+      "published_md5": "e73a4f00ca31ff0fcbe0fc83db83af36",
+      "storage_note": "source cache on /media/peterc/SCRATCH/simulation_rendering_sources; symlinked here",
+      "map_projection": "simple cylindrical, -180..180 E, planetocentric, 256 ppd, 8-bit RGB"
+    },
+    {
+      "asset_id": "mars_mgs_mola_dem_463m_tif",
+      "asset_type": "displacement",
+      "local_path": "assets/bodies/mars/appearance/displacement/source/Mars_MGS_MOLA_DEM_mosaic_global_463m.tif",
+      "source_url": "https://astrogeology.usgs.gov/search/map/mars_mgs_mola_dem_463m",
+      "download_url": "https://planetarymaps.usgs.gov/mosaic/Mars_MGS_MOLA_DEM_mosaic_global_463m.tif",
+      "sha256": "38a4eb0b4452855b8dabfac40a367b458555ab4c01b31235807ad0a53c031f4c",
+      "size_gb": 2.125771142,
+      "fidelity": "max_public_global_dem_poles_filled",
+      "required_for_shape_runnable": false,
+      "published_md5": "e7920a303f46707d57fe72eab5f6b1aa",
+      "storage_note": "source cache on /media/peterc/SCRATCH/simulation_rendering_sources; symlinked here",
+      "map_projection": "equirectangular, -180..180 E, int16 m above the MOLA areoid, 128 ppd"
+    },
+    {
+      "asset_id": "mars_jgmro_120g_sha_tab",
+      "asset_type": "gravity",
+      "local_path": "assets/bodies/mars/gravity/source/jgmro_120g_sha.tab",
+      "source_url": "https://pds-geosciences.wustl.edu/mro/mro-m-rss-5-sdp-v1/mrors_1xxx/data/shadr/",
+      "download_url": "https://pds-geosciences.wustl.edu/mro/mro-m-rss-5-sdp-v1/mrors_1xxx/data/shadr/jgmro_120g_sha.tab",
+      "sha256": "b296318066d6e8b8ab5a3ca4878d99635f1cf0e977c39e3efb3f36bfcb06a569",
+      "size_gb": 0.000900604,
+      "fidelity": "newest_pds_field_degree_120_fully_normalized",
+      "required_for_shape_runnable": false,
+      "gravity_note": "R 3396.0 km, GM 42828.37509235890 km3/s2, Konopliv et al. 2026 frame"
+    },
+    {
+      "asset_id": "mars_jgmro_120g_sha_lbl",
+      "asset_type": "gravity",
+      "local_path": "assets/bodies/mars/gravity/source/jgmro_120g_sha.lbl",
+      "source_url": "https://pds-geosciences.wustl.edu/mro/mro-m-rss-5-sdp-v1/mrors_1xxx/data/shadr/",
+      "download_url": "https://pds-geosciences.wustl.edu/mro/mro-m-rss-5-sdp-v1/mrors_1xxx/data/shadr/jgmro_120g_sha.lbl",
+      "sha256": "c112b25087a5acf179916a8576edc38b7aa536e070d98bbd1e0ad2cada326f62",
+      "size_gb": 1.2629e-05,
+      "fidelity": "pds3_label",
+      "required_for_shape_runnable": false
+    },
+    {
+      "asset_id": "mars_iau_ellipsoid_1440x720_uv_obj",
+      "asset_type": "shape",
+      "local_path": "assets/bodies/mars/shape/mars_iau_ellipsoid_1440x720_uv_km.obj",
+      "source_url": "derived: ellipsoid grid from pck00011 BODY_RADII",
+      "download_url": "",
+      "sha256": "d5331ac74a5604f1fe87d0ebe8b1cf94c21bc20f81163edba9401206e7dd7962",
+      "size_gb": 0.162227215,
+      "fidelity": "pck00011_ellipsoid_grid_no_topography",
+      "required_for_shape_runnable": true,
+      "content_format": "obj",
+      "input_units": "km",
+      "body_fixed_frame": "IAU_MARS",
+      "load_materials": true,
+      "material_path": "assets/bodies/mars/shape/mars_iau_ellipsoid_1440x720_uv_km.mtl",
+      "derived_from_asset_id": ""
+    },
+    {
+      "asset_id": "mars_albedo_linear8_rgb",
+      "asset_type": "albedo",
+      "local_path": "assets/bodies/mars/appearance/albedo/mars_albedo_linear8_rgb.png",
+      "source_url": "https://astrogeology.usgs.gov/search/map/mars_viking_global_color_mosaic_232m",
+      "download_url": "",
+      "sha256": "2f39c2dc9b5ef672ba63579668dadaeeb843d39512e4c0015f79bb04af88ba15",
+      "size_gb": 0.335969861,
+      "fidelity": "mosaic_dn_scaled_to_bond_albedo",
+      "required_for_shape_runnable": false,
+      "derived_from_asset_id": "mars_viking_mdim21_color_232m_tif"
+    }
+  ],
+  "default_appearance_profile_id": "global_albedo",
+  "appearance_profiles": [
+    {
+      "profile_id": "global_albedo",
+      "albedo_asset_ids": [
+        "mars_albedo_linear8_rgb"
+      ],
+      "normal_asset_ids": [],
+      "albedo_mapping": "MESH_UV",
+      "normal_mapping": "NONE",
+      "albedo_color_space": "linear",
+      "normal_map_encoding": ""
+    }
+  ]
+}

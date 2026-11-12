@@ -16,14 +16,15 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import shutil
 import subprocess
 import sys
 import tempfile
 import unittest
+import zipfile
 from pathlib import Path
 from typing import Any
-
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT_PATH = REPO_ROOT / "tools" / "data" / "fetch_scenario_assets.py"
@@ -113,13 +114,13 @@ class FetchScenarioAssetsCliTest(unittest.TestCase):
         self.assertIn(str(self._destination_path()), result.stderr)
         self.assertIn("--verify-only", result.stderr)
 
-    def test_manifest_local_paths_must_stay_inside_data_root(self) -> None:
-        """Reject a fixture destination that escapes its temporary data root."""
+    def test_manifest_local_paths_must_stay_inside_asset_root(self) -> None:
+        """Reject a fixture destination that escapes its temporary asset root."""
         self._update_asset(PRIMARY_ASSET, local_path="../outside.obj")
         result = self._run_script("--scenario", PRIMARY_SCENARIO, "--dry-run")
 
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn("outside data root", result.stderr)
+        self.assertIn("outside asset root", result.stderr)
         self.assertIn(PRIMARY_ASSET, result.stderr)
 
     def test_unsupported_content_format_reports_manifest_and_asset(self) -> None:
@@ -206,17 +207,104 @@ class FetchScenarioAssetsCliTest(unittest.TestCase):
         self.assertIn("fixture_optional_shape", result.stdout)
         self.assertNotIn(PRIMARY_ASSET, result.stdout)
 
+    def test_obj_content_format_installs_and_writes_sidecar_receipt(self) -> None:
+        """Accept the schema-v2 ``obj`` format and record a receipt beside a non-body path."""
+        self._update_asset(PRIMARY_ASSET, content_format="obj")
+        result = self._run_script("--scenario", PRIMARY_SCENARIO)
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        receipt_path = self._destination_path().with_name("triangle.obj.acquisition.json")
+        receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+        self.assertEqual(receipt["asset_id"], PRIMARY_ASSET)
+        self.assertEqual(receipt["local_path"], "assets/fixture_a/shape/triangle.obj")
+        self.assertEqual(receipt["sha256"], hashlib.sha256(self._destination_path().read_bytes()).hexdigest())
+        self.assertEqual(receipt["bytes"], self._destination_path().stat().st_size)
+        current_umask = os.umask(0)
+        os.umask(current_umask)
+        self.assertEqual(self._destination_path().stat().st_mode & 0o777, 0o666 & ~current_umask)
+
+    def test_dsk_content_format_checks_das_identifier_and_body_receipt(self) -> None:
+        """Install a DAS/DSK payload under assets/bodies and reject a non-DSK one."""
+        dsk_source = self.data_root.parent / "fixture.bds"
+        dsk_source.write_bytes(b"DAS/DSK " + bytes(1016))
+        self._update_asset(
+            PRIMARY_ASSET,
+            content_format="dsk",
+            local_path="assets/bodies/fixture_a/shape/fixture.bds",
+            download_url=dsk_source.as_uri(),
+            sha256="",
+        )
+        result = self._run_script("--scenario", PRIMARY_SCENARIO)
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        receipt_path = (self.data_root / "assets" / "bodies" / "fixture_a" / "provenance"
+                        / f"{PRIMARY_ASSET}_acquisition.json")
+        self.assertTrue(receipt_path.is_file(), result.stdout)
+
+        dsk_source.write_bytes(b"DAF/SPK " + bytes(1016))
+        result = self._run_script("--scenario", PRIMARY_SCENARIO, "--overwrite")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("not DAS/DSK", result.stderr)
+
+    def test_archive_member_receipt_records_compressed_sha256(self) -> None:
+        """Extract one declared ZIP member, record the archive SHA-256 and leave no temporary folder."""
+        archive_path = self.data_root.parent / "fixture.zip"
+        with zipfile.ZipFile(archive_path, "w") as archive:
+            archive.write(SOURCE_ROOT / "triangle.tab", "nested/triangle.obj")
+        self._update_asset(
+            PRIMARY_ASSET,
+            content_format="obj",
+            local_path="assets/bodies/fixture_a/shape/triangle.obj",
+            download_url=archive_path.as_uri(),
+            archive_member="nested/triangle.obj",
+        )
+        result = self._run_script("--scenario", PRIMARY_SCENARIO)
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        shape_folder = self.data_root / "assets" / "bodies" / "fixture_a" / "shape"
+        self.assertEqual(sorted(path.name for path in shape_folder.iterdir()), ["triangle.obj"])
+        receipt_path = (self.data_root / "assets" / "bodies" / "fixture_a" / "provenance"
+                        / f"{PRIMARY_ASSET}_acquisition.json")
+        receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+        self.assertEqual(receipt["compressed_sha256"], hashlib.sha256(archive_path.read_bytes()).hexdigest())
+
+        self._update_asset(PRIMARY_ASSET, compressed_sha256="0" * 64)
+        result = self._run_script("--scenario", PRIMARY_SCENARIO, "--overwrite")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("Archive checksum mismatch", result.stderr)
+
+    def test_asset_root_defaults_to_rendering_data_environment(self) -> None:
+        """Read manifests from the data root and write payloads under SPECTRA_RT_RENDERING_DATA."""
+        assets_root = self.data_root.parent / "rendering_assets"
+        assets_root.mkdir()
+        result = subprocess.run(
+            [sys.executable, str(SCRIPT_PATH), "--data-root", str(self.data_root),
+             "--scenario", PRIMARY_SCENARIO],
+            check=False,
+            capture_output=True,
+            text=True,
+            env={**os.environ, "SPECTRA_RT_RENDERING_DATA": str(assets_root)},
+        )
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertTrue((assets_root / "assets" / "fixture_a" / "shape" / "triangle.obj").is_file())
+        self.assertFalse(self._destination_path().exists())
+
     def _run_script(self, *args: str | Path) -> subprocess.CompletedProcess[str]:
-        """Run the real CLI against this test's temporary fixture data root.
+        """Run the real CLI against this test's temporary fixture roots.
+
+        The temporary data root also serves as the asset root, so a developer's
+        ``SPECTRA_RT_RENDERING_DATA`` is never written by these tests.
 
         Args:
-            *args: Additional CLI arguments; the data root is supplied here.
+            *args: Additional CLI arguments; both roots are supplied here.
 
         Returns:
             CLI exit status and captured text output.
         """
         return subprocess.run(
-            [sys.executable, str(SCRIPT_PATH), "--data-root", str(self.data_root), *map(str, args)],
+            [sys.executable, str(SCRIPT_PATH), "--data-root", str(self.data_root),
+             "--assets-root", str(self.data_root), *map(str, args)],
             check=False,
             capture_output=True,
             text=True,

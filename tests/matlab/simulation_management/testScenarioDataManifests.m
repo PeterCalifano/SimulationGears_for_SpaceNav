@@ -7,7 +7,14 @@ classdef testScenarioDataManifests < matlab.unittest.TestCase
         function testResolveDataRootDefaultsToSimGearsData(testCase)
             charDataRoot = ResolveSimGearsDataRoot();
 
-            testCase.verifyTrue(endsWith(string(charDataRoot), fullfile("SimulationGears_for_SpaceNav", "data")));
+            % A linked worktree is a valid owner; its basename need not match
+            % the primary checkout. Explicit environment overrides still win.
+            charExpectedRoot = string(getenv("SIMGEARS_DATA_ROOT"));
+            if strlength(charExpectedRoot) == 0
+                charExpectedRoot = fullfile(fileparts(fileparts(fileparts( ...
+                    which('ResolveSimGearsDataRoot')))), 'data');
+            end
+            testCase.verifyEqual(string(charDataRoot), string(charExpectedRoot));
             testCase.verifyTrue(isfolder(charDataRoot));
         end
 
@@ -86,6 +93,21 @@ classdef testScenarioDataManifests < matlab.unittest.TestCase
             testCase.verifyTrue(all(isfile(objBennuAssets.charAlbedoMapPaths)));
         end
 
+        function testResolvePlanetaryBodyAssetBundles(testCase)
+            charAssetRoot = testScenarioDataManifests.assetRoot_();
+            for charBody = ["Phobos", "Deimos", "Enceladus", "Mars", "Saturn"]
+                objAssets = ResolveTargetAssetBundle(charBody, charAssetRootPath=charAssetRoot);
+
+                testCase.verifyEqual(objAssets.charShapeFormat, "obj", charBody);
+                testCase.verifyEqual(objAssets.enumShapeInputUnits, EnumLengthUnits.km, charBody);
+                testCase.verifyTrue(objAssets.bLoadMaterials, charBody);
+                testCase.verifyEqual(objAssets.enumAlbedoMapping, EnumSurfaceMapMapping.MESH_UV, charBody);
+                testCase.verifyEqual(objAssets.charAlbedoColorSpace, "linear", charBody);
+                testCase.verifyTrue(all(isfile(objAssets.charAlbedoMapPaths)), charBody);
+                testCase.verifyEqual(strlength(objAssets.charShapeSha256), strlength(repmat('0', 1, 64)), charBody);
+            end
+        end
+
         function testFetchScenarioDataDryRunReturnsPlannedAssets(testCase)
             strPlan = FetchScenarioData("Eros", bDryRun=true);
 
@@ -95,8 +117,13 @@ classdef testScenarioDataManifests < matlab.unittest.TestCase
         end
 
         function testAllManifestBackedScenariosHaveAlignedDefaults(testCase)
+            % Validate this checkout's tracked payload, even when the process
+            % has an external data-root override for another experiment.
+            charOwnedDataRoot = fullfile(fileparts(fileparts(fileparts( ...
+                fileparts(mfilename('fullpath'))))), 'data');
             cellExpectedManifestBacked = ["Apophis", "ApophisElongated", "Itokawa", "Bennu", ...
-                "Didymos", "Eros", "Arrokoth", "Comet67P", "Toutatis"];
+                "Didymos", "Eros", "Arrokoth", "Comet67P", "Toutatis", ...
+                "Phobos", "Deimos", "Enceladus", "Mars", "Saturn"];
             cellManifestBacked = strings(1, 0);
 
             for charScenarioName = CScenarioRegistry.ListSupportedScenarios()
@@ -106,7 +133,8 @@ classdef testScenarioDataManifests < matlab.unittest.TestCase
                 end
 
                 cellManifestBacked(end + 1) = string(strSpec.charCanonicalName); %#ok<AGROW>
-                strManifest = LoadScenarioDataManifest(strSpec.enumScenarioName);
+                strManifest = LoadScenarioDataManifest(strSpec.enumScenarioName, ...
+                    charDataRootPath=charOwnedDataRoot);
                 testCase.verifyEqual(string(strManifest.default_shape_asset_id), ...
                     string(strSpec.charDefaultShapeAssetId), string(strSpec.charCanonicalName));
 
@@ -158,7 +186,7 @@ classdef testScenarioDataManifests < matlab.unittest.TestCase
         end
 
         function testLegacyMetadataScenariosAreNotManifestBacked(testCase)
-            for charScenarioName = ["Moon", "Mars", "Ceres", "Earth", "FromShape", "NotDefined"]
+            for charScenarioName = ["Moon", "Ceres", "Earth", "FromShape", "NotDefined"]
                 strSpec = CScenarioRegistry.GetScenarioSpec(charScenarioName);
                 testCase.verifyEqual(strlength(string(strSpec.charDataManifestRelativePath)), 0, charScenarioName);
                 testCase.verifyEmpty(string(strSpec.cellTags), charScenarioName);
