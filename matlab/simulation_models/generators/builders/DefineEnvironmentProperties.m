@@ -67,6 +67,7 @@ end
 % 21-07-2025    Pietro Califano     Add support for 3rd body reference data and generalize implementation
 % 13-08-2026    Pietro Califano, Codex gpt-5.6     Preserve source-owned target angular velocity.
 % 13-08-2026    Pietro Califano, Codex gpt-5.6     Resolve and transport target spin-axis provenance.
+% 23-08-2026    Pietro Califano, Codex              Correct SPICE rate sign for active R_INfromTB histories.
 % 29-09-2026    Pietro Califano, Codex gpt-6      Clarify the SPICE rate frame and model sign.
 % -------------------------------------------------------------------------------------------------------------
 %% DEPENDENCIES
@@ -124,9 +125,10 @@ if kwargs.objDataset.bDefaultConstructed % Try to use SPICE kernels
         char(charTargetFixedFrame), dEphemeridesTimegrid);
     [~, dTargetFrameAngVel_IN] = cspice_xf2rav(dTargetStateTransforms);
 
-    % Use the returned rate in the transform's input frame (IN); no additional frame rotation is needed.
-    % Apply the sign required by the current model: R_INfromTB(t) = Exp(-omega_IN*t) R_INfromTB(0).
-    strMainBodyRefData.dAngVel_IN = -dTargetFrameAngVel_IN;
+    % For an IN-to-TB state transform, XF2RAV returns the angular
+    % velocity of TB relative to IN, resolved in IN. This is already the
+    % rate satisfying R_INfromTB(t) = Exp(+omega_IN*t) R_INfromTB(0).
+    strMainBodyRefData.dAngVel_IN = dTargetFrameAngVel_IN;
     strMainBodyRefData.dSpinAxis_TB = [0.0; 0.0; 1.0];
     strMainBodyRefData.charSpinAxisSource = "DEFAULT_PLUS_Z";
 

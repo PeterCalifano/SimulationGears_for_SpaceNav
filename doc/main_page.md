@@ -197,13 +197,13 @@ same adapter and leave rates absent when their source supplies none.
 
 Timegrid scaling does not rescale the rates. A source without rate data clears
 these three fields from a reused dynamics structure, while retaining unrelated
-attitude metadata. Keep the current model convention
-`R_INfromTB(t) = Exp(-omega_IN*t) R_INfromTB(0)`; this transport fix does not
-adopt the separate target-rotation extension.
+attitude metadata. The rates follow
+`R_INfromTB(t) = Exp(+omega_IN*t) R_INfromTB(0)`: they are the angular velocity
+of the target body frame relative to the inertial frame, in inertial coordinates.
 
 For SPICE inputs, `DefineEnvironmentProperties` queries the inertial-to-target
 state transform. `cspice_xf2rav` returns its rate in the input frame, already
-inertial here, so apply only the existing model sign. See the
+inertial here, and it is stored without a sign change. See the
 [NAIF frame contract](https://naif.jpl.nasa.gov/pub/naif/toolkit_docs/MATLAB/mice/cspice_xf2rav.html).
 
 Run `testReferenceImagesDatasetRates` and `testEphemeridesDataFactory` after

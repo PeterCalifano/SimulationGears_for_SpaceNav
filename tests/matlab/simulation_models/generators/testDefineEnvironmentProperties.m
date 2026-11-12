@@ -1,5 +1,34 @@
 classdef testDefineEnvironmentProperties < matlab.unittest.TestCase
     methods (Test)
+        function testSpiceRateSign(testCase)
+            % Explicit opt-in uses real NAIF kernels; unavailable installations report a filtered test.
+            charKernelRoot = string(getenv('SIMGEARS_SPICE_KERNEL_ROOT'));
+            testCase.assumeTrue(isfolder(charKernelRoot) && exist('cspice_xf2rav', 'file') == 2, ...
+                'Set SIMGEARS_SPICE_KERNEL_ROOT and add the real MICE toolbox for this integration test.');
+
+            cellKernels = {fullfile(charKernelRoot, 'naif0012.tls'), ...
+                fullfile(charKernelRoot, 'pck00010.tpc'), fullfile(charKernelRoot, 'de440.bsp')};
+            for ui32KernelIdx = uint32(1):uint32(numel(cellKernels))
+                testCase.assertTrue(isfile(cellKernels{ui32KernelIdx}));
+                cspice_furnsh(char(cellKernels{ui32KernelIdx}));
+                testCase.addTeardown(@() cspice_unload(char(cellKernels{ui32KernelIdx})));
+            end
+
+            dTimestamps = 8e8 + [0, 20, 70];
+            [~, strMainBodyRefData] = DefineEnvironmentProperties(dTimestamps, "Moon", "J2000");
+
+            % Differentiate the SPICE attitude itself: skew(omega_IN) = dR_INfromTB/dt * R_INfromTB'.
+            for ui32TimeIdx = uint32(1):uint32(numel(dTimestamps))
+                dDCMBefore_INfromTB = cspice_pxform('IAU_MOON', 'J2000', dTimestamps(ui32TimeIdx) - 0.1);
+                dDCMAfter_INfromTB = cspice_pxform('IAU_MOON', 'J2000', dTimestamps(ui32TimeIdx) + 0.1);
+                dSkewAngVel_IN = ((dDCMAfter_INfromTB - dDCMBefore_INfromTB) / 0.2) ...
+                    * strMainBodyRefData.dDCM_INfromTB(:, :, ui32TimeIdx)';
+                dExpectedAngVel_IN = [dSkewAngVel_IN(3, 2); dSkewAngVel_IN(1, 3); dSkewAngVel_IN(2, 1)];
+                testCase.verifyEqual(strMainBodyRefData.dAngVel_IN(:, ui32TimeIdx), dExpectedAngVel_IN, ...
+                    'AbsTol', 1e-11);
+            end
+        end
+
         function testCarriesDatasetTargetAngularVelocity(testCase)
             dTimestamps = [0.0, 15.0, 40.0];
             dStateSC_IN = zeros(6, numel(dTimestamps));

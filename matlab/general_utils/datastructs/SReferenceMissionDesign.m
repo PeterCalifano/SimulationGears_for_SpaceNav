@@ -15,13 +15,14 @@ classdef SReferenceMissionDesign < CBaseDatastructWithTimes
     % 22-12-2025    Pietro Califano     Extend conversion pipeline with intermediate representation class
     % 13-08-2026    Pietro Califano, Codex gpt-5.6     Carry source-provided target angular velocity.
     % 13-08-2026    Pietro Califano, Codex gpt-5.6     Resolve target spin-axis provenance with a +Z default.
+    % 23-08-2026    Pietro Califano, Codex             Correct the active body-to-inertial rate convention.
     % -------------------------------------------------------------------------------------------------------------
     %% METHODS
     % [-]
     % -------------------------------------------------------------------------------------------------------------
     %% PROPERTIES
     % dTargetAngVel_IN: Optional source-provided target attitude-model rate satisfying
-    %                   R_INfromTB(t) = Exp(-omega_IN*t) R_INfromTB(0), expressed in inertial coordinates [rad/s].
+    %                   R_INfromTB(t) = Exp(+omega_IN*t) R_INfromTB(0), expressed in inertial coordinates [rad/s].
     % dTargetSpinAxis_TB: Resolved unit spin axis expressed in the target body-fixed frame.
     % charTargetSpinAxisSource: DEFAULT_PLUS_Z or SCENARIO_DECLARED provenance token.
     % -------------------------------------------------------------------------------------------------------------
