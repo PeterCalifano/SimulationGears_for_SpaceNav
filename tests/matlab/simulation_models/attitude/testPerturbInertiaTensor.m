@@ -13,6 +13,8 @@ function tests = testPerturbInertiaTensor
 % -------------------------------------------------------------------------------------------------------------
 %% CHANGELOG
 % 23-08-2026  Pietro Califano, Codex     First implementation.
+% 12-11-2026  Pietro Califano, Claude Opus 5.5   Expect the ValidatePhysicalInertia error for a nonphysical
+%                                                nominal inertia.
 % -------------------------------------------------------------------------------------------------------------
 %% DEPENDENCIES
 % PerturbInertiaTensor.
@@ -72,7 +74,7 @@ function testRejectsNonphysicalNominalInertia(testCase)
 dNonphysicalInertia_TB = diag([1.0, 1.0, 3.0]);
 
 verifyError(testCase, @() PerturbInertiaTensor(dNonphysicalInertia_TB, zeros(6, 1)), ...
-    'PerturbInertiaTensor:InvalidNominalInertia');
+    'ValidatePhysicalInertia:InvalidInertiaTensor');
 end
 
 function testRejectsAsymmetryRelativeToSmallInertiaScale(testCase)
@@ -83,5 +85,5 @@ dAsymmetricInertia_TB = [3.0e-10, 1.0e-13, 0.0; ...
                          0.0,     0.0,     5.0e-10];
 
 verifyError(testCase, @() PerturbInertiaTensor(dAsymmetricInertia_TB, zeros(6, 1)), ...
-    'PerturbInertiaTensor:InvalidNominalInertia');
+    'ValidatePhysicalInertia:InvalidInertiaTensor');
 end
