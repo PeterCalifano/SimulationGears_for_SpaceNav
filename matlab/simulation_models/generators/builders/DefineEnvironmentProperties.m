@@ -74,6 +74,7 @@ end
 % 23-08-2026    Pietro Califano, Codex              Correct SPICE rate sign for active R_INfromTB histories.
 % 18-09-2026    Pietro Califano, Codex gpt-5.6     Label default SRP area in the selected dynamics units.
 % 29-09-2026    Pietro Califano, Codex gpt-6      Clarify the SPICE rate frame and model sign.
+% 13-11-2026    Pietro Califano, Claude Opus 5.5   Prefix the target rate and spin-axis fields with Target.
 % -------------------------------------------------------------------------------------------------------------
 %% DEPENDENCIES
 % CScenarioGenerator, EnumTargetAngularVelocityRegime, BuildQuadsModelSRPDataFromObj, CShapeModel,
@@ -135,10 +136,10 @@ if kwargs.objDataset.bDefaultConstructed % Try to use SPICE kernels
         % For an IN-to-TB state transform, XF2RAV returns the angular
         % velocity of TB relative to IN, resolved in IN. This is already the
         % rate satisfying R_INfromTB(t) = Exp(+omega_IN*t) R_INfromTB(0).
-        strMainBodyRefData.dAngVel_IN = dTargetFrameAngVel_IN;
-        strMainBodyRefData.enumAngularVelocityRegime = ...
+        strMainBodyRefData.dTargetAngVel_IN = dTargetFrameAngVel_IN;
+        strMainBodyRefData.enumTargetAngularVelocityRegime = ...
             EnumTargetAngularVelocityRegime.Classify( ...
-            strMainBodyRefData.dAngVel_IN);
+            strMainBodyRefData.dTargetAngVel_IN);
         % Leave the optional spin axis and its source absent: a SPICE frame
         % attitude and rate declare no physical shape or inertia axis.
     end
@@ -216,8 +217,8 @@ else
     if kwargs.bLoadTargetRotationalState
         strMainBodyRefData.dDCM_INfromTB = pagetranspose( ...
             kwargs.objDataset.dDCM_TBfromW(:, :, ui32EphemeridesExtractIdx));
-        strMainBodyRefData.dSpinAxis_TB = kwargs.objDataset.dTargetSpinAxis_TB;
-        strMainBodyRefData.charSpinAxisSource = kwargs.objDataset.charTargetSpinAxisSource;
+        strMainBodyRefData.dTargetSpinAxis_TB = kwargs.objDataset.dTargetSpinAxis_TB;
+        strMainBodyRefData.charTargetSpinAxisSource = kwargs.objDataset.charTargetSpinAxisSource;
         if not(isempty(kwargs.objDataset.dTargetAngVel_IN))
             if size(kwargs.objDataset.dTargetAngVel_IN, 2) ~= ui32NumEntriesInDataset || ...
                     any(not(isfinite(kwargs.objDataset.dTargetAngVel_IN)), 'all')
@@ -225,13 +226,13 @@ else
                     ['Dataset target attitude-model angular velocity must be a finite 3-by-N sequence aligned with ' ...
                      'the dataset timestamps.']);
             end
-            strMainBodyRefData.dAngVel_IN = ...
+            strMainBodyRefData.dTargetAngVel_IN = ...
                 kwargs.objDataset.dTargetAngVel_IN(:, ui32EphemeridesExtractIdx);
-            strMainBodyRefData.enumAngularVelocityRegime = ...
+            strMainBodyRefData.enumTargetAngularVelocityRegime = ...
                 EnumTargetAngularVelocityRegime.Classify( ...
-                strMainBodyRefData.dAngVel_IN);
+                strMainBodyRefData.dTargetAngVel_IN);
         else
-            strMainBodyRefData.enumAngularVelocityRegime = ...
+            strMainBodyRefData.enumTargetAngularVelocityRegime = ...
                 EnumTargetAngularVelocityRegime.UNAVAILABLE;
         end
     end

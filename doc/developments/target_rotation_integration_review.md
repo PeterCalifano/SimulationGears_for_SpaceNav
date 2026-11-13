@@ -7,7 +7,7 @@ on `feature/target-rotational-state-models`.
 
 ## Decisions
 
-- **Rate sign.** `dAngVel_IN` is the angular velocity of the target body frame
+- **Rate sign.** `dTargetAngVel_IN` is the angular velocity of the target body frame
   relative to the inertial frame, in inertial coordinates. It satisfies
   `R_INfromTB(t) = Exp(+omega_IN*t) R_INfromTB(0)`. For SPICE sources,
   `cspice_xf2rav` on the inertial-to-target state transform already returns this
@@ -17,7 +17,7 @@ on `feature/target-rotational-state-models`.
   spin axis and its source travel as an optional pair and stay absent unless the
   source supplies them. The dataset path keeps its own contract, including the
   `DEFAULT_PLUS_Z` default of `SReferenceMissionDesign`.
-- **Rate regime.** `enumAngularVelocityRegime` (`EnumTargetAngularVelocityRegime`)
+- **Rate regime.** `enumTargetAngularVelocityRegime` (`EnumTargetAngularVelocityRegime`)
   alone states whether rates exist. `EphemeridesDataFactory` checks it against
   every rate sample and no longer writes the first-sample `dNominalAngVel_IN`.
 

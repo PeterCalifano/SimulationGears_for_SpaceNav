@@ -191,10 +191,10 @@ same adapter and leave rates absent when their source supplies none.
 
 | Field | Contract |
 | --- | --- |
-| `enumAngularVelocityRegime` | Always present: `UNAVAILABLE`, `CONSTANT_INERTIAL` or `TIME_VARYING` (`EnumTargetAngularVelocityRegime`) |
-| `dAngVel_IN` | Finite 3-by-N source attitude-model rates in inertial coordinates, in rad/s. Present only when the regime is not `UNAVAILABLE` |
-| `dAngVelTimegrid` | N matching epochs in the actual interpolation domain: relative seconds, absolute seconds or absolute days. Present with `dAngVel_IN` |
-| `dAngVel_TB` | Optional finite 3-by-N body-frame rates, copied when the source supplies them |
+| `enumTargetAngularVelocityRegime` | Always present: `UNAVAILABLE`, `CONSTANT_INERTIAL` or `TIME_VARYING` (`EnumTargetAngularVelocityRegime`) |
+| `dTargetAngVel_IN` | Finite 3-by-N source attitude-model rates in inertial coordinates, in rad/s. Present only when the regime is not `UNAVAILABLE` |
+| `dTargetAngVelTimegrid` | N matching epochs in the actual interpolation domain: relative seconds, absolute seconds or absolute days. Present with `dTargetAngVel_IN` |
+| `dTargetAngVel_TB` | Optional finite 3-by-N body-frame rates, copied when the source supplies them |
 | `dTargetSpinAxis_TB`, `charTargetSpinAxisSource` | Optional pair: a unit body-frame spin axis and its source. Absent when no single axis is known, for example for SPICE frames |
 
 The factory checks the declared regime against every rate sample and rejects a
@@ -206,6 +206,12 @@ keeps unrelated attitude metadata. `DefineEnvironmentProperties` with
 axis, for generated histories that bring their own. The rates follow
 `R_INfromTB(t) = Exp(+omega_IN*t) R_INfromTB(0)`: they are the angular velocity
 of the target body frame relative to the inertial frame, in inertial coordinates.
+
+The same Target-prefixed names are used in `strMainBodyRefData` and in the
+histories of `BuildTargetRotationalStateHistory`. Data saved before 13 November
+2026 uses the old names without the prefix (`dAngVel_IN`, `dSpinAxis_TB`, ...).
+Loaders of saved packs pass the attitude struct through
+`RenameLegacyTargetAttitudeFields`, which gives those fields their current names.
 
 For SPICE inputs, `DefineEnvironmentProperties` queries the inertial-to-target
 state transform. `cspice_xf2rav` returns its rate in the input frame, already

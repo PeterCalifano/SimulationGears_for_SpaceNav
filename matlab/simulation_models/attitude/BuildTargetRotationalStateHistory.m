@@ -26,6 +26,7 @@ function strHistory = BuildTargetRotationalStateHistory(objConfig, dTimegrid, st
 % 12-11-2026  Pietro Califano, Claude Opus 5.5   Check the configuration with
 %                                                STargetRotationalStateConfig.validate; check DCMs with ValidateDCM
 %                                                and drop the quaternion sign steps, which do not change the DCMs.
+% 13-11-2026  Pietro Califano, Claude Opus 5.5   Prefix the target rate and spin-axis fields with Target.
 % -------------------------------------------------------------------------------------------------------------
 %% DEPENDENCIES
 % CQuatKinematicsIntegrator.NormalizeSeq, DCM2quatSeq, RunTorqueFreeBodyHistory,
@@ -165,24 +166,24 @@ end
 dDCM_INfromTB = NormalizeDcmHistory_(dDCM_INfromTB, ui32NumTimes);
 
 % Express the constant inertial rate in the body frame
-dAngVel_IN = repmat(dInitialAngVel_IN, 1, double(ui32NumTimes));
-dAngVel_TB = zeros(3, double(ui32NumTimes));
+dTargetAngVel_IN = repmat(dInitialAngVel_IN, 1, double(ui32NumTimes));
+dTargetAngVel_TB = zeros(3, double(ui32NumTimes));
 for ui32TimeIdx = uint32(1):ui32NumTimes
-    dAngVel_TB(:, ui32TimeIdx) = transpose(dDCM_INfromTB(:, :, ui32TimeIdx)) * dInitialAngVel_IN;
+    dTargetAngVel_TB(:, ui32TimeIdx) = transpose(dDCM_INfromTB(:, :, ui32TimeIdx)) * dInitialAngVel_IN;
 end
 
 strHistory = struct();
 strHistory.dDCM_INfromTB = dDCM_INfromTB;
-strHistory.dAngVel_IN = dAngVel_IN;
-strHistory.dAngVel_TB = dAngVel_TB;
-strHistory.enumAngularVelocityRegime = EnumTargetAngularVelocityRegime.CONSTANT_INERTIAL;
+strHistory.dTargetAngVel_IN = dTargetAngVel_IN;
+strHistory.dTargetAngVel_TB = dTargetAngVel_TB;
+strHistory.enumTargetAngularVelocityRegime = EnumTargetAngularVelocityRegime.CONSTANT_INERTIAL;
 
 % A nonzero constant rate defines one actual body-fixed spin axis. Zero angular velocity has no unique axis and
 % therefore carries no axis metadata.
-dBodyRateNorm = norm(dAngVel_TB(:, 1));
+dBodyRateNorm = norm(dTargetAngVel_TB(:, 1));
 if dBodyRateNorm > 1.0e-14
-    strHistory.dSpinAxis_TB = dAngVel_TB(:, 1) / dBodyRateNorm;
-    strHistory.charSpinAxisSource = "GENERATED_CONSTANT_RATE";
+    strHistory.dTargetSpinAxis_TB = dTargetAngVel_TB(:, 1) / dBodyRateNorm;
+    strHistory.charTargetSpinAxisSource = "GENERATED_CONSTANT_RATE";
 end
 
 end
@@ -232,7 +233,7 @@ dInitialQuaternion_TBfromIN = DCM2quatSeq(transpose(dInitialDCM_INfromTB), false
 
 % SimulationGears owns the complete history loop; MathCore owns only the stateless numerical steps used
 % internally.
-[dQuaternionHistory_TBfromIN, dAngVel_TB] = RunTorqueFreeBodyHistory(dRelativeTimegrid, ...
+[dQuaternionHistory_TBfromIN, dTargetAngVel_TB] = RunTorqueFreeBodyHistory(dRelativeTimegrid, ...
     dInitialQuaternion_TBfromIN, ...
     objConfig.dInitialAngVel_TB, ...
     objConfig.dInertiaTensor_TB, ...
@@ -244,16 +245,16 @@ dInitialQuaternion_TBfromIN = DCM2quatSeq(transpose(dInitialDCM_INfromTB), false
 dQuaternionHistory_TBfromIN = CQuatKinematicsIntegrator.NormalizeSeq(dQuaternionHistory_TBfromIN);
 dDCM_TBfromIN = QuatSeq2DCM(dQuaternionHistory_TBfromIN, false);
 dDCM_INfromTB = permute(dDCM_TBfromIN, [2, 1, 3]);
-dAngVel_IN = zeros(size(dAngVel_TB));
+dTargetAngVel_IN = zeros(size(dTargetAngVel_TB));
 for ui32TimeIdx = uint32(1):uint32(numel(dTimegrid))
-    dAngVel_IN(:, ui32TimeIdx) = dDCM_INfromTB(:, :, ui32TimeIdx) * dAngVel_TB(:, ui32TimeIdx);
+    dTargetAngVel_IN(:, ui32TimeIdx) = dDCM_INfromTB(:, :, ui32TimeIdx) * dTargetAngVel_TB(:, ui32TimeIdx);
 end
 
 strHistory = struct();
 strHistory.dDCM_INfromTB = dDCM_INfromTB;
-strHistory.dAngVel_IN = dAngVel_IN;
-strHistory.dAngVel_TB = dAngVel_TB;
-strHistory.enumAngularVelocityRegime = EnumTargetAngularVelocityRegime.Classify(dAngVel_IN);
+strHistory.dTargetAngVel_IN = dTargetAngVel_IN;
+strHistory.dTargetAngVel_TB = dTargetAngVel_TB;
+strHistory.enumTargetAngularVelocityRegime = EnumTargetAngularVelocityRegime.Classify(dTargetAngVel_IN);
 
 end
 
@@ -346,48 +347,48 @@ end
 if isfield(strSourceHistory, 'dNominalAngVel_IN')
     error('BuildTargetRotationalStateHistory:UnsupportedNominalAngularVelocityField', ...
         ['dNominalAngVel_IN is not part of the canonical history contract. ', ...
-        'Use enumAngularVelocityRegime after complete-history validation.']);
+        'Use enumTargetAngularVelocityRegime after complete-history validation.']);
 end
 
 % Mark the rates unavailable when the source carries neither frame
 ui32NumTimes = uint32(numel(dTimegrid));
-bHasInertialRate = isfield(strSourceHistory, 'dAngVel_IN');
-bHasBodyRate = isfield(strSourceHistory, 'dAngVel_TB');
+bHasInertialRate = isfield(strSourceHistory, 'dTargetAngVel_IN');
+bHasBodyRate = isfield(strSourceHistory, 'dTargetAngVel_TB');
 
 if ~bHasInertialRate && ~bHasBodyRate
-    strHistory.enumAngularVelocityRegime = EnumTargetAngularVelocityRegime.UNAVAILABLE;
+    strHistory.enumTargetAngularVelocityRegime = EnumTargetAngularVelocityRegime.UNAVAILABLE;
     return
 end
 
 % Derive the other frame from the inertial rates when present, else from the body rates
 if bHasInertialRate
-    dAngVel_IN = ValidateRateHistory_(strSourceHistory.dAngVel_IN, ui32NumTimes, 'dAngVel_IN');
-    dAngVel_TB = zeros(3, double(ui32NumTimes));
+    dTargetAngVel_IN = ValidateRateHistory_(strSourceHistory.dTargetAngVel_IN, ui32NumTimes, 'dTargetAngVel_IN');
+    dTargetAngVel_TB = zeros(3, double(ui32NumTimes));
     for ui32TimeIdx = uint32(1):ui32NumTimes
-        dAngVel_TB(:, ui32TimeIdx) = transpose(strHistory.dDCM_INfromTB(:, :, ui32TimeIdx)) * ...
-            dAngVel_IN(:, ui32TimeIdx);
+        dTargetAngVel_TB(:, ui32TimeIdx) = transpose(strHistory.dDCM_INfromTB(:, :, ui32TimeIdx)) * ...
+            dTargetAngVel_IN(:, ui32TimeIdx);
     end
 else
-    dAngVel_TB = ValidateRateHistory_(strSourceHistory.dAngVel_TB, ui32NumTimes, 'dAngVel_TB');
-    dAngVel_IN = zeros(3, double(ui32NumTimes));
+    dTargetAngVel_TB = ValidateRateHistory_(strSourceHistory.dTargetAngVel_TB, ui32NumTimes, 'dTargetAngVel_TB');
+    dTargetAngVel_IN = zeros(3, double(ui32NumTimes));
     for ui32TimeIdx = uint32(1):ui32NumTimes
-        dAngVel_IN(:, ui32TimeIdx) = strHistory.dDCM_INfromTB(:, :, ui32TimeIdx) * dAngVel_TB(:, ui32TimeIdx);
+        dTargetAngVel_IN(:, ui32TimeIdx) = strHistory.dDCM_INfromTB(:, :, ui32TimeIdx) * dTargetAngVel_TB(:, ui32TimeIdx);
     end
 end
 
 % With both frames given, require the source body rates to match the derived ones
 if bHasBodyRate && bHasInertialRate
-    dSourceAngVel_TB = ValidateRateHistory_(strSourceHistory.dAngVel_TB, ui32NumTimes, 'dAngVel_TB');
-    dRateTolerance = 1.0e-12 * max(1.0, max(abs(dAngVel_TB), [], 'all'));
-    if max(abs(dSourceAngVel_TB - dAngVel_TB), [], 'all') > dRateTolerance
+    dSourceAngVel_TB = ValidateRateHistory_(strSourceHistory.dTargetAngVel_TB, ui32NumTimes, 'dTargetAngVel_TB');
+    dRateTolerance = 1.0e-12 * max(1.0, max(abs(dTargetAngVel_TB), [], 'all'));
+    if max(abs(dSourceAngVel_TB - dTargetAngVel_TB), [], 'all') > dRateTolerance
         error('BuildTargetRotationalStateHistory:InconsistentAngularVelocity', ...
             'Source inertial and body-frame angular-velocity histories are inconsistent with attitude.');
     end
 end
 
-strHistory.dAngVel_IN = dAngVel_IN;
-strHistory.dAngVel_TB = dAngVel_TB;
-strHistory.enumAngularVelocityRegime = EnumTargetAngularVelocityRegime.Classify(dAngVel_IN);
+strHistory.dTargetAngVel_IN = dTargetAngVel_IN;
+strHistory.dTargetAngVel_TB = dTargetAngVel_TB;
+strHistory.enumTargetAngularVelocityRegime = EnumTargetAngularVelocityRegime.Classify(dTargetAngVel_IN);
 
 end
 
@@ -459,8 +460,8 @@ arguments (Output)
 end
 
 % Require the axis and its provenance together; copy nothing when both are absent
-bHasSpinAxis = isfield(strSourceHistory, 'dSpinAxis_TB');
-bHasSpinAxisSource = isfield(strSourceHistory, 'charSpinAxisSource');
+bHasSpinAxis = isfield(strSourceHistory, 'dTargetSpinAxis_TB');
+bHasSpinAxisSource = isfield(strSourceHistory, 'charTargetSpinAxisSource');
 if bHasSpinAxis ~= bHasSpinAxisSource
     error('BuildTargetRotationalStateHistory:IncompleteSpinAxisMetadata', ...
         'Source spin-axis value and provenance must be supplied together.');
@@ -470,8 +471,8 @@ if ~bHasSpinAxis
 end
 
 % Check the value types: a real numeric 3-vector and a char row or string scalar
-varSpinAxis_TB = strSourceHistory.dSpinAxis_TB;
-varSpinAxisSource = strSourceHistory.charSpinAxisSource;
+varSpinAxis_TB = strSourceHistory.dTargetSpinAxis_TB;
+varSpinAxisSource = strSourceHistory.charTargetSpinAxisSource;
 bValidSpinAxisSourceType = (ischar(varSpinAxisSource) && isrow(varSpinAxisSource)) || ...
     (isstring(varSpinAxisSource) && isscalar(varSpinAxisSource));
 if ~isnumeric(varSpinAxis_TB) || ~isreal(varSpinAxis_TB) || numel(varSpinAxis_TB) ~= 3 || ...
@@ -482,17 +483,17 @@ if ~isnumeric(varSpinAxis_TB) || ~isreal(varSpinAxis_TB) || numel(varSpinAxis_TB
 end
 
 % Check the values: a finite unit axis and a nonblank provenance
-dSpinAxis_TB = reshape(double(varSpinAxis_TB), [], 1);
-charSpinAxisSource = string(varSpinAxisSource);
-if any(~isfinite(dSpinAxis_TB)) || ...
-        abs(norm(dSpinAxis_TB) - 1.0) > 1.0e-12 || ...
-        strlength(strip(charSpinAxisSource)) == 0
+dTargetSpinAxis_TB = reshape(double(varSpinAxis_TB), [], 1);
+charTargetSpinAxisSource = string(varSpinAxisSource);
+if any(~isfinite(dTargetSpinAxis_TB)) || ...
+        abs(norm(dTargetSpinAxis_TB) - 1.0) > 1.0e-12 || ...
+        strlength(strip(charTargetSpinAxisSource)) == 0
     error('BuildTargetRotationalStateHistory:InvalidSpinAxisMetadata', ...
         ['Source spin axis must be one finite real numeric unit 3-vector ', ...
         'with nonempty char or string-scalar provenance.']);
 end
 
-strHistory.dSpinAxis_TB = dSpinAxis_TB;
-strHistory.charSpinAxisSource = charSpinAxisSource;
+strHistory.dTargetSpinAxis_TB = dTargetSpinAxis_TB;
+strHistory.charTargetSpinAxisSource = charTargetSpinAxisSource;
 
 end

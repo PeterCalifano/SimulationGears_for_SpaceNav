@@ -18,9 +18,9 @@ classdef testDefineEnvironmentProperties < matlab.unittest.TestCase
             [~, strMainBodyRefData] = DefineEnvironmentProperties(dTimestamps, "Moon", "J2000");
 
             % A SPICE frame declares no spin axis, and its rate regime is always known.
-            testCase.verifyFalse(isfield(strMainBodyRefData, 'dSpinAxis_TB'));
-            testCase.verifyFalse(isfield(strMainBodyRefData, 'charSpinAxisSource'));
-            testCase.verifyNotEqual(strMainBodyRefData.enumAngularVelocityRegime, ...
+            testCase.verifyFalse(isfield(strMainBodyRefData, 'dTargetSpinAxis_TB'));
+            testCase.verifyFalse(isfield(strMainBodyRefData, 'charTargetSpinAxisSource'));
+            testCase.verifyNotEqual(strMainBodyRefData.enumTargetAngularVelocityRegime, ...
                 EnumTargetAngularVelocityRegime.UNAVAILABLE);
 
             % Differentiate the SPICE attitude itself: skew(omega_IN) = dR_INfromTB/dt * R_INfromTB'.
@@ -30,7 +30,7 @@ classdef testDefineEnvironmentProperties < matlab.unittest.TestCase
                 dSkewAngVel_IN = ((dDCMAfter_INfromTB - dDCMBefore_INfromTB) / 0.2) ...
                     * strMainBodyRefData.dDCM_INfromTB(:, :, ui32TimeIdx)';
                 dExpectedAngVel_IN = [dSkewAngVel_IN(3, 2); dSkewAngVel_IN(1, 3); dSkewAngVel_IN(2, 1)];
-                testCase.verifyEqual(strMainBodyRefData.dAngVel_IN(:, ui32TimeIdx), dExpectedAngVel_IN, ...
+                testCase.verifyEqual(strMainBodyRefData.dTargetAngVel_IN(:, ui32TimeIdx), dExpectedAngVel_IN, ...
                     'AbsTol', 1e-11);
             end
         end
@@ -52,9 +52,9 @@ classdef testDefineEnvironmentProperties < matlab.unittest.TestCase
             [~, strMainBodyRefData] = DefineEnvironmentProperties(dTimestamps, ...
                 "Itokawa", "J2000", objDataset=objDataset);
 
-            testCase.verifyEqual(strMainBodyRefData.dAngVel_IN, dTargetAngVel_IN, 'AbsTol', 0.0);
+            testCase.verifyEqual(strMainBodyRefData.dTargetAngVel_IN, dTargetAngVel_IN, 'AbsTol', 0.0);
             testCase.verifyEqual( ...
-                strMainBodyRefData.enumAngularVelocityRegime, ...
+                strMainBodyRefData.enumTargetAngularVelocityRegime, ...
                 EnumTargetAngularVelocityRegime.TIME_VARYING);
         end
 
@@ -76,18 +76,18 @@ classdef testDefineEnvironmentProperties < matlab.unittest.TestCase
                 bLoadTargetRotationalState=true);
 
             testCase.verifyFalse(isfield(strMainBodyRefData, 'dDCM_INfromTB'));
-            testCase.verifyFalse(isfield(strMainBodyRefData, 'dAngVel_IN'));
+            testCase.verifyFalse(isfield(strMainBodyRefData, 'dTargetAngVel_IN'));
             testCase.verifyFalse(isfield(strMainBodyRefData, ...
-                'enumAngularVelocityRegime'));
-            testCase.verifyFalse(isfield(strMainBodyRefData, 'dSpinAxis_TB'));
-            testCase.verifyFalse(isfield(strMainBodyRefData, 'charSpinAxisSource'));
+                'enumTargetAngularVelocityRegime'));
+            testCase.verifyFalse(isfield(strMainBodyRefData, 'dTargetSpinAxis_TB'));
+            testCase.verifyFalse(isfield(strMainBodyRefData, 'charTargetSpinAxisSource'));
             testCase.verifyEqual(strMainBodyRefData.dSunPosition_IN, dSunPosition_IN, 'AbsTol', 0.0);
 
             % The skip flag owns only target rotation; all other environment
             % and spacecraft outputs must match the normal source-loading path.
-            cellRotationFields = {'dDCM_INfromTB', 'dAngVel_IN', ...
-                                  'enumAngularVelocityRegime', ...
-                                  'dSpinAxis_TB', 'charSpinAxisSource'};
+            cellRotationFields = {'dDCM_INfromTB', 'dTargetAngVel_IN', ...
+                                  'enumTargetAngularVelocityRegime', ...
+                                  'dTargetSpinAxis_TB', 'charTargetSpinAxisSource'};
             strExpectedMainBodyRefData = rmfield( ...
                 strLoadedMainBodyRefData, cellRotationFields);
             testCase.verifyEqual(strMainBodyRefData, strExpectedMainBodyRefData);
@@ -106,10 +106,10 @@ classdef testDefineEnvironmentProperties < matlab.unittest.TestCase
 
             testCase.verifyEqual(objDataset.dTargetSpinAxis_TB, [0.0; 0.0; 1.0], 'AbsTol', 0.0);
             testCase.verifyEqual(objDataset.charTargetSpinAxisSource, "DEFAULT_PLUS_Z");
-            testCase.verifyEqual(strMainBodyRefData.dSpinAxis_TB, [0.0; 0.0; 1.0], 'AbsTol', 0.0);
-            testCase.verifyEqual(strMainBodyRefData.charSpinAxisSource, "DEFAULT_PLUS_Z");
+            testCase.verifyEqual(strMainBodyRefData.dTargetSpinAxis_TB, [0.0; 0.0; 1.0], 'AbsTol', 0.0);
+            testCase.verifyEqual(strMainBodyRefData.charTargetSpinAxisSource, "DEFAULT_PLUS_Z");
             testCase.verifyEqual( ...
-                strMainBodyRefData.enumAngularVelocityRegime, ...
+                strMainBodyRefData.enumTargetAngularVelocityRegime, ...
                 EnumTargetAngularVelocityRegime.UNAVAILABLE);
         end
 
@@ -123,8 +123,8 @@ classdef testDefineEnvironmentProperties < matlab.unittest.TestCase
             [~, strMainBodyRefData] = DefineEnvironmentProperties(dTimestamps, ...
                 "Itokawa", "J2000", objDataset=objDataset);
 
-            testCase.verifyEqual(strMainBodyRefData.dSpinAxis_TB, [0.0; -1.0; 0.0], 'AbsTol', 0.0);
-            testCase.verifyEqual(strMainBodyRefData.charSpinAxisSource, "SCENARIO_DECLARED");
+            testCase.verifyEqual(strMainBodyRefData.dTargetSpinAxis_TB, [0.0; -1.0; 0.0], 'AbsTol', 0.0);
+            testCase.verifyEqual(strMainBodyRefData.charTargetSpinAxisSource, "SCENARIO_DECLARED");
         end
 
         function testRejectsZeroDeclaredTargetSpinAxis(testCase)

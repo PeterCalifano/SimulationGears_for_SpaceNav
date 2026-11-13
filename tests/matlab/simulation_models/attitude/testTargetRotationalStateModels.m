@@ -20,6 +20,7 @@ function tests = testTargetRotationalStateModels
 % 11-11-2026  Pietro Califano, Claude Opus 5.5   Readability pass.
 % 12-11-2026  Pietro Califano, Claude Opus 5.5   Add the axisymmetric and Jacobi elliptic torque-free tests;
 %                                                expect the shared realization and inertia error identifiers.
+% 13-11-2026  Pietro Califano, Claude Opus 5.5   Prefix the target rate and spin-axis fields with Target.
 % -------------------------------------------------------------------------------------------------------------
 %% DEPENDENCIES
 % STargetRotationalStateConfig, BuildTargetRotationalStateHistory,
@@ -148,12 +149,12 @@ end
 dExpectedAngVel_TB = dInitialDCM_INfromTB.' * dInitialAngVel_IN;
 
 verifyEqual(testCase, strHistory.dDCM_INfromTB, dExpectedDCM, 'AbsTol', 2.0e-13);
-verifyEqual(testCase, strHistory.dAngVel_IN, repmat(dInitialAngVel_IN, 1, numel(dTimegrid)), 'AbsTol', 0.0);
-verifyEqual(testCase, strHistory.dAngVel_TB, repmat(dExpectedAngVel_TB, 1, numel(dTimegrid)), 'AbsTol', 2.0e-13);
-verifyEqual(testCase, strHistory.enumAngularVelocityRegime, EnumTargetAngularVelocityRegime.CONSTANT_INERTIAL);
+verifyEqual(testCase, strHistory.dTargetAngVel_IN, repmat(dInitialAngVel_IN, 1, numel(dTimegrid)), 'AbsTol', 0.0);
+verifyEqual(testCase, strHistory.dTargetAngVel_TB, repmat(dExpectedAngVel_TB, 1, numel(dTimegrid)), 'AbsTol', 2.0e-13);
+verifyEqual(testCase, strHistory.enumTargetAngularVelocityRegime, EnumTargetAngularVelocityRegime.CONSTANT_INERTIAL);
 verifyFalse(testCase, isfield(strHistory, 'dNominalAngVel_IN'));
-verifyEqual(testCase, strHistory.dSpinAxis_TB, dExpectedAngVel_TB / norm(dExpectedAngVel_TB), 'AbsTol', 2.0e-13);
-verifyEqual(testCase, strHistory.charSpinAxisSource, "GENERATED_CONSTANT_RATE");
+verifyEqual(testCase, strHistory.dTargetSpinAxis_TB, dExpectedAngVel_TB / norm(dExpectedAngVel_TB), 'AbsTol', 2.0e-13);
+verifyEqual(testCase, strHistory.charTargetSpinAxisSource, "GENERATED_CONSTANT_RATE");
 end
 
 function testHistoryCarriesTypedAngularVelocityRegime(testCase)
@@ -164,8 +165,8 @@ strSourceHistory = struct('dDCM_INfromTB', repmat(eye(3), 1, 1, numel(dTimegrid)
 
 strHistory = BuildTargetRotationalStateHistory(objConfig, dTimegrid, strSourceHistory);
 
-bHasTypedRegime = isfield(strHistory, 'enumAngularVelocityRegime') && ...
-    isa(strHistory.enumAngularVelocityRegime, 'EnumTargetAngularVelocityRegime');
+bHasTypedRegime = isfield(strHistory, 'enumTargetAngularVelocityRegime') && ...
+    isa(strHistory.enumTargetAngularVelocityRegime, 'EnumTargetAngularVelocityRegime');
 verifyTrue(testCase, bHasTypedRegime);
 end
 
@@ -180,33 +181,33 @@ objConfig = STargetRotationalStateConfig.FromConfigStruct(struct('source', 'data
 
 % A varying rate sequence is time varying
 strVariableSource = struct('dDCM_INfromTB', dDCM_INfromTB, ...
-    'dAngVel_IN', dVariableAngVel_IN);
+    'dTargetAngVel_IN', dVariableAngVel_IN);
 strVariableHistory = BuildTargetRotationalStateHistory(objConfig, dTimegrid, strVariableSource);
-verifyEqual(testCase, strVariableHistory.enumAngularVelocityRegime, EnumTargetAngularVelocityRegime.TIME_VARYING);
+verifyEqual(testCase, strVariableHistory.enumTargetAngularVelocityRegime, EnumTargetAngularVelocityRegime.TIME_VARYING);
 verifyFalse(testCase, isfield(strVariableHistory, 'dNominalAngVel_IN'));
-verifyEqual(testCase, strVariableHistory.dAngVel_TB, dVariableAngVel_IN, 'AbsTol', 0.0);
+verifyEqual(testCase, strVariableHistory.dTargetAngVel_TB, dVariableAngVel_IN, 'AbsTol', 0.0);
 
 % A constant sequence is constant, and attitude alone leaves the rates unavailable
 dConstantAngVel_IN = repmat([0.01; -0.02; 0.03], 1, numel(dTimegrid));
 strConstantSource = struct('dDCM_INfromTB', dDCM_INfromTB, ...
-    'dAngVel_IN', dConstantAngVel_IN);
+    'dTargetAngVel_IN', dConstantAngVel_IN);
 strConstantHistory = BuildTargetRotationalStateHistory(objConfig, dTimegrid, strConstantSource);
-verifyEqual(testCase, strConstantHistory.enumAngularVelocityRegime, ...
+verifyEqual(testCase, strConstantHistory.enumTargetAngularVelocityRegime, ...
     EnumTargetAngularVelocityRegime.CONSTANT_INERTIAL);
 verifyFalse(testCase, isfield(strConstantHistory, 'dNominalAngVel_IN'));
 
 strAttitudeOnlySource = struct('dDCM_INfromTB', dDCM_INfromTB);
 strAttitudeOnlyHistory = BuildTargetRotationalStateHistory(objConfig, dTimegrid, strAttitudeOnlySource);
-verifyEqual(testCase, strAttitudeOnlyHistory.enumAngularVelocityRegime, ...
+verifyEqual(testCase, strAttitudeOnlyHistory.enumTargetAngularVelocityRegime, ...
     EnumTargetAngularVelocityRegime.UNAVAILABLE);
 
 % A declared spin axis is copied with its provenance
 strAxisSource = strConstantSource;
-strAxisSource.dSpinAxis_TB = [0.0; 0.0; 1.0];
-strAxisSource.charSpinAxisSource = "SOURCE_DECLARED";
+strAxisSource.dTargetSpinAxis_TB = [0.0; 0.0; 1.0];
+strAxisSource.charTargetSpinAxisSource = "SOURCE_DECLARED";
 strAxisHistory = BuildTargetRotationalStateHistory(objConfig, dTimegrid, strAxisSource);
-verifyEqual(testCase, strAxisHistory.dSpinAxis_TB, [0.0; 0.0; 1.0], 'AbsTol', 0.0);
-verifyEqual(testCase, strAxisHistory.charSpinAxisSource, "SOURCE_DECLARED");
+verifyEqual(testCase, strAxisHistory.dTargetSpinAxis_TB, [0.0; 0.0; 1.0], 'AbsTol', 0.0);
+verifyEqual(testCase, strAxisHistory.charTargetSpinAxisSource, "SOURCE_DECLARED");
 
 % Reject the nominal-rate field and malformed spin-axis metadata
 strLegacyNominalSource = strConstantSource;
@@ -215,25 +216,25 @@ verifyError(testCase, @() BuildTargetRotationalStateHistory(objConfig, dTimegrid
     'BuildTargetRotationalStateHistory:UnsupportedNominalAngularVelocityField');
 
 strIncompleteSpinAxisSource = strConstantSource;
-strIncompleteSpinAxisSource.dSpinAxis_TB = [0.0; 0.0; 1.0];
+strIncompleteSpinAxisSource.dTargetSpinAxis_TB = [0.0; 0.0; 1.0];
 verifyError(testCase, @() BuildTargetRotationalStateHistory(objConfig, dTimegrid, strIncompleteSpinAxisSource), ...
     'BuildTargetRotationalStateHistory:IncompleteSpinAxisMetadata');
 
 strComplexSpinAxisSource = strConstantSource;
-strComplexSpinAxisSource.dSpinAxis_TB = [1.0i; 0.0; 0.0];
-strComplexSpinAxisSource.charSpinAxisSource = "SOURCE_DECLARED";
+strComplexSpinAxisSource.dTargetSpinAxis_TB = [1.0i; 0.0; 0.0];
+strComplexSpinAxisSource.charTargetSpinAxisSource = "SOURCE_DECLARED";
 verifyError(testCase, @() BuildTargetRotationalStateHistory(objConfig, dTimegrid, strComplexSpinAxisSource), ...
     'BuildTargetRotationalStateHistory:InvalidSpinAxisMetadata');
 
 strNumericSpinAxisProvenance = strConstantSource;
-strNumericSpinAxisProvenance.dSpinAxis_TB = [0.0; 0.0; 1.0];
-strNumericSpinAxisProvenance.charSpinAxisSource = 42;
+strNumericSpinAxisProvenance.dTargetSpinAxis_TB = [0.0; 0.0; 1.0];
+strNumericSpinAxisProvenance.charTargetSpinAxisSource = 42;
 verifyError(testCase, @() BuildTargetRotationalStateHistory(objConfig, dTimegrid, strNumericSpinAxisProvenance), ...
     'BuildTargetRotationalStateHistory:InvalidSpinAxisMetadata');
 
 strEmptySpinAxisProvenance = strConstantSource;
-strEmptySpinAxisProvenance.dSpinAxis_TB = [0.0; 0.0; 1.0];
-strEmptySpinAxisProvenance.charSpinAxisSource = "   ";
+strEmptySpinAxisProvenance.dTargetSpinAxis_TB = [0.0; 0.0; 1.0];
+strEmptySpinAxisProvenance.charTargetSpinAxisSource = "   ";
 verifyError(testCase, @() BuildTargetRotationalStateHistory(objConfig, dTimegrid, strEmptySpinAxisProvenance), ...
     'BuildTargetRotationalStateHistory:InvalidSpinAxisMetadata');
 end
@@ -249,9 +250,9 @@ strHistory = BuildTargetRotationalStateHistory(objConfig, dTimegrid);
 
 % A spherical inertia keeps the body rate constant
 verifySize(testCase, strHistory.dDCM_INfromTB, [3, 3, 2]);
-verifySize(testCase, strHistory.dAngVel_IN, [3, 2]);
-verifySize(testCase, strHistory.dAngVel_TB, [3, 2]);
-verifyEqual(testCase, strHistory.dAngVel_TB, repmat(objConfig.dInitialAngVel_TB, 1, 2), 'AbsTol', 2.0e-13);
+verifySize(testCase, strHistory.dTargetAngVel_IN, [3, 2]);
+verifySize(testCase, strHistory.dTargetAngVel_TB, [3, 2]);
+verifyEqual(testCase, strHistory.dTargetAngVel_TB, repmat(objConfig.dInitialAngVel_TB, 1, 2), 'AbsTol', 2.0e-13);
 end
 
 function testTorqueFreeMatlabBackendDoesNotCreateMexRoot(testCase)
@@ -286,7 +287,7 @@ strHistory = BuildTargetRotationalStateHistory(objConfig, ...
 
 verifyFalse(testCase, isfolder(charAbsentMexRoot));
 verifySize(testCase, strHistory.dDCM_INfromTB, [3, 3, 3]);
-verifySize(testCase, strHistory.dAngVel_TB, [3, 3]);
+verifySize(testCase, strHistory.dTargetAngVel_TB, [3, 3]);
 end
 
 function testRequestedMexBuildFailureDoesNotFallback(testCase)
@@ -478,8 +479,8 @@ strTorqueFreeHistory = BuildTargetRotationalStateHistory(objTorqueFreeConfig, dT
 strConstantRateHistory = BuildTargetRotationalStateHistory(objConstantRateConfig, dTimegrid);
 
 verifyEqual(testCase, strTorqueFreeHistory.dDCM_INfromTB, strConstantRateHistory.dDCM_INfromTB, 'AbsTol', 2.0e-10);
-verifyEqual(testCase, strTorqueFreeHistory.dAngVel_IN, strConstantRateHistory.dAngVel_IN, 'AbsTol', 2.0e-10);
-verifyEqual(testCase, strTorqueFreeHistory.dAngVel_TB, strConstantRateHistory.dAngVel_TB, 'AbsTol', 2.0e-12);
+verifyEqual(testCase, strTorqueFreeHistory.dTargetAngVel_IN, strConstantRateHistory.dTargetAngVel_IN, 'AbsTol', 2.0e-10);
+verifyEqual(testCase, strTorqueFreeHistory.dTargetAngVel_TB, strConstantRateHistory.dTargetAngVel_TB, 'AbsTol', 2.0e-12);
 end
 
 function testTorqueFreeHistoryPreservesRigidBodyInvariants(testCase)
@@ -492,26 +493,26 @@ dKineticEnergy = zeros(1, numel(dTimegrid));
 dAngularMomentumNorm = zeros(1, numel(dTimegrid));
 dAngularMomentum_IN = zeros(3, numel(dTimegrid));
 for ui32TimeIdx = uint32(1):uint32(numel(dTimegrid))
-    dAngVel_TB = strHistory.dAngVel_TB(:, ui32TimeIdx);
-    dAngularMomentum_TB = objConfig.dInertiaTensor_TB * dAngVel_TB;
-    dKineticEnergy(ui32TimeIdx) = 0.5 * transpose(dAngVel_TB) * dAngularMomentum_TB;
+    dTargetAngVel_TB = strHistory.dTargetAngVel_TB(:, ui32TimeIdx);
+    dAngularMomentum_TB = objConfig.dInertiaTensor_TB * dTargetAngVel_TB;
+    dKineticEnergy(ui32TimeIdx) = 0.5 * transpose(dTargetAngVel_TB) * dAngularMomentum_TB;
     dAngularMomentumNorm(ui32TimeIdx) = norm(dAngularMomentum_TB);
 
     dDCM = strHistory.dDCM_INfromTB(:, :, ui32TimeIdx);
     dAngularMomentum_IN(:, ui32TimeIdx) = dDCM * dAngularMomentum_TB;
     verifyEqual(testCase, transpose(dDCM) * dDCM, eye(3), 'AbsTol', 2.0e-12);
     verifyEqual(testCase, det(dDCM), 1.0, 'AbsTol', 2.0e-12);
-    verifyEqual(testCase, strHistory.dAngVel_IN(:, ui32TimeIdx), dDCM * dAngVel_TB, 'AbsTol', 2.0e-12);
+    verifyEqual(testCase, strHistory.dTargetAngVel_IN(:, ui32TimeIdx), dDCM * dTargetAngVel_TB, 'AbsTol', 2.0e-12);
 end
 
 % Energy, momentum norm and inertial momentum are conserved
 verifyLessThan(testCase, max(abs(dKineticEnergy - dKineticEnergy(1))), 2.0e-10);
 verifyLessThan(testCase, max(abs(dAngularMomentumNorm - dAngularMomentumNorm(1))), 2.0e-10);
 verifyLessThan(testCase, max(vecnorm(dAngularMomentum_IN - dAngularMomentum_IN(:, 1), 2, 1)), 2.0e-10);
-verifyEqual(testCase, strHistory.enumAngularVelocityRegime, EnumTargetAngularVelocityRegime.TIME_VARYING);
+verifyEqual(testCase, strHistory.enumTargetAngularVelocityRegime, EnumTargetAngularVelocityRegime.TIME_VARYING);
 verifyFalse(testCase, isfield(strHistory, 'dNominalAngVel_IN'));
-verifyFalse(testCase, isfield(strHistory, 'dSpinAxis_TB'));
-verifyFalse(testCase, isfield(strHistory, 'charSpinAxisSource'));
+verifyFalse(testCase, isfield(strHistory, 'dTargetSpinAxis_TB'));
+verifyFalse(testCase, isfield(strHistory, 'charTargetSpinAxisSource'));
 end
 
 function testTorqueFreeAxisymmetricMatchesClosedForm(testCase)
@@ -572,7 +573,7 @@ end
 
 % The grid spans about three nutation periods, and the history follows the closed form
 verifyGreaterThan(testCase, dNutationRate * (dTimegrid(end) - dTimegrid(1)), 6.0 * pi);
-verifyEqual(testCase, strHistory.dAngVel_TB, dExpectedAngVel_TB, 'AbsTol', 1.0e-9);
+verifyEqual(testCase, strHistory.dTargetAngVel_TB, dExpectedAngVel_TB, 'AbsTol', 1.0e-9);
 verifyEqual(testCase, strHistory.dDCM_INfromTB, dExpectedDCM_INfromTB, 'AbsTol', 1.0e-9);
 end
 
@@ -636,7 +637,7 @@ dExpectedAngVel_TB = dAmplitudes .* [dCn; dSn; dDn];
 verifyGreaterThan(testCase, dMomentumSquared, dTwiceEnergy * dI2);
 verifyEqual(testCase, dExpectedAngVel_TB(:, 1), dInitialAngVel_TB, 'AbsTol', 1.0e-15);
 verifyGreaterThan(testCase, dTimeScale * (dTimegrid(end) - dTimegrid(1)), 12.0 * ellipke(dEllipticParameter));
-verifyEqual(testCase, strHistory.dAngVel_TB, dExpectedAngVel_TB, 'AbsTol', 1.0e-9);
+verifyEqual(testCase, strHistory.dTargetAngVel_TB, dExpectedAngVel_TB, 'AbsTol', 1.0e-9);
 end
 
 function testAppliesDeterministicPhysicalPerturbations(testCase)

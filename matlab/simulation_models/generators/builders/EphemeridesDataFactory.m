@@ -60,6 +60,7 @@ end
 % 23-08-2026    Pietro Califano, Codex              Replace optional nominal-rate capability with a typed regime.
 % 11-09-2026  Pietro Califano, Codex gpt-6    Remove unused runtime sign-switch metadata.
 % 29-09-2026  Pietro Califano, Codex gpt-6    Preserve target rates in both interpolation layouts.
+% 13-11-2026  Pietro Califano, Claude Opus 5.5   Prefix the target rate and spin-axis fields with Target.
 % -------------------------------------------------------------------------------------------------------------
 %% DEPENDENCIES
 % DCM2quatSeq, EnumTargetAngularVelocityRegime, fitAttQuatChbvPolynmials, fitChbvPolynomials.
@@ -93,16 +94,16 @@ dQuat_WfromTB = DCM2quatSeq(strMainBodyRefData.dDCM_INfromTB, false);
 
 % Persist a resolved body-fixed spin axis only as a complete value/provenance
 % pair. An absent pair means that no single body-fixed axis is known.
-bHasTargetSpinAxis = isfield(strMainBodyRefData, 'dSpinAxis_TB');
-bHasTargetSpinAxisSource = isfield(strMainBodyRefData, 'charSpinAxisSource');
+bHasTargetSpinAxis = isfield(strMainBodyRefData, 'dTargetSpinAxis_TB');
+bHasTargetSpinAxisSource = isfield(strMainBodyRefData, 'charTargetSpinAxisSource');
 if bHasTargetSpinAxis ~= bHasTargetSpinAxisSource
     error('EphemeridesDataFactory:IncompleteTargetSpinAxisMetadata', ...
         'Target spin-axis value and provenance must be supplied together.');
 end
 
 if bHasTargetSpinAxis
-    varTargetSpinAxis = strMainBodyRefData.dSpinAxis_TB;
-    varTargetSpinAxisSource = strMainBodyRefData.charSpinAxisSource;
+    varTargetSpinAxis = strMainBodyRefData.dTargetSpinAxis_TB;
+    varTargetSpinAxisSource = strMainBodyRefData.charTargetSpinAxisSource;
 
     % Validate the raw values before conversion, so that a complex axis or a
     % numeric source cannot pass as valid metadata.
@@ -130,17 +131,17 @@ end
 
 % Dispatch on the typed regime, never on field presence. Rate-bearing regimes
 % need source rates; UNAVAILABLE must carry none.
-enumAngularVelocityRegime = strMainBodyRefData.enumAngularVelocityRegime;
-if ~isa(enumAngularVelocityRegime, 'EnumTargetAngularVelocityRegime') || ...
-        ~isscalar(enumAngularVelocityRegime)
+enumTargetAngularVelocityRegime = strMainBodyRefData.enumTargetAngularVelocityRegime;
+if ~isa(enumTargetAngularVelocityRegime, 'EnumTargetAngularVelocityRegime') || ...
+        ~isscalar(enumTargetAngularVelocityRegime)
     error('EphemeridesDataFactory:InvalidAngularVelocityRegime', ...
         ['Target angular-velocity capability must be one scalar ', ...
          'EnumTargetAngularVelocityRegime value.']);
 end
 
-bHasTargetAngVel_IN = isfield(strMainBodyRefData, 'dAngVel_IN');
-bHasTargetAngVel_TB = isfield(strMainBodyRefData, 'dAngVel_TB');
-switch enumAngularVelocityRegime
+bHasTargetAngVel_IN = isfield(strMainBodyRefData, 'dTargetAngVel_IN');
+bHasTargetAngVel_TB = isfield(strMainBodyRefData, 'dTargetAngVel_TB');
+switch enumTargetAngularVelocityRegime
     case EnumTargetAngularVelocityRegime.UNAVAILABLE
         if bHasTargetAngVel_IN || bHasTargetAngVel_TB
             error('EphemeridesDataFactory:InconsistentAngularVelocityRegime', ...
@@ -152,9 +153,9 @@ switch enumAngularVelocityRegime
           EnumTargetAngularVelocityRegime.TIME_VARYING}
         if ~bHasTargetAngVel_IN
             error('EphemeridesDataFactory:InvalidTargetAngularVelocity', ...
-                'A rate-bearing target regime requires dAngVel_IN.');
+                'A rate-bearing target regime requires dTargetAngVel_IN.');
         end
-        varTargetAngVel_IN = strMainBodyRefData.dAngVel_IN;
+        varTargetAngVel_IN = strMainBodyRefData.dTargetAngVel_IN;
         if ~isnumeric(varTargetAngVel_IN) || ~isreal(varTargetAngVel_IN) || ...
                 not(isequal(size(varTargetAngVel_IN), [3, numel(dEphemTimegrid)])) || ...
                 any(not(isfinite(varTargetAngVel_IN)), 'all')
@@ -167,7 +168,7 @@ switch enumAngularVelocityRegime
         % Require the declared regime to agree with every rate sample.
         enumClassifiedRegime = ...
             EnumTargetAngularVelocityRegime.Classify(dTargetAngVel_IN);
-        if enumAngularVelocityRegime ~= enumClassifiedRegime
+        if enumTargetAngularVelocityRegime ~= enumClassifiedRegime
             error('EphemeridesDataFactory:InconsistentAngularVelocityRegime', ...
                 ['The declared target angular-velocity regime is inconsistent ', ...
                  'with the complete inertial-rate history.']);
@@ -179,7 +180,7 @@ switch enumAngularVelocityRegime
 end
 
 if bHasTargetAngVel_TB
-    varTargetAngVel_TB = strMainBodyRefData.dAngVel_TB;
+    varTargetAngVel_TB = strMainBodyRefData.dTargetAngVel_TB;
     if ~isnumeric(varTargetAngVel_TB) || ~isreal(varTargetAngVel_TB) || ...
             not(isequal(size(varTargetAngVel_TB), [3, numel(dEphemTimegrid)])) || ...
             any(not(isfinite(varTargetAngVel_TB)), 'all')
@@ -193,9 +194,9 @@ end
 % Replace the factory-owned rate and spin-axis fields instead of merging them,
 % so that a reused dynamics payload keeps no stale source metadata.
 if isfield(strDynParams.strMainData, 'strAttData')
-    cellAttitudeContextFields = {'dAngVel_IN', 'dAngVelTimegrid', ...
-                                 'dNominalAngVel_IN', 'dAngVel_TB', ...
-                                 'enumAngularVelocityRegime', ...
+    cellAttitudeContextFields = {'dTargetAngVel_IN', 'dTargetAngVelTimegrid', ...
+                                 'dNominalAngVel_IN', 'dTargetAngVel_TB', ...
+                                 'enumTargetAngularVelocityRegime', ...
                                  'dTargetSpinAxis_TB', ...
                                  'charTargetSpinAxisSource'};
     cellPresentAttitudeFields = intersect(cellAttitudeContextFields, ...
@@ -243,16 +244,16 @@ end
 
 % The typed regime is always present in the runtime attitude payload. Only
 % rate-bearing regimes carry aligned samples and their interpolation domain.
-strDynParams.strMainData.strAttData.enumAngularVelocityRegime = ...
-    enumAngularVelocityRegime;
-if enumAngularVelocityRegime ~= EnumTargetAngularVelocityRegime.UNAVAILABLE
-    strDynParams.strMainData.strAttData.dAngVel_IN = ...
+strDynParams.strMainData.strAttData.enumTargetAngularVelocityRegime = ...
+    enumTargetAngularVelocityRegime;
+if enumTargetAngularVelocityRegime ~= EnumTargetAngularVelocityRegime.UNAVAILABLE
+    strDynParams.strMainData.strAttData.dTargetAngVel_IN = ...
         dTargetAngVel_IN;
-    strDynParams.strMainData.strAttData.dAngVelTimegrid = ...
+    strDynParams.strMainData.strAttData.dTargetAngVelTimegrid = ...
         dInterpDomain;
 end
 if bHasTargetAngVel_TB
-    strDynParams.strMainData.strAttData.dAngVel_TB = dTargetAngVel_TB;
+    strDynParams.strMainData.strAttData.dTargetAngVel_TB = dTargetAngVel_TB;
 end
 
 % Keep known spin-axis analysis provenance available in both interpolation
