@@ -1,6 +1,6 @@
 classdef testDefineEnvironmentProperties < matlab.unittest.TestCase
     methods (Test)
-        function testSpiceRateSign(testCase)
+        function testSpiceRateSignAndOptionalAxisContract(testCase)
             % Explicit opt-in uses real NAIF kernels; unavailable installations report a filtered test.
             charKernelRoot = string(getenv('SIMGEARS_SPICE_KERNEL_ROOT'));
             testCase.assumeTrue(isfolder(charKernelRoot) && exist('cspice_xf2rav', 'file') == 2, ...
@@ -16,6 +16,12 @@ classdef testDefineEnvironmentProperties < matlab.unittest.TestCase
 
             dTimestamps = 8e8 + [0, 20, 70];
             [~, strMainBodyRefData] = DefineEnvironmentProperties(dTimestamps, "Moon", "J2000");
+
+            % A SPICE frame declares no spin axis, and its rate regime is always known.
+            testCase.verifyFalse(isfield(strMainBodyRefData, 'dSpinAxis_TB'));
+            testCase.verifyFalse(isfield(strMainBodyRefData, 'charSpinAxisSource'));
+            testCase.verifyNotEqual(strMainBodyRefData.enumAngularVelocityRegime, ...
+                EnumTargetAngularVelocityRegime.UNAVAILABLE);
 
             % Differentiate the SPICE attitude itself: skew(omega_IN) = dR_INfromTB/dt * R_INfromTB'.
             for ui32TimeIdx = uint32(1):uint32(numel(dTimestamps))
@@ -36,7 +42,9 @@ classdef testDefineEnvironmentProperties < matlab.unittest.TestCase
             dTargetPosition_IN = zeros(3, numel(dTimestamps));
             dSunPosition_IN = repmat([1.495978707e11; 0.0; 0.0], 1, numel(dTimestamps));
             dEarthPosition_IN = zeros(3, numel(dTimestamps));
-            dTargetAngVel_IN = repmat([0.8e-4; -0.4e-4; 1.7e-4], 1, numel(dTimestamps));
+            dTargetAngVel_IN = [0.8e-4, 0.9e-4, 1.1e-4; ...
+                               -0.4e-4, -0.3e-4, -0.5e-4; ...
+                                1.7e-4, 1.6e-4, 1.8e-4];
             objDataset = SReferenceMissionDesign(EnumFrameName.IN, dTimestamps, dStateSC_IN, ...
                 dDCM_TBfromIN, dTargetPosition_IN, dSunPosition_IN, dEarthPosition_IN, ...
                 'dTargetAngVel_IN', dTargetAngVel_IN);
@@ -45,6 +53,46 @@ classdef testDefineEnvironmentProperties < matlab.unittest.TestCase
                 "Itokawa", "J2000", objDataset=objDataset);
 
             testCase.verifyEqual(strMainBodyRefData.dAngVel_IN, dTargetAngVel_IN, 'AbsTol', 0.0);
+            testCase.verifyEqual( ...
+                strMainBodyRefData.enumAngularVelocityRegime, ...
+                EnumTargetAngularVelocityRegime.TIME_VARYING);
+        end
+
+        function testCanSkipDatasetTargetRotationalState(testCase)
+            [dTimestamps, dStateSC_IN, dDCM_TBfromIN, dTargetPosition_IN, ...
+                dSunPosition_IN, dEarthPosition_IN] = testCase.buildMinimalDatasetInputs();
+            dTargetAngVel_IN = repmat([0.8e-4; -0.4e-4; 1.7e-4], 1, numel(dTimestamps));
+            objDataset = SReferenceMissionDesign(EnumFrameName.IN, dTimestamps, dStateSC_IN, ...
+                dDCM_TBfromIN, dTargetPosition_IN, dSunPosition_IN, dEarthPosition_IN, ...
+                'dTargetAngVel_IN', dTargetAngVel_IN);
+
+            [strSkippedDynParams, strMainBodyRefData, strSkipped3rdBodyRefData] = ...
+                DefineEnvironmentProperties(dTimestamps, ...
+                "Itokawa", "J2000", objDataset=objDataset, ...
+                bLoadTargetRotationalState=false);
+            [strLoadedDynParams, strLoadedMainBodyRefData, strLoaded3rdBodyRefData] = ...
+                DefineEnvironmentProperties(dTimestamps, ...
+                "Itokawa", "J2000", objDataset=objDataset, ...
+                bLoadTargetRotationalState=true);
+
+            testCase.verifyFalse(isfield(strMainBodyRefData, 'dDCM_INfromTB'));
+            testCase.verifyFalse(isfield(strMainBodyRefData, 'dAngVel_IN'));
+            testCase.verifyFalse(isfield(strMainBodyRefData, ...
+                'enumAngularVelocityRegime'));
+            testCase.verifyFalse(isfield(strMainBodyRefData, 'dSpinAxis_TB'));
+            testCase.verifyFalse(isfield(strMainBodyRefData, 'charSpinAxisSource'));
+            testCase.verifyEqual(strMainBodyRefData.dSunPosition_IN, dSunPosition_IN, 'AbsTol', 0.0);
+
+            % The skip flag owns only target rotation; all other environment
+            % and spacecraft outputs must match the normal source-loading path.
+            cellRotationFields = {'dDCM_INfromTB', 'dAngVel_IN', ...
+                                  'enumAngularVelocityRegime', ...
+                                  'dSpinAxis_TB', 'charSpinAxisSource'};
+            strExpectedMainBodyRefData = rmfield( ...
+                strLoadedMainBodyRefData, cellRotationFields);
+            testCase.verifyEqual(strMainBodyRefData, strExpectedMainBodyRefData);
+            testCase.verifyEqual(strSkippedDynParams, strLoadedDynParams);
+            testCase.verifyEqual(strSkipped3rdBodyRefData, strLoaded3rdBodyRefData);
         end
 
         function testDefaultsTargetSpinAxisToBodyPlusZ(testCase)
@@ -60,6 +108,9 @@ classdef testDefineEnvironmentProperties < matlab.unittest.TestCase
             testCase.verifyEqual(objDataset.charTargetSpinAxisSource, "DEFAULT_PLUS_Z");
             testCase.verifyEqual(strMainBodyRefData.dSpinAxis_TB, [0.0; 0.0; 1.0], 'AbsTol', 0.0);
             testCase.verifyEqual(strMainBodyRefData.charSpinAxisSource, "DEFAULT_PLUS_Z");
+            testCase.verifyEqual( ...
+                strMainBodyRefData.enumAngularVelocityRegime, ...
+                EnumTargetAngularVelocityRegime.UNAVAILABLE);
         end
 
         function testNormalizesDeclaredTargetSpinAxis(testCase)
@@ -82,13 +133,13 @@ classdef testDefineEnvironmentProperties < matlab.unittest.TestCase
 
             testCase.verifyError(@() SReferenceMissionDesign(EnumFrameName.IN, dTimestamps, dStateSC_IN, ...
                 dDCM_TBfromIN, dTargetPosition_IN, dSunPosition_IN, dEarthPosition_IN, ...
-                'dTargetSpinAxis_TB', zeros(3,1)), ...
+                'dTargetSpinAxis_TB', zeros(3, 1)), ...
                 'SReferenceMissionDesign:InvalidTargetSpinAxis');
         end
 
         function testBuildsSpacecraftPanelsAndPolyhedronGravityDataFromObj(testCase)
-            fixture = testCase.applyFixture(matlab.unittest.fixtures.TemporaryFolderFixture);
-            charObjPath = fullfile(string(fixture.Folder), "cube_model.obj");
+            objTempFolder = testCase.applyFixture(matlab.unittest.fixtures.TemporaryFolderFixture);
+            charObjPath = fullfile(string(objTempFolder.Folder), "cube_model.obj");
             [ui32Faces, dVerts] = testCase.buildCubeMesh();
             testCase.writeObjFile(charObjPath, ui32Faces, dVerts);
 
@@ -174,17 +225,17 @@ classdef testDefineEnvironmentProperties < matlab.unittest.TestCase
         end
 
         function writeObjFile(~, charObjPath, ui32Faces, dVerts)
-            fid = fopen(char(charObjPath), "w");
-            assert(fid ~= -1, "testDefineEnvironmentProperties:FileOpenFailed", ...
+            dFileId = fopen(char(charObjPath), "w");
+            assert(dFileId ~= -1, "testDefineEnvironmentProperties:FileOpenFailed", ...
                 "Failed to create temporary OBJ file: %s", char(charObjPath));
-            cleanupObj = onCleanup(@() fclose(fid)); %#ok<NASGU>
+            objFileCleanup = onCleanup(@() fclose(dFileId));
 
-            for idVert = 1:size(dVerts, 1)
-                fprintf(fid, "v %.16g %.16g %.16g\n", dVerts(idVert, 1), dVerts(idVert, 2), dVerts(idVert, 3));
+            for ui32VertIdx = uint32(1):uint32(size(dVerts, 1))
+                fprintf(dFileId, "v %.16g %.16g %.16g\n", dVerts(ui32VertIdx, 1), dVerts(ui32VertIdx, 2), dVerts(ui32VertIdx, 3));
             end
 
-            for idFace = 1:size(ui32Faces, 1)
-                fprintf(fid, "f %u %u %u\n", ui32Faces(idFace, 1), ui32Faces(idFace, 2), ui32Faces(idFace, 3));
+            for ui32FaceIdx = uint32(1):uint32(size(ui32Faces, 1))
+                fprintf(dFileId, "f %u %u %u\n", ui32Faces(ui32FaceIdx, 1), ui32Faces(ui32FaceIdx, 2), ui32Faces(ui32FaceIdx, 3));
             end
         end
     end

@@ -1,5 +1,5 @@
 function strDynParams = EphemeridesDataFactory(dEphemTimegrid, ...
-                                                ui32EphemerisPolyDeg,...
+                                                ui32EphemerisPolyDeg, ...
                                                 ui32AttitudePolyDeg, ...
                                                 strDynParams, ...
                                                 strMainBodyRefData, ...
@@ -32,10 +32,11 @@ end
 %% DESCRIPTION
 % Fit target and third-body ephemeris products into the runtime dynamics structure. When the source provides target
 % attitude-model rate, preserve it as source data aligned with the attitude ephemeris; never recover it by differencing
-% sampled attitudes. The model rate satisfies R_INfromTB(t) = Exp(-omega_IN*t) R_INfromTB(0). This builder expects the
-% field contract produced by DefineEnvironmentProperties and is not a standalone source loader.
-% Keep rate metadata independent of the coefficient layout. Express rates in rad/s and their timegrid in
-% the selected interpolation domain (relative/absolute seconds or absolute days).
+% sampled attitudes. The model rate satisfies R_INfromTB(t) = Exp(+omega_IN*t) R_INfromTB(0). Rates are in rad/s and
+% their timegrid is in the selected interpolation domain (relative or absolute seconds, or absolute days), for both
+% coefficient layouts. The typed angular-velocity regime alone decides whether rates exist: UNAVAILABLE carries no rate
+% samples, CONSTANT_INERTIAL and TIME_VARYING need a complete validated sequence. This builder expects the field
+% contract produced by DefineEnvironmentProperties and the target-history builders; it is not a standalone source loader.
 % -------------------------------------------------------------------------------------------------------------
 %% INPUT
 % dEphemTimegrid               Ephemeris sample epochs [s].
@@ -55,11 +56,13 @@ end
 %                                   ephemerides from input reference data; minor updates
 % 18-08-2025    Pietro Califano     Update implementation to generalize RCS1 alternative code branch
 % 13-08-2026    Pietro Califano, Codex gpt-5.6     Preserve source-provided target angular velocity.
+% 22-08-2026    Pietro Califano, Codex              Separate variable-rate history from constant-rate capability.
+% 23-08-2026    Pietro Califano, Codex              Replace optional nominal-rate capability with a typed regime.
 % 11-09-2026  Pietro Califano, Codex gpt-6    Remove unused runtime sign-switch metadata.
 % 29-09-2026  Pietro Califano, Codex gpt-6    Preserve target rates in both interpolation layouts.
 % -------------------------------------------------------------------------------------------------------------
 %% DEPENDENCIES
-% DCM2quatSeq, fitAttQuatChbvPolynmials, fitChbvPolynomials.
+% DCM2quatSeq, EnumTargetAngularVelocityRegime, fitAttQuatChbvPolynmials, fitChbvPolynomials.
 % -------------------------------------------------------------------------------------------------------------
 
 %% Common data
@@ -88,30 +91,119 @@ end
 % Convert attitude DCMs to quaternion
 dQuat_WfromTB = DCM2quatSeq(strMainBodyRefData.dDCM_INfromTB, false);
 
-% Persist the already resolved body-fixed spin axis and its source beside the attitude model. Direct callers that
-% predate this contract receive the approved +Z default with explicit default provenance.
-if isfield(strMainBodyRefData, 'dSpinAxis_TB')
-    dTargetSpinAxis_TB = strMainBodyRefData.dSpinAxis_TB;
-    charTargetSpinAxisSource = string(strMainBodyRefData.charSpinAxisSource);
-else
-    dTargetSpinAxis_TB = [0.0; 0.0; 1.0];
-    charTargetSpinAxisSource = "DEFAULT_PLUS_Z";
-end
-if not(isequal(size(dTargetSpinAxis_TB), [3,1])) || any(not(isfinite(dTargetSpinAxis_TB))) || ...
-        abs(norm(dTargetSpinAxis_TB) - 1.0) > 1.0e-12
-    error('EphemeridesDataFactory:InvalidTargetSpinAxis', ...
-        'The resolved target spin axis must be one finite unit 3-vector.');
+% Persist a resolved body-fixed spin axis only as a complete value/provenance
+% pair. An absent pair means that no single body-fixed axis is known.
+bHasTargetSpinAxis = isfield(strMainBodyRefData, 'dSpinAxis_TB');
+bHasTargetSpinAxisSource = isfield(strMainBodyRefData, 'charSpinAxisSource');
+if bHasTargetSpinAxis ~= bHasTargetSpinAxisSource
+    error('EphemeridesDataFactory:IncompleteTargetSpinAxisMetadata', ...
+        'Target spin-axis value and provenance must be supplied together.');
 end
 
-% Preserve the angular velocity delivered by the ephemeris source. This is
-% source data, not a numerical derivative of the sampled attitude sequence.
-if isfield(strMainBodyRefData, 'dAngVel_IN')
-    dTargetAngVel_IN = strMainBodyRefData.dAngVel_IN;
-    if not(isequal(size(dTargetAngVel_IN), [3, numel(dEphemTimegrid)])) || ...
-            any(not(isfinite(dTargetAngVel_IN)), 'all')
-        error('EphemeridesDataFactory:InvalidTargetAngularVelocity', ...
-            ['Source-provided target angular velocity must be a finite 3-by-N sequence aligned with the ' ...
-             'ephemeris timegrid.']);
+if bHasTargetSpinAxis
+    varTargetSpinAxis = strMainBodyRefData.dSpinAxis_TB;
+    varTargetSpinAxisSource = strMainBodyRefData.charSpinAxisSource;
+
+    % Validate the raw values before conversion, so that a complex axis or a
+    % numeric source cannot pass as valid metadata.
+    bValidTargetSpinAxisSourceType = ...
+        (ischar(varTargetSpinAxisSource) && isrow(varTargetSpinAxisSource)) || ...
+        (isstring(varTargetSpinAxisSource) && isscalar(varTargetSpinAxisSource));
+    if ~isnumeric(varTargetSpinAxis) || ~isreal(varTargetSpinAxis) || ...
+            not(isequal(size(varTargetSpinAxis), [3, 1])) || ...
+            any(not(isfinite(varTargetSpinAxis))) || ...
+            ~bValidTargetSpinAxisSourceType
+        error('EphemeridesDataFactory:InvalidTargetSpinAxis', ...
+            ['The resolved target spin axis must be one finite real numeric unit ', ...
+             '3-vector with nonempty char or string-scalar provenance.']);
+    end
+
+    dTargetSpinAxis_TB = double(varTargetSpinAxis);
+    charTargetSpinAxisSource = string(varTargetSpinAxisSource);
+    if abs(norm(dTargetSpinAxis_TB) - 1.0) > 1.0e-12 || ...
+            strlength(strip(charTargetSpinAxisSource)) == 0
+        error('EphemeridesDataFactory:InvalidTargetSpinAxis', ...
+            ['The resolved target spin axis must be one finite real numeric unit ', ...
+             '3-vector with nonempty char or string-scalar provenance.']);
+    end
+end
+
+% Dispatch on the typed regime, never on field presence. Rate-bearing regimes
+% need source rates; UNAVAILABLE must carry none.
+enumAngularVelocityRegime = strMainBodyRefData.enumAngularVelocityRegime;
+if ~isa(enumAngularVelocityRegime, 'EnumTargetAngularVelocityRegime') || ...
+        ~isscalar(enumAngularVelocityRegime)
+    error('EphemeridesDataFactory:InvalidAngularVelocityRegime', ...
+        ['Target angular-velocity capability must be one scalar ', ...
+         'EnumTargetAngularVelocityRegime value.']);
+end
+
+bHasTargetAngVel_IN = isfield(strMainBodyRefData, 'dAngVel_IN');
+bHasTargetAngVel_TB = isfield(strMainBodyRefData, 'dAngVel_TB');
+switch enumAngularVelocityRegime
+    case EnumTargetAngularVelocityRegime.UNAVAILABLE
+        if bHasTargetAngVel_IN || bHasTargetAngVel_TB
+            error('EphemeridesDataFactory:InconsistentAngularVelocityRegime', ...
+                ['UNAVAILABLE target angular velocity cannot carry inertial ', ...
+                 'or body-frame rate samples.']);
+        end
+
+    case {EnumTargetAngularVelocityRegime.CONSTANT_INERTIAL, ...
+          EnumTargetAngularVelocityRegime.TIME_VARYING}
+        if ~bHasTargetAngVel_IN
+            error('EphemeridesDataFactory:InvalidTargetAngularVelocity', ...
+                'A rate-bearing target regime requires dAngVel_IN.');
+        end
+        varTargetAngVel_IN = strMainBodyRefData.dAngVel_IN;
+        if ~isnumeric(varTargetAngVel_IN) || ~isreal(varTargetAngVel_IN) || ...
+                not(isequal(size(varTargetAngVel_IN), [3, numel(dEphemTimegrid)])) || ...
+                any(not(isfinite(varTargetAngVel_IN)), 'all')
+            error('EphemeridesDataFactory:InvalidTargetAngularVelocity', ...
+                ['Source-provided target angular velocity must be a finite real ', ...
+                 'numeric 3-by-N sequence aligned with the ephemeris timegrid.']);
+        end
+        dTargetAngVel_IN = double(varTargetAngVel_IN);
+
+        % Require the declared regime to agree with every rate sample.
+        enumClassifiedRegime = ...
+            EnumTargetAngularVelocityRegime.Classify(dTargetAngVel_IN);
+        if enumAngularVelocityRegime ~= enumClassifiedRegime
+            error('EphemeridesDataFactory:InconsistentAngularVelocityRegime', ...
+                ['The declared target angular-velocity regime is inconsistent ', ...
+                 'with the complete inertial-rate history.']);
+        end
+
+    otherwise
+        error('EphemeridesDataFactory:InvalidAngularVelocityRegime', ...
+            'Unsupported target angular-velocity regime.');
+end
+
+if bHasTargetAngVel_TB
+    varTargetAngVel_TB = strMainBodyRefData.dAngVel_TB;
+    if ~isnumeric(varTargetAngVel_TB) || ~isreal(varTargetAngVel_TB) || ...
+            not(isequal(size(varTargetAngVel_TB), [3, numel(dEphemTimegrid)])) || ...
+            any(not(isfinite(varTargetAngVel_TB)), 'all')
+        error('EphemeridesDataFactory:InvalidTargetBodyAngularVelocity', ...
+            ['Source-provided target body angular velocity must be a finite ', ...
+             'real numeric 3-by-N sequence aligned with the ephemeris timegrid.']);
+    end
+    dTargetAngVel_TB = double(varTargetAngVel_TB);
+end
+
+% Replace the factory-owned rate and spin-axis fields instead of merging them,
+% so that a reused dynamics payload keeps no stale source metadata.
+if isfield(strDynParams.strMainData, 'strAttData')
+    cellAttitudeContextFields = {'dAngVel_IN', 'dAngVelTimegrid', ...
+                                 'dNominalAngVel_IN', 'dAngVel_TB', ...
+                                 'enumAngularVelocityRegime', ...
+                                 'dTargetSpinAxis_TB', ...
+                                 'charTargetSpinAxisSource'};
+    cellPresentAttitudeFields = intersect(cellAttitudeContextFields, ...
+        fieldnames(strDynParams.strMainData.strAttData), 'stable');
+    if ~isempty(cellPresentAttitudeFields)
+        strDynParams.strMainData.strAttData = rmfield( ...
+            strDynParams.strMainData.strAttData, ...
+            cellPresentAttitudeFields);
     end
 end
 
@@ -137,8 +229,8 @@ else
     % hardcoded inside the evaluation funtion!).
 
     % Apply discontinuity fix
-    [dQuat_WfromTB, bIsSignSwitched, ui8howManySwitches, ...
-        bsignSwitchDetectionMask] = fixQuatSignDiscontinuity(dQuat_WfromTB'); %#ok<ASGLU>
+    [dQuat_WfromTB, bIsSignSwitched, ui8HowManySwitches, ...
+        bSignSwitchDetectionMask] = fixQuatSignDiscontinuity(dQuat_WfromTB'); %#ok<ASGLU>
 
     strDynParams.strMainData.d_gnc_eph_target_att_coeffs = EphCoeffsGeneration(dInterpDomain, ...
                                                                                 dQuat_WfromTB', ...
@@ -149,26 +241,28 @@ else
 
 end
 
-% Share source rates across coefficient layouts and retain the first-sample nominal value.
-if isfield(strMainBodyRefData, 'dAngVel_IN')
-    strDynParams.strMainData.strAttData.dNominalAngVel_IN = dTargetAngVel_IN(:,1);
-    strDynParams.strMainData.strAttData.dAngVel_IN = dTargetAngVel_IN;
-    strDynParams.strMainData.strAttData.dAngVelTimegrid = dInterpDomain;
-elseif isfield(strDynParams.strMainData, 'strAttData')
-    % Clear context owned by the previous rate source when reusing a dynamics payload.
-    cellRateFields = {'dNominalAngVel_IN', 'dAngVel_IN', 'dAngVelTimegrid'};
-    cellPresentRateFields = intersect(cellRateFields, ...
-        fieldnames(strDynParams.strMainData.strAttData), 'stable');
-    if ~isempty(cellPresentRateFields)
-        strDynParams.strMainData.strAttData = rmfield( ...
-            strDynParams.strMainData.strAttData, cellPresentRateFields);
-    end
+% The typed regime is always present in the runtime attitude payload. Only
+% rate-bearing regimes carry aligned samples and their interpolation domain.
+strDynParams.strMainData.strAttData.enumAngularVelocityRegime = ...
+    enumAngularVelocityRegime;
+if enumAngularVelocityRegime ~= EnumTargetAngularVelocityRegime.UNAVAILABLE
+    strDynParams.strMainData.strAttData.dAngVel_IN = ...
+        dTargetAngVel_IN;
+    strDynParams.strMainData.strAttData.dAngVelTimegrid = ...
+        dInterpDomain;
+end
+if bHasTargetAngVel_TB
+    strDynParams.strMainData.strAttData.dAngVel_TB = dTargetAngVel_TB;
 end
 
-% Keep spin-axis analysis provenance available in both interpolation layouts and in serialized COSMICA dynamics
-% context. This metadata is not consumed by the propagation kernel.
-strDynParams.strMainData.strAttData.dTargetSpinAxis_TB = dTargetSpinAxis_TB;
-strDynParams.strMainData.strAttData.charTargetSpinAxisSource = charTargetSpinAxisSource;
+% Keep known spin-axis analysis provenance available in both interpolation
+% layouts. Unknown or time-varying axes remain absent.
+if bHasTargetSpinAxis
+    strDynParams.strMainData.strAttData.dTargetSpinAxis_TB = ...
+        dTargetSpinAxis_TB;
+    strDynParams.strMainData.strAttData.charTargetSpinAxisSource = ...
+        charTargetSpinAxisSource;
+end
 
 %% Sun position
 if not(kwargs.bUseInterpFcnFromRCS1)
@@ -199,11 +293,11 @@ end
 
 %% Add 3rd bodies
 if not(isempty(str3rdBodyRefData)) && length(strDynParams.strBody3rdData) > 1 && ( kwargs.bAdd3rdBodiesPosition || kwargs.bAdd3rdBodiesAttitude)
-    for idB = 1:length(str3rdBodyRefData)
+    for ui32BodyIdx = uint32(1):uint32(length(str3rdBodyRefData))
         % Get position data
         if isfield(str3rdBodyRefData, "strOrbitData")
             try
-                dPosition_W = str3rdBodyRefData(idB).strOrbitData.dPosition_W;
+                dPosition_W = str3rdBodyRefData(ui32BodyIdx).strOrbitData.dPosition_W;
 
                 if not(kwargs.bUseInterpFcnFromRCS1)
                     % Use nav-system implementation
@@ -214,10 +308,10 @@ if not(isempty(str3rdBodyRefData)) && length(strDynParams.strBody3rdData) > 1 &&
                                                             dDomainUB, ...
                                                             kwargs.bEnableInterpValidation);
 
-                    strDynParams.strBody3rdData(idB+1).strOrbitData.ui32PolyDeg      = ui32EphemerisPolyDeg;
-                    strDynParams.strBody3rdData(idB+1).strOrbitData.dChbvPolycoeffs  = dChbvCoeffs;
-                    strDynParams.strBody3rdData(idB+1).strOrbitData.dTimeLowBound    = dDomainLB;
-                    strDynParams.strBody3rdData(idB+1).strOrbitData.dTimeUpBound     = dDomainUB;
+                    strDynParams.strBody3rdData(ui32BodyIdx+1).strOrbitData.ui32PolyDeg      = ui32EphemerisPolyDeg;
+                    strDynParams.strBody3rdData(ui32BodyIdx+1).strOrbitData.dChbvPolycoeffs  = dChbvCoeffs;
+                    strDynParams.strBody3rdData(ui32BodyIdx+1).strOrbitData.dTimeLowBound    = dDomainLB;
+                    strDynParams.strBody3rdData(ui32BodyIdx+1).strOrbitData.dTimeUpBound     = dDomainUB;
 
 
                 else
@@ -226,38 +320,38 @@ if not(isempty(str3rdBodyRefData)) && length(strDynParams.strBody3rdData) > 1 &&
                     % DEVNOTE: interpolation time domain is assumed to be expressed in days (conversion is
                     % hardcoded inside the evaluation funtion!).
 
-                    strDynParams.strBody3rdData(idB+1).d_gnc_eph_coeffs = EphCoeffsGeneration(dInterpDomain, ...
+                    strDynParams.strBody3rdData(ui32BodyIdx+1).d_gnc_eph_coeffs = EphCoeffsGeneration(dInterpDomain, ...
                                                                                             dPosition_W', ...
                                                                                             ui32EphemerisPolyDeg);
-                    strDynParams.strBody3rdData(idB+1).d_gnc_eph_time_bounds = [dInterpDomain(1), dInterpDomain(end)] ;
-                    strDynParams.strBody3rdData(idB+1).ui32CoeffsSizePtr = size(strDynParams.strBody3rdData(idB+1).d_gnc_eph_coeffs, 2);
+                    strDynParams.strBody3rdData(ui32BodyIdx+1).d_gnc_eph_time_bounds = [dInterpDomain(1), dInterpDomain(end)] ;
+                    strDynParams.strBody3rdData(ui32BodyIdx+1).ui32CoeffsSizePtr = size(strDynParams.strBody3rdData(ui32BodyIdx+1).d_gnc_eph_coeffs, 2);
                 end
 
-            catch ME
+            catch objError
 
-                warning("EphemeridesDataFactory: Failed to fit orbit data for 3rd body %d due to error: %s. \nSkipping ephemeris fitting.", idB, string(ME.message));
+                warning("EphemeridesDataFactory: Failed to fit orbit data for 3rd body %d due to error: %s. \nSkipping ephemeris fitting.", ui32BodyIdx, string(objError.message));
                 if not(kwargs.bUseInterpFcnFromRCS1)
                     % Use nav-system implementation
-                    strDynParams.strBody3rdData(idB+1).strOrbitData.ui32PolyDeg      = 0;
-                    strDynParams.strBody3rdData(idB+1).strOrbitData.dChbvPolycoeffs  = [];
-                    strDynParams.strBody3rdData(idB+1).strOrbitData.dTimeLowBound    = [];
-                    strDynParams.strBody3rdData(idB+1).strOrbitData.dTimeUpBound     = [];
+                    strDynParams.strBody3rdData(ui32BodyIdx+1).strOrbitData.ui32PolyDeg      = 0;
+                    strDynParams.strBody3rdData(ui32BodyIdx+1).strOrbitData.dChbvPolycoeffs  = [];
+                    strDynParams.strBody3rdData(ui32BodyIdx+1).strOrbitData.dTimeLowBound    = [];
+                    strDynParams.strBody3rdData(ui32BodyIdx+1).strOrbitData.dTimeUpBound     = [];
 
                 else
                     % Use implementation for RCS-1
-                    strDynParams.strBody3rdData(idB+1).d_gnc_eph_coeffs = [];
-                    strDynParams.strBody3rdData(idB+1).d_gnc_eph_time_bounds = [];
-                    strDynParams.strBody3rdData(idB+1).ui32CoeffsSizePtr = [];
+                    strDynParams.strBody3rdData(ui32BodyIdx+1).d_gnc_eph_coeffs = [];
+                    strDynParams.strBody3rdData(ui32BodyIdx+1).d_gnc_eph_time_bounds = [];
+                    strDynParams.strBody3rdData(ui32BodyIdx+1).ui32CoeffsSizePtr = [];
                 end
             end
         else
-            warning("EphemeridesDataFactory: No orbit data found for 3rd body %d. Skipping ephemeris fitting.", idB);
+            warning("EphemeridesDataFactory: No orbit data found for 3rd body %d. Skipping ephemeris fitting.", ui32BodyIdx);
         end
 
-        if isfield(str3rdBodyRefData(idB), "strAttData") && kwargs.bAdd3rdBodiesAttitude
+        if isfield(str3rdBodyRefData(ui32BodyIdx), "strAttData") && kwargs.bAdd3rdBodiesAttitude
             try
                 % Fit attitude data (convert to quaternion scalar first)
-                dQuat_WfromTB = DCM2quatSeq(str3rdBodyRefData(idB).strAttData.dDCM_WfromTB , false);
+                dQuat_WfromTB = DCM2quatSeq(str3rdBodyRefData(ui32BodyIdx).strAttData.dDCM_WfromTB , false);
 
                 if not(kwargs.bUseInterpFcnFromRCS1)
                     % Use nav-system implementation
@@ -269,10 +363,10 @@ if not(isempty(str3rdBodyRefData)) && length(strDynParams.strBody3rdData) > 1 &&
                                                                     dDomainUB, ...
                                                                     kwargs.bEnableInterpValidation); %#ok<ASGLU>
 
-                    strDynParams.strBody3rdData(idB+1).strAttData.ui32PolyDeg          = ui32AttitudePolyDeg;
-                    strDynParams.strBody3rdData(idB+1).strAttData.dChbvPolycoeffs      = dTmpChbvCoeffs;
-                    strDynParams.strBody3rdData(idB+1).strAttData.dTimeLowBound        = dDomainLB;
-                    strDynParams.strBody3rdData(idB+1).strAttData.dTimeUpBound         = dDomainUB;
+                    strDynParams.strBody3rdData(ui32BodyIdx+1).strAttData.ui32PolyDeg          = ui32AttitudePolyDeg;
+                    strDynParams.strBody3rdData(ui32BodyIdx+1).strAttData.dChbvPolycoeffs      = dTmpChbvCoeffs;
+                    strDynParams.strBody3rdData(ui32BodyIdx+1).strAttData.dTimeLowBound        = dDomainLB;
+                    strDynParams.strBody3rdData(ui32BodyIdx+1).strAttData.dTimeUpBound         = dDomainUB;
 
                 else
                     % Use implementation for RCS-1
@@ -281,22 +375,22 @@ if not(isempty(str3rdBodyRefData)) && length(strDynParams.strBody3rdData) > 1 &&
                     % hardcoded inside the evaluation funtion!).
 
                     % Apply discontinuity fix
-                    [dQuat_WfromTB, bIsSignSwitched, ui8howManySwitches, ...
-                        bsignSwitchDetectionMask] = fixQuatSignDiscontinuity(dQuat_WfromTB'); %#ok<ASGLU>
+                    [dQuat_WfromTB, bIsSignSwitched, ui8HowManySwitches, ...
+                        bSignSwitchDetectionMask] = fixQuatSignDiscontinuity(dQuat_WfromTB'); %#ok<ASGLU>
 
-                    strDynParams.strBody3rdData(idB+1).strAttData.d_gnc_eph_coeffs = EphCoeffsGeneration(dInterpDomain, ...
+                    strDynParams.strBody3rdData(ui32BodyIdx+1).strAttData.d_gnc_eph_coeffs = EphCoeffsGeneration(dInterpDomain, ...
                                                                                                     dQuat_WfromTB', ...
                                                                                                     ui32EphemerisPolyDeg);
                     
-                    strDynParams.strBody3rdData(idB+1).strAttData.d_gnc_eph_time_bounds = [dInterpDomain(1), dInterpDomain(end)] ;
-                    strDynParams.strBody3rdData(idB+1).strAttData.ui32CoeffsSizePtr = size(strDynParams.strBody3rdData(idB+1).strAttData.d_gnc_eph_coeffs, 2);
+                    strDynParams.strBody3rdData(ui32BodyIdx+1).strAttData.d_gnc_eph_time_bounds = [dInterpDomain(1), dInterpDomain(end)] ;
+                    strDynParams.strBody3rdData(ui32BodyIdx+1).strAttData.ui32CoeffsSizePtr = size(strDynParams.strBody3rdData(ui32BodyIdx+1).strAttData.d_gnc_eph_coeffs, 2);
                 end
-            catch ME
-                warning("EphemeridesDataFactory: Failed to fit attitude data for 3rd body %d due to error: %s. \nSkipping attitude fitting.", idB, string(ME.message));
-                strDynParams.strBody3rdData(idB+1).strAttData.ui32PolyDeg          = 0;
-                strDynParams.strBody3rdData(idB+1).strAttData.dChbvPolycoeffs      = [];
-                strDynParams.strBody3rdData(idB+1).strAttData.dTimeLowBound        = [];
-                strDynParams.strBody3rdData(idB+1).strAttData.dTimeUpBound         = [];
+            catch objError
+                warning("EphemeridesDataFactory: Failed to fit attitude data for 3rd body %d due to error: %s. \nSkipping attitude fitting.", ui32BodyIdx, string(objError.message));
+                strDynParams.strBody3rdData(ui32BodyIdx+1).strAttData.ui32PolyDeg          = 0;
+                strDynParams.strBody3rdData(ui32BodyIdx+1).strAttData.dChbvPolycoeffs      = [];
+                strDynParams.strBody3rdData(ui32BodyIdx+1).strAttData.dTimeLowBound        = [];
+                strDynParams.strBody3rdData(ui32BodyIdx+1).strAttData.dTimeUpBound         = [];
             end
         end
     

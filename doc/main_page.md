@@ -191,13 +191,19 @@ same adapter and leave rates absent when their source supplies none.
 
 | Field | Contract |
 | --- | --- |
-| `dAngVel_IN` | Finite 3-by-N source attitude-model rates in inertial coordinates, in rad/s |
-| `dNominalAngVel_IN` | First source sample, retained for existing consumers |
-| `dAngVelTimegrid` | N matching epochs in the actual interpolation domain: relative seconds, absolute seconds or absolute days |
+| `enumAngularVelocityRegime` | Always present: `UNAVAILABLE`, `CONSTANT_INERTIAL` or `TIME_VARYING` (`EnumTargetAngularVelocityRegime`) |
+| `dAngVel_IN` | Finite 3-by-N source attitude-model rates in inertial coordinates, in rad/s. Present only when the regime is not `UNAVAILABLE` |
+| `dAngVelTimegrid` | N matching epochs in the actual interpolation domain: relative seconds, absolute seconds or absolute days. Present with `dAngVel_IN` |
+| `dAngVel_TB` | Optional finite 3-by-N body-frame rates, copied when the source supplies them |
+| `dTargetSpinAxis_TB`, `charTargetSpinAxisSource` | Optional pair: a unit body-frame spin axis and its source. Absent when no single axis is known, for example for SPICE frames |
 
-Timegrid scaling does not rescale the rates. A source without rate data clears
-these three fields from a reused dynamics structure, while retaining unrelated
-attitude metadata. The rates follow
+The factory checks the declared regime against every rate sample and rejects a
+mismatch. It no longer writes the first-sample `dNominalAngVel_IN`. Timegrid
+scaling does not rescale the rates. On a reused dynamics structure the factory
+replaces these fields, so no field from the previous source survives, while it
+keeps unrelated attitude metadata. `DefineEnvironmentProperties` with
+`bLoadTargetRotationalState=false` skips the target attitude, rate and spin
+axis, for generated histories that bring their own. The rates follow
 `R_INfromTB(t) = Exp(+omega_IN*t) R_INfromTB(0)`: they are the angular velocity
 of the target body frame relative to the inertial frame, in inertial coordinates.
 

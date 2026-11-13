@@ -2,12 +2,12 @@ function [strDynParams, strMainBodyRefData, str3rdBodyRefData] = DefineEnvironme
                                                                                           enumScenarioName, ...
                                                                                           charInertialFrame, ...
                                                                                           kwargs)
-arguments
+arguments (Input)
     dEphemeridesTimegrid  (1,:) double 
     enumScenarioName    EnumScenarioName {mustBeA(enumScenarioName, ["EnumScenarioName", "string", "char"])} = EnumScenarioName.Itokawa
     charInertialFrame   (1,:) char {mustBeA(charInertialFrame, ["string", "char"])} = "J2000"
 end
-arguments
+arguments (Input)
     kwargs.strDynParams                     (1,1) struct = struct()    % Initialization value
     kwargs.str3rdBodyRefData                (1,1) struct = struct()    % Initialization value
     kwargs.bAddNonSphericalGravityCoeffs    (1,1) logical = false;
@@ -16,6 +16,7 @@ arguments
     kwargs.ui16MaxSHdegree                  (1,1) uint16 = uint16(4)
     kwargs.cellAdditionalBodiesNames        (1,:) string {mustBeA(kwargs.cellAdditionalBodiesNames, ["string", "char"])} = string.empty(0, 1)
     kwargs.bAdd3rdBodiesAttitude            (1,1) logical = true; % If true, attitude data will be added to str3rdBodyRefData
+    kwargs.bLoadTargetRotationalState       (1,1) logical = true;
     kwargs.bUseKilometersScale              (1,1) logical = false;
     kwargs.charSCpanelObjFilePath           (1,:) string {mustBeA(kwargs.charSCpanelObjFilePath, ["string", "char"])} = ""
     kwargs.bBuildSCpanelSRPdata             (1,1) logical = false
@@ -33,10 +34,10 @@ arguments
     kwargs.dPolyhedronMeshSimplifyFactor    (1,1) double {mustBeFinite} = 1.0
 end
 %% SIGNATURE
-% [strDynParams, strAdditionalData] = DefineEnvironmentProperties(dEphemeridesTimegrid, ...
-%                                                                 enumScenarioName, ...
-%                                                                 charInertialFrame, ...
-%                                                                 kwargs)
+% [strDynParams, strMainBodyRefData, str3rdBodyRefData] = DefineEnvironmentProperties(dEphemeridesTimegrid, ...
+%                                                                                       enumScenarioName, ...
+%                                                                                       charInertialFrame, ...
+%                                                                                       kwargs)
 % -------------------------------------------------------------------------------------------------------------
 %% DESCRIPTION
 % Define scenario dynamics and use SPICE or a supplied dataset for Sun and target-attitude ephemerides.
@@ -54,24 +55,29 @@ end
 % kwargs.ui16MaxSHdegree                 (1,1) uint16 = uint16(4); 0 disables SH data.
 % kwargs.cellAdditionalBodiesNames       (1,:) string {mustBeA(kwargs.cellAdditionalBodiesNames, ["string", "char"])} = string.empty(0, 1)
 % kwargs.bAdd3rdBodiesAttitude           (1,1) logical = true; % If true, attitude data will be added to str3rdBodyRefData
+% kwargs.bLoadTargetRotationalState      (1,1) logical = true; false skips only the target attitude, rate and spin-axis loading
 % kwargs.bUseKilometersScale             (1,1) logical = false;
 % -------------------------------------------------------------------------------------------------------------
 %% OUTPUT
-% strDynParams
-% strAdditionalData
+% strDynParams          Scenario dynamics: target, Sun, 3rd bodies, SRP and spacecraft data.
+% strMainBodyRefData    Target source data: Sun position and, when loaded, the target attitude, its rate regime and
+%                       rates, and the optional spin axis with its source.
+% str3rdBodyRefData     3rd-body source positions and attitudes.
 % -------------------------------------------------------------------------------------------------------------
 %% CHANGELOG
-% 18-09-2026    Pietro Califano, Codex gpt-5.6     Label default SRP area in the selected dynamics units.
 % 19-02-2025    Pietro Califano     First version copy-pasting previous implementation
 % 14-03-2025    Pietro Califano     Move code to CScenarioGenerator static method for standardization
 % 21-07-2025    Pietro Califano     Add support for 3rd body reference data and generalize implementation
 % 13-08-2026    Pietro Califano, Codex gpt-5.6     Preserve source-owned target angular velocity.
 % 13-08-2026    Pietro Califano, Codex gpt-5.6     Resolve and transport target spin-axis provenance.
+% 22-08-2026    Pietro Califano, Codex              Allow generated histories to skip target rotation source loading.
 % 23-08-2026    Pietro Califano, Codex              Correct SPICE rate sign for active R_INfromTB histories.
+% 18-09-2026    Pietro Califano, Codex gpt-5.6     Label default SRP area in the selected dynamics units.
 % 29-09-2026    Pietro Califano, Codex gpt-6      Clarify the SPICE rate frame and model sign.
 % -------------------------------------------------------------------------------------------------------------
 %% DEPENDENCIES
-% [-]
+% CScenarioGenerator, EnumTargetAngularVelocityRegime, BuildQuadsModelSRPDataFromObj, CShapeModel,
+% ComputeMeshModelVolumeAndCoM, MICE (SPICE path only).
 % -------------------------------------------------------------------------------------------------------------
 
 strDynParams = kwargs.strDynParams;
@@ -116,41 +122,46 @@ if kwargs.objDataset.bDefaultConstructed % Try to use SPICE kernels
             'This is being used to query CSPICE but seems too small. Make sure it is as intended!'])
     end
 
-    % Query the target attitude and its analytic frame angular velocity from
-    % the same SPICE source. No sampled-attitude differencing is used.
-    strMainBodyRefData.dDCM_INfromTB = cspice_pxform(char(charTargetFixedFrame), ...
-                                                    char(charInertialFrame), ...
-                                                    dEphemeridesTimegrid);
-    dTargetStateTransforms = cspice_sxform(char(charInertialFrame), ...
-        char(charTargetFixedFrame), dEphemeridesTimegrid);
-    [~, dTargetFrameAngVel_IN] = cspice_xf2rav(dTargetStateTransforms);
+    if kwargs.bLoadTargetRotationalState
+        % Query target attitude and its analytic frame angular velocity from
+        % the same SPICE source. No sampled-attitude differencing is used.
+        strMainBodyRefData.dDCM_INfromTB = cspice_pxform(char(charTargetFixedFrame), ...
+                                                        char(charInertialFrame), ...
+                                                        dEphemeridesTimegrid);
+        dTargetStateTransforms = cspice_sxform(char(charInertialFrame), ...
+            char(charTargetFixedFrame), dEphemeridesTimegrid);
+        [~, dTargetFrameAngVel_IN] = cspice_xf2rav(dTargetStateTransforms);
 
-    % For an IN-to-TB state transform, XF2RAV returns the angular
-    % velocity of TB relative to IN, resolved in IN. This is already the
-    % rate satisfying R_INfromTB(t) = Exp(+omega_IN*t) R_INfromTB(0).
-    strMainBodyRefData.dAngVel_IN = dTargetFrameAngVel_IN;
-    strMainBodyRefData.dSpinAxis_TB = [0.0; 0.0; 1.0];
-    strMainBodyRefData.charSpinAxisSource = "DEFAULT_PLUS_Z";
+        % For an IN-to-TB state transform, XF2RAV returns the angular
+        % velocity of TB relative to IN, resolved in IN. This is already the
+        % rate satisfying R_INfromTB(t) = Exp(+omega_IN*t) R_INfromTB(0).
+        strMainBodyRefData.dAngVel_IN = dTargetFrameAngVel_IN;
+        strMainBodyRefData.enumAngularVelocityRegime = ...
+            EnumTargetAngularVelocityRegime.Classify( ...
+            strMainBodyRefData.dAngVel_IN);
+        % Leave the optional spin axis and its source absent: a SPICE frame
+        % attitude and rate declare no physical shape or inertia axis.
+    end
 
     % Get Sun position in Inertial frame
     strMainBodyRefData.dSunPosition_IN = dUnitsScaling * cspice_spkpos('SUN', dEphemeridesTimegrid, ...
                                                 charInertialFrame, 'none', charTargetName);
 
     % Get additional bodies data if provided (Sun not included)
-    ui32NumOfAdditionalBodies = length(kwargs.cellAdditionalBodiesNames);
+    ui32NumOfAdditionalBodies = uint32(length(kwargs.cellAdditionalBodiesNames));
     bAdd3rdBodiesAttitude = kwargs.bAdd3rdBodiesAttitude;
 
-    for idB = 1:ui32NumOfAdditionalBodies
-        charAdditionalBodyName = char(kwargs.cellAdditionalBodiesNames(idB));
+    for ui32BodyIdx = uint32(1):ui32NumOfAdditionalBodies
+        charAdditionalBodyName = char(kwargs.cellAdditionalBodiesNames(ui32BodyIdx));
 
         % Try to load 3rd body positions from SPICE
         try
-            str3rdBodyRefData(idB).strOrbitData.dPosition_W = dUnitsScaling * cspice_spkpos( ...
+            str3rdBodyRefData(ui32BodyIdx).strOrbitData.dPosition_W = dUnitsScaling * cspice_spkpos( ...
                 upper(charAdditionalBodyName), dEphemeridesTimegrid, charInertialFrame, 'none', charTargetName);
-        catch ME
+        catch objError
             warning('DefineEnvironmentProperties:ThirdBodyPositionUnavailable', ...
-                'Failed to fetch %s ephemerides from SPICE: %s', charAdditionalBodyName, string(ME.message));
-            str3rdBodyRefData(idB).strOrbitData.dPosition_W = zeros(3, numel(dEphemeridesTimegrid));
+                'Failed to fetch %s ephemerides from SPICE: %s', charAdditionalBodyName, string(objError.message));
+            str3rdBodyRefData(ui32BodyIdx).strOrbitData.dPosition_W = zeros(3, numel(dEphemeridesTimegrid));
         end
 
         % Load 3rd body dynamics parameters from CScenarioGenerator database if available
@@ -158,16 +169,16 @@ if kwargs.objDataset.bDefaultConstructed % Try to use SPICE kernels
             [~, ~, strDynParams_3rdBody] = CScenarioGenerator.LoadDefaultScenarioData(charAdditionalBodyName, ...
                 struct(), "bUseKilometersScale", kwargs.bUseKilometersScale);
             
-            strDynParams.strBody3rdData(idB+1).dGM = strDynParams_3rdBody.strMainData.dGM;
-            strDynParams.strBody3rdData(idB+1).dRefRadius = strDynParams_3rdBody.strMainData.dRefRadius;
+            strDynParams.strBody3rdData(ui32BodyIdx+1).dGM = strDynParams_3rdBody.strMainData.dGM;
+            strDynParams.strBody3rdData(ui32BodyIdx+1).dRefRadius = strDynParams_3rdBody.strMainData.dRefRadius;
 
-        catch ME
+        catch objError
             warning('DefineEnvironmentProperties:ThirdBodyDefaultsUnavailable', ...
                 'Failed to load %s default dynamics data: %s. GM/radius set to zero.', ...
-                charAdditionalBodyName, string(ME.message));
+                charAdditionalBodyName, string(objError.message));
 
-            strDynParams.strBody3rdData(idB+1).dGM = 0.0;
-            strDynParams.strBody3rdData(idB+1).dRefRadius = 0.0;
+            strDynParams.strBody3rdData(ui32BodyIdx+1).dGM = 0.0;
+            strDynParams.strBody3rdData(ui32BodyIdx+1).dRefRadius = 0.0;
         end
 
         if bAdd3rdBodiesAttitude
@@ -176,11 +187,11 @@ if kwargs.objDataset.bDefaultConstructed % Try to use SPICE kernels
                 [~, charAdditionalBodyFixedFrame] = CScenarioGenerator.LoadDefaultScenarioData(charAdditionalBodyName, ...
                     struct(), "bUseKilometersScale", kwargs.bUseKilometersScale);
 
-                str3rdBodyRefData(idB).strAttData.dDCM_WfromTB = cspice_pxform(char(charAdditionalBodyFixedFrame), ...
+                str3rdBodyRefData(ui32BodyIdx).strAttData.dDCM_WfromTB = cspice_pxform(char(charAdditionalBodyFixedFrame), ...
                     char(charInertialFrame), dEphemeridesTimegrid);
-            catch ME
+            catch objError
                 warning('DefineEnvironmentProperties:ThirdBodyAttitudeUnavailable', ...
-                    'Failed to fetch %s attitude from SPICE: %s', charAdditionalBodyName, string(ME.message));
+                    'Failed to fetch %s attitude from SPICE: %s', charAdditionalBodyName, string(objError.message));
             end
         end
     end
@@ -200,51 +211,61 @@ else
     ui32EphemeridesExtractIdx = interp1(kwargs.objDataset.dTimestamps(:), 1:ui32NumEntriesInDataset, dEphTimegrid, 'nearest', 'extrap'); % Nearest index for each ephemeris time
     ui32EphemeridesExtractIdx = uint32(max(1, min(ui32NumEntriesInDataset, round(ui32EphemeridesExtractIdx)))); % Clamp to [1, N]
 
-    strMainBodyRefData.dDCM_INfromTB    = pagetranspose(kwargs.objDataset.dDCM_TBfromW(:,:,ui32EphemeridesExtractIdx));
-    strMainBodyRefData.dSunPosition_IN  = kwargs.objDataset.dSunPosition_W(:,ui32EphemeridesExtractIdx);
-    strMainBodyRefData.dSpinAxis_TB = kwargs.objDataset.dTargetSpinAxis_TB;
-    strMainBodyRefData.charSpinAxisSource = kwargs.objDataset.charTargetSpinAxisSource;
-    if not(isempty(kwargs.objDataset.dTargetAngVel_IN))
-        if size(kwargs.objDataset.dTargetAngVel_IN, 2) ~= ui32NumEntriesInDataset || ...
-                any(not(isfinite(kwargs.objDataset.dTargetAngVel_IN)), 'all')
-            error('DefineEnvironmentProperties:InvalidTargetAngularVelocity', ...
-                ['Dataset target attitude-model angular velocity must be a finite 3-by-N sequence aligned with ' ...
-                 'the dataset timestamps.']);
+    strMainBodyRefData.dSunPosition_IN  = kwargs.objDataset.dSunPosition_W(:, ui32EphemeridesExtractIdx);
+
+    if kwargs.bLoadTargetRotationalState
+        strMainBodyRefData.dDCM_INfromTB = pagetranspose( ...
+            kwargs.objDataset.dDCM_TBfromW(:, :, ui32EphemeridesExtractIdx));
+        strMainBodyRefData.dSpinAxis_TB = kwargs.objDataset.dTargetSpinAxis_TB;
+        strMainBodyRefData.charSpinAxisSource = kwargs.objDataset.charTargetSpinAxisSource;
+        if not(isempty(kwargs.objDataset.dTargetAngVel_IN))
+            if size(kwargs.objDataset.dTargetAngVel_IN, 2) ~= ui32NumEntriesInDataset || ...
+                    any(not(isfinite(kwargs.objDataset.dTargetAngVel_IN)), 'all')
+                error('DefineEnvironmentProperties:InvalidTargetAngularVelocity', ...
+                    ['Dataset target attitude-model angular velocity must be a finite 3-by-N sequence aligned with ' ...
+                     'the dataset timestamps.']);
+            end
+            strMainBodyRefData.dAngVel_IN = ...
+                kwargs.objDataset.dTargetAngVel_IN(:, ui32EphemeridesExtractIdx);
+            strMainBodyRefData.enumAngularVelocityRegime = ...
+                EnumTargetAngularVelocityRegime.Classify( ...
+                strMainBodyRefData.dAngVel_IN);
+        else
+            strMainBodyRefData.enumAngularVelocityRegime = ...
+                EnumTargetAngularVelocityRegime.UNAVAILABLE;
         end
-        strMainBodyRefData.dAngVel_IN = ...
-            kwargs.objDataset.dTargetAngVel_IN(:, ui32EphemeridesExtractIdx);
     end
 
     % Get additional bodies data if provided (Sun not included)
-    ui32NumOfAdditionalBodies = length(kwargs.objDataset.cellAdditionalBodiesTags);
+    ui32NumOfAdditionalBodies = uint32(length(kwargs.objDataset.cellAdditionalBodiesTags));
     bAdd3rdBodiesAttitude = not(isempty(kwargs.objDataset.cellAdditionalBodiesDCM_TBfromW)) && kwargs.bAdd3rdBodiesAttitude;
 
-    for idB = 1:ui32NumOfAdditionalBodies
+    for ui32BodyIdx = uint32(1):ui32NumOfAdditionalBodies
 
-        if not(isempty(kwargs.objDataset.cellAdditionalBodiesPos_W{idB}))
+        if not(isempty(kwargs.objDataset.cellAdditionalBodiesPos_W{ui32BodyIdx}))
             % Store data in struct for ephemerides factory
-            str3rdBodyRefData(idB).strOrbitData.dPosition_W  = kwargs.objDataset.cellAdditionalBodiesPos_W{idB}(:,ui32EphemeridesExtractIdx);
+            str3rdBodyRefData(ui32BodyIdx).strOrbitData.dPosition_W  = kwargs.objDataset.cellAdditionalBodiesPos_W{ui32BodyIdx}(:, ui32EphemeridesExtractIdx);
         end
         
-        if bAdd3rdBodiesAttitude && not(isempty(kwargs.objDataset.cellAdditionalBodiesDCM_TBfromW{idB}))
-            str3rdBodyRefData(idB).strAttData.dDCM_WfromTB = pagetranspose(kwargs.objDataset.cellAdditionalBodiesDCM_TBfromW{idB}(:,:,ui32EphemeridesExtractIdx));
+        if bAdd3rdBodiesAttitude && not(isempty(kwargs.objDataset.cellAdditionalBodiesDCM_TBfromW{ui32BodyIdx}))
+            str3rdBodyRefData(ui32BodyIdx).strAttData.dDCM_WfromTB = pagetranspose(kwargs.objDataset.cellAdditionalBodiesDCM_TBfromW{ui32BodyIdx}(:, :, ui32EphemeridesExtractIdx));
         end
 
         try
-            charTargetName = kwargs.objDataset.cellAdditionalBodiesTags{idB};
+            charTargetName = kwargs.objDataset.cellAdditionalBodiesTags{ui32BodyIdx};
             fprintf('\nLoading additional body %s data from CScenarioGenerator database...', charTargetName);
             [charTargetName, charTargetFixedFrame, strDynParams_3rdBody] = CScenarioGenerator.LoadDefaultScenarioData(charTargetName, ...
                                                                                                     "bUseKilometersScale", kwargs.bUseKilometersScale);
 
             % Add GM information if available to scenario generator
-            strDynParams.strBody3rdData(idB+1).dGM        = strDynParams_3rdBody.strMainData.dGM;
-            strDynParams.strBody3rdData(idB+1).dRefRadius = strDynParams_3rdBody.strMainData.dRefRadius;
+            strDynParams.strBody3rdData(ui32BodyIdx+1).dGM        = strDynParams_3rdBody.strMainData.dGM;
+            strDynParams.strBody3rdData(ui32BodyIdx+1).dRefRadius = strDynParams_3rdBody.strMainData.dRefRadius;
 
-        catch ME
-            warning('ERROR occurred while assigning data of 3rd bodies: %s.\nBody %s not available in CScenarioGenerator. GM will be set to zero.', string(ME.message), charTargetName);
+        catch objError
+            warning('ERROR occurred while assigning data of 3rd bodies: %s.\nBody %s not available in CScenarioGenerator. GM will be set to zero.', string(objError.message), charTargetName);
             % If not available, set to zero
-            strDynParams.strBody3rdData(idB+1).dGM = 0.0;
-            strDynParams.strBody3rdData(idB+1).dRefRadius = 0.0;
+            strDynParams.strBody3rdData(ui32BodyIdx+1).dGM = 0.0;
+            strDynParams.strBody3rdData(ui32BodyIdx+1).dRefRadius = 0.0;
         end
     end
 
@@ -269,8 +290,8 @@ fprintf('\nAverage distance from the SUN in AU: %3.4f AU\n', dDistFromSunAU);
 % Add Sun gravity parameter
 try
     strDynParams.strBody3rdData(1).dGM = cspice_bodvrd('SUN', 'GM', 1) * (dUnitsScaling^3); 
-catch ME
-    warning('ERROR occurred while fetching Sun GM: %s. Setting to default value in m^3/s^2.', string(ME.message));
+catch objError
+    warning('ERROR occurred while fetching Sun GM: %s. Setting to default value in m^3/s^2.', string(objError.message));
     % If not available, set to default value
     strDynParams.strBody3rdData(1).dGM = (dUnitsScaling^3) * 1.32712440041279419 * 1E11; % [km^3/s^2] or [m^3/s^2] - JPL DE440
 end
