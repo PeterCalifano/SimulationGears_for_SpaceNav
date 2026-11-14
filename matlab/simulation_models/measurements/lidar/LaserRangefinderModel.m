@@ -16,6 +16,7 @@ function [dMeasDistance, bInsersectionFlag, bValidityFlag, dIntersectionPoint, d
 % Apply configured white noise and bias only after a geometric hit. Return an
 % invalid measurement on a miss, even when range-validity checks are disabled.
 % Keep sensor and geometry inputs in the same length unit.
+% Enforce the inclusive physical interval on the noiseless intersection before adding sensor error.
 % -------------------------------------------------------------------------------------------------------------
 %% INPUT
 % strTargetModelData      Prepared strRayData, or raw vertices and triangle indices.
@@ -32,7 +33,7 @@ function [dMeasDistance, bInsersectionFlag, bValidityFlag, dIntersectionPoint, d
 %% OUTPUT
 % dMeasDistance       Range including enabled sensor error [length]; -1 on a miss.
 % bInsersectionFlag   Geometric hit flag; retain the existing public spelling.
-% bValidityFlag       Measurement satisfies geometry and enabled range checks.
+% bValidityFlag       Noiseless hit satisfies physical bounds and measured output is finite/nonnegative.
 % dIntersectionPoint  (3,1) Geometric target-frame hit [length]; zero on a miss.
 % dMeasErr            Realized additive sensor error [length].
 % -------------------------------------------------------------------------------------------------------------
@@ -42,6 +43,8 @@ function [dMeasDistance, bInsersectionFlag, bValidityFlag, dIntersectionPoint, d
 % 24-08-2026    Pietro Califano, Codex gpt-5.6     Reject ranges outside either validity bound.
 % 05-10-2026    Pietro Califano, Codex (GPT-6)  Trace the closest forward surface without centre clipping.
 % 08-10-2026    Pietro Califano, Codex (GPT-6)  Share sensor policy with direct-array MEX entry points.
+% 28-10-2026    Pietro Califano, Codex (GPT-6)  Document physical acquisition bounds independently of
+%                                               sensor error.
 % -------------------------------------------------------------------------------------------------------------
 %% DEPENDENCIES
 % RayTraceTriangMesh, ApplyLidarMeasurementError.

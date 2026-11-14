@@ -104,11 +104,11 @@ strRngBeforeMiss = rng;
 assert(~bHit && ~bValid && dRange == -1 && dError == 0 && all(dPoint == 0));
 assert(isequal(rng, strRngBeforeMiss));
 
-% Include both range endpoints after sensor bias is applied.
+% A physical endpoint remains valid when sensor bias moves the reported range outside its interval.
 for dBound = [2, 3]
     [dRange, bHit, bValid, ~, dError] = LaserRangefinderModel( ...
         strMesh, [0;0;1], [0.2;0.2;0], 0, dBound - 2, zeros(3, 1), ...
-        [dBound;dBound], true, false, true);
+        [2;2], true, false, true);
     assert(bHit && bValid && dRange == dBound && dError == dBound - 2);
 end
 
@@ -163,7 +163,7 @@ assert(~isfield(strNested.objShape, 'strRayCache_'));
 assert(~contains(CBaseDatastruct.toJsonStatic(objShape), 'strRayCache_'));
 assert(~contains(CBaseDatastruct.toYamlStatic(objShape), 'strRayCache_'));
 charSavedShape = [tempname, '.mat'];
-objSaveCleanup = onCleanup(@() delete(charSavedShape)); %#ok<NASGU>
+objSaveCleanup = onCleanup(@() delete(charSavedShape));
 save(charSavedShape, 'objShape');
 strLoaded = load(charSavedShape, 'objShape');
 assert(~isfield(strLoaded.objShape.getRayTracingModel(), 'strRayData'));
@@ -183,7 +183,7 @@ assert(~isfield(strCleared, 'strRayData') && isempty(strCleared.dVerticesPositio
 
 % Compare random queries against the flat oracle in identical transformed units.
 strInitialRng = rng;
-objRandomCleanup = onCleanup(@() rng(strInitialRng)); %#ok<NASGU>
+objRandomCleanup = onCleanup(@() rng(strInitialRng));
 rng(58031, 'twister');
 dRandomFaces = randn(3, 3, 96);
 dOrigins = 3*randn(3, 512);

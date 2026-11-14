@@ -37,7 +37,7 @@ strTargetModelData = BuildSingleTriangleTarget_();
 
 [dMeasuredRange, bIntersection, bValid] = LaserRangefinderModel( ...
     strTargetModelData, [1.0; 0.0; 0.0], [-10.0; 0.0; 0.0], 0.0, 0.0, ...
-    zeros(3,1), [0.0; 5.0], false, false, true);
+    zeros(3, 1), [0.0; 5.0], false, false, true);
 
 verifyTrue(testCase, bIntersection);
 verifyGreaterThan(testCase, dMeasuredRange, 5.0);
@@ -49,7 +49,7 @@ strTargetModelData = BuildSingleTriangleTarget_();
 
 [dMeasuredRange, bIntersection, bValid] = LaserRangefinderModel( ...
     strTargetModelData, [1.0; 0.0; 0.0], [-10.0; 0.0; 0.0], 0.0, 0.0, ...
-    zeros(3,1), [9.5; 20.0], false, false, true);
+    zeros(3, 1), [9.5; 20.0], false, false, true);
 
 verifyTrue(testCase, bIntersection);
 verifyLessThan(testCase, dMeasuredRange, 9.5);
@@ -131,21 +131,22 @@ for bPrepared = [false, true]
 end
 end
 
-function testIncludesBiasedIntervalEndpoints_(objTestCase)
+function testPhysicalEndpointRemainsValidWithSensorBias_(objTestCase)
 %% SIGNATURE
-% testIncludesBiasedIntervalEndpoints_(objTestCase)
+% testPhysicalEndpointRemainsValidWithSensorBias_(objTestCase)
 % -------------------------------------------------------------------------------------------------------------
 %% DESCRIPTION
-% Include both range endpoints after applying the configured sensor bias.
+% Keep an inclusive physical endpoint valid when sensor bias moves the reported range outside that interval.
 % -------------------------------------------------------------------------------------------------------------
 %% INPUT
 % objTestCase  MATLAB assertion owner.
 % -------------------------------------------------------------------------------------------------------------
 %% OUTPUT
-% None; verify biased ranges at both inclusive endpoints.
+% None; verify reported ranges and unchanged physical endpoint acceptance.
 % -------------------------------------------------------------------------------------------------------------
 %% CHANGELOG
 % 08-10-2026  Pietro Califano, Codex (GPT-6)  Check validity after realized sensor error.
+% 28-10-2026  Pietro Califano, Codex (GPT-6)  Separate physical endpoint validity from realized sensor error.
 % -------------------------------------------------------------------------------------------------------------
 %% DEPENDENCIES
 % BuildSingleTriangleTarget_, LaserRangefinderModel.
@@ -155,7 +156,7 @@ strMesh = BuildSingleTriangleTarget_();
 for dBias = [1, 2]
     [dRange, bHit, bValid, ~, dError] = LaserRangefinderModel( ...
         strMesh, [1; 0; 0], [-10; 0; 0], 0, dBias, zeros(3, 1), ...
-        [10; 11], true, false, true);
+        [9; 9], true, false, true);
 
     objTestCase.verifyTrue(bHit && bValid);
     objTestCase.verifyEqual(dRange, 9 + dBias);

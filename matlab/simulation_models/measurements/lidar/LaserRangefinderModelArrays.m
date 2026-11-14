@@ -27,18 +27,19 @@ function [dMeasDistance, bInsersectionFlag, bValidityFlag, dIntersectionPoint, d
 % dSensorOrigin           (3,1) ray origin in that frame and length unit.
 % dWhiteNoiseSigma        Sensor white-noise standard deviation.
 % dConstantBias           Additive sensor bias.
-% dValidInterval          (2,1) inclusive measured-range bounds.
+% dValidInterval          (2,1) inclusive physical bounds on the noiseless range.
 % bEnableNoise/Checks     Enable the existing sensor-error and validity policies.
 % -------------------------------------------------------------------------------------------------------------
 %% OUTPUT
 % dMeasDistance           Measured range; -1 on a geometric miss.
 % bInsersectionFlag       Geometric hit flag; preserve the public spelling.
-% bValidityFlag           Measurement passes geometry and enabled range checks.
+% bValidityFlag           Noiseless hit passes physical bounds and measured output is finite/nonnegative.
 % dIntersectionPoint      (3,1) geometric hit point; zero on a miss.
 % dMeasErr                Realized additive sensor error; zero on a miss.
 % -------------------------------------------------------------------------------------------------------------
 %% CHANGELOG
 % 08-10-2026  Pietro Califano, Codex (GPT-6)  Avoid struct-field copies in complete LiDAR MEX calls.
+% 28-10-2026  Pietro Califano, Codex (GPT-6)  Document the shared physical acquisition policy.
 % -------------------------------------------------------------------------------------------------------------
 %% DEPENDENCIES
 % TraceTriangleRayArrays, ApplyLidarMeasurementError.
@@ -73,6 +74,8 @@ arguments (Output)
     dIntersectionPoint (3, 1) double
     dMeasErr           (1, 1) double
 end
+
+%% Function code
 
 % TODO (PC): Reduce generated MEX input-protection copies of validated geometry.
 % Keep the verified source/MEX semantics and cached geometry ownership unchanged.

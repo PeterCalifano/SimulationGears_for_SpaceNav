@@ -6,8 +6,10 @@ function [dMeasDistance, bValidityFlag, dMeasErr] = ...
 % -------------------------------------------------------------------------------------------------------------
 %% DESCRIPTION
 % Apply the shared LiDAR noise, bias and range-validity policy after tracing.
-% A geometric miss remains invalid and consumes no noise. Range checks use
-% inclusive endpoints after the realized sensor error has been added.
+% A geometric miss remains invalid and consumes no noise. Inclusive physical range checks use the noiseless
+% intersection, so sensor error cannot create or remove physical acquisition support. Every geometric hit
+% retains its existing noise draw, including hits outside the physical interval. Invalid numeric measured
+% outputs are rejected independently of physical support.
 % -------------------------------------------------------------------------------------------------------------
 %% INPUT
 % dTrueDistance       Geometric range in the mesh length unit.
@@ -20,11 +22,13 @@ function [dMeasDistance, bValidityFlag, dMeasErr] = ...
 % -------------------------------------------------------------------------------------------------------------
 %% OUTPUT
 % dMeasDistance       Measured range; -1 on a geometric miss.
-% bValidityFlag       Measurement satisfies geometry and enabled range checks.
+% bValidityFlag       Geometry satisfies enabled physical bounds and the realized measurement is
+%                     finite/nonnegative.
 % dMeasErr            Realized additive sensor error; zero on a miss.
 % -------------------------------------------------------------------------------------------------------------
 %% CHANGELOG
 % 08-10-2026  Pietro Califano, Codex (GPT-6)  Share sensor policy across codegen interfaces.
+% 28-10-2026  Pietro Califano, Codex (GPT-6)  Check physical support before noise without changing hit draws.
 % -------------------------------------------------------------------------------------------------------------
 %% DEPENDENCIES
 % LaserRangefinderNoiseModel.
@@ -46,6 +50,8 @@ arguments (Output)
     dMeasErr       (1, 1) double
 end
 
+%% Function code
+
 % Return the geometric miss before advancing the sensor's random stream.
 dMeasDistance = -1;
 bValidityFlag = false;
@@ -55,19 +61,20 @@ if ~bIntersectionFlag
     return
 end
 
-% Apply one authoritative noise model to valid geometric returns.
+% Resolve acquisition support before noise while retaining every geometric hit's draw schedule.
+bValidityFlag = isfinite(dTrueDistance) && dTrueDistance >= 0;
+if bEnableChecks
+    bValidityFlag = bValidityFlag && dTrueDistance >= dValidInterval(1) && ...
+        dTrueDistance <= dValidInterval(2);
+end
+
+% A hit outside physical support still consumes the same sensor-noise draw as an in-range hit.
 if bEnableNoise
     dMeasErr = LaserRangefinderNoiseModel(dWhiteNoiseSigma, dTrueDistance, dConstantBias);
 end
 
 dMeasDistance = dTrueDistance + dMeasErr;
-bValidityFlag = true;
 
-% Keep interval acceptance independent of the geometric hit flag.
-if bEnableChecks
-    if dMeasDistance < dValidInterval(1) || dMeasDistance > dValidInterval(2) || ...
-            dMeasDistance < 0
-        bValidityFlag = false;
-    end
-end
+% Numeric output validity is independent of the inclusive physical range decision.
+bValidityFlag = bValidityFlag && isfinite(dMeasDistance) && dMeasDistance >= 0;
 end
