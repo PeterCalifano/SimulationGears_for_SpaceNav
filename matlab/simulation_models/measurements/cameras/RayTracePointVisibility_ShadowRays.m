@@ -33,10 +33,15 @@ end
 % -Preliminary checks performed:
 %   1) Points projections within field of view using pinhole projection model
 % - Intersection check performed using ray tracing to points against each triangle of the mesh, one-sided to
-%   automatically exclude back-facing triangles (normals in the same direction as the ray, withopaque body)
+%   automatically exclude back-facing triangles (normals in the same direction as the ray, with opaque body)
+%   unless bTwoSidedTest is true. The point is occluded when the camera ray crosses a triangle closer than the
+%   point by more than eps('single'); all triangles are tested.
 % - Illumination check performed using a shadow ray from point to light. Point is illuminated if shadow ray 
 %   to light does not intersect anything. Illumination check may be pre-computed if light is fixed (not done
 %   here). All points that pass both intersection checks are marked as visible.
+% - The illumination check runs for every point that the camera sees, also when its camera ray crosses no
+%   triangle at all (limb points); bSkipIlluminationCheck = true marks these points visible without it.
+% - bPointsAreMeshVertices = true excludes the triangles that contain the point from both checks.
 % -------------------------------------------------------------------------------------------------------------
 %% INPUT
 % ui32PointsIdx           (1,:) uint32
@@ -50,14 +55,16 @@ end
 % bSkipIlluminationCheck  (1,1) logical = false;
 % -------------------------------------------------------------------------------------------------------------
 %% OUTPUT
-% bPointsVisibilityMask
-% dProjectedPoints_UV
+% bAllPointsVisibilityMask  (N,1) logical visibility of every input point
+% dProjectedPoints_UV       (2,:) double pixel coordinates of the visible points
 % -------------------------------------------------------------------------------------------------------------
 %% CHANGELOG
 % 30-11-2024    Pietro Califano               New optimized version implemented from CheckLMvisibility_rayTrace
 % 02-12-2024    Pietro Califano               Unit testing completed, verification and autocoding OK
 % 10-06-2025    P. Califano, L. Cesarini.     Fix incorrect visibility conditions for edge cases (points not discarded
 %                                             by ray tracing and visible)
+% 29-10-2026    Pietro Califano, Claude Opus 5.5  Cast the shadow ray also for limb points and test every triangle
+%                                             for occlusion before the illumination check. Interface unchanged.
 % -------------------------------------------------------------------------------------------------------------
 %% DEPENDENCIES
 % RayTriangleIntersection_MollerTrumbore()
@@ -173,21 +180,17 @@ parfor idL = 1:i32NumOfPointsToTrace
         end
     end
 
-    %% Intersection computation checks
-    % DEVNOTE: may be modified to select only a subset of the triangles for further optimization
+    %% Camera ray: occlusion test against all triangles
+    % The point is hidden when the camera ray crosses a triangle closer than the point by more than
+    % eps('single'). All triangles are tested before the illumination test, so a crossing beyond the point
+    % never ends the search for an occluder in front of it.
     ui32NumTrianglesInSubset = ui32NumOfTriangles; 
-    ui32TrianglesIDsubset = 1:ui32NumOfTriangles;
-    
-    % Loop over triangles (TODO attempt to vectorize code)
     dTmpTriangleVertices = coder.nullcopy(zeros(3, 3));
     bDoRayTrace = true; % Default: perform intersection check for all triangles
-
-    % "Global" intersect flag
-    bNoIntersect = false; % Becomes true only if any triangle is intersected
+    bOccludedFromCamera = false;
 
     for id = 1:ui32NumTrianglesInSubset
 
-        idT = ui32TrianglesIDsubset(id);
         % DEVNOTE the only way to avoid broadcast arrays is to compose first vectors cointaining the indices of the vertices for each triangle.
         % Get triangle vertices ptrs
         i32triangVertPtr1_tmp = i32triangVertPtr1(id); % TODO check how to solve broadcasting problem
@@ -201,11 +204,6 @@ parfor idL = 1:i32NumOfPointsToTrace
                               i32triangVertPtr3_tmp ~= ui32PointsIdx(idL));       
         end
 
-        % Check if all three vertices of the triangle are not visible --> continue without testing the idth triangle
-        %if all( bTriangVerticesVisibilityMask([i32triangVertPtr1_tmp, i32triangVertPtr2_tmp, i32triangVertPtr3_tmp]) == false )
-        %    continue;
-        %end
-
         if bDoRayTrace == true
 
             % Get triangle vertices positions
@@ -213,88 +211,54 @@ parfor idL = 1:i32NumOfPointsToTrace
             dTmpTriangleVertices(1:3, 2) = dVerticesPos(:, i32triangVertPtr2_tmp );
             dTmpTriangleVertices(1:3, 3) = dVerticesPos(:, i32triangVertPtr3_tmp );
 
-            % Perform intersection test against mesh (1 ray 1 triangle) using one-sided test 
-            % (cull computations excluding back-facing triangles)
-    
+            % Perform intersection test against mesh (1 ray 1 triangle); one-sided test when bTwoSidedTest is
+            % false (back-facing triangles culled)
             % TODO(devDir): keep root-repo callers aligned with the 6-input
             % RayTriangleIntersection_MollerTrumbore signature.
             [bTmpIntersectFlag, ~, ~, dIntersectDistance, ~] = RayTriangleIntersection_MollerTrumbore(dCamPosition_TB, ...
-                [dPointDirFromCamX_TB(idL); dPointDirFromCamY_TB(idL); dPointDirFromCamZ_TB(idL);],  ... 
+                [dPointDirFromCamX_TB(idL); dPointDirFromCamY_TB(idL); dPointDirFromCamZ_TB(idL);], ...
                 dTmpTriangleVertices(:, 1), ...
                 dTmpTriangleVertices(:, 2), ...
                 dTmpTriangleVertices(:, 3), ...
-                bTwoSidedTest); % Normal ray, one-sided test
+                bTwoSidedTest);
 
-            bNoIntersect = bNoIntersect || bTmpIntersectFlag;
-
-            %%%%%%%%%%%%%%%%%%%%%% DEBUG %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-            % [bTmpIntersectFlag_check, ~, ~, dIntersectDistance_check] = RayTwoSidedTriangleIntersection_MollerTrembore(dCamPosition_TB, ...
-            %     [dPointDirFromCamX_TB(idL); dPointDirFromCamY_TB(idL); dPointDirFromCamZ_TB(idL);],  ... 
-            %     dTmpTriangleVertices(:, 1), dTmpTriangleVertices(:, 2), dTmpTriangleVertices(:, 3));
-
-
-            % assert(bTmpIntersectFlag == bTmpIntersectFlag_check)
-            %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-            if (dRayToPointsFromCamNorm(idL) - dIntersectDistance) > eps('single') && bTmpIntersectFlag == true
+            if bTmpIntersectFlag == true && (dRayToPointsFromCamNorm(idL) - dIntersectDistance) > eps('single')
                 % Intersection closer than point detected --> point occluded by mesh (camera does not see it)
-                assert(idT <= ui32NumOfTriangles)
-                bPointsVisibilityMask(idL) = false;
-
-                %%%%%%%%%%%%%%%%%%%%%% DEBUG %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-                % PlotRays(dCamPosition_TB, [dPointPosX_TB(idL); dPointPosY_TB(idL); dPointPosZ_TB(idL)], dIntersectPoint_TB);
-                %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+                bOccludedFromCamera = true;
                 break;
-
-            elseif (dRayToPointsFromCamNorm(idL) - dIntersectDistance) <= eps('single') && bTmpIntersectFlag == true
-                % Intersection farther than point detected --> point visible by camera
-                % Cast shadow ray to light and check for illumination occlusion
-                
-                if bSkipIlluminationCheck == true
-                    % Skip illumination check
-                    bPointsVisibilityMask(idL) = true;
-                    break;
-                end
-
-                % Compute ray direction (to Sun)
-                dSunDirFromPoint_TB = dSunPosition_TB - [dPointPosX_TB(idL); dPointPosY_TB(idL); dPointPosZ_TB(idL)];
-                dSunDirFromPoint_TB = dSunDirFromPoint_TB./norm(dSunDirFromPoint_TB);
-
-                % NOTE: for loop over all triangles of mesh inside (one-sided test, in principle)
-                [bLightOcclusion] = TraceShadowRay([dPointPosX_TB(idL); dPointPosY_TB(idL); dPointPosZ_TB(idL)], ...
-                                            dSunDirFromPoint_TB, ...
-                                            dVerticesPos, ...
-                                            int32(ui32NumTrianglesInSubset), ...
-                                            i32triangVertPtr1, ...
-                                            i32triangVertPtr2, ...
-                                            i32triangVertPtr3, ...
-                                            ui32PointsIdx(idL), ...
-                                            bPointsAreMeshVertices);
-
-                bPointsVisibilityMask(idL) = not(bLightOcclusion); % Point is visible if light not occluded
-                %%%%%%%%%%%%%%%%%%%%%% DEBUG %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-                % PlotRays(dCamPosition_TB, [dPointPosX_TB(idL); dPointPosY_TB(idL); dPointPosZ_TB(idL)], dIntersectPoint_TB, dSunPosition_TB);
-                %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-                if bLightOcclusion
-                    break;
-                end
-                
-            elseif id == ui32NumTrianglesInSubset && bNoIntersect == false
-                if bPointsVisibilityMask(idL) == false
-                    % No intersection detected after testing all triangles and point not occluded by mesh --> point visible
-                    bPointsVisibilityMask(idL) = true;
-                end
             end
-
-        elseif id == ui32NumTrianglesInSubset && bNoIntersect == false
-
-            % No intersection detected after testing all triangles and point not occluded by mesh AND it is part of the discarded triangles (bDoRayTrace was false)--> point visible
-            if bPointsVisibilityMask(idL) == false
-                bPointsVisibilityMask(idL) = true;
-            end
-        end % Ray trace if conditional branch
+        end
 
     end % Loop over triangles
+
+    %% Illumination: shadow ray to the Sun for every point the camera sees
+    % Cast it whether or not the camera ray crosses a triangle beyond the point, also when it crosses no
+    % triangle at all (limb points).
+    bPointIsVisible = false;
+    if bOccludedFromCamera == false
+        if bSkipIlluminationCheck == true
+            bPointIsVisible = true;
+        else
+            % Compute ray direction (to Sun)
+            dSunDirFromPoint_TB = dSunPosition_TB - [dPointPosX_TB(idL); dPointPosY_TB(idL); dPointPosZ_TB(idL)];
+            dSunDirFromPoint_TB = dSunDirFromPoint_TB./norm(dSunDirFromPoint_TB);
+
+            % NOTE: for loop over all triangles of mesh inside (two-sided test)
+            [bLightOcclusion] = TraceShadowRay([dPointPosX_TB(idL); dPointPosY_TB(idL); dPointPosZ_TB(idL)], ...
+                                        dSunDirFromPoint_TB, ...
+                                        dVerticesPos, ...
+                                        int32(ui32NumTrianglesInSubset), ...
+                                        i32triangVertPtr1, ...
+                                        i32triangVertPtr2, ...
+                                        i32triangVertPtr3, ...
+                                        ui32PointsIdx(idL), ...
+                                        bPointsAreMeshVertices);
+
+            bPointIsVisible = not(bLightOcclusion); % Point is visible if light not occluded
+        end
+    end
+
+    bPointsVisibilityMask(idL) = bPointIsVisible;
 
 end % Parallelized Loop over points to trace
 
